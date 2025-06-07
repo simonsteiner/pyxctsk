@@ -106,7 +106,7 @@ class QRCodeSSS:
             "t": self.type.value,
         }
         if self.time_gates:
-            result["gs"] = [gate.to_json_string() for gate in self.time_gates]
+            result["g"] = [gate.to_json_string() for gate in self.time_gates]
         return result
 
     @classmethod
@@ -115,8 +115,8 @@ class QRCodeSSS:
         from .task import TimeOfDay
 
         time_gates = []
-        if "gs" in data:
-            time_gates = [TimeOfDay.from_json_string(gate) for gate in data["gs"]]
+        if "g" in data:
+            time_gates = [TimeOfDay.from_json_string(gate) for gate in data["g"]]
 
         return cls(
             direction=QRCodeDirection(data["d"]),
@@ -171,22 +171,38 @@ class QRCodeTurnpoint:
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
+        # Store coordinates and metadata separately for better compatibility
         result = {
-            "y": self.lat,
-            "x": self.lon,
-            "r": self.radius,
             "n": self.name,
+            "x": self.lon,
+            "y": self.lat,
             "a": self.alt_smoothed,
+            "r": self.radius,
         }
-        if self.type != QRCodeTurnpointType.NONE:
-            result["t"] = self.type.value
         if self.description:
             result["d"] = self.description
+        if self.type != QRCodeTurnpointType.NONE:
+            result["t"] = self.type.value
         return result
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "QRCodeTurnpoint":
         """Create from dictionary."""
+        # Use individual fields for better reliability
+        lon = data.get("x", 0.0)
+        lat = data.get("y", 0.0)
+        alt_smoothed = data.get("a", 0)
+        radius = data.get("r", 1000)
+
+        # Fallback: try polyline decoding if individual fields not available
+        if "z" in data and ("x" not in data or "y" not in data):
+            coords = polyline.decode(data["z"], precision=5)
+            if coords:
+                coord = coords[0]  # Take first coordinate
+                lon, lat = coord[0], coord[1]
+                alt_smoothed = int(coord[2]) if len(coord) > 2 else 0
+                radius = int(coord[3]) if len(coord) > 3 else 1000
+
         turnpoint_type = QRCodeTurnpointType.NONE
         if "t" in data:
             turnpoint_type = QRCodeTurnpointType(data["t"])
@@ -194,11 +210,11 @@ class QRCodeTurnpoint:
         description = data.get("d")
 
         return cls(
-            lat=data["y"],
-            lon=data["x"],
-            radius=data["r"],
+            lat=lat,
+            lon=lon,
+            radius=radius,
             name=data["n"],
-            alt_smoothed=data["a"],
+            alt_smoothed=alt_smoothed,
             type=turnpoint_type,
             description=description,
         )
@@ -219,18 +235,20 @@ class QRCodeTask:
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
-        result = {"v": self.version}
+        result = {"version": self.version}
 
         if self.task_type is not None:
-            result["t"] = self.task_type.value
+            result["taskType"] = "CLASSIC" if self.task_type == QRCodeTaskType.CLASSIC else "WAYPOINTS"
         if self.earth_model is not None:
             result["e"] = self.earth_model.value
-        if self.turnpoints_polyline:
-            result["p"] = self.turnpoints_polyline
         if self.turnpoints:
-            result["tps"] = [tp.to_dict() for tp in self.turnpoints]
+            result["t"] = [tp.to_dict() for tp in self.turnpoints]
         if self.takeoff:
-            result["to"] = self.takeoff.to_dict()
+            takeoff_dict = self.takeoff.to_dict()
+            if "o" in takeoff_dict:
+                result["to"] = takeoff_dict["o"]
+            if "c" in takeoff_dict:
+                result["tc"] = takeoff_dict["c"]
         if self.sss:
             result["s"] = self.sss.to_dict()
         if self.goal:
@@ -241,11 +259,14 @@ class QRCodeTask:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "QRCodeTask":
         """Create from dictionary."""
-        version = data.get("v", QR_CODE_TASK_VERSION)
+        version = data.get("version", QR_CODE_TASK_VERSION)
 
         task_type = None
-        if "t" in data:
-            task_type = QRCodeTaskType(data["t"])
+        if "taskType" in data:
+            if data["taskType"] == "CLASSIC":
+                task_type = QRCodeTaskType.CLASSIC
+            elif data["taskType"] == "W":
+                task_type = QRCodeTaskType.WAYPOINTS
 
         earth_model = None
         if "e" in data:
@@ -254,12 +275,17 @@ class QRCodeTask:
         turnpoints_polyline = data.get("p")
 
         turnpoints = []
-        if "tps" in data:
-            turnpoints = [QRCodeTurnpoint.from_dict(tp) for tp in data["tps"]]
+        if "t" in data:
+            turnpoints = [QRCodeTurnpoint.from_dict(tp) for tp in data["t"]]
 
         takeoff = None
-        if "to" in data:
-            takeoff = QRCodeTakeoff.from_dict(data["to"])
+        if "to" in data or "tc" in data:
+            takeoff_data = {}
+            if "to" in data:
+                takeoff_data["o"] = data["to"]
+            if "tc" in data:
+                takeoff_data["c"] = data["tc"]
+            takeoff = QRCodeTakeoff.from_dict(takeoff_data)
 
         sss = None
         if "s" in data:
@@ -491,6 +517,7 @@ class QRCodeTask:
                 type=sss_type,
                 direction=direction,
                 time_gates=self.sss.time_gates,
+                time_close=None,  # QR code format doesn't include time_close
             )
 
         # Convert goal
