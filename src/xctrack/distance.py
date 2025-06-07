@@ -49,7 +49,8 @@ def optimized_distance(turnpoints: List[TaskTurnpoint], angle_step: int = DEFAUL
     """Compute the fully optimized distance through turnpoints using Dynamic Programming.
     
     This algorithm finds the shortest possible route through all turnpoint cylinders
-    by computing the optimal path from perimeter to perimeter.
+    starting from the center of the take-off and computing the optimal path to 
+    perimeters of subsequent turnpoints.
     
     Args:
         turnpoints: List of TaskTurnpoint objects
@@ -75,7 +76,12 @@ def optimized_distance(turnpoints: List[TaskTurnpoint], angle_step: int = DEFAUL
     # Initialize distance table: list of dicts for each turnpoint
     # dp[i][point] = minimum distance to reach 'point' on turnpoint i
     dp = [{} for _ in turnpoints]
-    dp[0] = {p: 0 for p in perimeters[0]}  # distance from start is 0
+    
+    # The first turnpoint (takeoff) is the starting point - distance 0
+    dp[0] = {p: 0 for p in perimeters[0]}
+    
+    # Get the center of the take-off for use in calculating distances to subsequent turnpoints
+    takeoff_center = turnpoints[0].center
 
     # Fill DP table using dynamic programming
     for i in range(1, len(turnpoints)):
@@ -84,12 +90,26 @@ def optimized_distance(turnpoints: List[TaskTurnpoint], angle_step: int = DEFAUL
         
         for curr_pt in perimeters[i]:
             min_dist = float("inf")
-            # Check all possible previous points
-            for prev_pt, prev_dist in dp[i - 1].items():
-                leg_distance = geodesic(prev_pt, curr_pt).meters
-                total_distance = prev_dist + leg_distance
-                if total_distance < min_dist:
-                    min_dist = total_distance
+            
+            if i == 1:
+                # For the first actual turnpoint, calculate distance from takeoff center
+                # If takeoff center is inside the turnpoint cylinder, distance is 0
+                distance_to_center = geodesic(takeoff_center, turnpoints[i].center).meters
+                if distance_to_center <= turnpoints[i].radius:
+                    # Takeoff center is inside the cylinder, minimum distance is 0
+                    min_dist = 0
+                else:
+                    # Calculate distance from takeoff center to perimeter
+                    leg_distance = geodesic(takeoff_center, curr_pt).meters
+                    min_dist = leg_distance
+            else:
+                # For subsequent turnpoints, use normal DP approach
+                for prev_pt, prev_dist in dp[i - 1].items():
+                    leg_distance = geodesic(prev_pt, curr_pt).meters
+                    total_distance = prev_dist + leg_distance
+                    if total_distance < min_dist:
+                        min_dist = total_distance
+            
             dp[i][curr_pt] = min_dist
 
     # Find the shortest distance to any point on the last cylinder
@@ -245,7 +265,8 @@ def optimized_route_coordinates(turnpoints: List[TaskTurnpoint], angle_step: int
     """Compute the fully optimized route coordinates through turnpoints using Dynamic Programming.
     
     This algorithm finds the shortest possible route through all turnpoint cylinders
-    and returns the actual coordinates of the optimal path.
+    and returns the actual coordinates of the optimal path. The route starts from the
+    center of the take-off turnpoint.
     
     Args:
         turnpoints: List of TaskTurnpoint objects
@@ -265,18 +286,37 @@ def optimized_route_coordinates(turnpoints: List[TaskTurnpoint], angle_step: int
     dp = [{} for _ in turnpoints]
     dp[0] = {p: (0, None) for p in perimeters[0]}  # distance from start is 0, no previous point
 
+    # Get the center of the take-off for use in calculating distances to subsequent turnpoints
+    takeoff_center = turnpoints[0].center
+
     # Fill DP table using dynamic programming
     for i in range(1, len(turnpoints)):
         for curr_pt in perimeters[i]:
             min_dist = float("inf")
             best_prev_pt = None
-            # Check all possible previous points
-            for prev_pt, (prev_dist, _) in dp[i - 1].items():
-                leg_distance = geodesic(prev_pt, curr_pt).meters
-                total_distance = prev_dist + leg_distance
-                if total_distance < min_dist:
-                    min_dist = total_distance
-                    best_prev_pt = prev_pt
+            
+            if i == 1:
+                # For the first actual turnpoint, calculate distance from takeoff center
+                # If takeoff center is inside the turnpoint cylinder, distance is 0
+                distance_to_center = geodesic(takeoff_center, turnpoints[i].center).meters
+                if distance_to_center <= turnpoints[i].radius:
+                    # Takeoff center is inside the cylinder, minimum distance is 0
+                    min_dist = 0
+                    best_prev_pt = takeoff_center
+                else:
+                    # Calculate distance from takeoff center to perimeter
+                    leg_distance = geodesic(takeoff_center, curr_pt).meters
+                    min_dist = leg_distance
+                    best_prev_pt = takeoff_center
+            else:
+                # For subsequent turnpoints, use normal DP approach
+                for prev_pt, (prev_dist, _) in dp[i - 1].items():
+                    leg_distance = geodesic(prev_pt, curr_pt).meters
+                    total_distance = prev_dist + leg_distance
+                    if total_distance < min_dist:
+                        min_dist = total_distance
+                        best_prev_pt = prev_pt
+            
             dp[i][curr_pt] = (min_dist, best_prev_pt)
 
     # Find the optimal end point on the last cylinder

@@ -278,10 +278,11 @@ class TestDistanceFunctions:
         center_dist = distance_through_centers(turnpoints)
         opt_dist = optimized_distance(turnpoints, angle_step=10)
         
-        # Optimized should be shorter (can save ~2km with 1km radius on each end)
+        # Optimized should be shorter (starting from takeoff center, saves ~1km)
         assert opt_dist < center_dist, "Optimization should reduce distance"
         savings = center_dist - opt_dist
-        assert 1000 < savings < 3000, f"Expected ~2km savings, got {savings:.0f}m"
+        # With takeoff center start, savings should be approximately the target cylinder radius
+        assert 800 < savings < 1200, f"Expected ~1km savings (target radius), got {savings:.0f}m"
     
     def test_cumulative_distances(self):
         """Test cumulative distance calculation."""
