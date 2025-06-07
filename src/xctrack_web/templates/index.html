@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XCTrack Task Analysis</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <style>
+        .task-info {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .turnpoint-table {
+            font-size: 0.9rem;
+        }
+        .map-container {
+            height: 400px;
+            margin: 20px 0;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .qr-code-container {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .stats-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            margin: 20px 0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .upload-area:hover {
+            border-color: #007bff;
+            background-color: #f8f9fa;
+        }
+        .upload-area.dragover {
+            border-color: #007bff;
+            background-color: #e3f2fd;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <strong>XCTrack Task Analysis</strong>
+            </a>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-md-12">
+                <h1>XCTrack Competition Task Analysis</h1>
+                <p class="lead">Upload or analyze XCTrack task files with visual representation.</p>
+            </div>
+        </div>
+
+        <!-- Upload Area -->
+        <div class="row">
+            <div class="col-md-12">
+                <div class="upload-area" id="uploadArea">
+                    <input type="file" id="fileInput" accept=".xctsk,.json" style="display: none;">
+                    <i class="fas fa-cloud-upload-alt fa-3x mb-3 text-muted"></i>
+                    <h4>Upload Task File</h4>
+                    <p class="text-muted">Click here or drag and drop your .xctsk task file</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Access to Test Tasks -->
+        <div class="row">
+            <div class="col-md-12">
+                <h3>Sample Tasks</h3>
+                <div class="list-group">
+                    <a href="/task/meta" class="list-group-item list-group-item-action">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h5 class="mb-1">Meta Task (Swiss Competition)</h5>
+                            <small>132.2km</small>
+                        </div>
+                        <p class="mb-1">Paragliding competition task in Switzerland with 8 turnpoints</p>
+                        <small>Task type: Classic • Earth model: WGS84</small>
+                    </a>
+                    <a href="/task/2020-07-07" class="list-group-item list-group-item-action">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h5 class="mb-1">Alpine Task (2020-07-07)</h5>
+                            <small>17 TPs</small>
+                        </div>
+                        <p class="mb-1">Complex alpine task with multiple turnpoints in Swiss Alps</p>
+                        <small>Task type: Classic • Earth model: WGS84</small>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Task Display Area -->
+        <div id="taskDisplay" style="display: none;">
+            <hr class="my-5">
+            <div id="taskContent">
+                <!-- Task content will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // File upload handling
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const taskDisplay = document.getElementById('taskDisplay');
+        const taskContent = document.getElementById('taskContent');
+
+        uploadArea.addEventListener('click', () => fileInput.click());
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFileUpload(files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFileUpload(e.target.files[0]);
+            }
+        });
+
+        function handleFileUpload(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                } else {
+                    displayTask(data);
+                }
+            })
+            .catch(error => {
+                alert('Error uploading file: ' + error);
+            });
+        }
+
+        function displayTask(taskData) {
+            const html = generateTaskHTML(taskData);
+            taskContent.innerHTML = html;
+            taskDisplay.style.display = 'block';
+            
+            // Initialize map
+            if (taskData.turnpoints.length > 0) {
+                initializeMap(taskData.turnpoints);
+            }
+            
+            // Smooth scroll to task display
+            taskDisplay.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function generateTaskHTML(task) {
+            return `
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="task-info">
+                            <h2>Task Information</h2>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p><strong>Task Type:</strong> ${task.taskType}</p>
+                                    <p><strong>Version:</strong> ${task.version}</p>
+                                    <p><strong>Earth Model:</strong> ${task.earthModel || 'Not specified'}</p>
+                                </div>
+                                <div class="col-md-6">
+                                    ${task.takeoff ? `
+                                        <p><strong>Take-off Open:</strong> ${task.takeoff.timeOpen || 'Not specified'}</p>
+                                        <p><strong>Take-off Close:</strong> ${task.takeoff.timeClose || 'Not specified'}</p>
+                                    ` : ''}
+                                    ${task.sss ? `
+                                        <p><strong>SSS Open:</strong> ${task.sss.timeGates.join(', ') || 'Not specified'}</p>
+                                        <p><strong>Start Type:</strong> ${task.sss.type}</p>
+                                    ` : ''}
+                                    ${task.goal ? `
+                                        <p><strong>Goal Type:</strong> ${task.goal.type || 'Not specified'}</p>
+                                        <p><strong>Task Deadline:</strong> ${task.goal.deadline || 'Not specified'}</p>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="stats-card">
+                            <h3>Task Statistics</h3>
+                            <p class="h4 mb-2">${task.stats.totalDistance} km</p>
+                            <p class="mb-1">Total Distance</p>
+                            <p class="h5 mb-2">${task.stats.turnpointCount} Turnpoints</p>
+                            <p class="mb-0">Task Complexity</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-12">
+                        <div id="mapContainer" class="map-container"></div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-12">
+                        <h3>Turnpoints</h3>
+                        <div class="table-responsive">
+                            <table class="table table-striped turnpoint-table">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Name</th>
+                                        <th>Description</th>
+                                        <th>Radius (m)</th>
+                                        <th>Distance (km)</th>
+                                        <th>Cumulative (km)</th>
+                                        <th>Type</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${task.turnpoints.map(tp => `
+                                        <tr>
+                                            <td>${tp.index + 1}</td>
+                                            <td><strong>${tp.name}</strong></td>
+                                            <td>${tp.description}</td>
+                                            <td>${tp.radius}</td>
+                                            <td>${tp.distance}</td>
+                                            <td>${tp.cumulative_distance}</td>
+                                            <td><span class="badge bg-${getTypeColor(tp.type)}">${tp.type || 'Turnpoint'}</span></td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="qr-code-container">
+                            <h3>QR Code</h3>
+                            <div id="qrCodeArea">
+                                <button class="btn btn-primary" onclick="generateQRCode()">Generate QR Code</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <h3>Export Options</h3>
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-outline-primary" onclick="downloadJSON()">Download as JSON</button>
+                            <button class="btn btn-outline-success" onclick="downloadKML()">Download as KML</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function getTypeColor(type) {
+            switch(type) {
+                case 'TAKEOFF': return 'success';
+                case 'SSS': return 'primary';
+                case 'ESS': return 'warning';
+                default: return 'secondary';
+            }
+        }
+
+        function initializeMap(turnpoints) {
+            // Calculate bounds
+            const lats = turnpoints.map(tp => tp.lat);
+            const lons = turnpoints.map(tp => tp.lon);
+            const bounds = [
+                [Math.min(...lats), Math.min(...lons)],
+                [Math.max(...lats), Math.max(...lons)]
+            ];
+
+            // Initialize map
+            const map = L.map('mapContainer').fitBounds(bounds, { padding: [20, 20] });
+            
+            // Add tile layer
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+
+            // Add turnpoint markers
+            turnpoints.forEach((tp, index) => {
+                const marker = L.marker([tp.lat, tp.lon]).addTo(map);
+                marker.bindPopup(`
+                    <strong>${tp.name}</strong><br>
+                    ${tp.description}<br>
+                    Alt: ${tp.alt}m<br>
+                    Radius: ${tp.radius}m<br>
+                    ${tp.type ? `Type: ${tp.type}` : ''}
+                `);
+                
+                // Add circle for turnpoint radius
+                L.circle([tp.lat, tp.lon], {
+                    radius: tp.radius,
+                    fillColor: getTypeColor(tp.type) === 'success' ? '#28a745' : 
+                              getTypeColor(tp.type) === 'primary' ? '#007bff' :
+                              getTypeColor(tp.type) === 'warning' ? '#ffc107' : '#6c757d',
+                    fillOpacity: 0.2,
+                    color: '#333',
+                    weight: 1
+                }).addTo(map);
+            });
+
+            // Draw task line
+            const taskLine = turnpoints.map(tp => [tp.lat, tp.lon]);
+            L.polyline(taskLine, {
+                color: '#dc3545',
+                weight: 3,
+                opacity: 0.8
+            }).addTo(map);
+        }
+
+        function generateQRCode() {
+            // This would call the API to generate QR code
+            // For now, show a placeholder
+            document.getElementById('qrCodeArea').innerHTML = 
+                '<p class="text-muted">QR code generation requires additional setup</p>';
+        }
+
+        function downloadJSON() {
+            alert('JSON download functionality to be implemented');
+        }
+
+        function downloadKML() {
+            alert('KML download functionality to be implemented');
+        }
+    </script>
+</body>
+</html>

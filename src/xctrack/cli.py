@@ -9,7 +9,13 @@ from .parser import parse_task
 from .utils import generate_qr_code, task_to_kml
 
 
-@click.command()
+@click.group()
+def main():
+    """XCTrack task analysis tools."""
+    pass
+
+
+@main.command()
 @click.argument("input_file", type=click.File("rb"), required=False)
 @click.option(
     "--format",
@@ -25,7 +31,7 @@ from .utils import generate_qr_code, task_to_kml
     type=click.Path(),
     help="Output file (default: stdout)",
 )
-def main(input_file, output_format: str, output_file: str) -> None:
+def convert(input_file, output_format: str, output_file: str) -> None:
     """Convert XCTrack task formats."""
     try:
         # Read input data

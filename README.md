@@ -1,8 +1,17 @@
 # Python XCTrack
 
-A Python library for parsing and manipulating XCTrack task files and formats.
+A comprehensive Python ecosystem for parsing, analyzing, and visualizing XCTrack task files and formats.
 
-This is a Python port of the Go [xctrack](https://github.com/twpayne/go-xctrack) library, providing support for:
+This repository contains two complementary modules:
+
+- **`xctrack`** - Core library for parsing and manipulating XCTrack task files
+- **`xctrack-web`** - Web interface for visual task analysis and sharing
+
+## Modules Overview
+
+### XCTrack Core (`src/xctrack/`)
+
+The core Python library providing:
 
 - Reading and writing `.xctsk` task files (JSON format)
 - Generating and parsing `XCTSK:` URLs for task sharing
@@ -10,21 +19,52 @@ This is a Python port of the Go [xctrack](https://github.com/twpayne/go-xctrack)
 - Converting tasks to KML format for visualization
 - Command-line interface for format conversion
 
+### XCTrack Web (`src/xctrack-web/`)
+
+A modern web interface providing:
+
+- Interactive task visualization with maps
+- Task file upload and analysis
+- QR code generation for XCTrack app
+- Task sharing and export features
+- RESTful API for programmatic access
+
 ## Installation
+
+### Core Library Only
 
 ```bash
 pip install xctrack
 ```
 
-For QR code image support (optional):
+### Web Interface
 
 ```bash
-pip install xctrack[qr]
+# Install core library first
+pip install xctrack
+
+# Then install web interface
+cd src/xctrack-web
+pip install -e .
+```
+
+### Development Installation
+
+```bash
+git clone https://github.com/simon/python-xctrack.git
+cd python-xctrack
+
+# Install core library in development mode
+pip install -e .
+
+# Install web interface in development mode  
+cd src/xctrack-web
+pip install -e .
 ```
 
 ## Quick Start
 
-### Reading a task file
+### Core Library Usage
 
 ```python
 from xctrack import parse_task
@@ -40,6 +80,49 @@ task = parse_task('qr_code.png')
 
 print(f"Task type: {task.task_type}")
 print(f"Number of turnpoints: {len(task.turnpoints)}")
+```
+
+### Web Interface Usage
+
+Start the web server:
+
+```bash
+xctrack-web serve
+```
+
+Or with custom settings:
+
+```bash
+xctrack-web serve --host 0.0.0.0 --port 8080 --debug
+```
+
+Then open <http://localhost:5000> in your browser to:
+
+- Upload and analyze .xctsk task files
+- View tasks on interactive maps
+- Generate QR codes for XCTrack app
+- Export tasks in multiple formats
+
+### Command Line Tools
+
+Core XCTrack CLI:
+
+```bash
+# Convert task file to JSON
+xctrack convert task.xctsk --format json
+
+# Generate QR code
+xctrack convert task.xctsk --format png --output qr.png
+```
+
+Web interface CLI:
+
+```bash
+# Start development server
+xctrack-web serve --debug
+
+# Generate deployment files
+xctrack-web install --output /etc/xctrack-web
 ```
 
 ### Creating a task
