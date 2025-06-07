@@ -202,14 +202,18 @@ class SSS:
     type: SSSType
     direction: Direction
     time_gates: List[TimeOfDay] = field(default_factory=list)
+    time_close: Optional[TimeOfDay] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
-        return {
+        result = {
             "type": self.type.value,
             "direction": self.direction.value,
             "timeGates": [gate.to_json_string() for gate in self.time_gates],
         }
+        if self.time_close:
+            result["timeClose"] = self.time_close.to_json_string()
+        return result
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "SSS":
@@ -220,10 +224,15 @@ class SSS:
                 TimeOfDay.from_json_string(gate) for gate in data["timeGates"]
             ]
 
+        time_close = None
+        if "timeClose" in data:
+            time_close = TimeOfDay.from_json_string(data["timeClose"])
+
         return cls(
             type=SSSType(data["type"]),
             direction=Direction(data["direction"]),
             time_gates=time_gates,
+            time_close=time_close,
         )
 
 
