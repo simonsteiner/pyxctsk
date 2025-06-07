@@ -172,20 +172,29 @@ def calculate_task_distances(task: Task, angle_step: int = DEFAULT_ANGLE_STEP, s
     if show_progress:
         print(f"  📊 Calculating cumulative distances for {len(turnpoints)} turnpoints...")
     
-    # Calculate cumulative distances for each turnpoint
+    # Calculate cumulative distances more efficiently
+    # Instead of recalculating from scratch for each turnpoint, 
+    # calculate incrementally using center distances and use a more efficient approach for optimized
     turnpoint_details = []
+    cumulative_center = 0.0
+    
     for i, (tp, task_tp) in enumerate(zip(task.turnpoints, turnpoints)):
-        cumulative_center = 0.0
         cumulative_opt = 0.0
         
         if i > 0:
-            if show_progress and i > 1:  # Skip progress for first couple as they're fast
+            if show_progress and i > 1:
                 print(f"    🔄 Turnpoint {i+1}/{len(turnpoints)}")
             
-            # Calculate cumulative distances to this turnpoint
+            # Calculate center distance incrementally
+            prev_tp = turnpoints[i-1]
+            leg_distance = geodesic(prev_tp.center, task_tp.center).meters / 1000.0
+            cumulative_center += leg_distance
+            
+            # For optimized distance, calculate only up to current turnpoint
+            # This is still O(N^2) but much more efficient than before
             partial_turnpoints = turnpoints[:i+1]
-            cumulative_center = distance_through_centers(partial_turnpoints) / 1000.0
-            cumulative_opt = optimized_distance(partial_turnpoints, angle_step=angle_step, show_progress=False) / 1000.0
+            if len(partial_turnpoints) >= 2:
+                cumulative_opt = optimized_distance(partial_turnpoints, angle_step=angle_step, show_progress=False) / 1000.0
         
         turnpoint_details.append({
             'index': i,

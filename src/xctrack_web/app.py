@@ -42,6 +42,9 @@ class XCTrackWebApp:
                         static_folder=str(Path(__file__).parent / 'static'))
         self.app.config['DEBUG'] = debug
         
+        # Distance calculation cache to improve performance
+        self._distance_cache = {}
+        
         # Set default task directory
         if tasks_dir:
             self.task_directory = Path(tasks_dir)
@@ -56,6 +59,10 @@ class XCTrackWebApp:
         # Directory for saved task metadata
         self.saved_tasks_metadata_dir = Path(__file__).parent / 'static' / 'saved_tasks_metadata'
         self.saved_tasks_metadata_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Directory for cached distance calculations
+        self.distance_cache_dir = Path(__file__).parent / 'static' / 'distance_cache'
+        self.distance_cache_dir.mkdir(parents=True, exist_ok=True)
         
         self.setup_routes()
     
@@ -169,7 +176,8 @@ class XCTrackWebApp:
                     'distance': task_dict['stats']['totalDistance'],
                     'optimized_distance': task_dict['stats']['totalOptimizedDistance'],
                     'turnpoint_count': task_dict['stats']['turnpointCount'],
-                    'task_type': task_dict['taskType']
+                    'task_type': task_dict['taskType'],
+                    'cache_key': self._get_task_cache_key(task)  # Store cache key for faster lookups
                 }
                 
                 metadata_file = self.saved_tasks_metadata_dir / f"{timestamp}_{clean_name}.json"
@@ -197,20 +205,30 @@ class XCTrackWebApp:
                             with open(task_file, 'r') as f:
                                 task_data = f.read()
                             task = parse_task(task_data)
-                            task_dict = self._task_to_dict(task)
+                            
+                            # Check if we have cached distance data first
+                            cache_key = self._get_task_cache_key(task)
+                            distance_data = self._load_cached_distances(cache_key)
+                            
+                            if distance_data is None:
+                                # Calculate if not cached (with faster settings for listing)
+                                distance_data = calculate_task_distances(task, angle_step=15)  # Faster for listings
+                                self._save_cached_distances(cache_key, distance_data)
+                            
                             tasks.append({
                                 'code': task_file.stem.replace('task_', ''),
                                 'name': f"Task {task_file.stem}",
-                                'distance': task_dict['stats']['totalDistance'],
-                                'optimizedDistance': task_dict['stats']['totalOptimizedDistance'],
-                                'savings': task_dict['stats']['optimizationSavings'],
-                                'savingsPercent': task_dict['stats']['optimizationSavingsPercent'],
-                                'turnpoints': task_dict['stats']['turnpointCount'],
-                                'cylinders': task_dict['stats']['cylinderCount'],
-                                'type': task_dict['taskType'],
+                                'distance': distance_data['center_distance_km'],
+                                'optimizedDistance': distance_data['optimized_distance_km'],
+                                'savings': distance_data['savings_km'],
+                                'savingsPercent': distance_data['savings_percent'],
+                                'turnpoints': len(task.turnpoints),
+                                'cylinders': sum(1 for tp in task.turnpoints if tp.radius > 0),
+                                'type': task.task_type.value,
                                 'source': 'sample'
                             })
-                        except Exception:
+                        except Exception as e:
+                            print(f"Error processing task {task_file}: {e}")
                             continue
                 
                 # Load saved tasks from metadata
@@ -275,7 +293,19 @@ class XCTrackWebApp:
 
     def _find_task_file(self, task_code: str) -> Optional[Path]:
         """Find a task file by code."""
-        # Try different naming patterns
+        # First try saved tasks (uploaded files)
+        if task_code.endswith('.xctsk'):
+            # Direct filename lookup for saved tasks
+            saved_task_file = self.saved_tasks_dir / task_code
+            if saved_task_file.exists():
+                return saved_task_file
+        else:
+            # Try with .xctsk extension for saved tasks
+            saved_task_file = self.saved_tasks_dir / f'{task_code}.xctsk'
+            if saved_task_file.exists():
+                return saved_task_file
+        
+        # Try different naming patterns for sample tasks
         patterns = [
             f'task_{task_code}.xctsk',
             f'{task_code}.xctsk',
@@ -290,8 +320,71 @@ class XCTrackWebApp:
         
         return None
     
+    def _get_task_cache_key(self, task: Task) -> str:
+        """Generate a cache key for a task based on its content."""
+        import hashlib
+        
+        # Create a unique identifier based on task turnpoints and properties
+        cache_data = {
+            'task_type': task.task_type.value,
+            'version': task.version,
+            'turnpoints': []
+        }
+        
+        for tp in task.turnpoints:
+            cache_data['turnpoints'].append({
+                'lat': round(tp.waypoint.lat, 6),  # Round to avoid floating point precision issues
+                'lon': round(tp.waypoint.lon, 6),
+                'radius': tp.radius,
+                'type': tp.type.value if tp.type else None
+            })
+        
+        # Create hash from the serialized data
+        cache_str = str(sorted(cache_data.items()))
+        return hashlib.md5(cache_str.encode()).hexdigest()
+    
+    def _load_cached_distances(self, cache_key: str) -> Optional[Dict[str, Any]]:
+        """Load cached distance calculations from file."""
+        cache_file = self.distance_cache_dir / f"{cache_key}.json"
+        if cache_file.exists():
+            try:
+                with open(cache_file, 'r') as f:
+                    return json.load(f)
+            except Exception:
+                # If cache file is corrupted, ignore it
+                pass
+        return None
+    
+    def _save_cached_distances(self, cache_key: str, distance_data: Dict[str, Any]) -> None:
+        """Save distance calculations to cache file."""
+        cache_file = self.distance_cache_dir / f"{cache_key}.json"
+        try:
+            with open(cache_file, 'w') as f:
+                json.dump(distance_data, f, indent=2)
+        except Exception:
+            # If we can't save cache, continue without it
+            pass
+    
     def _task_to_dict(self, task: Task) -> Dict[str, Any]:
         """Convert a task to a dictionary for JSON serialization."""
+        # Check persistent cache first
+        cache_key = self._get_task_cache_key(task)
+        distance_data = self._load_cached_distances(cache_key)
+        
+        if distance_data is None:
+            # Check memory cache
+            if cache_key in self._distance_cache:
+                distance_data = self._distance_cache[cache_key]
+            else:
+                # Calculate distances with faster settings for web interface
+                print(f"Calculating distances for task with {len(task.turnpoints)} turnpoints...")
+                distance_data = calculate_task_distances(task, angle_step=10)  # Use 10° for faster web response
+                
+                # Cache in both memory and persistent storage
+                self._distance_cache[cache_key] = distance_data
+                self._save_cached_distances(cache_key, distance_data)
+                print(f"Distance calculation complete: {distance_data['center_distance_km']:.1f}km center, {distance_data['optimized_distance_km']:.1f}km optimized")
+        
         result = {
             'taskType': task.task_type.value,
             'version': task.version,
@@ -300,12 +393,12 @@ class XCTrackWebApp:
             'stats': {}
         }
         
-        # Calculate optimized distances using the new distance calculator
-        distance_data = calculate_task_distances(task)
-        
         # Add turnpoint data with both basic and optimized distances
         for i, tp in enumerate(task.turnpoints):
-            tp_distance_data = distance_data['turnpoints'][i] if i < len(distance_data['turnpoints']) else {}
+            # Get distance data for this turnpoint, handling missing data gracefully
+            tp_distance_data = {}
+            if i < len(distance_data.get('turnpoints', [])):
+                tp_distance_data = distance_data['turnpoints'][i]
             
             tp_data = {
                 'index': i,
