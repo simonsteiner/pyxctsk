@@ -1,0 +1,109 @@
+{
+  "center_distance_km": 88.8,
+  "optimized_distance_km": 35.3,
+  "savings_km": 53.5,
+  "savings_percent": 60.3,
+  "turnpoints": [
+    {
+      "index": 0,
+      "name": "T03",
+      "lat": 46.70068359375,
+      "lon": 7.81991720199585,
+      "radius": 400,
+      "type": "TAKEOFF",
+      "cumulative_center_km": 0.0,
+      "cumulative_optimized_km": 0.0
+    },
+    {
+      "index": 1,
+      "name": "L04",
+      "lat": 46.68098449707031,
+      "lon": 7.823750019073486,
+      "radius": 1500,
+      "type": "SSS",
+      "cumulative_center_km": 2.2,
+      "cumulative_optimized_km": 0.3
+    },
+    {
+      "index": 2,
+      "name": "B02",
+      "lat": 46.70090103149414,
+      "lon": 7.773349761962891,
+      "radius": 1000,
+      "type": "",
+      "cumulative_center_km": 6.7,
+      "cumulative_optimized_km": 2.8
+    },
+    {
+      "index": 3,
+      "name": "B06",
+      "lat": 46.742984771728516,
+      "lon": 7.929200172424316,
+      "radius": 7500,
+      "type": "",
+      "cumulative_center_km": 19.5,
+      "cumulative_optimized_km": 7.3
+    },
+    {
+      "index": 4,
+      "name": "B02",
+      "lat": 46.70090103149414,
+      "lon": 7.773349761962891,
+      "radius": 1500,
+      "type": "",
+      "cumulative_center_km": 32.3,
+      "cumulative_optimized_km": 11.1
+    },
+    {
+      "index": 5,
+      "name": "B06",
+      "lat": 46.742984771728516,
+      "lon": 7.929200172424316,
+      "radius": 3000,
+      "type": "",
+      "cumulative_center_km": 45.1,
+      "cumulative_optimized_km": 19.4
+    },
+    {
+      "index": 6,
+      "name": "B48",
+      "lat": 46.748348236083984,
+      "lon": 7.71608304977417,
+      "radius": 7500,
+      "type": "",
+      "cumulative_center_km": 61.4,
+      "cumulative_optimized_km": 25.4
+    },
+    {
+      "index": 7,
+      "name": "B13",
+      "lat": 46.62241744995117,
+      "lon": 7.793867111206055,
+      "radius": 5500,
+      "type": "",
+      "cumulative_center_km": 76.6,
+      "cumulative_optimized_km": 31.5
+    },
+    {
+      "index": 8,
+      "name": "B01",
+      "lat": 46.69729995727539,
+      "lon": 7.851716995239258,
+      "radius": 1700,
+      "type": "ESS",
+      "cumulative_center_km": 86.0,
+      "cumulative_optimized_km": 34.3
+    },
+    {
+      "index": 9,
+      "name": "L04",
+      "lat": 46.68098449707031,
+      "lon": 7.823750019073486,
+      "radius": 200,
+      "type": "",
+      "cumulative_center_km": 88.8,
+      "cumulative_optimized_km": 35.3
+    }
+  ],
+  "optimization_angle_step": 10
+}

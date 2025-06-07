@@ -1,0 +1,119 @@
+{
+  "center_distance_km": 80.0,
+  "optimized_distance_km": 50.0,
+  "savings_km": 29.9,
+  "savings_percent": 37.4,
+  "turnpoints": [
+    {
+      "index": 0,
+      "name": "D05",
+      "lat": 42.49360275268555,
+      "lon": 12.897383689880371,
+      "radius": 0,
+      "type": "TAKEOFF",
+      "cumulative_center_km": 0.0,
+      "cumulative_optimized_km": 0.0
+    },
+    {
+      "index": 1,
+      "name": "A01",
+      "lat": 42.485084533691406,
+      "lon": 12.857166290283203,
+      "radius": 3000,
+      "type": "SSS",
+      "cumulative_center_km": 3.4,
+      "cumulative_optimized_km": 0.5
+    },
+    {
+      "index": 2,
+      "name": "A01",
+      "lat": 42.485084533691406,
+      "lon": 12.857166290283203,
+      "radius": 1000,
+      "type": "",
+      "cumulative_center_km": 3.4,
+      "cumulative_optimized_km": 2.5
+    },
+    {
+      "index": 3,
+      "name": "P66",
+      "lat": 42.458343505859375,
+      "lon": 12.926838874816895,
+      "radius": 400,
+      "type": "",
+      "cumulative_center_km": 9.9,
+      "cumulative_optimized_km": 7.7
+    },
+    {
+      "index": 4,
+      "name": "P73",
+      "lat": 42.491668701171875,
+      "lon": 12.80852222442627,
+      "radius": 1000,
+      "type": "",
+      "cumulative_center_km": 20.3,
+      "cumulative_optimized_km": 16.8
+    },
+    {
+      "index": 5,
+      "name": "D01",
+      "lat": 42.514774322509766,
+      "lon": 12.883161544799805,
+      "radius": 800,
+      "type": "",
+      "cumulative_center_km": 27.0,
+      "cumulative_optimized_km": 21.8
+    },
+    {
+      "index": 6,
+      "name": "Z03",
+      "lat": 42.5088005065918,
+      "lon": 12.75505256652832,
+      "radius": 1000,
+      "type": "",
+      "cumulative_center_km": 37.5,
+      "cumulative_optimized_km": 30.6
+    },
+    {
+      "index": 7,
+      "name": "P11",
+      "lat": 42.48255157470703,
+      "lon": 12.98342514038086,
+      "radius": 8000,
+      "type": "",
+      "cumulative_center_km": 56.5,
+      "cumulative_optimized_km": 40.6
+    },
+    {
+      "index": 8,
+      "name": "P12",
+      "lat": 42.498863220214844,
+      "lon": 12.7793550491333,
+      "radius": 3000,
+      "type": "",
+      "cumulative_center_km": 73.4,
+      "cumulative_optimized_km": 46.5
+    },
+    {
+      "index": 9,
+      "name": "A01",
+      "lat": 42.485084533691406,
+      "lon": 12.857166290283203,
+      "radius": 1500,
+      "type": "ESS",
+      "cumulative_center_km": 80.0,
+      "cumulative_optimized_km": 48.6
+    },
+    {
+      "index": 10,
+      "name": "A01",
+      "lat": 42.485084533691406,
+      "lon": 12.857166290283203,
+      "radius": 100,
+      "type": "",
+      "cumulative_center_km": 80.0,
+      "cumulative_optimized_km": 50.0
+    }
+  ],
+  "optimization_angle_step": 10
+}
