@@ -12,7 +12,7 @@ except ImportError:
     FLASK_AVAILABLE = False
 
 try:
-    from xctrack import parse_task, Task
+    from xctrack import parse_task, Task, calculate_task_distances
     from xctrack.utils import generate_qr_code, QR_CODE_SUPPORT
     XCTRACK_AVAILABLE = True
 except ImportError:
@@ -149,7 +149,11 @@ class XCTrackWebApp:
                                 'code': task_file.stem.replace('task_', ''),
                                 'name': f"Task {task_file.stem}",
                                 'distance': task_dict['stats']['totalDistance'],
+                                'optimizedDistance': task_dict['stats']['totalOptimizedDistance'],
+                                'savings': task_dict['stats']['optimizationSavings'],
+                                'savingsPercent': task_dict['stats']['optimizationSavingsPercent'],
                                 'turnpoints': task_dict['stats']['turnpointCount'],
+                                'cylinders': task_dict['stats']['cylinderCount'],
                                 'type': task_dict['taskType']
                             })
                         except Exception:
@@ -185,9 +189,13 @@ class XCTrackWebApp:
             'stats': {}
         }
         
-        # Add turnpoint data
-        total_distance = 0
+        # Calculate optimized distances using the new distance calculator
+        distance_data = calculate_task_distances(task)
+        
+        # Add turnpoint data with both basic and optimized distances
         for i, tp in enumerate(task.turnpoints):
+            tp_distance_data = distance_data['turnpoints'][i] if i < len(distance_data['turnpoints']) else {}
+            
             tp_data = {
                 'index': i,
                 'name': tp.waypoint.name,
@@ -197,11 +205,12 @@ class XCTrackWebApp:
                 'alt': tp.waypoint.alt_smoothed,
                 'radius': tp.radius,
                 'type': tp.type.value if tp.type else '',
-                'distance': 0,  # Distance from previous turnpoint
-                'cumulative_distance': 0
+                'distance': 0,  # Distance from previous turnpoint (basic calculation)
+                'cumulative_distance': tp_distance_data.get('cumulative_center_km', 0),
+                'cumulative_optimized_distance': tp_distance_data.get('cumulative_optimized_km', 0)
             }
             
-            # Calculate distance from previous turnpoint
+            # Calculate basic distance from previous turnpoint for compatibility
             if i > 0:
                 prev_tp = task.turnpoints[i-1]
                 distance = self._calculate_distance(
@@ -209,9 +218,7 @@ class XCTrackWebApp:
                     tp.waypoint.lat, tp.waypoint.lon
                 )
                 tp_data['distance'] = round(distance, 1)
-                total_distance += distance
             
-            tp_data['cumulative_distance'] = round(total_distance, 1)
             result['turnpoints'].append(tp_data)
         
         # Add task configuration
@@ -235,11 +242,15 @@ class XCTrackWebApp:
                 'deadline': str(task.goal.deadline) if task.goal.deadline else None
             }
         
-        # Add statistics
+        # Add enhanced statistics with optimized distance calculations
         result['stats'] = {
-            'totalDistance': round(total_distance, 1),
+            'totalDistance': distance_data['center_distance_km'],
+            'totalOptimizedDistance': distance_data['optimized_distance_km'],
+            'optimizationSavings': distance_data['savings_km'],
+            'optimizationSavingsPercent': distance_data['savings_percent'],
             'turnpointCount': len(task.turnpoints),
-            'taskType': task.task_type.value
+            'taskType': task.task_type.value,
+            'cylinderCount': sum(1 for tp in task.turnpoints if tp.radius > 0)
         }
         
         return result

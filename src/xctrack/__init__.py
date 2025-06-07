@@ -24,6 +24,12 @@ from .task import (
 )
 from .qrcode_task import QRCodeTask
 from .parser import parse_task
+from .distance import (
+    calculate_task_distances,
+    optimized_distance,
+    distance_through_centers,
+    TaskTurnpoint,
+)
 from .exceptions import (
     EmptyInputError,
     InvalidFormatError,
@@ -52,6 +58,10 @@ __all__ = [
     "TurnpointType",
     "QRCodeTask",
     "parse_task",
+    "calculate_task_distances",
+    "optimized_distance",
+    "distance_through_centers",
+    "TaskTurnpoint",
     "EmptyInputError",
     "InvalidFormatError",
     "InvalidTimeOfDayError",

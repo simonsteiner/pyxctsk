@@ -1,0 +1,95 @@
+{
+    "earthModel": "WGS84",
+    "goal": {
+        "deadline": "17:30:00Z",
+        "type": "CYLINDER"
+    },
+    "sss": {
+        "direction": "EXIT",
+        "timeGates": [
+            "12:30:00Z"
+        ],
+        "type": "RACE"
+    },
+    "takeoff": {
+        "timeClose": "12:00:00Z",
+        "timeOpen": "10:30:00Z"
+    },
+    "taskType": "CLASSIC",
+    "turnpoints": [
+        {
+            "radius": 400,
+            "type": "TAKEOFF",
+            "waypoint": {
+                "altSmoothed": 1561,
+                "description": "Tissiniva",
+                "lat": 46.63274444444445,
+                "lon": 7.202591666666667,
+                "name": "B21156"
+            }
+        },
+        {
+            "radius": 28000,
+            "type": "SSS",
+            "waypoint": {
+                "altSmoothed": 585,
+                "description": "Seftigen",
+                "lat": 46.78876388888889,
+                "lon": 7.541408333333333,
+                "name": "B43585"
+            }
+        },
+        {
+            "radius": 12000,
+            "waypoint": {
+                "altSmoothed": 585,
+                "description": "Seftigen",
+                "lat": 46.78876388888889,
+                "lon": 7.541408333333333,
+                "name": "B43585"
+            }
+        },
+        {
+            "radius": 6000,
+            "waypoint": {
+                "altSmoothed": 1362,
+                "description": "Pleiades",
+                "lat": 46.48272777777778,
+                "lon": 6.910166666666667,
+                "name": "B03136"
+            }
+        },
+        {
+            "radius": 1000,
+            "waypoint": {
+                "altSmoothed": 1916,
+                "description": "Patraflon",
+                "lat": 46.639516666666665,
+                "lon": 7.241594444444445,
+                "name": "B22192"
+            }
+        },
+        {
+            "radius": 11000,
+            "type": "ESS",
+            "waypoint": {
+                "altSmoothed": 1197,
+                "description": "Gibloux",
+                "lat": 46.683505555555556,
+                "lon": 7.040483333333333,
+                "name": "B54119"
+            }
+        },
+        {
+            "radius": 100,
+            "waypoint": {
+                "altSmoothed": 869,
+                "description": "Charmey -869m-",
+                "lat": 46.61811388888889,
+                "lon": 7.169480555555555,
+                "name": "L02087"
+            }
+        }
+    ],
+    "version": 1
+}

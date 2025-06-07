@@ -29,6 +29,8 @@ dependencies = [
     "pyzbar>=0.1.9",
     "polyline>=2.0.0",
     "click>=8.0.0",
+    "geopy>=2.0.0",
+    "pyproj>=3.0.0",
 ]
 
 [project.optional-dependencies]
