@@ -1,6 +1,8 @@
 """Flask web application for XCTrack task visualization."""
 
 import base64
+import json
+from datetime import datetime
 from io import BytesIO
 from pathlib import Path
 from typing import Optional, Dict, Any
@@ -46,6 +48,14 @@ class XCTrackWebApp:
         else:
             # Default to tests directory in the parent project
             self.task_directory = Path(__file__).parent.parent.parent / 'tests'
+        
+        # Directory for saved uploaded tasks
+        self.saved_tasks_dir = Path(__file__).parent / 'static' / 'saved_tasks'
+        self.saved_tasks_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Directory for saved task metadata
+        self.saved_tasks_metadata_dir = Path(__file__).parent / 'static' / 'saved_tasks_metadata'
+        self.saved_tasks_metadata_dir.mkdir(parents=True, exist_ok=True)
         
         self.setup_routes()
     
@@ -128,8 +138,49 @@ class XCTrackWebApp:
                 # Parse the uploaded task
                 task_data = file.read()
                 task = parse_task(task_data)
+                task_dict = self._task_to_dict(task)
                 
-                return jsonify(self._task_to_dict(task))
+                # Generate a unique filename based on timestamp and original filename
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                original_filename = file.filename
+                if original_filename.endswith('.xctsk'):
+                    base_name = original_filename[:-6]  # Remove .xctsk extension
+                else:
+                    base_name = original_filename
+                
+                # Clean the filename
+                clean_name = "".join(c for c in base_name if c.isalnum() or c in (' ', '-', '_')).rstrip()
+                if not clean_name:
+                    clean_name = "uploaded_task"
+                
+                saved_filename = f"{timestamp}_{clean_name}.xctsk"
+                saved_file_path = self.saved_tasks_dir / saved_filename
+                
+                # Save the original task file
+                with open(saved_file_path, 'wb') as f:
+                    f.write(task_data)
+                
+                # Save task metadata for quick access
+                metadata = {
+                    'filename': saved_filename,
+                    'original_filename': original_filename,
+                    'upload_time': timestamp,
+                    'task_name': task_dict.get('turnpoints', [{}])[0].get('name', clean_name) if task_dict.get('turnpoints') else clean_name,
+                    'distance': task_dict['stats']['totalDistance'],
+                    'optimized_distance': task_dict['stats']['totalOptimizedDistance'],
+                    'turnpoint_count': task_dict['stats']['turnpointCount'],
+                    'task_type': task_dict['taskType']
+                }
+                
+                metadata_file = self.saved_tasks_metadata_dir / f"{timestamp}_{clean_name}.json"
+                with open(metadata_file, 'w') as f:
+                    json.dump(metadata, f, indent=2)
+                
+                # Add the saved file info to the response
+                task_dict['saved_as'] = saved_filename
+                task_dict['saved_timestamp'] = timestamp
+                
+                return jsonify(task_dict)
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
 
@@ -138,6 +189,8 @@ class XCTrackWebApp:
             """API endpoint to list available tasks."""
             try:
                 tasks = []
+                
+                # Load sample tasks from tests directory
                 if self.task_directory.exists():
                     for task_file in self.task_directory.glob('*.xctsk'):
                         try:
@@ -154,14 +207,72 @@ class XCTrackWebApp:
                                 'savingsPercent': task_dict['stats']['optimizationSavingsPercent'],
                                 'turnpoints': task_dict['stats']['turnpointCount'],
                                 'cylinders': task_dict['stats']['cylinderCount'],
-                                'type': task_dict['taskType']
+                                'type': task_dict['taskType'],
+                                'source': 'sample'
                             })
                         except Exception:
                             continue
+                
+                # Load saved tasks from metadata
+                saved_tasks = self._get_saved_tasks()
+                tasks.extend(saved_tasks)
+                
                 return jsonify({'tasks': tasks})
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
+        
+        @self.app.route('/api/saved-tasks')
+        def api_list_saved_tasks():
+            """API endpoint to list only saved tasks."""
+            try:
+                saved_tasks = self._get_saved_tasks()
+                return jsonify({'tasks': saved_tasks})
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
+        @self.app.route('/api/task/saved/<filename>')
+        def api_get_saved_task(filename: str):
+            """API endpoint to get saved task data."""
+            try:
+                task_file = self.saved_tasks_dir / filename
+                
+                if task_file.exists() and task_file.suffix == '.xctsk':
+                    with open(task_file, 'r') as f:
+                        task_data = f.read()
+                    task = parse_task(task_data)
+                    return jsonify(self._task_to_dict(task))
+                else:
+                    return jsonify({'error': 'Saved task not found'}), 404
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
     
+    def _get_saved_tasks(self):
+        """Get list of saved tasks from metadata files."""
+        saved_tasks = []
+        
+        if self.saved_tasks_metadata_dir.exists():
+            for metadata_file in self.saved_tasks_metadata_dir.glob('*.json'):
+                try:
+                    with open(metadata_file, 'r') as f:
+                        metadata = json.load(f)
+                    
+                    saved_tasks.append({
+                        'code': metadata['filename'],
+                        'name': metadata.get('task_name', metadata['original_filename']),
+                        'distance': metadata['distance'],
+                        'optimizedDistance': metadata['optimized_distance'],
+                        'turnpoints': metadata['turnpoint_count'],
+                        'type': metadata['task_type'],
+                        'source': 'uploaded',
+                        'upload_time': metadata['upload_time'],
+                        'original_filename': metadata['original_filename']
+                    })
+                except Exception:
+                    continue
+        
+        # Sort by upload time (newest first)
+        saved_tasks.sort(key=lambda x: x['upload_time'], reverse=True)
+        return saved_tasks
+
     def _find_task_file(self, task_code: str) -> Optional[Path]:
         """Find a task file by code."""
         # Try different naming patterns
