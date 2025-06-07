@@ -133,6 +133,18 @@ All classes support JSON serialization/deserialization and maintain compatibilit
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
+## AI-Assisted Migration
+
+This Python implementation was migrated from the original Go codebase with the assistance of GitHub Copilot. The migration process involved:
+
+- **AI Model**: Claude 4 Sonnet (via GitHub Copilot Chat)
+- **Migration Approach**: Automated code analysis and conversion with human oversight
+- **Process**: Complete rewrite maintaining API compatibility and feature parity
+- **Validation**: Comprehensive testing against XCTrack Competition Interfaces specification
+- **Quality Assurance**: Manual verification of all core functionality and edge cases
+
+The AI assistant analyzed the Go source code structure, understood the XCTrack protocol specifications, and generated equivalent Python implementations while ensuring compatibility with the original format and adding modern Python idioms and type hints.
+
 ## Original Go Implementation
 
 This Python library is based on the Go implementation by Tom Payne:
