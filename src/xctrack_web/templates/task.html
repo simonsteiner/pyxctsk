@@ -195,9 +195,11 @@
                         <div class="stats-card">
                             <i class="fas fa-chart-line fa-2x mb-3"></i>
                             <h3>Task Statistics</h3>
-                            <div class="h2 mb-2">${task.stats.totalDistance} km</div>
-                            <p class="mb-3">Total Distance</p>
-                            <div class="h4 mb-2">${task.stats.turnpointCount}</div>
+                            <div class="h3 mb-1">${task.stats.totalDistance} km</div>
+                            <p class="mb-2">Distance (centers)</p>
+                            <div class="h4 mb-1">${task.stats.totalOptimizedDistance} km</div>
+                            <p class="mb-3">Optimized distance</p>
+                            <div class="h5 mb-1">${task.stats.turnpointCount}</div>
                             <p class="mb-0">Turnpoints</p>
                         </div>
                     </div>
@@ -225,7 +227,7 @@
                                             <th><i class="fas fa-info"></i> Description</th>
                                             <th><i class="fas fa-circle-notch"></i> Radius (m)</th>
                                             <th><i class="fas fa-ruler"></i> Distance (km)</th>
-                                            <th><i class="fas fa-plus"></i> Cumulative (km)</th>
+                                            <th><i class="fas fa-route"></i> Optimized (km)</th>
                                             <th><i class="fas fa-tag"></i> Type</th>
                                         </tr>
                                     </thead>
@@ -236,8 +238,8 @@
                                                 <td><strong>${tp.name}</strong></td>
                                                 <td>${tp.description}</td>
                                                 <td>${tp.radius}</td>
-                                                <td>${tp.distance}</td>
-                                                <td><strong>${tp.cumulative_distance}</strong></td>
+                                                <td><strong>${tp.cumulative_center_km}</strong></td>
+                                                <td><strong>${tp.cumulative_optimized_km}</strong></td>
                                                 <td><span class="badge bg-${getTypeColor(tp.type)} badge-custom">${tp.type || 'Turnpoint'}</span></td>
                                             </tr>
                                         `).join('')}

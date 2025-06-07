@@ -410,6 +410,9 @@ class XCTrackWebApp:
                 'radius': tp.radius,
                 'type': tp.type.value if tp.type else '',
                 'distance': 0,  # Distance from previous turnpoint (basic calculation)
+                'cumulative_center_km': tp_distance_data.get('cumulative_center_km', 0),
+                'cumulative_optimized_km': tp_distance_data.get('cumulative_optimized_km', 0),
+                # Keep old field names for backwards compatibility
                 'cumulative_distance': tp_distance_data.get('cumulative_center_km', 0),
                 'cumulative_optimized_distance': tp_distance_data.get('cumulative_optimized_km', 0)
             }
