@@ -239,3 +239,63 @@ def calculate_cumulative_distances(turnpoints: List[TaskTurnpoint], index: int, 
     opt_dist = optimized_distance(partial_turnpoints, angle_step=angle_step, show_progress=False) / 1000.0
     
     return center_dist, opt_dist
+
+
+def optimized_route_coordinates(turnpoints: List[TaskTurnpoint], angle_step: int = DEFAULT_ANGLE_STEP) -> List[Tuple[float, float]]:
+    """Compute the fully optimized route coordinates through turnpoints using Dynamic Programming.
+    
+    This algorithm finds the shortest possible route through all turnpoint cylinders
+    and returns the actual coordinates of the optimal path.
+    
+    Args:
+        turnpoints: List of TaskTurnpoint objects
+        angle_step: Angle step in degrees for perimeter point generation
+        
+    Returns:
+        List of (lat, lon) tuples representing the optimized route coordinates
+    """
+    if len(turnpoints) < 2:
+        return [(tp.center[0], tp.center[1]) for tp in turnpoints]
+    
+    # Precompute perimeter points for all turnpoints
+    perimeters = [tp.perimeter_points(angle_step) for tp in turnpoints]
+    
+    # Initialize distance table: list of dicts for each turnpoint
+    # dp[i][point] = (minimum distance to reach 'point' on turnpoint i, previous point)
+    dp = [{} for _ in turnpoints]
+    dp[0] = {p: (0, None) for p in perimeters[0]}  # distance from start is 0, no previous point
+
+    # Fill DP table using dynamic programming
+    for i in range(1, len(turnpoints)):
+        for curr_pt in perimeters[i]:
+            min_dist = float("inf")
+            best_prev_pt = None
+            # Check all possible previous points
+            for prev_pt, (prev_dist, _) in dp[i - 1].items():
+                leg_distance = geodesic(prev_pt, curr_pt).meters
+                total_distance = prev_dist + leg_distance
+                if total_distance < min_dist:
+                    min_dist = total_distance
+                    best_prev_pt = prev_pt
+            dp[i][curr_pt] = (min_dist, best_prev_pt)
+
+    # Find the optimal end point on the last cylinder
+    last_turnpoint_distances = dp[-1]
+    optimal_end_point = min(last_turnpoint_distances.keys(), 
+                          key=lambda p: last_turnpoint_distances[p][0])
+    
+    # Backtrack to reconstruct the optimal path
+    route_coordinates = []
+    current_point = optimal_end_point
+    
+    # Work backwards through the turnpoints
+    for i in range(len(turnpoints) - 1, -1, -1):
+        route_coordinates.append(current_point)
+        if i > 0:
+            # Get the previous point from the DP table
+            current_point = dp[i][current_point][1]
+    
+    # Reverse to get the path from start to end
+    route_coordinates.reverse()
+    
+    return route_coordinates

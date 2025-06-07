@@ -1,11 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>XCTrack Task: {{ task_code }}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         .task-header {
@@ -14,22 +15,26 @@
             padding: 40px 0;
             margin-bottom: 30px;
         }
+
         .task-info {
             background: #f8f9fa;
             border-radius: 8px;
             padding: 20px;
             margin-bottom: 20px;
         }
+
         .turnpoint-table {
             font-size: 0.9rem;
         }
+
         .map-container {
             height: 500px;
             margin: 20px 0;
             border-radius: 8px;
             overflow: hidden;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
+
         .qr-code-container {
             text-align: center;
             margin: 20px 0;
@@ -37,6 +42,7 @@
             background: #f8f9fa;
             border-radius: 8px;
         }
+
         .stats-card {
             background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
             color: white;
@@ -45,17 +51,20 @@
             margin-bottom: 20px;
             text-align: center;
         }
+
         .info-card {
             background: white;
             border-radius: 8px;
             padding: 20px;
             margin-bottom: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
+
         .loading {
             text-align: center;
             padding: 40px;
         }
+
         .error {
             background: #f8d7da;
             color: #721c24;
@@ -64,20 +73,23 @@
             padding: 15px;
             margin: 20px 0;
         }
+
         .btn-download {
             margin: 5px;
         }
+
         .badge-custom {
             font-size: 0.8em;
             padding: 0.5em 0.8em;
         }
     </style>
 </head>
+
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
         <div class="container">
             <a class="navbar-brand" href="/">
-                <i class="fas fa-plane"></i>
+                <i class="fas fa-parachute-box"></i>
                 <strong>XCTrack Task Analysis</strong>
             </a>
             <div class="navbar-nav ms-auto">
@@ -155,7 +167,7 @@
             const html = generateTaskHTML(task);
             document.getElementById('taskContent').innerHTML = html;
             document.getElementById('taskContent').style.display = 'block';
-            
+
             // Initialize map
             if (task.turnpoints.length > 0) {
                 initializeMap(task.turnpoints);
@@ -208,7 +220,21 @@
                 <div class="row">
                     <div class="col-md-12">
                         <div class="info-card">
-                            <h3><i class="fas fa-map text-primary"></i> Task Map</h3>
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h3><i class="fas fa-map text-primary"></i> Task Map</h3>
+                                <div class="btn-group" role="group" aria-label="Route display options">
+
+                                    <input type="radio" class="btn-check" name="routeToggle" id="optimizedRoute" checked>
+                                    <label class="btn btn-outline-success btn-sm" for="optimizedRoute">
+                                        <i class="fas fa-route"></i> Optimized Route
+                                    </label>
+
+                                    <input type="radio" class="btn-check" name="routeToggle" id="centerRoute">
+                                    <label class="btn btn-outline-primary btn-sm" for="centerRoute">
+                                        <i class="fas fa-circle"></i> Center Route
+                                    </label>
+                                </div>
+                            </div>
                             <div id="mapContainer" class="map-container"></div>
                         </div>
                     </div>
@@ -293,7 +319,7 @@
         }
 
         function getTypeColor(type) {
-            switch(type) {
+            switch (type) {
                 case 'TAKEOFF': return 'success';
                 case 'SSS': return 'primary';
                 case 'ESS': return 'warning';
@@ -312,19 +338,23 @@
 
             // Initialize map
             const map = L.map('mapContainer').fitBounds(bounds, { padding: [20, 20] });
-            
+
             // Add tile layer
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '© OpenStreetMap contributors'
             }).addTo(map);
 
+            // Store route layers for toggling
+            let centerRouteLayer = null;
+            let optimizedRouteLayer = null;
+
             // Add turnpoint markers and circles
             turnpoints.forEach((tp, index) => {
                 // Create custom icon based on type
-                const iconColor = tp.type === 'TAKEOFF' ? 'green' : 
-                                tp.type === 'SSS' ? 'blue' :
-                                tp.type === 'ESS' ? 'orange' : 'red';
-                
+                const iconColor = tp.type === 'TAKEOFF' ? 'green' :
+                    tp.type === 'SSS' ? 'blue' :
+                        tp.type === 'ESS' ? 'orange' : 'red';
+
                 const marker = L.marker([tp.lat, tp.lon]).addTo(map);
                 marker.bindPopup(`
                     <div style="min-width: 200px;">
@@ -339,7 +369,7 @@
                         </small>
                     </div>
                 `);
-                
+
                 // Add circle for turnpoint radius (scaled for visibility)
                 const circleRadius = Math.max(tp.radius, 100); // Minimum 100m for visibility
                 L.circle([tp.lat, tp.lon], {
@@ -362,14 +392,87 @@
                 }).addTo(map);
             });
 
-            // Draw task line
-            const taskLine = turnpoints.map(tp => [tp.lat, tp.lon]);
-            L.polyline(taskLine, {
-                color: '#dc3545',
-                weight: 3,
-                opacity: 0.8,
-                dashArray: '10, 5'
-            }).addTo(map);
+            // Draw center route (default)
+            function drawCenterRoute() {
+                if (centerRouteLayer) {
+                    map.removeLayer(centerRouteLayer);
+                }
+                const taskLine = turnpoints.map(tp => [tp.lat, tp.lon]);
+                centerRouteLayer = L.polyline(taskLine, {
+                    color: '#dc3545',
+                    weight: 3,
+                    opacity: 0.8,
+                    dashArray: '10, 5'
+                }).addTo(map);
+            }
+
+            // Draw optimized route
+            function drawOptimizedRoute() {
+                if (optimizedRouteLayer) {
+                    map.removeLayer(optimizedRouteLayer);
+                }
+
+                // Fetch optimized route data
+                fetch(`/api/task/${taskCode}/optimized-route`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.error) {
+                            console.error('Error fetching optimized route:', data.error);
+                            alert('Error loading optimized route: ' + data.error);
+                            // Switch back to center route
+                            document.getElementById('centerRoute').checked = true;
+                            showCenterRoute();
+                        } else {
+                            const routeCoords = data.route.map(pt => [pt.lat, pt.lon]);
+                            optimizedRouteLayer = L.polyline(routeCoords, {
+                                color: '#28a745',
+                                weight: 3,
+                                opacity: 0.9
+                            }).addTo(map);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error fetching optimized route:', error);
+                        alert('Error loading optimized route: ' + error.message);
+                        // Switch back to center route
+                        document.getElementById('centerRoute').checked = true;
+                        showCenterRoute();
+                    });
+            }
+
+            // Route display functions
+            function showCenterRoute() {
+                if (optimizedRouteLayer) {
+                    map.removeLayer(optimizedRouteLayer);
+                }
+                drawCenterRoute();
+            }
+
+            function showOptimizedRoute() {
+                if (centerRouteLayer) {
+                    map.removeLayer(centerRouteLayer);
+                }
+                drawOptimizedRoute();
+            }
+
+            // Set up toggle event listeners
+            document.getElementById('centerRoute').addEventListener('change', function () {
+                if (this.checked) {
+                    showCenterRoute();
+                }
+            });
+
+            document.getElementById('optimizedRoute').addEventListener('change', function () {
+                if (this.checked) {
+                    showOptimizedRoute();
+                }
+            });
+
+            // Initialize with optimized route (default)
+            drawOptimizedRoute();
+
+            // Store map reference for potential future use
+            window.taskMap = map;
         }
 
         function generateQRCode() {
@@ -401,7 +504,7 @@
         function downloadJSON() {
             if (currentTaskData) {
                 const dataStr = JSON.stringify(currentTaskData, null, 2);
-                const dataBlob = new Blob([dataStr], {type: 'application/json'});
+                const dataBlob = new Blob([dataStr], { type: 'application/json' });
                 const url = URL.createObjectURL(dataBlob);
                 const link = document.createElement('a');
                 link.href = url;
@@ -435,4 +538,5 @@
         }
     </script>
 </body>
+
 </html>

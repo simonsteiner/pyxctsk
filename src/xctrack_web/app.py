@@ -262,7 +262,43 @@ class XCTrackWebApp:
                     return jsonify({'error': 'Saved task not found'}), 404
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
-    
+        
+        @self.app.route('/api/task/<task_code>/optimized-route')
+        def api_get_optimized_route(task_code: str):
+            """API endpoint to get optimized route coordinates for a task."""
+            try:
+                # Load task
+                task_file = self._find_task_file(task_code)
+                
+                if task_file and task_file.exists():
+                    with open(task_file, 'r') as f:
+                        task_data = f.read()
+                    task = parse_task(task_data)
+                    
+                    # Convert task turnpoints to distance calculation format
+                    from xctrack.distance import TaskTurnpoint, optimized_route_coordinates
+                    from geopy.distance import geodesic
+                    turnpoints = []
+                    for tp in task.turnpoints:
+                        task_tp = TaskTurnpoint(tp.waypoint.lat, tp.waypoint.lon, tp.radius)
+                        turnpoints.append(task_tp)
+                    
+                    # Calculate optimized route coordinates
+                    route_coords = optimized_route_coordinates(turnpoints, angle_step=10)
+                    
+                    # Convert to the format expected by the frontend
+                    route_data = [{'lat': lat, 'lon': lon} for lat, lon in route_coords]
+                    
+                    return jsonify({
+                        'route': route_data,
+                        'distance_km': sum(geodesic(route_coords[i], route_coords[i+1]).meters 
+                                         for i in range(len(route_coords)-1)) / 1000.0
+                    })
+                else:
+                    return jsonify({'error': 'Task not found'}), 404
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
+
     def _get_saved_tasks(self):
         """Get list of saved tasks from metadata files."""
         saved_tasks = []
