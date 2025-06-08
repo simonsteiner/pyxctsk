@@ -347,6 +347,8 @@
             // Store route layers for toggling
             let centerRouteLayer = null;
             let optimizedRouteLayer = null;
+            let sssOptimalMarker = null;
+            let sssConnectionLine = null;
 
             // Add turnpoint markers and circles
             turnpoints.forEach((tp, index) => {
@@ -424,11 +426,45 @@
                             showCenterRoute();
                         } else {
                             const routeCoords = data.route.map(pt => [pt.lat, pt.lon]);
-                            optimizedRouteLayer = L.polyline(routeCoords, {
-                                color: '#28a745',
-                                weight: 3,
-                                opacity: 0.9
-                            }).addTo(map);
+                            
+                            // Check if this is an SSS task
+                            if (data.sss_info && data.takeoff_center) {
+                                // For SSS tasks, the routeCoords already contain the correct optimized route
+                                // (takeoff center -> optimal points on turnpoints after SSS)
+                                optimizedRouteLayer = L.polyline(routeCoords, {
+                                    color: '#28a745',
+                                    weight: 3,
+                                    opacity: 0.9
+                                }).addTo(map);
+                                
+                                // Add a special marker for the optimal SSS entry point
+                                const optimalSssPoint = [data.sss_info.optimal_entry_point.lat, data.sss_info.optimal_entry_point.lon];
+                                sssOptimalMarker = L.marker(optimalSssPoint, {
+                                    icon: L.divIcon({
+                                        className: 'sss-optimal-point',
+                                        html: '<div style="background: #007bff; border: 2px solid white; border-radius: 50%; width: 12px; height: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>',
+                                        iconSize: [12, 12],
+                                        iconAnchor: [6, 6]
+                                    })
+                                }).addTo(map).bindPopup('<strong>Optimal SSS Entry Point</strong><br>Best point to enter the Start Speed Section');
+                                
+                                // Add a dashed line from takeoff to optimal SSS entry point to show the relation
+                                const takeoffCoord = [data.takeoff_center.lat, data.takeoff_center.lon];
+                                sssConnectionLine = L.polyline([takeoffCoord, optimalSssPoint], {
+                                    color: '#007bff',
+                                    weight: 2,
+                                    opacity: 0.6,
+                                    dashArray: '5, 5'
+                                }).addTo(map);
+                                
+                            } else {
+                                // For non-SSS tasks, draw the normal optimized route
+                                optimizedRouteLayer = L.polyline(routeCoords, {
+                                    color: '#28a745',
+                                    weight: 3,
+                                    opacity: 0.9
+                                }).addTo(map);
+                            }
                         }
                     })
                     .catch(error => {
@@ -444,6 +480,14 @@
             function showCenterRoute() {
                 if (optimizedRouteLayer) {
                     map.removeLayer(optimizedRouteLayer);
+                }
+                if (sssOptimalMarker) {
+                    map.removeLayer(sssOptimalMarker);
+                    sssOptimalMarker = null;
+                }
+                if (sssConnectionLine) {
+                    map.removeLayer(sssConnectionLine);
+                    sssConnectionLine = null;
                 }
                 drawCenterRoute();
             }

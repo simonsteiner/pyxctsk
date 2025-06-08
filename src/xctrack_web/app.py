@@ -14,7 +14,9 @@ except ImportError:
     FLASK_AVAILABLE = False
 
 try:
-    from xctrack import parse_task, Task, calculate_task_distances
+    from xctrack.parser import parse_task
+    from xctrack.task import Task
+    from xctrack.distance import calculate_task_distances
     from xctrack.utils import generate_qr_code, QR_CODE_SUPPORT
     XCTRACK_AVAILABLE = True
 except ImportError:
@@ -276,24 +278,38 @@ class XCTrackWebApp:
                     task = parse_task(task_data)
                     
                     # Convert task turnpoints to distance calculation format
-                    from xctrack.distance import TaskTurnpoint, optimized_route_coordinates
-                    from geopy.distance import geodesic
+                    from xctrack.distance import TaskTurnpoint, optimized_route_coordinates, optimized_distance, calculate_sss_info
                     turnpoints = []
                     for tp in task.turnpoints:
                         task_tp = TaskTurnpoint(tp.waypoint.lat, tp.waypoint.lon, tp.radius)
                         turnpoints.append(task_tp)
                     
-                    # Calculate optimized route coordinates
-                    route_coords = optimized_route_coordinates(turnpoints, angle_step=10)
+                    # Calculate optimized route coordinates using the proper distance.py function
+                    route_coords = optimized_route_coordinates(turnpoints, task_turnpoints=task.turnpoints, angle_step=10)
                     
                     # Convert to the format expected by the frontend
                     route_data = [{'lat': lat, 'lon': lon} for lat, lon in route_coords]
                     
-                    return jsonify({
+                    # Calculate optimized distance using centralized function instead of manual calculation
+                    total_distance = optimized_distance(turnpoints, angle_step=10, show_progress=False)
+                    
+                    response_data = {
                         'route': route_data,
-                        'distance_km': sum(geodesic(route_coords[i], route_coords[i+1]).meters 
-                                         for i in range(len(route_coords)-1)) / 1000.0
-                    })
+                        'distance_km': total_distance / 1000.0
+                    }
+                    
+                    # Check for SSS and add SSS info if needed using centralized function
+                    sss_info = calculate_sss_info(task.turnpoints, route_coords, angle_step=10)
+                    takeoff_center = None
+                    
+                    if task.turnpoints:
+                        takeoff_center = {'lat': task.turnpoints[0].waypoint.lat, 'lon': task.turnpoints[0].waypoint.lon}
+                    
+                    if sss_info:
+                        response_data['sss_info'] = sss_info
+                        response_data['takeoff_center'] = takeoff_center
+                    
+                    return jsonify(response_data)
                 else:
                     return jsonify({'error': 'Task not found'}), 404
             except Exception as e:
