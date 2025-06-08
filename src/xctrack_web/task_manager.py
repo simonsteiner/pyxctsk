@@ -22,7 +22,7 @@ class TaskManager:
 
     def __init__(self, task_directory: Path, saved_tasks_dir: Path):
         """Initialize the task manager.
-        
+
         Args:
             task_directory: Directory containing sample task files
             saved_tasks_dir: Directory for saved uploaded tasks
@@ -33,10 +33,10 @@ class TaskManager:
 
     def find_task_file(self, task_code: str) -> Optional[Path]:
         """Find a task file by code.
-        
+
         Args:
             task_code: The task code to search for
-            
+
         Returns:
             Path to the task file or None if not found
         """
@@ -69,10 +69,10 @@ class TaskManager:
 
     def load_task(self, task_code: str) -> Optional[Task]:
         """Load a task by its code.
-        
+
         Args:
             task_code: The task code to load
-            
+
         Returns:
             Parsed Task object or None if not found
         """
@@ -83,20 +83,22 @@ class TaskManager:
             return parse_task(task_data)
         return None
 
-    def save_uploaded_task(self, file_data: bytes, original_filename: str, task: Task) -> Dict[str, str]:
+    def save_uploaded_task(
+        self, file_data: bytes, original_filename: str, task: Task
+    ) -> Dict[str, str]:
         """Save an uploaded task file and its metadata.
-        
+
         Args:
             file_data: Raw file data
             original_filename: Original filename
             task: Parsed task object
-            
+
         Returns:
             Dictionary with saved file information
         """
         # Generate a unique filename based on timestamp and original filename
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        
+
         if original_filename.endswith(".xctsk"):
             base_name = original_filename[:-6]  # Remove .xctsk extension
         else:
@@ -119,13 +121,18 @@ class TaskManager:
         return {
             "filename": saved_filename,
             "timestamp": timestamp,
-            "clean_name": clean_name
+            "clean_name": clean_name,
         }
 
-    def save_task_metadata(self, save_info: Dict[str, str], original_filename: str, 
-                          task_dict: Dict[str, Any], cache_key: str) -> None:
+    def save_task_metadata(
+        self,
+        save_info: Dict[str, str],
+        original_filename: str,
+        task_dict: Dict[str, Any],
+        cache_key: str,
+    ) -> None:
         """Save task metadata for quick access.
-        
+
         Args:
             save_info: Save information from save_uploaded_task
             original_filename: Original filename
@@ -137,7 +144,9 @@ class TaskManager:
             "original_filename": original_filename,
             "upload_time": save_info["timestamp"],
             "task_name": (
-                task_dict.get("turnpoints", [{}])[0].get("name", save_info["clean_name"])
+                task_dict.get("turnpoints", [{}])[0].get(
+                    "name", save_info["clean_name"]
+                )
                 if task_dict.get("turnpoints")
                 else save_info["clean_name"]
             ),
@@ -149,14 +158,15 @@ class TaskManager:
         }
 
         metadata_file = (
-            self.saved_tasks_dir / f"{save_info['timestamp']}_{save_info['clean_name']}-metadata.json"
+            self.saved_tasks_dir
+            / f"{save_info['timestamp']}_{save_info['clean_name']}-metadata.json"
         )
         with open(metadata_file, "w") as f:
             json.dump(metadata, f, indent=2)
 
     def get_saved_tasks(self) -> List[Dict[str, Any]]:
         """Get list of saved tasks from metadata files.
-        
+
         Returns:
             List of saved task metadata
         """
@@ -192,10 +202,10 @@ class TaskManager:
 
     def get_sample_tasks(self, cache_manager) -> List[Dict[str, Any]]:
         """Get list of sample tasks from the tests directory.
-        
+
         Args:
             cache_manager: Cache manager for distance calculations
-            
+
         Returns:
             List of sample task metadata
         """
@@ -224,9 +234,7 @@ class TaskManager:
                             "code": task_file.stem.replace("task_", ""),
                             "name": f"Task {task_file.stem}",
                             "distance": distance_data["center_distance_km"],
-                            "optimizedDistance": distance_data[
-                                "optimized_distance_km"
-                            ],
+                            "optimizedDistance": distance_data["optimized_distance_km"],
                             "savings": distance_data["savings_km"],
                             "savingsPercent": distance_data["savings_percent"],
                             "turnpoints": len(task.turnpoints),
@@ -243,15 +251,17 @@ class TaskManager:
 
         return tasks
 
-    def task_to_dict(self, task: Task, cache_manager, progress_tracker=None, task_code: str = None) -> Dict[str, Any]:
+    def task_to_dict(
+        self, task: Task, cache_manager, progress_tracker=None, task_code: str = None
+    ) -> Dict[str, Any]:
         """Convert a task to a dictionary for JSON serialization.
-        
+
         Args:
             task: The task to convert
             cache_manager: Cache manager for distance calculations
             progress_tracker: Optional progress tracker
             task_code: Optional task code for progress tracking
-            
+
         Returns:
             Dictionary representation of the task
         """
@@ -262,9 +272,13 @@ class TaskManager:
         if distance_data is None:
             # Calculate distances with faster settings for web interface
             if progress_tracker and task_code:
-                progress_tracker.set_progress(task_code, "Calculating distances...", 50, 
-                                           f"Processing {len(task.turnpoints)} turnpoints")
-            
+                progress_tracker.set_progress(
+                    task_code,
+                    "Calculating distances...",
+                    50,
+                    f"Processing {len(task.turnpoints)} turnpoints",
+                )
+
             print(
                 f"Calculating distances for task with {len(task.turnpoints)} turnpoints..."
             )
@@ -273,12 +287,21 @@ class TaskManager:
             )  # Use 10° for faster web response
 
             if progress_tracker and task_code:
-                progress_tracker.set_progress(task_code, "Optimizing route...", 70, 
-                                           "Finding optimal path between turnpoints")
+                progress_tracker.set_progress(
+                    task_code,
+                    "Optimizing route...",
+                    70,
+                    "Finding optimal path between turnpoints",
+                )
 
             # Add optimized route data to cache
             route_data = self.calculate_and_cache_route_data(
-                task, cache_key, cache_manager, progress_tracker, angle_step=10, task_code=task_code
+                task,
+                cache_key,
+                cache_manager,
+                progress_tracker,
+                angle_step=10,
+                task_code=task_code,
             )
             distance_data["route_data"] = route_data
 
@@ -291,12 +314,21 @@ class TaskManager:
         # If cache exists but doesn't have route data, calculate and add it
         if "route_data" not in distance_data:
             if progress_tracker and task_code:
-                progress_tracker.set_progress(task_code, "Adding route data...", 80, 
-                                           "Calculating optimized route coordinates")
-            
+                progress_tracker.set_progress(
+                    task_code,
+                    "Adding route data...",
+                    80,
+                    "Calculating optimized route coordinates",
+                )
+
             print("Adding route data to existing cache...")
             route_data = self.calculate_and_cache_route_data(
-                task, cache_key, cache_manager, progress_tracker, angle_step=10, task_code=task_code
+                task,
+                cache_key,
+                cache_manager,
+                progress_tracker,
+                angle_step=10,
+                task_code=task_code,
             )
             distance_data["route_data"] = route_data
             # Update cache
@@ -390,11 +422,16 @@ class TaskManager:
         return result
 
     def calculate_and_cache_route_data(
-        self, task: Task, cache_key: str, cache_manager, progress_tracker=None, 
-        angle_step: int = 10, task_code: str = None
+        self,
+        task: Task,
+        cache_key: str,
+        cache_manager,
+        progress_tracker=None,
+        angle_step: int = 10,
+        task_code: str = None,
     ) -> Dict[str, Any]:
         """Calculate optimized route data and add it to cache.
-        
+
         Args:
             task: The task to calculate route for
             cache_key: Cache key for the task
@@ -402,13 +439,17 @@ class TaskManager:
             progress_tracker: Optional progress tracker
             angle_step: Angle step for calculations
             task_code: Optional task code for progress tracking
-            
+
         Returns:
             Route data dictionary
         """
         if progress_tracker and task_code:
-            progress_tracker.set_progress(task_code, "Preparing route calculation...", 0, 
-                                       "Converting turnpoints for optimization")
+            progress_tracker.set_progress(
+                task_code,
+                "Preparing route calculation...",
+                0,
+                "Converting turnpoints for optimization",
+            )
 
         # Convert task turnpoints to distance calculation format
         turnpoints = []
@@ -417,8 +458,12 @@ class TaskManager:
             turnpoints.append(task_tp)
 
         if progress_tracker and task_code:
-            progress_tracker.set_progress(task_code, "Calculating route coordinates...", 25, 
-                                       f"Optimizing path through {len(turnpoints)} turnpoints")
+            progress_tracker.set_progress(
+                task_code,
+                "Calculating route coordinates...",
+                25,
+                f"Optimizing path through {len(turnpoints)} turnpoints",
+            )
 
         # Calculate optimized route coordinates
         route_coords = optimized_route_coordinates(
@@ -429,8 +474,12 @@ class TaskManager:
         route_data = [{"lat": lat, "lon": lon} for lat, lon in route_coords]
 
         if progress_tracker and task_code:
-            progress_tracker.set_progress(task_code, "Calculating optimized distance...", 50, 
-                                       "Computing total route distance")
+            progress_tracker.set_progress(
+                task_code,
+                "Calculating optimized distance...",
+                50,
+                "Computing total route distance",
+            )
 
         # Calculate optimized distance
         total_distance = optimized_distance(
@@ -438,8 +487,12 @@ class TaskManager:
         )
 
         if progress_tracker and task_code:
-            progress_tracker.set_progress(task_code, "Checking for SSS information...", 75, 
-                                       "Analyzing start sector geometry")
+            progress_tracker.set_progress(
+                task_code,
+                "Checking for SSS information...",
+                75,
+                "Analyzing start sector geometry",
+            )
 
         # Check for SSS and add SSS info if needed
         sss_info = calculate_sss_info(
@@ -454,8 +507,9 @@ class TaskManager:
             }
 
         if progress_tracker and task_code:
-            progress_tracker.set_progress(task_code, "Finalizing route data...", 90, 
-                                       "Preparing route for display")
+            progress_tracker.set_progress(
+                task_code, "Finalizing route data...", 90, "Preparing route for display"
+            )
 
         route_cache_data = {
             "route": route_data,
@@ -468,8 +522,12 @@ class TaskManager:
             route_cache_data["takeoff_center"] = takeoff_center
 
         if progress_tracker and task_code:
-            progress_tracker.set_progress(task_code, "Route calculation complete", 100, 
-                                       f"Optimized route ready ({total_distance/1000:.1f}km)")
+            progress_tracker.set_progress(
+                task_code,
+                "Route calculation complete",
+                100,
+                f"Optimized route ready ({total_distance/1000:.1f}km)",
+            )
 
         return route_cache_data
 
@@ -477,11 +535,11 @@ class TaskManager:
         self, lat1: float, lon1: float, lat2: float, lon2: float
     ) -> float:
         """Calculate distance between two coordinates in km using Haversine formula.
-        
+
         Args:
             lat1, lon1: First coordinate
             lat2, lon2: Second coordinate
-            
+
         Returns:
             Distance in kilometers
         """

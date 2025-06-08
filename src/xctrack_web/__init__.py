@@ -11,6 +11,7 @@ Requires the xctrack core module for task parsing and analysis.
 try:
     from .app import XCTrackWebApp
     from .server import create_app, run_development_server, run_production_server
+
     _web_available = True
 except ImportError:
     _web_available = False
@@ -22,11 +23,12 @@ except ImportError:
 __version__ = "1.0.0"
 __all__ = [
     "XCTrackWebApp",
-    "create_app", 
+    "create_app",
     "run_development_server",
     "run_production_server",
     "web_available",
 ]
+
 
 def web_available():
     """Check if web interface dependencies are available"""

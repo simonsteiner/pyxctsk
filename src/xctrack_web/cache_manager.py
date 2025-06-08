@@ -14,22 +14,22 @@ class CacheManager:
 
     def __init__(self, cache_dir: Path):
         """Initialize the cache manager.
-        
+
         Args:
             cache_dir: Directory to store cache files
         """
         self.cache_dir = cache_dir
         self.cache_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # In-memory cache for faster access
         self._memory_cache = {}
 
     def get_task_cache_key(self, task: Task) -> str:
         """Generate a cache key for a task based on its content.
-        
+
         Args:
             task: The task to generate a cache key for
-            
+
         Returns:
             A unique cache key string
         """
@@ -58,17 +58,17 @@ class CacheManager:
 
     def load_cached_distances(self, cache_key: str) -> Optional[Dict[str, Any]]:
         """Load cached distance calculations from file.
-        
+
         Args:
             cache_key: The cache key to load
-            
+
         Returns:
             Cached distance data or None if not found
         """
         # Check memory cache first
         if cache_key in self._memory_cache:
             return self._memory_cache[cache_key]
-            
+
         # Check persistent cache
         cache_file = self.cache_dir / f"{cache_key}.json"
 
@@ -94,7 +94,7 @@ class CacheManager:
         self, cache_key: str, distance_data: Dict[str, Any]
     ) -> None:
         """Save distance calculations to cache file.
-        
+
         Args:
             cache_key: The cache key to save under
             distance_data: The distance data to cache
@@ -107,7 +107,7 @@ class CacheManager:
         try:
             # Save to memory cache
             self._memory_cache[cache_key] = distance_data
-            
+
             # Save to persistent cache
             with open(cache_file, "w") as f:
                 json.dump(distance_data, f, indent=2)
@@ -117,24 +117,24 @@ class CacheManager:
 
     def is_task_fully_cached(self, cache_key: str) -> bool:
         """Check if a task is fully cached (has both distance and route data).
-        
+
         Args:
             cache_key: The cache key to check
-            
+
         Returns:
             True if fully cached, False otherwise
         """
         distance_data = self.load_cached_distances(cache_key)
-        
+
         return (
-            distance_data is not None and 
-            "route_data" in distance_data and
-            cache_key in self._memory_cache
+            distance_data is not None
+            and "route_data" in distance_data
+            and cache_key in self._memory_cache
         )
 
     def get_cache_info(self) -> Dict[str, Any]:
         """Get information about current cache files.
-        
+
         Returns:
             Dictionary with cache statistics
         """
@@ -163,7 +163,7 @@ class CacheManager:
     def clear_cache(self) -> None:
         """Clear all cached data."""
         self._memory_cache.clear()
-        
+
         # Remove all cache files
         for cache_file in self.cache_dir.glob("*.json"):
             try:

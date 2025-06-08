@@ -238,7 +238,9 @@ class QRCodeTask:
         result = {"version": self.version}
 
         if self.task_type is not None:
-            result["taskType"] = "CLASSIC" if self.task_type == QRCodeTaskType.CLASSIC else "WAYPOINTS"
+            result["taskType"] = (
+                "CLASSIC" if self.task_type == QRCodeTaskType.CLASSIC else "WAYPOINTS"
+            )
         if self.earth_model is not None:
             result["e"] = self.earth_model.value
         if self.turnpoints:

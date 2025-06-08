@@ -204,10 +204,10 @@
 
         function loadTaskDataWithProgress() {
             let progressInterval;
-            
+
             // Clear existing steps and prepare for dynamic loading
             clearProcessingSteps();
-            
+
             // Start polling for progress updates
             progressInterval = setInterval(() => {
                 fetch(`/api/task/${taskCode}/progress`)
@@ -221,7 +221,7 @@
                         console.warn('Progress update failed:', error);
                     });
             }, 500);
-            
+
             // Start the actual task loading
             fetch(`/api/task/${taskCode}`)
                 .then(response => {
@@ -229,18 +229,18 @@
                 })
                 .then(data => {
                     clearInterval(progressInterval);
-                    
+
                     // Create and show final completion step
                     const finalStepData = { text: 'Task processing complete', icon: 'fas fa-check-circle' };
                     createStepIfNotExists('step-complete', finalStepData);
-                    
+
                     // Complete all previous steps and show final completion
                     completePreviousSteps('step-complete');
                     completeStep('step-complete', 'Task loaded successfully');
-                    
+
                     setTimeout(() => {
                         document.getElementById('loading').style.display = 'none';
-                        
+
                         if (data.error) {
                             showError(data.error);
                         } else {
@@ -260,14 +260,14 @@
             // Create or update step based on message content
             let stepId = getStepIdFromMessage(message);
             let stepData = getStepDataFromMessage(message);
-            
+
             if (stepId && stepData) {
                 // Create the step if it doesn't exist
                 createStepIfNotExists(stepId, stepData);
-                
+
                 // Show current step as in progress
                 showStep(stepId, message);
-                
+
                 // Complete previous steps if any
                 completePreviousSteps(stepId);
             }
@@ -304,7 +304,7 @@
                 'step-finalizing': { text: 'Finalizing task data', icon: 'fas fa-cogs' },
                 'step-complete': { text: 'Task processing complete', icon: 'fas fa-check-circle' }
             };
-            
+
             const stepId = getStepIdFromMessage(message);
             return stepId ? stepData[stepId] : null;
         }
@@ -327,7 +327,7 @@
             // Define step order
             const stepOrder = ['step-loading', 'step-parsing', 'step-converting', 'step-distances', 'step-route', 'step-finalizing', 'step-complete'];
             const currentIndex = stepOrder.indexOf(currentStepId);
-            
+
             // Complete all previous steps
             for (let i = 0; i < currentIndex; i++) {
                 const stepElement = document.getElementById(stepOrder[i]);
@@ -341,18 +341,18 @@
             const step = document.getElementById(stepId);
             if (step) {
                 step.style.display = 'block';
-                
+
                 const icon = step.querySelector('i');
                 const badge = step.querySelector('.badge');
                 const textSpan = step.querySelector('span');
-                
+
                 // Update icon to spinning
                 icon.className = icon.className.replace('text-secondary', 'text-primary').replace('fa-check-circle', 'fa-circle-notch fa-spin');
-                
+
                 // Update badge to "In Progress"
                 badge.textContent = 'In Progress';
                 badge.className = 'badge bg-primary rounded-pill';
-                
+
                 // Update message if provided
                 if (message) {
                     const iconClass = icon.className;
@@ -367,15 +367,15 @@
                 const icon = step.querySelector('i');
                 const badge = step.querySelector('.badge');
                 const textSpan = step.querySelector('span');
-                
+
                 // Update icon to check mark
                 const baseIconClass = icon.className.replace('fa-circle-notch fa-spin text-primary', 'fa-check-circle text-success').replace('text-secondary', 'text-success');
                 icon.className = 'fas fa-check-circle text-success me-2';
-                
+
                 // Update badge to "Done"
                 badge.textContent = 'Done';
                 badge.className = 'badge bg-success rounded-pill';
-                
+
                 // Update message if provided - keep original text but with check icon
                 if (message) {
                     textSpan.innerHTML = `<i class="fas fa-check-circle text-success me-2"></i>${message}`;
@@ -687,12 +687,12 @@
                     .then(response => response.json())
                     .then(data => {
                         clearInterval(routeProgressInterval);
-                        
+
                         // Hide loading indicator and re-enable buttons
                         document.getElementById('routeLoading').style.display = 'none';
                         document.getElementById('optimizedRoute').disabled = false;
                         document.getElementById('centerRoute').disabled = false;
-                        
+
                         if (data.error) {
                             console.error('Error fetching optimized route:', data.error);
                             alert('Error loading optimized route: ' + data.error);
@@ -701,7 +701,7 @@
                             showCenterRoute();
                         } else {
                             const routeCoords = data.route.map(pt => [pt.lat, pt.lon]);
-                            
+
                             // Check if this is an SSS task
                             if (data.sss_info && data.takeoff_center) {
                                 // For SSS tasks, the routeCoords already contain the correct optimized route
@@ -711,7 +711,7 @@
                                     weight: 3,
                                     opacity: 0.9
                                 }).addTo(map);
-                                
+
                                 // Add a special marker for the optimal SSS entry point
                                 const optimalSssPoint = [data.sss_info.optimal_entry_point.lat, data.sss_info.optimal_entry_point.lon];
                                 sssOptimalMarker = L.marker(optimalSssPoint, {
@@ -722,7 +722,7 @@
                                         iconAnchor: [6, 6]
                                     })
                                 }).addTo(map).bindPopup('<strong>Optimal SSS Entry Point</strong><br>Best point to enter the Start Speed Section');
-                                
+
                                 // Add a dashed line from takeoff to optimal SSS entry point to show the relation
                                 const takeoffCoord = [data.takeoff_center.lat, data.takeoff_center.lon];
                                 sssConnectionLine = L.polyline([takeoffCoord, optimalSssPoint], {
@@ -731,7 +731,7 @@
                                     opacity: 0.6,
                                     dashArray: '5, 5'
                                 }).addTo(map);
-                                
+
                             } else {
                                 // For non-SSS tasks, draw the normal optimized route
                                 optimizedRouteLayer = L.polyline(routeCoords, {
@@ -744,12 +744,12 @@
                     })
                     .catch(error => {
                         clearInterval(routeProgressInterval);
-                        
+
                         // Hide loading indicator and re-enable buttons
                         document.getElementById('routeLoading').style.display = 'none';
                         document.getElementById('optimizedRoute').disabled = false;
                         document.getElementById('centerRoute').disabled = false;
-                        
+
                         console.error('Error fetching optimized route:', error);
                         alert('Error loading optimized route: ' + error.message);
                         // Switch back to center route
@@ -762,7 +762,7 @@
             function showCenterRoute() {
                 // Hide loading indicator
                 document.getElementById('routeLoading').style.display = 'none';
-                
+
                 if (optimizedRouteLayer) {
                     map.removeLayer(optimizedRouteLayer);
                 }

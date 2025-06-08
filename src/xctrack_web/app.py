@@ -5,6 +5,7 @@ from typing import Optional
 
 try:
     from flask import Flask
+
     FLASK_AVAILABLE = True
 except ImportError:
     FLASK_AVAILABLE = False
@@ -12,6 +13,7 @@ except ImportError:
 try:
     # Check if xctrack is available - actual imports are in respective modules
     import importlib.util
+
     if importlib.util.find_spec("xctrack") is not None:
         XCTRACK_AVAILABLE = True
     else:
@@ -73,27 +75,33 @@ class XCTrackWebApp:
         self.task_manager = TaskManager(self.task_directory, self.saved_tasks_dir)
         self.progress_tracker = ProgressTracker()
         self.route_handlers = RouteHandlers(
-            self.task_manager, 
-            self.cache_manager, 
-            self.progress_tracker
+            self.task_manager, self.cache_manager, self.progress_tracker
         )
 
         self.setup_routes()
 
     def setup_routes(self):
         """Setup Flask routes."""
-        
+
         # Main pages
         self.app.route("/")(self.route_handlers.index)
         self.app.route("/task/<task_code>")(self.route_handlers.view_task)
 
         # Task API endpoints
         self.app.route("/api/task/<task_code>")(self.route_handlers.api_get_task)
-        self.app.route("/api/task/<task_code>/cache-status")(self.route_handlers.api_get_cache_status)
-        self.app.route("/api/task/<task_code>/progress")(self.route_handlers.api_get_task_progress)
+        self.app.route("/api/task/<task_code>/cache-status")(
+            self.route_handlers.api_get_cache_status
+        )
+        self.app.route("/api/task/<task_code>/progress")(
+            self.route_handlers.api_get_task_progress
+        )
         self.app.route("/api/task/<task_code>/qr")(self.route_handlers.api_get_qr_code)
-        self.app.route("/api/task/<task_code>/optimized-route")(self.route_handlers.api_get_optimized_route)
-        self.app.route("/api/task/<task_code>/route-progress")(self.route_handlers.api_get_route_progress)
+        self.app.route("/api/task/<task_code>/optimized-route")(
+            self.route_handlers.api_get_optimized_route
+        )
+        self.app.route("/api/task/<task_code>/route-progress")(
+            self.route_handlers.api_get_route_progress
+        )
 
         # Upload and file management
         self.app.route("/upload", methods=["POST"])(self.route_handlers.upload_task)
@@ -101,7 +109,9 @@ class XCTrackWebApp:
         # Task listing endpoints
         self.app.route("/api/tasks")(self.route_handlers.api_list_tasks)
         self.app.route("/api/saved-tasks")(self.route_handlers.api_list_saved_tasks)
-        self.app.route("/api/task/saved/<filename>")(self.route_handlers.api_get_saved_task)
+        self.app.route("/api/task/saved/<filename>")(
+            self.route_handlers.api_get_saved_task
+        )
 
         # Cache management
         self.app.route("/api/cache/info")(self.route_handlers.api_get_cache_info)

@@ -6,6 +6,7 @@ from threading import Timer
 
 try:
     from flask import render_template, request, jsonify
+
     FLASK_AVAILABLE = True
 except ImportError:
     FLASK_AVAILABLE = False
@@ -13,6 +14,7 @@ except ImportError:
 try:
     from xctrack.parser import parse_task
     from xctrack.utils import generate_qr_code, QR_CODE_SUPPORT
+
     XCTRACK_AVAILABLE = True
 except ImportError:
     XCTRACK_AVAILABLE = False
@@ -23,7 +25,7 @@ class RouteHandlers:
 
     def __init__(self, task_manager, cache_manager, progress_tracker):
         """Initialize route handlers.
-        
+
         Args:
             task_manager: TaskManager instance
             cache_manager: CacheManager instance
@@ -51,27 +53,48 @@ class RouteHandlers:
                 with open(task_file, "r") as f:
                     task_data = f.read()
                 task = parse_task(task_data)
-                
+
                 # Check if we have complete cached data
                 cache_key = self.cache_manager.get_task_cache_key(task)
                 is_fully_cached = self.cache_manager.is_task_fully_cached(cache_key)
-                
+
                 if is_fully_cached:
                     # Return cached data immediately without progress tracking
                     result = self.task_manager.task_to_dict(task, self.cache_manager)
                     return jsonify(result)
                 else:
                     # Need to calculate data, so show progress
-                    self.progress_tracker.set_progress(task_code, "Loading task file...", 10, "Task found, checking cache")
-                    self.progress_tracker.set_progress(task_code, "Parsing task data...", 30, "Reading and validating task format")
-                    self.progress_tracker.set_progress(task_code, "Converting to web format...", 50, "Preparing task for processing")
-                    
-                    result = self.task_manager.task_to_dict(task, self.cache_manager, self.progress_tracker, task_code)
-                    
-                    self.progress_tracker.set_progress(task_code, "Task processing complete", 100, "Ready to display")
+                    self.progress_tracker.set_progress(
+                        task_code,
+                        "Loading task file...",
+                        10,
+                        "Task found, checking cache",
+                    )
+                    self.progress_tracker.set_progress(
+                        task_code,
+                        "Parsing task data...",
+                        30,
+                        "Reading and validating task format",
+                    )
+                    self.progress_tracker.set_progress(
+                        task_code,
+                        "Converting to web format...",
+                        50,
+                        "Preparing task for processing",
+                    )
+
+                    result = self.task_manager.task_to_dict(
+                        task, self.cache_manager, self.progress_tracker, task_code
+                    )
+
+                    self.progress_tracker.set_progress(
+                        task_code, "Task processing complete", 100, "Ready to display"
+                    )
                     # Clear progress after a short delay
-                    Timer(2.0, lambda: self.progress_tracker.clear_progress(task_code)).start()
-                    
+                    Timer(
+                        2.0, lambda: self.progress_tracker.clear_progress(task_code)
+                    ).start()
+
                     return jsonify(result)
             else:
                 self.progress_tracker.clear_progress(task_code)
@@ -90,17 +113,20 @@ class RouteHandlers:
                 with open(task_file, "r") as f:
                     task_data = f.read()
                 task = parse_task(task_data)
-                
+
                 # Check if we have complete cached data
                 cache_key = self.cache_manager.get_task_cache_key(task)
                 distance_data = self.cache_manager.load_cached_distances(cache_key)
                 is_fully_cached = self.cache_manager.is_task_fully_cached(cache_key)
-                
-                return jsonify({
-                    "fully_cached": is_fully_cached,
-                    "has_distance_data": distance_data is not None,
-                    "has_route_data": distance_data is not None and "route_data" in distance_data
-                })
+
+                return jsonify(
+                    {
+                        "fully_cached": is_fully_cached,
+                        "has_distance_data": distance_data is not None,
+                        "has_route_data": distance_data is not None
+                        and "route_data" in distance_data,
+                    }
+                )
             else:
                 return jsonify({"error": "Task not found"}), 404
         except Exception as e:
@@ -158,11 +184,15 @@ class RouteHandlers:
             task_dict = self.task_manager.task_to_dict(task, self.cache_manager)
 
             # Save the task file
-            save_info = self.task_manager.save_uploaded_task(task_data, file.filename, task)
-            
+            save_info = self.task_manager.save_uploaded_task(
+                task_data, file.filename, task
+            )
+
             # Save metadata
             cache_key = self.cache_manager.get_task_cache_key(task)
-            self.task_manager.save_task_metadata(save_info, file.filename, task_dict, cache_key)
+            self.task_manager.save_task_metadata(
+                save_info, file.filename, task_dict, cache_key
+            )
 
             # Add the saved file info to the response
             task_dict["saved_as"] = save_info["filename"]
@@ -177,10 +207,10 @@ class RouteHandlers:
         try:
             # Load sample tasks from tests directory
             sample_tasks = self.task_manager.get_sample_tasks(self.cache_manager)
-            
+
             # Load saved tasks from metadata
             saved_tasks = self.task_manager.get_saved_tasks()
-            
+
             # Combine both lists
             all_tasks = sample_tasks + saved_tasks
 
@@ -216,8 +246,10 @@ class RouteHandlers:
         try:
             # Initialize progress for route calculation
             route_id = f"{task_code}_route"
-            self.progress_tracker.set_progress(route_id, "Loading task for route optimization...", 10)
-            
+            self.progress_tracker.set_progress(
+                route_id, "Loading task for route optimization...", 10
+            )
+
             # Load task
             task = self.task_manager.load_task(task_code)
             if not task:
@@ -234,13 +266,21 @@ class RouteHandlers:
                 return jsonify(distance_data["route_data"])
             else:
                 # Calculate route data if not cached
-                self.progress_tracker.set_progress(route_id, "Calculating optimized route...", 50, 
-                                       "Computing optimal path between turnpoints")
-                
+                self.progress_tracker.set_progress(
+                    route_id,
+                    "Calculating optimized route...",
+                    50,
+                    "Computing optimal path between turnpoints",
+                )
+
                 print(f"Calculating optimized route for task {task_code}...")
                 route_data = self.task_manager.calculate_and_cache_route_data(
-                    task, cache_key, self.cache_manager, self.progress_tracker, 
-                    angle_step=10, task_code=task_code
+                    task,
+                    cache_key,
+                    self.cache_manager,
+                    self.progress_tracker,
+                    angle_step=10,
+                    task_code=task_code,
                 )
 
                 # Update cache if it exists
