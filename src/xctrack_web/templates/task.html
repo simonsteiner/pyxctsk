@@ -82,6 +82,25 @@
             font-size: 0.8em;
             padding: 0.5em 0.8em;
         }
+
+        .route-loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            text-align: center;
+            min-width: 200px;
+        }
+
+        .route-loading .spinner-border {
+            width: 2rem;
+            height: 2rem;
+        }
     </style>
 </head>
 
@@ -235,7 +254,14 @@
                                     </label>
                                 </div>
                             </div>
-                            <div id="mapContainer" class="map-container"></div>
+                            <div id="mapContainer" class="map-container" style="position: relative;">
+                                <div id="routeLoading" class="route-loading" style="display: none;">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p class="mt-2 mb-0">Calculating optimized route...</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -414,10 +440,20 @@
                     map.removeLayer(optimizedRouteLayer);
                 }
 
+                // Show loading indicator and disable buttons
+                document.getElementById('routeLoading').style.display = 'block';
+                document.getElementById('optimizedRoute').disabled = true;
+                document.getElementById('centerRoute').disabled = true;
+
                 // Fetch optimized route data
                 fetch(`/api/task/${taskCode}/optimized-route`)
                     .then(response => response.json())
                     .then(data => {
+                        // Hide loading indicator and re-enable buttons
+                        document.getElementById('routeLoading').style.display = 'none';
+                        document.getElementById('optimizedRoute').disabled = false;
+                        document.getElementById('centerRoute').disabled = false;
+                        
                         if (data.error) {
                             console.error('Error fetching optimized route:', data.error);
                             alert('Error loading optimized route: ' + data.error);
@@ -468,6 +504,11 @@
                         }
                     })
                     .catch(error => {
+                        // Hide loading indicator and re-enable buttons
+                        document.getElementById('routeLoading').style.display = 'none';
+                        document.getElementById('optimizedRoute').disabled = false;
+                        document.getElementById('centerRoute').disabled = false;
+                        
                         console.error('Error fetching optimized route:', error);
                         alert('Error loading optimized route: ' + error.message);
                         // Switch back to center route
@@ -478,6 +519,9 @@
 
             // Route display functions
             function showCenterRoute() {
+                // Hide loading indicator
+                document.getElementById('routeLoading').style.display = 'none';
+                
                 if (optimizedRouteLayer) {
                     map.removeLayer(optimizedRouteLayer);
                 }
