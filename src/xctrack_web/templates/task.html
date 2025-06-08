@@ -135,7 +135,12 @@
             <div class="spinner-border text-primary" role="status">
                 <span class="visually-hidden">Loading...</span>
             </div>
-            <p class="mt-3">Loading task data...</p>
+            <h4 class="mt-3">Processing Task</h4>
+            <div class="mt-4">
+                <div class="list-group" id="processingSteps">
+                    <!-- Processing steps will be added dynamically -->
+                </div>
+            </div>
         </div>
 
         <div id="error" class="error" style="display: none;">
@@ -160,10 +165,31 @@
         });
 
         function loadTaskData() {
+            // First check if data is fully cached
+            fetch(`/api/task/${taskCode}/cache-status`)
+                .then(response => response.json())
+                .then(cacheStatus => {
+                    if (cacheStatus.fully_cached) {
+                        // Data is cached, load directly without showing loading screen
+                        document.getElementById('loading').style.display = 'none';
+                        loadTaskDataDirect();
+                    } else {
+                        // Data needs processing, show loading screen with progress
+                        loadTaskDataWithProgress();
+                    }
+                })
+                .catch(error => {
+                    console.warn('Cache status check failed, proceeding with loading screen:', error);
+                    // Fallback to showing loading screen
+                    loadTaskDataWithProgress();
+                });
+        }
+
+        function loadTaskDataDirect() {
+            // Load task data directly without progress tracking
             fetch(`/api/task/${taskCode}`)
                 .then(response => response.json())
                 .then(data => {
-                    document.getElementById('loading').style.display = 'none';
                     if (data.error) {
                         showError(data.error);
                     } else {
@@ -172,9 +198,199 @@
                     }
                 })
                 .catch(error => {
+                    showError('Failed to load task data: ' + error.message);
+                });
+        }
+
+        function loadTaskDataWithProgress() {
+            let progressInterval;
+            
+            // Clear existing steps and prepare for dynamic loading
+            clearProcessingSteps();
+            
+            // Start polling for progress updates
+            progressInterval = setInterval(() => {
+                fetch(`/api/task/${taskCode}/progress`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.message && data.progress !== undefined) {
+                            updateLoadingStatus(data.message, data.progress, data.details);
+                        }
+                    })
+                    .catch(error => {
+                        console.warn('Progress update failed:', error);
+                    });
+            }, 500);
+            
+            // Start the actual task loading
+            fetch(`/api/task/${taskCode}`)
+                .then(response => {
+                    return response.json();
+                })
+                .then(data => {
+                    clearInterval(progressInterval);
+                    
+                    // Create and show final completion step
+                    const finalStepData = { text: 'Task processing complete', icon: 'fas fa-check-circle' };
+                    createStepIfNotExists('step-complete', finalStepData);
+                    
+                    // Complete all previous steps and show final completion
+                    completePreviousSteps('step-complete');
+                    completeStep('step-complete', 'Task loaded successfully');
+                    
+                    setTimeout(() => {
+                        document.getElementById('loading').style.display = 'none';
+                        
+                        if (data.error) {
+                            showError(data.error);
+                        } else {
+                            currentTaskData = data;
+                            displayTask(data);
+                        }
+                    }, 1000); // Show completion for 1 second before hiding
+                })
+                .catch(error => {
+                    clearInterval(progressInterval);
                     document.getElementById('loading').style.display = 'none';
                     showError('Failed to load task data: ' + error.message);
                 });
+        }
+
+        function updateLoadingStatus(message, progress = null, details = null) {
+            // Create or update step based on message content
+            let stepId = getStepIdFromMessage(message);
+            let stepData = getStepDataFromMessage(message);
+            
+            if (stepId && stepData) {
+                // Create the step if it doesn't exist
+                createStepIfNotExists(stepId, stepData);
+                
+                // Show current step as in progress
+                showStep(stepId, message);
+                
+                // Complete previous steps if any
+                completePreviousSteps(stepId);
+            }
+        }
+
+        function getStepIdFromMessage(message) {
+            // Map messages to step IDs based on backend progress messages
+            if (message.includes('Loading task file') || message.includes('Loading task for route')) {
+                return 'step-loading';
+            } else if (message.includes('Parsing task data') || message.includes('Reading and validating')) {
+                return 'step-parsing';
+            } else if (message.includes('Converting to web format') || message.includes('Preparing task')) {
+                return 'step-converting';
+            } else if (message.includes('Calculating distances') || message.includes('Preparing route calculation') || message.includes('Calculating route coordinates')) {
+                return 'step-distances';
+            } else if (message.includes('Optimizing route') || message.includes('Calculating optimized')) {
+                return 'step-route';
+            } else if (message.includes('Checking for SSS') || message.includes('Finalizing route') || message.includes('Adding route data')) {
+                return 'step-finalizing';
+            } else if (message.includes('Complete') || message.includes('successfully') || message.includes('processing complete')) {
+                return 'step-complete';
+            }
+            return null;
+        }
+
+        function getStepDataFromMessage(message) {
+            // Get step display information based on message
+            const stepData = {
+                'step-loading': { text: 'Loading task data', icon: 'fas fa-download' },
+                'step-parsing': { text: 'Parsing task data', icon: 'fas fa-file-alt' },
+                'step-converting': { text: 'Converting to web format', icon: 'fas fa-exchange-alt' },
+                'step-distances': { text: 'Calculating distances', icon: 'fas fa-ruler' },
+                'step-route': { text: 'Optimizing route', icon: 'fas fa-route' },
+                'step-finalizing': { text: 'Finalizing task data', icon: 'fas fa-cogs' },
+                'step-complete': { text: 'Task processing complete', icon: 'fas fa-check-circle' }
+            };
+            
+            const stepId = getStepIdFromMessage(message);
+            return stepId ? stepData[stepId] : null;
+        }
+
+        function createStepIfNotExists(stepId, stepData) {
+            if (!document.getElementById(stepId)) {
+                const stepsContainer = document.getElementById('processingSteps');
+                const stepElement = document.createElement('div');
+                stepElement.className = 'list-group-item d-flex justify-content-between align-items-center';
+                stepElement.id = stepId;
+                stepElement.innerHTML = `
+                    <span><i class="${stepData.icon} text-secondary me-2"></i>${stepData.text}...</span>
+                    <span class="badge bg-secondary rounded-pill">Waiting</span>
+                `;
+                stepsContainer.appendChild(stepElement);
+            }
+        }
+
+        function completePreviousSteps(currentStepId) {
+            // Define step order
+            const stepOrder = ['step-loading', 'step-parsing', 'step-converting', 'step-distances', 'step-route', 'step-finalizing', 'step-complete'];
+            const currentIndex = stepOrder.indexOf(currentStepId);
+            
+            // Complete all previous steps
+            for (let i = 0; i < currentIndex; i++) {
+                const stepElement = document.getElementById(stepOrder[i]);
+                if (stepElement) {
+                    completeStep(stepOrder[i]);
+                }
+            }
+        }
+
+        function showStep(stepId, message = null) {
+            const step = document.getElementById(stepId);
+            if (step) {
+                step.style.display = 'block';
+                
+                const icon = step.querySelector('i');
+                const badge = step.querySelector('.badge');
+                const textSpan = step.querySelector('span');
+                
+                // Update icon to spinning
+                icon.className = icon.className.replace('text-secondary', 'text-primary').replace('fa-check-circle', 'fa-circle-notch fa-spin');
+                
+                // Update badge to "In Progress"
+                badge.textContent = 'In Progress';
+                badge.className = 'badge bg-primary rounded-pill';
+                
+                // Update message if provided
+                if (message) {
+                    const iconClass = icon.className;
+                    textSpan.innerHTML = `<i class="${iconClass}"></i>${message}`;
+                }
+            }
+        }
+
+        function completeStep(stepId, message = null) {
+            const step = document.getElementById(stepId);
+            if (step) {
+                const icon = step.querySelector('i');
+                const badge = step.querySelector('.badge');
+                const textSpan = step.querySelector('span');
+                
+                // Update icon to check mark
+                const baseIconClass = icon.className.replace('fa-circle-notch fa-spin text-primary', 'fa-check-circle text-success').replace('text-secondary', 'text-success');
+                icon.className = 'fas fa-check-circle text-success me-2';
+                
+                // Update badge to "Done"
+                badge.textContent = 'Done';
+                badge.className = 'badge bg-success rounded-pill';
+                
+                // Update message if provided - keep original text but with check icon
+                if (message) {
+                    textSpan.innerHTML = `<i class="fas fa-check-circle text-success me-2"></i>${message}`;
+                } else {
+                    // Just update the icon, keep existing text
+                    const currentText = textSpan.textContent || textSpan.innerText;
+                    textSpan.innerHTML = `<i class="fas fa-check-circle text-success me-2"></i>${currentText}`;
+                }
+            }
+        }
+
+        function clearProcessingSteps() {
+            // Clear all dynamically created steps
+            const stepsContainer = document.getElementById('processingSteps');
+            stepsContainer.innerHTML = '';
         }
 
         function showError(message) {
@@ -445,10 +661,33 @@
                 document.getElementById('optimizedRoute').disabled = true;
                 document.getElementById('centerRoute').disabled = true;
 
+                // Start progress polling for route calculation
+                let routeProgressInterval = setInterval(() => {
+                    fetch(`/api/task/${taskCode}/route-progress`)
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.message && data.progress !== undefined) {
+                                const loadingDiv = document.getElementById('routeLoading');
+                                const loadingText = loadingDiv.querySelector('p');
+                                if (loadingText) {
+                                    loadingText.textContent = data.message;
+                                }
+                                if (data.details) {
+                                    loadingText.textContent += ` - ${data.details}`;
+                                }
+                            }
+                        })
+                        .catch(error => {
+                            console.warn('Route progress update failed:', error);
+                        });
+                }, 500);
+
                 // Fetch optimized route data
                 fetch(`/api/task/${taskCode}/optimized-route`)
                     .then(response => response.json())
                     .then(data => {
+                        clearInterval(routeProgressInterval);
+                        
                         // Hide loading indicator and re-enable buttons
                         document.getElementById('routeLoading').style.display = 'none';
                         document.getElementById('optimizedRoute').disabled = false;
@@ -504,6 +743,8 @@
                         }
                     })
                     .catch(error => {
+                        clearInterval(routeProgressInterval);
+                        
                         // Hide loading indicator and re-enable buttons
                         document.getElementById('routeLoading').style.display = 'none';
                         document.getElementById('optimizedRoute').disabled = false;

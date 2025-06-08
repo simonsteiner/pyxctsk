@@ -56,6 +56,9 @@ class XCTrackWebApp:
 
         # Distance calculation cache to improve performance
         self._distance_cache = {}
+        
+        # Progress tracking for long-running operations
+        self._task_progress = {}
 
         # Set default task directory
         if tasks_dir:
@@ -91,6 +94,54 @@ class XCTrackWebApp:
         def api_get_task(task_code: str):
             """API endpoint to get task data."""
             try:
+                # Try to load the task file first
+                task_file = self._find_task_file(task_code)
+
+                if task_file and task_file.exists():
+                    with open(task_file, "r") as f:
+                        task_data = f.read()
+                    task = parse_task(task_data)
+                    
+                    # Check if we have complete cached data
+                    cache_key = self._get_task_cache_key(task)
+                    distance_data = self._load_cached_distances(cache_key)
+                    
+                    # Check if cache is complete (has both distance and route data)
+                    is_fully_cached = (
+                        distance_data is not None and 
+                        "route_data" in distance_data and
+                        cache_key in self._distance_cache
+                    )
+                    
+                    if is_fully_cached:
+                        # Return cached data immediately without progress tracking
+                        result = self._task_to_dict(task, task_code=None)  # No progress tracking
+                        return jsonify(result)
+                    else:
+                        # Need to calculate data, so show progress
+                        self._set_task_progress(task_code, "Loading task file...", 10, "Task found, checking cache")
+                        self._set_task_progress(task_code, "Parsing task data...", 30, "Reading and validating task format")
+                        self._set_task_progress(task_code, "Converting to web format...", 50, "Preparing task for processing")
+                        
+                        result = self._task_to_dict(task, task_code)
+                        
+                        self._set_task_progress(task_code, "Task processing complete", 100, "Ready to display")
+                        # Clear progress after a short delay
+                        from threading import Timer
+                        Timer(2.0, lambda: self._clear_task_progress(task_code)).start()
+                        
+                        return jsonify(result)
+                else:
+                    self._clear_task_progress(task_code)
+                    return jsonify({"error": "Task not found"}), 404
+            except Exception as e:
+                self._clear_task_progress(task_code)
+                return jsonify({"error": str(e)}), 500
+
+        @self.app.route("/api/task/<task_code>/cache-status")
+        def api_get_cache_status(task_code: str):
+            """API endpoint to check if task data is fully cached."""
+            try:
                 # Try to load the task file
                 task_file = self._find_task_file(task_code)
 
@@ -98,11 +149,37 @@ class XCTrackWebApp:
                     with open(task_file, "r") as f:
                         task_data = f.read()
                     task = parse_task(task_data)
-                    return jsonify(self._task_to_dict(task))
+                    
+                    # Check if we have complete cached data
+                    cache_key = self._get_task_cache_key(task)
+                    distance_data = self._load_cached_distances(cache_key)
+                    
+                    # Check if cache is complete (has both distance and route data)
+                    is_fully_cached = (
+                        distance_data is not None and 
+                        "route_data" in distance_data and
+                        cache_key in self._distance_cache
+                    )
+                    
+                    return jsonify({
+                        "fully_cached": is_fully_cached,
+                        "has_distance_data": distance_data is not None,
+                        "has_route_data": distance_data is not None and "route_data" in distance_data
+                    })
                 else:
                     return jsonify({"error": "Task not found"}), 404
             except Exception as e:
                 return jsonify({"error": str(e)}), 500
+
+        @self.app.route("/api/task/<task_code>/progress")
+        def api_get_task_progress(task_code: str):
+            """API endpoint to get task loading progress."""
+            progress = self._task_progress.get(task_code, {
+                "message": "Task not found", 
+                "progress": 0, 
+                "details": ""
+            })
+            return jsonify(progress)
 
         @self.app.route("/api/task/<task_code>/qr")
         def api_get_qr_code(task_code: str):
@@ -296,6 +373,9 @@ class XCTrackWebApp:
         def api_get_optimized_route(task_code: str):
             """API endpoint to get optimized route coordinates for a task."""
             try:
+                # Initialize progress for route calculation
+                self._set_task_progress(f"{task_code}_route", "Loading task for route optimization...", 10)
+                
                 # Load task
                 task_file = self._find_task_file(task_code)
 
@@ -310,12 +390,16 @@ class XCTrackWebApp:
 
                     if distance_data and "route_data" in distance_data:
                         # Return cached route data
+                        self._clear_task_progress(f"{task_code}_route")
                         return jsonify(distance_data["route_data"])
                     else:
                         # Calculate route data if not cached
+                        self._set_task_progress(f"{task_code}_route", "Calculating optimized route...", 50, 
+                                              "Computing optimal path between turnpoints")
+                        
                         print(f"Calculating optimized route for task {task_code}...")
                         route_data = self._calculate_and_cache_route_data(
-                            task, cache_key, angle_step=10
+                            task, cache_key, angle_step=10, task_code=task_code
                         )
 
                         # Update cache if it exists
@@ -324,11 +408,24 @@ class XCTrackWebApp:
                             self._distance_cache[cache_key] = distance_data
                             self._save_cached_distances(cache_key, distance_data)
 
+                        self._clear_task_progress(f"{task_code}_route")
                         return jsonify(route_data)
                 else:
+                    self._clear_task_progress(f"{task_code}_route")
                     return jsonify({"error": "Task not found"}), 404
             except Exception as e:
+                self._clear_task_progress(f"{task_code}_route")
                 return jsonify({"error": str(e)}), 500
+
+        @self.app.route("/api/task/<task_code>/route-progress")
+        def api_get_route_progress(task_code: str):
+            """API endpoint to get route calculation progress."""
+            progress = self._task_progress.get(f"{task_code}_route", {
+                "message": "No route calculation in progress", 
+                "progress": 0, 
+                "details": ""
+            })
+            return jsonify(progress)
 
         @self.app.route("/api/cache/info")
         def api_get_cache_info():
@@ -463,7 +560,7 @@ class XCTrackWebApp:
             pass
 
     def _calculate_and_cache_route_data(
-        self, task: Task, cache_key: str, angle_step: int = 10
+        self, task: Task, cache_key: str, angle_step: int = 10, task_code: str = None
     ) -> Dict[str, Any]:
         """Calculate optimized route data and add it to cache."""
         from xctrack.distance import (
@@ -473,11 +570,19 @@ class XCTrackWebApp:
             calculate_sss_info,
         )
 
+        if task_code:
+            self._set_task_progress(task_code, "Preparing route calculation...", 0, 
+                                  "Converting turnpoints for optimization")
+
         # Convert task turnpoints to distance calculation format
         turnpoints = []
         for tp in task.turnpoints:
             task_tp = TaskTurnpoint(tp.waypoint.lat, tp.waypoint.lon, tp.radius)
             turnpoints.append(task_tp)
+
+        if task_code:
+            self._set_task_progress(task_code, "Calculating route coordinates...", 25, 
+                                  f"Optimizing path through {len(turnpoints)} turnpoints")
 
         # Calculate optimized route coordinates
         route_coords = optimized_route_coordinates(
@@ -487,10 +592,18 @@ class XCTrackWebApp:
         # Convert to the format expected by the frontend
         route_data = [{"lat": lat, "lon": lon} for lat, lon in route_coords]
 
+        if task_code:
+            self._set_task_progress(task_code, "Calculating optimized distance...", 50, 
+                                  "Computing total route distance")
+
         # Calculate optimized distance
         total_distance = optimized_distance(
             turnpoints, angle_step=angle_step, show_progress=False
         )
+
+        if task_code:
+            self._set_task_progress(task_code, "Checking for SSS information...", 75, 
+                                  "Analyzing start sector geometry")
 
         # Check for SSS and add SSS info if needed
         sss_info = calculate_sss_info(
@@ -504,6 +617,10 @@ class XCTrackWebApp:
                 "lon": task.turnpoints[0].waypoint.lon,
             }
 
+        if task_code:
+            self._set_task_progress(task_code, "Finalizing route data...", 90, 
+                                  "Preparing route for display")
+
         route_cache_data = {
             "route": route_data,
             "distance_km": total_distance / 1000.0,
@@ -514,9 +631,13 @@ class XCTrackWebApp:
             route_cache_data["sss_info"] = sss_info
             route_cache_data["takeoff_center"] = takeoff_center
 
+        if task_code:
+            self._set_task_progress(task_code, "Route calculation complete", 100, 
+                                  f"Optimized route ready ({total_distance/1000:.1f}km)")
+
         return route_cache_data
 
-    def _task_to_dict(self, task: Task) -> Dict[str, Any]:
+    def _task_to_dict(self, task: Task, task_code: str = None) -> Dict[str, Any]:
         """Convert a task to a dictionary for JSON serialization."""
         # Check persistent cache first
         cache_key = self._get_task_cache_key(task)
@@ -528,6 +649,10 @@ class XCTrackWebApp:
                 distance_data = self._distance_cache[cache_key]
             else:
                 # Calculate distances with faster settings for web interface
+                if task_code:
+                    self._set_task_progress(task_code, "Calculating distances...", 50, 
+                                          f"Processing {len(task.turnpoints)} turnpoints")
+                
                 print(
                     f"Calculating distances for task with {len(task.turnpoints)} turnpoints..."
                 )
@@ -535,9 +660,13 @@ class XCTrackWebApp:
                     task, angle_step=10
                 )  # Use 10° for faster web response
 
+                if task_code:
+                    self._set_task_progress(task_code, "Optimizing route...", 70, 
+                                          "Finding optimal path between turnpoints")
+
                 # Add optimized route data to cache
                 route_data = self._calculate_and_cache_route_data(
-                    task, cache_key, angle_step=10
+                    task, cache_key, angle_step=10, task_code=task_code
                 )
                 distance_data["route_data"] = route_data
 
@@ -550,9 +679,13 @@ class XCTrackWebApp:
 
         # If cache exists but doesn't have route data, calculate and add it
         if "route_data" not in distance_data:
+            if task_code:
+                self._set_task_progress(task_code, "Adding route data...", 80, 
+                                      "Calculating optimized route coordinates")
+            
             print("Adding route data to existing cache...")
             route_data = self._calculate_and_cache_route_data(
-                task, cache_key, angle_step=10
+                task, cache_key, angle_step=10, task_code=task_code
             )
             distance_data["route_data"] = route_data
             # Update both memory and persistent cache
@@ -693,6 +826,20 @@ class XCTrackWebApp:
 
         cache_info["total_size_mb"] = round(cache_info["total_size_mb"], 2)
         return cache_info
+
+    def _set_task_progress(self, task_code: str, message: str, progress: int, details: str = ""):
+        """Set progress information for a task loading operation."""
+        self._task_progress[task_code] = {
+            "message": message,
+            "progress": progress,
+            "details": details,
+            "timestamp": datetime.now().isoformat()
+        }
+
+    def _clear_task_progress(self, task_code: str):
+        """Clear progress information for a task."""
+        if task_code in self._task_progress:
+            del self._task_progress[task_code]
 
     def run(
         self, host: str = "127.0.0.1", port: int = 5000, debug: Optional[bool] = None
