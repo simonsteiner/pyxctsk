@@ -1,8 +1,8 @@
 {
   "center_distance_km": 80.0,
-  "optimized_distance_km": 50.0,
-  "savings_km": 29.9,
-  "savings_percent": 37.4,
+  "optimized_distance_km": 49.9,
+  "savings_km": 30.0,
+  "savings_percent": 37.5,
   "turnpoints": [
     {
       "index": 0,
@@ -21,8 +21,8 @@
       "lon": 12.857166290283203,
       "radius": 3000,
       "type": "SSS",
-      "cumulative_center_km": 3.4,
-      "cumulative_optimized_km": 0.5
+      "cumulative_center_km": 0.0,
+      "cumulative_optimized_km": 0.0
     },
     {
       "index": 2,
@@ -32,7 +32,7 @@
       "radius": 1000,
       "type": "",
       "cumulative_center_km": 3.4,
-      "cumulative_optimized_km": 2.5
+      "cumulative_optimized_km": 2.4
     },
     {
       "index": 3,
@@ -52,7 +52,7 @@
       "radius": 1000,
       "type": "",
       "cumulative_center_km": 20.3,
-      "cumulative_optimized_km": 16.8
+      "cumulative_optimized_km": 16.7
     },
     {
       "index": 5,
@@ -62,7 +62,7 @@
       "radius": 800,
       "type": "",
       "cumulative_center_km": 27.0,
-      "cumulative_optimized_km": 21.8
+      "cumulative_optimized_km": 21.7
     },
     {
       "index": 6,
@@ -72,7 +72,7 @@
       "radius": 1000,
       "type": "",
       "cumulative_center_km": 37.5,
-      "cumulative_optimized_km": 30.6
+      "cumulative_optimized_km": 30.5
     },
     {
       "index": 7,
@@ -82,7 +82,7 @@
       "radius": 8000,
       "type": "",
       "cumulative_center_km": 56.5,
-      "cumulative_optimized_km": 40.6
+      "cumulative_optimized_km": 40.5
     },
     {
       "index": 8,
@@ -92,7 +92,7 @@
       "radius": 3000,
       "type": "",
       "cumulative_center_km": 73.4,
-      "cumulative_optimized_km": 46.5
+      "cumulative_optimized_km": 46.4
     },
     {
       "index": 9,
@@ -102,7 +102,7 @@
       "radius": 1500,
       "type": "ESS",
       "cumulative_center_km": 80.0,
-      "cumulative_optimized_km": 48.6
+      "cumulative_optimized_km": 48.5
     },
     {
       "index": 10,
@@ -112,8 +112,78 @@
       "radius": 100,
       "type": "",
       "cumulative_center_km": 80.0,
-      "cumulative_optimized_km": 50.0
+      "cumulative_optimized_km": 49.9
     }
   ],
-  "optimization_angle_step": 10
+  "optimization_angle_step": 10,
+  "route_data": {
+    "route": [
+      {
+        "lat": 42.49360275268555,
+        "lon": 12.897383689880371
+      },
+      {
+        "lat": 42.48508388834775,
+        "lon": 12.869328996250491
+      },
+      {
+        "lat": 42.46014389682384,
+        "lon": 12.922627262346944
+      },
+      {
+        "lat": 42.491668055680314,
+        "lon": 12.82068620600407
+      },
+      {
+        "lat": 42.512310795114274,
+        "lon": 12.874014213247799
+      },
+      {
+        "lat": 42.508799860715214,
+        "lon": 12.767219869217698
+      },
+      {
+        "lat": 42.495017367684646,
+        "lon": 12.887586540577594
+      },
+      {
+        "lat": 42.49416789506672,
+        "lon": 12.815294031349675
+      },
+      {
+        "lat": 42.48970170191486,
+        "lon": 12.840021221692352
+      },
+      {
+        "lat": 42.48539242481059,
+        "lon": 12.856023364166298
+      }
+    ],
+    "distance_km": 50.01339189756964,
+    "angle_step": 10,
+    "sss_info": {
+      "sss_center": {
+        "lat": 42.485084533691406,
+        "lon": 12.857166290283203,
+        "radius": 3000
+      },
+      "optimal_entry_point": {
+        "lat": 42.489768597687934,
+        "lon": 12.893102753935386
+      },
+      "first_tp_after_sss": {
+        "lat": 42.485084533691406,
+        "lon": 12.857166290283203
+      },
+      "takeoff_center": {
+        "lat": 42.49360275268555,
+        "lon": 12.897383689880371
+      }
+    },
+    "takeoff_center": {
+      "lat": 42.49360275268555,
+      "lon": 12.897383689880371
+    }
+  },
+  "cache_key": "170474117aa8c58bd50fb535eb6305b3"
 }

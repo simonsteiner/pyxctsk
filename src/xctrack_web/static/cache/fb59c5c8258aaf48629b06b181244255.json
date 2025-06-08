@@ -1,0 +1,175 @@
+{
+  "center_distance_km": 85.7,
+  "optimized_distance_km": 34.9,
+  "savings_km": 50.8,
+  "savings_percent": 59.3,
+  "turnpoints": [
+    {
+      "index": 0,
+      "name": "T03",
+      "lat": 46.70068359375,
+      "lon": 7.81991720199585,
+      "radius": 400,
+      "type": "TAKEOFF",
+      "cumulative_center_km": 0.0,
+      "cumulative_optimized_km": 0.0
+    },
+    {
+      "index": 1,
+      "name": "L04",
+      "lat": 46.68098449707031,
+      "lon": 7.823750019073486,
+      "radius": 1500,
+      "type": "SSS",
+      "cumulative_center_km": 0.0,
+      "cumulative_optimized_km": 0.0
+    },
+    {
+      "index": 2,
+      "name": "B02",
+      "lat": 46.70090103149414,
+      "lon": 7.773349761962891,
+      "radius": 1000,
+      "type": "",
+      "cumulative_center_km": 3.6,
+      "cumulative_optimized_km": 2.6
+    },
+    {
+      "index": 3,
+      "name": "B06",
+      "lat": 46.742984771728516,
+      "lon": 7.929200172424316,
+      "radius": 7500,
+      "type": "",
+      "cumulative_center_km": 16.4,
+      "cumulative_optimized_km": 6.9
+    },
+    {
+      "index": 4,
+      "name": "B02",
+      "lat": 46.70090103149414,
+      "lon": 7.773349761962891,
+      "radius": 1500,
+      "type": "",
+      "cumulative_center_km": 29.2,
+      "cumulative_optimized_km": 10.7
+    },
+    {
+      "index": 5,
+      "name": "B06",
+      "lat": 46.742984771728516,
+      "lon": 7.929200172424316,
+      "radius": 3000,
+      "type": "",
+      "cumulative_center_km": 42.0,
+      "cumulative_optimized_km": 19.0
+    },
+    {
+      "index": 6,
+      "name": "B48",
+      "lat": 46.748348236083984,
+      "lon": 7.71608304977417,
+      "radius": 7500,
+      "type": "",
+      "cumulative_center_km": 58.3,
+      "cumulative_optimized_km": 25.1
+    },
+    {
+      "index": 7,
+      "name": "B13",
+      "lat": 46.62241744995117,
+      "lon": 7.793867111206055,
+      "radius": 5500,
+      "type": "",
+      "cumulative_center_km": 73.5,
+      "cumulative_optimized_km": 31.1
+    },
+    {
+      "index": 8,
+      "name": "B01",
+      "lat": 46.69729995727539,
+      "lon": 7.851716995239258,
+      "radius": 1700,
+      "type": "ESS",
+      "cumulative_center_km": 82.9,
+      "cumulative_optimized_km": 33.9
+    },
+    {
+      "index": 9,
+      "name": "L04",
+      "lat": 46.68098449707031,
+      "lon": 7.823750019073486,
+      "radius": 200,
+      "type": "",
+      "cumulative_center_km": 85.7,
+      "cumulative_optimized_km": 34.9
+    }
+  ],
+  "optimization_angle_step": 10,
+  "route_data": {
+    "route": [
+      {
+        "lat": 46.70068359375,
+        "lon": 7.81991720199585
+      },
+      {
+        "lat": 46.702462382665075,
+        "lon": 7.7862269069131
+      },
+      {
+        "lat": 46.719872589626114,
+        "lon": 7.837016300994549
+      },
+      {
+        "lat": 46.705514578680585,
+        "lon": 7.7917816438529925
+      },
+      {
+        "lat": 46.73374882145254,
+        "lon": 7.892317173386139
+      },
+      {
+        "lat": 46.714583237764906,
+        "lon": 7.801031858644013
+      },
+      {
+        "lat": 46.668907495423355,
+        "lon": 7.818448903473862
+      },
+      {
+        "lat": 46.68746879368251,
+        "lon": 7.834693418487326
+      },
+      {
+        "lat": 46.68214094023214,
+        "lon": 7.8257525959145475
+      }
+    ],
+    "distance_km": 35.66392490932671,
+    "angle_step": 10,
+    "sss_info": {
+      "sss_center": {
+        "lat": 46.68098449707031,
+        "lon": 7.823750019073486,
+        "radius": 1500
+      },
+      "optimal_entry_point": {
+        "lat": 46.69366403085177,
+        "lon": 7.817042830411508
+      },
+      "first_tp_after_sss": {
+        "lat": 46.70090103149414,
+        "lon": 7.773349761962891
+      },
+      "takeoff_center": {
+        "lat": 46.70068359375,
+        "lon": 7.81991720199585
+      }
+    },
+    "takeoff_center": {
+      "lat": 46.70068359375,
+      "lon": 7.81991720199585
+    }
+  },
+  "cache_key": "fb59c5c8258aaf48629b06b181244255"
+}
