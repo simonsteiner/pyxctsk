@@ -9,6 +9,7 @@ Usage:
     python xctsk_automation.py upload --directory tests/xctsk --author "Your Name"
     python xctsk_automation.py download --codes waku,motu,duna --output results/
     python xctsk_automation.py qr --file task.xctsk --output qr.svg
+    python xctsk_automation.py html --codes waku,motu,duna --output html_pages/
 """
 
 import argparse
@@ -214,6 +215,59 @@ class XCTSKClient:
         except requests.RequestException as e:
             return False, f"Network error generating QR for {xctsk_file.name}: {e}"
 
+    def download_html(
+        self, task_code: str, output_file: Optional[Path] = None
+    ) -> Tuple[bool, str, Optional[str]]:
+        """Download HTML page for a task from XContest tools.
+
+        Args:
+            task_code: The task code to download HTML for
+            output_file: Optional path where to save the HTML content
+
+        Returns:
+            Tuple of (success, message, html_content)
+        """
+        try:
+            response = self.session.get(
+                f"{self.BASE_URL}/xctsk/load?taskCode={task_code}",
+                timeout=self.timeout,
+            )
+
+            if response.status_code == 200:
+                html_content = response.text
+
+                if output_file:
+                    # Ensure output directory exists
+                    output_file.parent.mkdir(parents=True, exist_ok=True)
+
+                    with open(output_file, "w", encoding="utf-8") as f:
+                        f.write(html_content)
+
+                    return (
+                        True,
+                        f"Downloaded HTML for task {task_code} to {output_file}",
+                        html_content,
+                    )
+                else:
+                    return (
+                        True,
+                        f"Retrieved HTML for task {task_code}",
+                        html_content,
+                    )
+            else:
+                return (
+                    False,
+                    f"HTML download failed with status {response.status_code}: {response.text}",
+                    None,
+                )
+
+        except requests.RequestException as e:
+            return (
+                False,
+                f"Network error downloading HTML for task {task_code}: {e}",
+                None,
+            )
+
 
 def upload_directory(
     client: XCTSKClient, directory: Path, author: Optional[str] = None
@@ -276,6 +330,40 @@ def download_tasks(
 
         output_file = output_dir / f"task_{task_code}.xctsk"
         success, message = client.download_task(task_code, output_file, version)
+        print(f"  {message}")
+
+        if success:
+            results.append(message)
+
+        # Add a small delay to be respectful to the server
+        if i < len(task_codes):
+            time.sleep(1)
+
+    return results
+
+
+def download_html_tasks(
+    client: XCTSKClient, task_codes: List[str], output_dir: Path
+) -> List[str]:
+    """Download HTML pages for multiple tasks by code.
+
+    Args:
+        client: XCTSKClient instance
+        task_codes: List of task codes to download HTML for
+        output_dir: Output directory
+
+    Returns:
+        List of success messages
+    """
+    results = []
+
+    print(f"Downloading HTML for {len(task_codes)} tasks...")
+
+    for i, task_code in enumerate(task_codes, 1):
+        print(f"[{i}/{len(task_codes)}] Downloading HTML for task {task_code}...")
+
+        output_file = output_dir / f"task_{task_code}.html"
+        success, message, _ = client.download_html(task_code, output_file)
         print(f"  {message}")
 
         if success:
@@ -355,6 +443,19 @@ Examples:
         "--output", "-o", type=Path, required=True, help="Output SVG file"
     )
 
+    # HTML download command
+    html_parser = subparsers.add_parser("html", help="Download HTML pages for tasks")
+    html_parser.add_argument(
+        "--codes",
+        "-c",
+        type=str,
+        required=True,
+        help="Comma-separated list of task codes",
+    )
+    html_parser.add_argument(
+        "--output", "-o", type=Path, required=True, help="Output directory"
+    )
+
     # Global options
     parser.add_argument(
         "--timeout",
@@ -426,6 +527,19 @@ Examples:
 
             if not success:
                 return 1
+
+        elif args.command == "html":
+            try:
+                task_codes = [code.strip() for code in args.codes.split(",")]
+            except ValueError:
+                print("Error: Invalid task codes format. Use comma-separated codes.")
+                return 1
+
+            results = download_html_tasks(client, task_codes, args.output)
+
+            print(
+                f"\nHTML Download Summary: {len(results)}/{len(task_codes)} tasks downloaded successfully"
+            )
 
     except KeyboardInterrupt:
         print("\nOperation cancelled by user")
