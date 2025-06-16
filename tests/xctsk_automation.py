@@ -7,7 +7,7 @@ https://tools.xcontest.org/xctsk/ using their REST API.
 
 Usage:
     python xctsk_automation.py upload --directory tests/xctsk --author "Your Name"
-    python xctsk_automation.py download --codes 12345,67890 --output results/
+    python xctsk_automation.py download --codes waku,motu,duna --output results/
     python xctsk_automation.py qr --file task.xctsk --output qr.svg
 """
 
@@ -56,7 +56,7 @@ class XCTSKClient:
 
     def upload_task(
         self, xctsk_file: Path, author: Optional[str] = None
-    ) -> Tuple[Optional[int], str]:
+    ) -> Tuple[Optional[str], str]:
         """Upload an XCTSK file and get a task code.
 
         Args:
@@ -89,8 +89,24 @@ class XCTSKClient:
 
             if response.status_code == 200:
                 try:
-                    task_code = int(response.text.strip())
-                    return task_code, f"Successfully uploaded {xctsk_file.name}"
+                    # Try to parse as JSON first (new API format)
+                    try:
+                        response_data = response.json()
+                        if (
+                            isinstance(response_data, dict)
+                            and "taskCode" in response_data
+                        ):
+                            task_code = response_data["taskCode"]
+                            return task_code, f"Successfully uploaded {xctsk_file.name}"
+                        else:
+                            return (
+                                None,
+                                f"Invalid JSON response format: {response.text}",
+                            )
+                    except json.JSONDecodeError:
+                        # Fallback to old format (plain numeric response)
+                        task_code = int(response.text.strip())
+                        return task_code, f"Successfully uploaded {xctsk_file.name}"
                 except ValueError:
                     return None, f"Invalid response format: {response.text}"
             else:
@@ -103,7 +119,7 @@ class XCTSKClient:
             return None, f"Network error uploading {xctsk_file.name}: {e}"
 
     def download_task(
-        self, task_code: int, output_file: Path, version: int = 1
+        self, task_code: str, output_file: Path, version: int = 1
     ) -> Tuple[bool, str]:
         """Download a task by code.
 
@@ -201,7 +217,7 @@ class XCTSKClient:
 
 def upload_directory(
     client: XCTSKClient, directory: Path, author: Optional[str] = None
-) -> Dict[str, int]:
+) -> Dict[str, str]:
     """Upload all XCTSK files in a directory.
 
     Args:
@@ -238,7 +254,7 @@ def upload_directory(
 
 
 def download_tasks(
-    client: XCTSKClient, task_codes: List[int], output_dir: Path, version: int = 1
+    client: XCTSKClient, task_codes: List[str], output_dir: Path, version: int = 1
 ) -> List[str]:
     """Download multiple tasks by code.
 
@@ -283,7 +299,7 @@ Examples:
     python xctsk_automation.py upload --directory tests/xctsk --author "John Doe"
   
   Download specific tasks:
-    python xctsk_automation.py download --codes 12345,67890 --output results/
+    python xctsk_automation.py download --codes waku,motu,duna --output results/
   
   Generate QR code for a task:
     python xctsk_automation.py qr --file task.xctsk --output qr.svg
@@ -389,9 +405,9 @@ Examples:
 
         elif args.command == "download":
             try:
-                task_codes = [int(code.strip()) for code in args.codes.split(",")]
+                task_codes = [code.strip() for code in args.codes.split(",")]
             except ValueError:
-                print("Error: Invalid task codes format. Use comma-separated integers.")
+                print("Error: Invalid task codes format. Use comma-separated codes.")
                 return 1
 
             results = download_tasks(client, task_codes, args.output, args.version)

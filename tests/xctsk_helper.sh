@@ -67,7 +67,7 @@ show_usage() {
     echo
     echo "Examples:"
     echo "  $0 upload 'John Doe'"
-    echo "  $0 download 12345,67890"
+    echo "  $0 download waku,motu,duna"
     echo "  $0 qr task_2025-01-19.xctsk"
     echo "  $0 list"
 }
@@ -103,7 +103,7 @@ cmd_download() {
     
     if [[ -z "$codes" ]]; then
         error "Please provide task codes (comma-separated)"
-        echo "Example: $0 download 12345,67890"
+        echo "Example: $0 download waku,motu,duna"
         exit 1
     fi
     
