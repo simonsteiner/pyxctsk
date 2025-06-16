@@ -15,7 +15,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from xctsk_automation import XCTSKClient
+from scripts.xcontest_xctsk_tool import XCTSKClient
 
 
 def test_client_initialization():

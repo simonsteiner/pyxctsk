@@ -6,10 +6,10 @@ This script automates the upload and download of XCTSK files to/from
 https://tools.xcontest.org/xctsk/ using their REST API.
 
 Usage:
-    python xctsk_automation.py upload --directory tests/xctsk --author "Your Name"
-    python xctsk_automation.py download --codes waku,motu,duna --output results/
-    python xctsk_automation.py qr --file task.xctsk --output qr.svg
-    python xctsk_automation.py html --codes waku,motu,duna --output html_pages/
+    python xcontest_xctsk_tool.py upload --directory tests/xctsk --author "Your Name"
+    python xcontest_xctsk_tool.py download --codes waku,motu,duna --output results/
+    python xcontest_xctsk_tool.py qr --file task.xctsk --output qr.svg
+    python xcontest_xctsk_tool.py html --codes waku,motu,duna --output html_pages/
 """
 
 import argparse
@@ -384,13 +384,13 @@ def main():
         epilog="""
 Examples:
   Upload all XCTSK files in a directory:
-    python xctsk_automation.py upload --directory tests/xctsk --author "John Doe"
+    python xcontest_xctsk_tool.py upload --directory tests/xctsk --author "John Doe"
   
   Download specific tasks:
-    python xctsk_automation.py download --codes waku,motu,duna --output results/
+    python xcontest_xctsk_tool.py download --codes waku,motu,duna --output results/
   
   Generate QR code for a task:
-    python xctsk_automation.py qr --file task.xctsk --output qr.svg
+    python xcontest_xctsk_tool.py qr --file task.xctsk --output qr.svg
         """,
     )
 

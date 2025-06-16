@@ -32,13 +32,13 @@ pip install requests
 Upload all XCTSK files from a directory:
 
 ```bash
-python xctsk_automation.py upload --directory tests/xctsk --author "Your Name"
+python xcontest_xctsk_tool.py upload --directory tests/xctsk --author "Your Name"
 ```
 
 Save upload results to a JSON file:
 
 ```bash
-python xctsk_automation.py upload --directory tests/xctsk --author "Your Name" --results-file upload_results.json
+python xcontest_xctsk_tool.py upload --directory tests/xctsk --author "Your Name" --results-file upload_results.json
 ```
 
 ### Download Tasks
@@ -46,13 +46,13 @@ python xctsk_automation.py upload --directory tests/xctsk --author "Your Name" -
 Download specific tasks by their codes:
 
 ```bash
-python xctsk_automation.py download --codes 12345,67890,13579 --output downloads/
+python xcontest_xctsk_tool.py download --codes 12345,67890,13579 --output downloads/
 ```
 
 Download using API version 2 (QR code format):
 
 ```bash
-python xctsk_automation.py download --codes 12345 --output downloads/ --version 2
+python xcontest_xctsk_tool.py download --codes 12345 --output downloads/ --version 2
 ```
 
 ### Generate QR Codes
@@ -60,7 +60,7 @@ python xctsk_automation.py download --codes 12345 --output downloads/ --version 
 Generate a QR code SVG for a single XCTSK file:
 
 ```bash
-python xctsk_automation.py qr --file task_2025-01-19.xctsk --output qr_code.svg
+python xcontest_xctsk_tool.py qr --file task_2025-01-19.xctsk --output qr_code.svg
 ```
 
 ## Command Reference
@@ -73,7 +73,7 @@ python xctsk_automation.py qr --file task_2025-01-19.xctsk --output qr_code.svg
 ### Upload Command
 
 ```bash
-python xctsk_automation.py upload [OPTIONS]
+python xcontest_xctsk_tool.py upload [OPTIONS]
 ```
 
 **Options:**
@@ -85,7 +85,7 @@ python xctsk_automation.py upload [OPTIONS]
 ### Download Command
 
 ```bash
-python xctsk_automation.py download [OPTIONS]
+python xcontest_xctsk_tool.py download [OPTIONS]
 ```
 
 **Options:**
@@ -97,7 +97,7 @@ python xctsk_automation.py download [OPTIONS]
 ### QR Command
 
 ```bash
-python xctsk_automation.py qr [OPTIONS]
+python xcontest_xctsk_tool.py qr [OPTIONS]
 ```
 
 **Options:**
@@ -121,7 +121,7 @@ The script uses the XContest tools REST API:
 1. Upload all your XCTSK files:
 
 ```bash
-python xctsk_automation.py upload --directory tests/xctsk --author "Pilot Name" --results-file codes.json
+python xcontest_xctsk_tool.py upload --directory tests/xctsk --author "Pilot Name" --results-file codes.json
 ```
 
 2. Share the codes with others or save for later use
@@ -130,7 +130,7 @@ python xctsk_automation.py upload --directory tests/xctsk --author "Pilot Name" 
 
 ```bash
 # Extract codes from the JSON file and download
-python xctsk_automation.py download --codes 12345,67890 --output shared_tasks/
+python xcontest_xctsk_tool.py download --codes 12345,67890 --output shared_tasks/
 ```
 
 ### QR Code Generation for Multiple Files
@@ -139,7 +139,7 @@ python xctsk_automation.py download --codes 12345,67890 --output shared_tasks/
 # Generate QR codes for all XCTSK files
 for file in tests/xctsk/*.xctsk; do
     basename=$(basename "$file" .xctsk)
-    python xctsk_automation.py qr --file "$file" --output "qr_codes/qr_$basename.svg"
+    python xcontest_xctsk_tool.py qr --file "$file" --output "qr_codes/qr_$basename.svg"
 done
 ```
 

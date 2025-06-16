@@ -8,9 +8,9 @@ I've created a comprehensive automation solution for uploading and downloading X
 
 ### Core Scripts
 
-1. **`xctsk_automation.py`** - Main automation script with REST API client
+1. **`xcontest_xctsk_tool.py`** - Main automation script with REST API client
 2. **`xctsk_helper.sh`** - Shell script for easy command-line operations  
-3. **`test_xctsk_automation.py`** - Test suite for the automation functionality
+3. **`test_xcontest_xctsk_tool.py`** - Test suite for the automation functionality
 4. **`xctsk_demo.py`** - Demonstration script showing usage patterns
 
 ### Documentation
@@ -63,19 +63,19 @@ pip install -e ".[dev]"
 ```bash
 cd tests
 source ../venv/bin/activate
-python xctsk_automation.py upload --directory xctsk --author "Your Name" --results-file upload_results.json
+python xcontest_xctsk_tool.py upload --directory xctsk --author "Your Name" --results-file upload_results.json
 ```
 
 ### 3. Generate QR Codes
 
 ```bash
-python xctsk_automation.py qr --file xctsk/task_2025-01-19.xctsk --output qr_task.svg
+python xcontest_xctsk_tool.py qr --file xctsk/task_2025-01-19.xctsk --output qr_task.svg
 ```
 
 ### 4. Download Tasks
 
 ```bash
-python xctsk_automation.py download --codes 12345,67890 --output downloads/
+python xcontest_xctsk_tool.py download --codes 12345,67890 --output downloads/
 ```
 
 ## Helper Script Usage
@@ -158,9 +158,9 @@ done
 
 ```sh
 tests/
-├── xctsk_automation.py          # Main automation script
+├── xcontest_xctsk_tool.py          # Main automation script
 ├── xctsk_helper.sh              # Shell helper (executable)
-├── test_xctsk_automation.py     # Test suite
+├── test_xcontest_xctsk_tool.py     # Test suite
 ├── xctsk_demo.py                # Demo script
 ├── XCTSK_AUTOMATION_README.md   # Full documentation
 ├── XCTSK_AUTOMATION_SUMMARY.md  # This summary
