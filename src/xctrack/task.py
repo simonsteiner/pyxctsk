@@ -4,7 +4,7 @@ import json
 import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List, Optional, Dict, Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from .exceptions import InvalidTimeOfDayError
 

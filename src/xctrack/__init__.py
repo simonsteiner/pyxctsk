@@ -7,33 +7,33 @@ generating and parsing XCTSK: URLs, and encoding/decoding XCTSK: URLs as QR code
 See http://xctrack.org/ and http://xctrack.org/Competition_Interfaces.html
 """
 
-from .task import (
-    Task,
-    Takeoff,
-    SSS,
-    Goal,
-    Turnpoint,
-    Waypoint,
-    TimeOfDay,
-    Direction,
-    EarthModel,
-    GoalType,
-    SSSType,
-    TaskType,
-    TurnpointType,
-)
-from .qrcode_task import QRCodeTask
-from .parser import parse_task
 from .distance import (
-    calculate_task_distances,
-    optimized_distance,
-    distance_through_centers,
     TaskTurnpoint,
+    calculate_task_distances,
+    distance_through_centers,
+    optimized_distance,
 )
 from .exceptions import (
     EmptyInputError,
     InvalidFormatError,
     InvalidTimeOfDayError,
+)
+from .parser import parse_task
+from .qrcode_task import QRCodeTask
+from .task import (
+    SSS,
+    Direction,
+    EarthModel,
+    Goal,
+    GoalType,
+    SSSType,
+    Takeoff,
+    Task,
+    TaskType,
+    TimeOfDay,
+    Turnpoint,
+    TurnpointType,
+    Waypoint,
 )
 
 # Constants

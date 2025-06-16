@@ -1,11 +1,11 @@
 """QR code task format implementation."""
 
 import json
-import polyline
 from dataclasses import dataclass, field
 from enum import IntEnum
-from typing import List, Optional, Dict, Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
+import polyline
 
 if TYPE_CHECKING:
     from .task import Task, TimeOfDay
@@ -441,18 +441,18 @@ class QRCodeTask:
     def to_task(self) -> "Task":
         """Convert to regular Task format."""
         from .task import (
-            Task,
-            Turnpoint,
-            Waypoint,
-            Takeoff,
             SSS,
-            Goal,
             Direction,
             EarthModel,
+            Goal,
             GoalType,
             SSSType,
+            Takeoff,
+            Task,
             TaskType,
+            Turnpoint,
             TurnpointType,
+            Waypoint,
         )
 
         # Convert task type

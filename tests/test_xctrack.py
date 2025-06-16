@@ -1,25 +1,26 @@
 """Tests for XCTrack task functionality."""
 
 import pytest
+
 from xctrack import (
-    Task,
-    Turnpoint,
-    Waypoint,
-    Takeoff,
     SSS,
-    Goal,
-    TimeOfDay,
-    TaskType,
     Direction,
-    SSSType,
-    GoalType,
-    TurnpointType,
     EarthModel,
-    parse_task,
-    QRCodeTask,
     EmptyInputError,
+    Goal,
+    GoalType,
     InvalidFormatError,
     InvalidTimeOfDayError,
+    QRCodeTask,
+    SSSType,
+    Takeoff,
+    Task,
+    TaskType,
+    TimeOfDay,
+    Turnpoint,
+    TurnpointType,
+    Waypoint,
+    parse_task,
 )
 
 

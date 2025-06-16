@@ -1,23 +1,24 @@
 """Basic tests for XCTrack task functionality without QR code dependencies."""
 
 import pytest
+
 from xctrack import (
-    Task,
-    Turnpoint,
-    Waypoint,
-    Takeoff,
     SSS,
-    Goal,
-    TimeOfDay,
-    TaskType,
     Direction,
-    SSSType,
-    GoalType,
-    TurnpointType,
     EarthModel,
-    parse_task,
     EmptyInputError,
+    Goal,
+    GoalType,
     InvalidFormatError,
+    SSSType,
+    Takeoff,
+    Task,
+    TaskType,
+    TimeOfDay,
+    Turnpoint,
+    TurnpointType,
+    Waypoint,
+    parse_task,
 )
 
 

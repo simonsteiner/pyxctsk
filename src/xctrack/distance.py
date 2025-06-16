@@ -1,8 +1,10 @@
 """Distance calculation module using WGS84 ellipsoid and route optimization."""
 
-from typing import List, Tuple, Dict, Any
+from typing import Any, Dict, List, Tuple
+
 from geopy.distance import geodesic
 from pyproj import Geod
+
 from .task import Task
 
 # Configuration constants

@@ -5,14 +5,15 @@ instead of to a point on the perimeter. The first leg should not be the same
 for center route vs optimized route.
 """
 
-import pytest
 import os
+
+import pytest
 from geopy.distance import geodesic
 
 from xctrack import parse_task
 from xctrack.distance import (
-    optimized_route_coordinates,
     _task_to_turnpoints,
+    optimized_route_coordinates,
 )
 
 

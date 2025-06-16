@@ -22,9 +22,9 @@ except ImportError:
     XCTRACK_AVAILABLE = False
 
 from .cache_manager import CacheManager
-from .task_manager import TaskManager
 from .progress_tracker import ProgressTracker
 from .routes import RouteHandlers
+from .task_manager import TaskManager
 
 
 class XCTrackWebApp:

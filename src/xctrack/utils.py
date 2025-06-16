@@ -4,8 +4,8 @@ from .task import Task
 
 # Optional QR code dependencies
 try:
-    from PIL import Image
     import qrcode
+    from PIL import Image
 
     QR_CODE_SUPPORT = True
 except ImportError:

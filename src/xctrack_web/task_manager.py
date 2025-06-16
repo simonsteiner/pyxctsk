@@ -4,17 +4,17 @@ import json
 import math
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Dict, Any, List
+from typing import Any, Dict, List, Optional
 
+from xctrack.distance import (
+    TaskTurnpoint,
+    calculate_sss_info,
+    calculate_task_distances,
+    optimized_distance,
+    optimized_route_coordinates,
+)
 from xctrack.parser import parse_task
 from xctrack.task import Task
-from xctrack.distance import (
-    calculate_task_distances,
-    TaskTurnpoint,
-    optimized_route_coordinates,
-    optimized_distance,
-    calculate_sss_info,
-)
 
 
 class TaskManager:

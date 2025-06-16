@@ -8,6 +8,7 @@ It creates and configures the Flask application with all necessary routes and se
 import sys
 from pathlib import Path
 from typing import Optional
+
 from .app import XCTrackWebApp
 
 # Add parent directory to path for xctrack imports

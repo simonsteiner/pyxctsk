@@ -4,9 +4,9 @@ import json
 from io import BytesIO
 from typing import Union
 
-from .task import Task
-from .qrcode_task import QRCodeTask, QR_CODE_SCHEME
 from .exceptions import EmptyInputError, InvalidFormatError
+from .qrcode_task import QR_CODE_SCHEME, QRCodeTask
+from .task import Task
 
 # Optional QR code dependencies
 try:

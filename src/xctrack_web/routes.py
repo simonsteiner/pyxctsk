@@ -5,7 +5,7 @@ from io import BytesIO
 from threading import Timer
 
 try:
-    from flask import render_template, request, jsonify
+    from flask import jsonify, render_template, request
 
     FLASK_AVAILABLE = True
 except ImportError:
@@ -13,7 +13,7 @@ except ImportError:
 
 try:
     from xctrack.parser import parse_task
-    from xctrack.utils import generate_qr_code, QR_CODE_SUPPORT
+    from xctrack.utils import QR_CODE_SUPPORT, generate_qr_code
 
     XCTRACK_AVAILABLE = True
 except ImportError:

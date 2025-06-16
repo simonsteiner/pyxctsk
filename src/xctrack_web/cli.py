@@ -3,10 +3,12 @@
 CLI interface for XCTrack Web Application
 """
 import sys
+from pathlib import Path
+
 import click
+
 from .app import XCTrackWebApp
 from .server import create_app
-from pathlib import Path
 
 # Add the parent directory to sys.path to allow importing xctrack
 current_dir = Path(__file__).parent.absolute()

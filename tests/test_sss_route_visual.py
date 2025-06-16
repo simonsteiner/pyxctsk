@@ -12,9 +12,9 @@ from geopy.distance import geodesic
 
 from xctrack import parse_task
 from xctrack.distance import (
+    _task_to_turnpoints,
     calculate_task_distances,
     optimized_route_coordinates,
-    _task_to_turnpoints,
 )
 
 
@@ -36,30 +36,30 @@ class TestSSSRouteVisual:
     def create_html_map(self, task, center_route, optimized_route, output_file):
         """Create an HTML map showing both routes."""
         turnpoints = _task_to_turnpoints(task)
-        
+
         # Calculate bounds for the map
         all_lats = []
         all_lons = []
-        
+
         # Add turnpoint centers
         for tp in turnpoints:
             all_lats.append(tp.center[0])
             all_lons.append(tp.center[1])
-        
+
         # Add route points
         for route in [center_route, optimized_route]:
             for point in route:
                 all_lats.append(point[0])
                 all_lons.append(point[1])
-        
+
         center_lat = sum(all_lats) / len(all_lats)
         center_lon = sum(all_lons) / len(all_lons)
-        
+
         # Calculate zoom level based on bounds
         lat_range = max(all_lats) - min(all_lats)
         lon_range = max(all_lons) - min(all_lons)
         max_range = max(lat_range, lon_range)
-        
+
         if max_range > 1:
             zoom = 8
         elif max_range > 0.1:
@@ -137,8 +137,8 @@ class TestSSSRouteVisual:
             lat, lon = tp.center
             radius = tp.radius
             name = task_tp.waypoint.name
-            tp_type = task_tp.type.value if task_tp.type else 'TP'
-            
+            tp_type = task_tp.type.value if task_tp.type else "TP"
+
             html_content += f"""
         // Turnpoint {i}: {name}
         L.marker([{lat}, {lon}]).addTo(map)
@@ -177,19 +177,27 @@ class TestSSSRouteVisual:
 
         # Add route comparison info
         if len(center_route) >= 2 and len(optimized_route) >= 2:
-            center_distance = sum(
-                geodesic(center_route[i], center_route[i+1]).meters 
-                for i in range(len(center_route)-1)
-            ) / 1000.0
-            
-            optimized_distance = sum(
-                geodesic(optimized_route[i], optimized_route[i+1]).meters 
-                for i in range(len(optimized_route)-1)
-            ) / 1000.0
-            
+            center_distance = (
+                sum(
+                    geodesic(center_route[i], center_route[i + 1]).meters
+                    for i in range(len(center_route) - 1)
+                )
+                / 1000.0
+            )
+
+            optimized_distance = (
+                sum(
+                    geodesic(optimized_route[i], optimized_route[i + 1]).meters
+                    for i in range(len(optimized_route) - 1)
+                )
+                / 1000.0
+            )
+
             savings = center_distance - optimized_distance
-            savings_percent = (savings / center_distance * 100) if center_distance > 0 else 0
-            
+            savings_percent = (
+                (savings / center_distance * 100) if center_distance > 0 else 0
+            )
+
             html_content += f"""
         // Add distance comparison popup
         var comparisonInfo = L.popup()
@@ -209,26 +217,26 @@ class TestSSSRouteVisual:
 """
 
         # Write HTML file
-        with open(output_file, 'w') as f:
+        with open(output_file, "w") as f:
             f.write(html_content)
 
     def test_create_visual_sss_comparison(self, test_data_dir, output_dir):
         """Create visual comparison for SSS route optimization."""
         task_file = os.path.join(test_data_dir, "task_fuvu.xctsk")
         task = parse_task(task_file)
-        
+
         # Verify this is an SSS task
         has_sss = any(tp.type and tp.type.value == "SSS" for tp in task.turnpoints)
         if not has_sss:
             pytest.skip("Not an SSS task")
-        
+
         turnpoints = _task_to_turnpoints(task)
-        
+
         # Create center route (through centers, skipping SSS)
         center_route = []
         takeoff_center = turnpoints[0].center
         center_route.append(takeoff_center)
-        
+
         # Find first TP after SSS
         first_tp_after_sss_index = None
         for i, tp in enumerate(task.turnpoints):
@@ -236,69 +244,77 @@ class TestSSSRouteVisual:
                 if i + 1 < len(task.turnpoints):
                     first_tp_after_sss_index = i + 1
                 break
-        
+
         if first_tp_after_sss_index:
             # Add centers of turnpoints after SSS
             for i in range(first_tp_after_sss_index, len(turnpoints)):
                 center_route.append(turnpoints[i].center)
-        
+
         # Get optimized route
         optimized_route = optimized_route_coordinates(turnpoints, task.turnpoints)
-        
+
         # Create HTML map
         output_file = os.path.join(output_dir, "sss_route_comparison.html")
         self.create_html_map(task, center_route, optimized_route, output_file)
-        
+
         print(f"🗺️  Visual comparison created: {output_file}")
         print("    Open this file in a web browser to see the route comparison")
-        
+
         # Verify basic properties
-        assert len(optimized_route) >= 2, "Optimized route should have at least 2 points"
+        assert (
+            len(optimized_route) >= 2
+        ), "Optimized route should have at least 2 points"
         assert optimized_route[0] == turnpoints[0].center, "Should start from takeoff"
-        
+
         # Calculate distances for comparison
-        center_distance = sum(
-            geodesic(center_route[i], center_route[i+1]).meters 
-            for i in range(len(center_route)-1)
-        ) / 1000.0
-        
-        optimized_distance = sum(
-            geodesic(optimized_route[i], optimized_route[i+1]).meters 
-            for i in range(len(optimized_route)-1)
-        ) / 1000.0
-        
+        center_distance = (
+            sum(
+                geodesic(center_route[i], center_route[i + 1]).meters
+                for i in range(len(center_route) - 1)
+            )
+            / 1000.0
+        )
+
+        optimized_distance = (
+            sum(
+                geodesic(optimized_route[i], optimized_route[i + 1]).meters
+                for i in range(len(optimized_route) - 1)
+            )
+            / 1000.0
+        )
+
         print("📊 Distance comparison:")
         print(f"    Center route: {center_distance:.2f} km")
         print(f"    Optimized route: {optimized_distance:.2f} km")
         print(f"    Savings: {center_distance - optimized_distance:.2f} km")
-        
+
         # The optimized route should be shorter
         assert optimized_distance < center_distance, "Optimized route should be shorter"
 
     def test_create_multiple_sss_visuals(self, test_data_dir, output_dir):
         """Create visual comparisons for multiple SSS tasks."""
         sss_task_files = ["task_fuvu.xctsk", "task_jedu.xctsk", "task_meta.xctsk"]
-        
+
         for task_file in sss_task_files:
             file_path = os.path.join(test_data_dir, task_file)
             if not os.path.exists(file_path):
                 continue
-                
+
             task = parse_task(file_path)
-            
+
             # Skip if not an SSS task
             has_sss = any(tp.type and tp.type.value == "SSS" for tp in task.turnpoints)
             if not has_sss:
                 print(f"⏭️  Skipping {task_file} (not an SSS task)")
                 continue
-            
+
             turnpoints = _task_to_turnpoints(task)
-            
+
             # Create center route
             center_route = []
             takeoff_center = turnpoints[0].center
             center_route.append(takeoff_center)
-            
+
             # Find first TP after SSS
             first_tp_after_sss_index = None
             for i, tp in enumerate(task.turnpoints):
@@ -306,56 +322,66 @@ class TestSSSRouteVisual:
                     if i + 1 < len(task.turnpoints):
                         first_tp_after_sss_index = i + 1
                     break
-            
+
             if first_tp_after_sss_index:
                 for i in range(first_tp_after_sss_index, len(turnpoints)):
                     center_route.append(turnpoints[i].center)
-            
+
             # Get optimized route
             optimized_route = optimized_route_coordinates(turnpoints, task.turnpoints)
-            
+
             # Create HTML map
             task_name = os.path.splitext(task_file)[0]
             output_file = os.path.join(output_dir, f"{task_name}_route_comparison.html")
             self.create_html_map(task, center_route, optimized_route, output_file)
-            
+
             print(f"🗺️  Created visual for {task_file}: {output_file}")
 
     def test_detailed_route_analysis(self, test_data_dir, output_dir):
         """Create detailed analysis of route optimization."""
         task_file = os.path.join(test_data_dir, "task_fuvu.xctsk")
         task = parse_task(task_file)
-        
+
         # Get detailed distance calculations
         distance_info = calculate_task_distances(task, show_progress=True)
-        
+
         # Create analysis report
         report_file = os.path.join(output_dir, "route_analysis.txt")
-        with open(report_file, 'w') as f:
+        with open(report_file, "w") as f:
             f.write("SSS Route Optimization Analysis\n")
             f.write("=" * 50 + "\n\n")
-            
+
             f.write(f"Task: {task.name if hasattr(task, 'name') else 'SSS Task'}\n")
             f.write(f"Turnpoints: {len(task.turnpoints)}\n\n")
-            
+
             f.write("Distance Summary:\n")
             f.write(f"  Center distance: {distance_info['center_distance_km']} km\n")
-            f.write(f"  Optimized distance: {distance_info['optimized_distance_km']} km\n")
-            f.write(f"  Savings: {distance_info['savings_km']} km ({distance_info['savings_percent']}%)\n\n")
-            
+            f.write(
+                f"  Optimized distance: {distance_info['optimized_distance_km']} km\n"
+            )
+            f.write(
+                f"  Savings: {distance_info['savings_km']} km ({distance_info['savings_percent']}%)\n\n"
+            )
+
             f.write("Turnpoint Details:\n")
-            for tp_info in distance_info['turnpoints']:
+            for tp_info in distance_info["turnpoints"]:
                 f.write(f"  {tp_info['index']}: {tp_info['name']}\n")
                 f.write(f"    Type: {tp_info['type'] or 'TP'}\n")
                 f.write(f"    Radius: {tp_info['radius']}m\n")
-                f.write(f"    Cumulative center: {tp_info['cumulative_center_km']} km\n")
-                f.write(f"    Cumulative optimized: {tp_info['cumulative_optimized_km']} km\n\n")
-        
+                f.write(
+                    f"    Cumulative center: {tp_info['cumulative_center_km']} km\n"
+                )
+                f.write(
+                    f"    Cumulative optimized: {tp_info['cumulative_optimized_km']} km\n\n"
+                )
+
         print(f"📊 Detailed analysis created: {report_file}")
-        
+
         # Verify the optimization is working
-        assert distance_info['savings_km'] > 0, "Should have savings from optimization"
-        assert distance_info['optimized_distance_km'] < distance_info['center_distance_km'], "Optimized should be shorter"
+        assert distance_info["savings_km"] > 0, "Should have savings from optimization"
+        assert (
+            distance_info["optimized_distance_km"] < distance_info["center_distance_km"]
+        ), "Optimized should be shorter"
 
 
 if __name__ == "__main__":

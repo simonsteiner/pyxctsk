@@ -6,7 +6,7 @@ from io import BytesIO
 
 import pytest
 
-from xctrack import parse_task, Task, TaskType, Turnpoint, Waypoint
+from xctrack import Task, TaskType, Turnpoint, Waypoint, parse_task
 from xctrack.qrcode_task import QRCodeTask
 from xctrack.utils import generate_qr_code
 
