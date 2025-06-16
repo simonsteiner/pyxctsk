@@ -1,0 +1,425 @@
+#!/usr/bin/env python3
+"""
+XCTrack XCTSK File Upload/Download Automation Script
+
+This script automates the upload and download of XCTSK files to/from
+https://tools.xcontest.org/xctsk/ using their REST API.
+
+Usage:
+    python xctsk_automation.py upload --directory tests/xctsk --author "Your Name"
+    python xctsk_automation.py download --codes 12345,67890 --output results/
+    python xctsk_automation.py qr --file task.xctsk --output qr.svg
+"""
+
+import argparse
+import json
+import os
+import sys
+import time
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
+
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
+
+class XCTSKClient:
+    """Client for interacting with XContest XCTSK API."""
+
+    BASE_URL = "https://tools.xcontest.org"
+
+    def __init__(
+        self, author: Optional[str] = None, timeout: int = 30, retry_count: int = 3
+    ):
+        """Initialize the client.
+
+        Args:
+            author: Default author name for uploads
+            timeout: Request timeout in seconds
+            retry_count: Number of retries for failed requests
+        """
+        self.author = author
+        self.timeout = timeout
+        self.session = requests.Session()
+
+        # Configure retry strategy
+        retry_strategy = Retry(
+            total=retry_count,
+            status_forcelist=[429, 500, 502, 503, 504],
+            allowed_methods=["HEAD", "GET", "POST"],
+            backoff_factor=1,
+        )
+        adapter = HTTPAdapter(max_retries=retry_strategy)
+        self.session.mount("http://", adapter)
+        self.session.mount("https://", adapter)
+
+    def upload_task(
+        self, xctsk_file: Path, author: Optional[str] = None
+    ) -> Tuple[Optional[int], str]:
+        """Upload an XCTSK file and get a task code.
+
+        Args:
+            xctsk_file: Path to the XCTSK file
+            author: Author name (overrides default)
+
+        Returns:
+            Tuple of (task_code, message)
+        """
+        try:
+            with open(xctsk_file, "r", encoding="utf-8") as f:
+                task_data = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            return None, f"Error reading file {xctsk_file}: {e}"
+
+        headers = {"Content-Type": "application/json"}
+
+        # Add author header if provided
+        upload_author = author or self.author
+        if upload_author:
+            headers["Author"] = upload_author
+
+        try:
+            response = self.session.post(
+                f"{self.BASE_URL}/api/xctsk/save",
+                json=task_data,
+                headers=headers,
+                timeout=self.timeout,
+            )
+
+            if response.status_code == 200:
+                try:
+                    task_code = int(response.text.strip())
+                    return task_code, f"Successfully uploaded {xctsk_file.name}"
+                except ValueError:
+                    return None, f"Invalid response format: {response.text}"
+            else:
+                return (
+                    None,
+                    f"Upload failed with status {response.status_code}: {response.text}",
+                )
+
+        except requests.RequestException as e:
+            return None, f"Network error uploading {xctsk_file.name}: {e}"
+
+    def download_task(
+        self, task_code: int, output_file: Path, version: int = 1
+    ) -> Tuple[bool, str]:
+        """Download a task by code.
+
+        Args:
+            task_code: The task code to download
+            output_file: Path where to save the downloaded task
+            version: API version (1 or 2)
+
+        Returns:
+            Tuple of (success, message)
+        """
+        endpoint = (
+            f"/api/xctsk/load/{task_code}"
+            if version == 1
+            else f"/api/xctsk/loadV2/{task_code}"
+        )
+
+        try:
+            response = self.session.get(
+                f"{self.BASE_URL}{endpoint}", timeout=self.timeout
+            )
+
+            if response.status_code == 200:
+                # Ensure output directory exists
+                output_file.parent.mkdir(parents=True, exist_ok=True)
+
+                with open(output_file, "w", encoding="utf-8") as f:
+                    f.write(response.text)
+
+                # Extract metadata from headers
+                metadata = {}
+                if "Last-Modified" in response.headers:
+                    metadata["last_modified"] = response.headers["Last-Modified"]
+                if "Author" in response.headers:
+                    metadata["author"] = response.headers["Author"]
+
+                metadata_str = ""
+                if metadata:
+                    metadata_str = f" (Author: {metadata.get('author', 'Unknown')}, Modified: {metadata.get('last_modified', 'Unknown')})"
+
+                return (
+                    True,
+                    f"Downloaded task {task_code} to {output_file}{metadata_str}",
+                )
+            else:
+                return (
+                    False,
+                    f"Download failed with status {response.status_code}: {response.text}",
+                )
+
+        except requests.RequestException as e:
+            return False, f"Network error downloading task {task_code}: {e}"
+
+    def get_qr_code(self, xctsk_file: Path, output_file: Path) -> Tuple[bool, str]:
+        """Get QR code SVG for an XCTSK file.
+
+        Args:
+            xctsk_file: Path to the XCTSK file
+            output_file: Path where to save the QR code SVG
+
+        Returns:
+            Tuple of (success, message)
+        """
+        try:
+            with open(xctsk_file, "r", encoding="utf-8") as f:
+                task_data = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            return False, f"Error reading file {xctsk_file}: {e}"
+
+        try:
+            response = self.session.post(
+                f"{self.BASE_URL}/api/xctsk/qr",
+                json=task_data,
+                headers={"Content-Type": "application/json"},
+                timeout=self.timeout,
+            )
+
+            if response.status_code == 200:
+                # Ensure output directory exists
+                output_file.parent.mkdir(parents=True, exist_ok=True)
+
+                with open(output_file, "w", encoding="utf-8") as f:
+                    f.write(response.text)
+
+                return True, f"Generated QR code for {xctsk_file.name} -> {output_file}"
+            else:
+                return (
+                    False,
+                    f"QR generation failed with status {response.status_code}: {response.text}",
+                )
+
+        except requests.RequestException as e:
+            return False, f"Network error generating QR for {xctsk_file.name}: {e}"
+
+
+def upload_directory(
+    client: XCTSKClient, directory: Path, author: Optional[str] = None
+) -> Dict[str, int]:
+    """Upload all XCTSK files in a directory.
+
+    Args:
+        client: XCTSKClient instance
+        directory: Directory containing XCTSK files
+        author: Author name for uploads
+
+    Returns:
+        Dictionary mapping filenames to task codes
+    """
+    results = {}
+    xctsk_files = list(directory.glob("*.xctsk"))
+
+    if not xctsk_files:
+        print(f"No XCTSK files found in {directory}")
+        return results
+
+    print(f"Found {len(xctsk_files)} XCTSK files to upload...")
+
+    for i, xctsk_file in enumerate(xctsk_files, 1):
+        print(f"[{i}/{len(xctsk_files)}] Uploading {xctsk_file.name}...")
+
+        task_code, message = client.upload_task(xctsk_file, author)
+        print(f"  {message}")
+
+        if task_code:
+            results[xctsk_file.name] = task_code
+
+        # Add a small delay to be respectful to the server
+        if i < len(xctsk_files):
+            time.sleep(1)
+
+    return results
+
+
+def download_tasks(
+    client: XCTSKClient, task_codes: List[int], output_dir: Path, version: int = 1
+) -> List[str]:
+    """Download multiple tasks by code.
+
+    Args:
+        client: XCTSKClient instance
+        task_codes: List of task codes to download
+        output_dir: Output directory
+        version: API version (1 or 2)
+
+    Returns:
+        List of success messages
+    """
+    results = []
+
+    print(f"Downloading {len(task_codes)} tasks...")
+
+    for i, task_code in enumerate(task_codes, 1):
+        print(f"[{i}/{len(task_codes)}] Downloading task {task_code}...")
+
+        output_file = output_dir / f"task_{task_code}.xctsk"
+        success, message = client.download_task(task_code, output_file, version)
+        print(f"  {message}")
+
+        if success:
+            results.append(message)
+
+        # Add a small delay to be respectful to the server
+        if i < len(task_codes):
+            time.sleep(1)
+
+    return results
+
+
+def main():
+    """Main entry point."""
+    parser = argparse.ArgumentParser(
+        description="Automate upload/download of XCTSK files to/from XContest tools",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  Upload all XCTSK files in a directory:
+    python xctsk_automation.py upload --directory tests/xctsk --author "John Doe"
+  
+  Download specific tasks:
+    python xctsk_automation.py download --codes 12345,67890 --output results/
+  
+  Generate QR code for a task:
+    python xctsk_automation.py qr --file task.xctsk --output qr.svg
+        """,
+    )
+
+    subparsers = parser.add_subparsers(dest="command", help="Available commands")
+
+    # Upload command
+    upload_parser = subparsers.add_parser("upload", help="Upload XCTSK files")
+    upload_parser.add_argument(
+        "--directory",
+        "-d",
+        type=Path,
+        required=True,
+        help="Directory containing XCTSK files",
+    )
+    upload_parser.add_argument(
+        "--author", "-a", type=str, help="Author name for uploads"
+    )
+    upload_parser.add_argument(
+        "--results-file",
+        "-r",
+        type=Path,
+        help="File to save upload results (JSON format)",
+    )
+
+    # Download command
+    download_parser = subparsers.add_parser("download", help="Download tasks by code")
+    download_parser.add_argument(
+        "--codes",
+        "-c",
+        type=str,
+        required=True,
+        help="Comma-separated list of task codes",
+    )
+    download_parser.add_argument(
+        "--output", "-o", type=Path, required=True, help="Output directory"
+    )
+    download_parser.add_argument(
+        "--version",
+        "-v",
+        type=int,
+        choices=[1, 2],
+        default=1,
+        help="API version (1 or 2)",
+    )
+
+    # QR code command
+    qr_parser = subparsers.add_parser("qr", help="Generate QR code for XCTSK file")
+    qr_parser.add_argument("--file", "-f", type=Path, required=True, help="XCTSK file")
+    qr_parser.add_argument(
+        "--output", "-o", type=Path, required=True, help="Output SVG file"
+    )
+
+    # Global options
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=30,
+        help="Request timeout in seconds (default: 30)",
+    )
+    parser.add_argument(
+        "--retries",
+        type=int,
+        default=3,
+        help="Number of retries for failed requests (default: 3)",
+    )
+
+    args = parser.parse_args()
+
+    if not args.command:
+        parser.print_help()
+        return 1
+
+    # Create client
+    client = XCTSKClient(timeout=args.timeout, retry_count=args.retries)
+
+    try:
+        if args.command == "upload":
+            if not args.directory.exists():
+                print(f"Error: Directory {args.directory} does not exist")
+                return 1
+
+            results = upload_directory(client, args.directory, args.author)
+
+            # Print summary
+            successful = len(results)
+            total = len(list(args.directory.glob("*.xctsk")))
+            print(f"\nUpload Summary: {successful}/{total} files uploaded successfully")
+
+            if results:
+                print("\nTask codes:")
+                for filename, task_code in results.items():
+                    print(f"  {filename}: {task_code}")
+
+            # Save results to file if requested
+            if args.results_file:
+                args.results_file.parent.mkdir(parents=True, exist_ok=True)
+                with open(args.results_file, "w") as f:
+                    json.dump(results, f, indent=2)
+                print(f"\nResults saved to {args.results_file}")
+
+        elif args.command == "download":
+            try:
+                task_codes = [int(code.strip()) for code in args.codes.split(",")]
+            except ValueError:
+                print("Error: Invalid task codes format. Use comma-separated integers.")
+                return 1
+
+            results = download_tasks(client, task_codes, args.output, args.version)
+
+            print(
+                f"\nDownload Summary: {len(results)}/{len(task_codes)} tasks downloaded successfully"
+            )
+
+        elif args.command == "qr":
+            if not args.file.exists():
+                print(f"Error: File {args.file} does not exist")
+                return 1
+
+            success, message = client.get_qr_code(args.file, args.output)
+            print(message)
+
+            if not success:
+                return 1
+
+    except KeyboardInterrupt:
+        print("\nOperation cancelled by user")
+        return 1
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        return 1
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

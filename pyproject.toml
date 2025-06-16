@@ -31,6 +31,7 @@ dependencies = [
     "click>=8.0.0",
     "geopy>=2.0.0",
     "pyproj>=3.0.0",
+    "requests>=2.25.0",
 ]
 
 [project.optional-dependencies]
