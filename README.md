@@ -50,16 +50,61 @@ pip install -e .
 
 ### Development Installation
 
+#### Setting up Virtual Environment
+
 ```bash
 git clone https://github.com/simon/python-xctrack.git
 cd python-xctrack
 
-# Install core library in development mode
-pip install -e .
+# Create and activate virtual environment
+python3 -m venv venv
+source venv/bin/activate
 
-# Install web interface in development mode  
-cd src/xctrack-web
+# Install core library in development mode with dev dependencies
+pip install -e ".[dev]"
+
+# Install web interface in development mode (optional)
+cd src/xctrack_web
 pip install -e .
+cd ../..
+```
+
+#### Development Workflow
+
+Once your virtual environment is set up:
+
+```bash
+# Format code before committing
+black src/ tests/
+isort src/ tests/
+
+# Run linting
+flake8 src/ tests/
+
+# Run type checking
+mypy src/
+
+# Run tests
+pytest
+
+# Deactivate when done
+deactivate
+```
+
+#### Verification
+
+```bash
+# Test that xctrack is properly installed
+xctrack --help
+
+# Run tests to ensure everything works
+pytest
+
+# Check code quality tools are available
+black --version
+isort --version
+flake8 --version
+mypy --version
 ```
 
 ## Quick Start
