@@ -1,0 +1,5 @@
+bevo,dami,duna,fobe,gimi,lorili,luma,mega,motu,naxe,nife,nohe,nubu,pepi,piga,qavu,qoga,quno,vocu,waku,wovi,xiga
+
+python tests/xcontest_xctsk_tool.py html --codes bevo,dami,duna,fobe,gimi,lorili,luma,mega,motu,naxe,nife,nohe,nubu,pepi,piga,qavu,qoga,quno,vocu,waku,wovi,xiga --output test_html/
+
+python xcontest_xctsk_tool.py download --codes bevo,dami,duna,fobe,gimi,lorili,luma,mega,motu,naxe,nife,nohe,nubu,pepi,piga,qavu,qoga,quno,vocu,waku,wovi,xiga --output downloads/

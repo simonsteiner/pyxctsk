@@ -1,0 +1,28 @@
+/* Task Viewer CSS */
+.map-container {
+    position: relative;
+}
+
+.task-info {
+    margin: 20px 0;
+}
+
+.task-table th {
+    position: sticky;
+    top: 0;
+    background-color: #f8f9fa;
+}
+
+.metadata-section, .turnpoints-section {
+    margin-bottom: 30px;
+}
+
+.json-preview {
+    font-family: monospace;
+    white-space: pre-wrap;
+    max-height: 500px;
+    overflow-y: auto;
+    background-color: #f8f9fa;
+    padding: 15px;
+    border-radius: 5px;
+}
