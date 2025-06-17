@@ -1,6 +1,7 @@
 from bs4 import BeautifulSoup
 import os
 import json
+import re
 
 
 def preprocess_html(html):
@@ -47,37 +48,67 @@ def preprocess_directory(directory_path):
 # preprocess_directory("downloaded_tasks/html")
 
 
-def extract_task_distances_from_dl(html):
+def extract_task_metadata(html):
+    """Extract all metadata from the HTML task details"""
     soup = BeautifulSoup(html, "html.parser")
     dt_elements = soup.find_all("dt")
     dd_elements = soup.find_all("dd")
 
-    task_distance_index = None
-    for i, dt in enumerate(dt_elements):
-        # print(dt.get_text(strip=True))
-        if "Task distance" in dt.get_text():
-            task_distance_index = i
-            break
+    metadata = {}
 
-    if task_distance_index is not None:
-        through_centers_text = dd_elements[task_distance_index].get_text(strip=True)
-        # Extract only the number (assuming format like "128.7km")
+    # Extract all metadata from definition list
+    for i, dt in enumerate(dt_elements):
+        if i < len(dd_elements):
+            key = dt.get_text(strip=True).rstrip(":")
+            value = dd_elements[i].get_text(strip=True)
+
+            # Special handling for task distance
+            if key == "Task distance":
+                metadata["task_distance_through_centers"] = value
+
+                # Check for optimized distance in next entry
+                if i + 1 < len(dd_elements) and not dt_elements[i + 1].get_text(
+                    strip=True
+                ):
+                    metadata["task_distance_optimized"] = dd_elements[i + 1].get_text(
+                        strip=True
+                    )
+            else:
+                # Convert key to snake_case
+                key = key.lower().replace(" ", "_")
+                metadata[key] = value
+
+    # Extract distance values as numbers
+    if "task_distance_through_centers" in metadata:
+        through_centers_text = metadata["task_distance_through_centers"]
         through_centers_value = "".join(
             c for c in through_centers_text if c.isdigit() or c == "."
         )
-        through_centers = float(through_centers_value) if through_centers_value else 0.0
+        metadata["distance_through_centers_km"] = (
+            float(through_centers_value) if through_centers_value else 0.0
+        )
 
-        optimized = None
-        if task_distance_index + 1 < len(dd_elements):
-            optimized_text = dd_elements[task_distance_index + 1].get_text(strip=True)
-            if optimized_text:
-                # Extract only the number (assuming format like "94.1km")
-                optimized_value = "".join(
-                    c for c in optimized_text if c.isdigit() or c == "."
-                )
-                optimized = float(optimized_value) if optimized_value else 0.0
+    if "task_distance_optimized" in metadata:
+        optimized_text = metadata["task_distance_optimized"]
+        optimized_value = "".join(c for c in optimized_text if c.isdigit() or c == ".")
+        metadata["distance_optimized_km"] = (
+            float(optimized_value) if optimized_value else 0.0
+        )
 
-        return {"through_centers": through_centers, "optimized": optimized}
+    return metadata
+
+
+def extract_task_distances_from_dl(html):
+    """Legacy function kept for backward compatibility"""
+    metadata = extract_task_metadata(html)
+
+    if "distance_through_centers_km" in metadata:
+        result = {"through_centers": metadata["distance_through_centers_km"]}
+
+        if "distance_optimized_km" in metadata:
+            result["optimized"] = metadata["distance_optimized_km"]
+
+        return result
 
     return None
 
@@ -205,8 +236,134 @@ def extract_turnpoints(html):
     return turnpoints
 
 
+def extract_geojson(html):
+    """Extract GeoJSON data from JavaScript in the HTML file"""
+    # Look for the geojson variable definition in the script
+    # This pattern handles both single-line and multi-line GeoJSON definitions
+    geojson_pattern = (
+        r'var\s+geojson\s*=\s*(\{\s*"type"\s*:\s*"FeatureCollection".+?});'
+    )
+    geojson_match = re.search(geojson_pattern, html, re.DOTALL)
+
+    if not geojson_match:
+        print("No GeoJSON data found in the HTML")
+        return None
+
+    try:
+        # Extract the raw JSON string
+        geojson_str = geojson_match.group(1)
+
+        # Clean up the string to handle potential JavaScript formatting issues
+        # Remove any trailing commas in arrays or objects (invalid in strict JSON)
+        geojson_str = re.sub(r",\s*([}\]])", r"\1", geojson_str)
+
+        # Parse the JSON string into a Python dictionary
+        geojson_data = json.loads(geojson_str)
+
+        # Validate the structure of the GeoJSON data
+        if not isinstance(geojson_data, dict):
+            print(
+                f"Warning: GeoJSON data is not a dictionary, got {type(geojson_data)}"
+            )
+            return None
+
+        if "type" not in geojson_data or geojson_data["type"] != "FeatureCollection":
+            print(
+                "Warning: GeoJSON data does not appear to be a valid FeatureCollection"
+            )
+            return None
+
+        if "features" not in geojson_data or not isinstance(
+            geojson_data["features"], list
+        ):
+            print("Warning: GeoJSON data does not have a valid features list")
+            return None
+
+        # All validation passed, return the data
+        return geojson_data
+    except json.JSONDecodeError as e:
+        print(f"Error parsing GeoJSON data: {e}")
+        # Debug information to help diagnose JSON parsing errors
+        print(f"JSON extract starts with: {geojson_str[:100]}...")
+        print(f"JSON extract ends with: ...{geojson_str[-100:]}")
+        return None
+    except Exception as e:
+        print(f"Unexpected error processing GeoJSON: {e}")
+        return None
+
+
+def save_task_json(task_data, filename, output_dir="downloaded_tasks/json"):
+    """Save task data to a JSON file"""
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Create output filename based on input filename
+    base_name = os.path.splitext(os.path.basename(filename))[0]
+    output_path = os.path.join(output_dir, f"{base_name}.json")
+
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(task_data, f, indent=2)
+
+    print(f"Task data saved to: {output_path}")
+    return output_path
+
+
+def save_geojson(geojson_data, filename, output_dir="downloaded_tasks/geojson"):
+    """Save GeoJSON data to a file"""
+    print(f"Saving GeoJSON data for {filename}...")
+
+    # Check for variable name conflict (if boolean is passed instead of data)
+    if isinstance(geojson_data, bool):
+        print(
+            "ERROR: Boolean value passed to save_geojson() - possible variable name conflict"
+        )
+        return None
+
+    if not geojson_data:
+        print("No GeoJSON data to save")
+        return None
+
+    if not isinstance(geojson_data, dict):
+        print(f"Error: GeoJSON data is not a dictionary, got {type(geojson_data)}")
+        return None
+
+    # Validate that the geojson_data has the expected structure
+    if "type" not in geojson_data or geojson_data["type"] != "FeatureCollection":
+        print("Error: GeoJSON data does not appear to be a valid FeatureCollection")
+        return None
+
+    if "features" not in geojson_data or not isinstance(geojson_data["features"], list):
+        print("Error: GeoJSON data does not have a valid features list")
+        return None
+
+    try:
+        json_dump = json.dumps(geojson_data, indent=2)
+        print(f"GeoJSON dump (first 100 chars): {json_dump[:100]}...")
+    except Exception as e:
+        print(f"Error creating JSON dump: {e}")
+        json_dump = None
+
+    try:
+        os.makedirs(output_dir, exist_ok=True)
+
+        # Create output filename based on input filename
+        base_name = os.path.splitext(os.path.basename(filename))[0]
+        output_path = os.path.join(output_dir, f"{base_name}.geojson")
+
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump(geojson_data, f, indent=2)
+
+        print(f"GeoJSON data saved to: {output_path}")
+        return output_path
+    except Exception as e:
+        print(f"Error saving GeoJSON file: {e}")
+        return None
+
+
 # Example usage for a directory
-def process_directory(directory_path, max_files=None):
+def process_directory(
+    directory_path,
+    max_files=None,
+):
     files_processed = 0
     for filename in sorted(os.listdir(directory_path)):
         if filename.endswith(".html"):
@@ -222,36 +379,72 @@ def process_directory(directory_path, max_files=None):
 
                 print(f"File size: {len(html)} bytes")
 
-                # Extract task data from the HTML
-                distance = extract_task_distances_from_dl(html)
-                if distance:
-                    print("Task Distance:")
-                    print(
-                        f"{distance.get('through_centers', 0):.1f}km (through centers)"
-                    )
-                    if distance.get("optimized") is not None:
-                        print(f"{distance.get('optimized', 0):.1f}km (optimized)")
-                    else:
-                        print("Not available (optimized)")
-                else:
-                    print("No distance information found")
+                # Extract all task metadata
+                metadata = extract_task_metadata(html)
 
+                # Extract turnpoints
                 print("\nExtracting turnpoints...")
                 turnpoints = extract_turnpoints(html)
 
-                if turnpoints:
-                    print(f"Found {len(turnpoints)} turnpoints:")
-                    for tp in turnpoints:
-                        print(tp)
-                else:
-                    print("No turnpoints extracted")
+                # Extract GeoJSON data
+                print("\nExtracting GeoJSON data...")
+                geojson_data = extract_geojson(html)
 
+                # Combine data into a complete task object
+                task_data = {"metadata": metadata, "turnpoints": turnpoints}
+
+                # Display information
+                if metadata:
+                    print("Task Metadata:")
+                    for key, value in metadata.items():
+                        if key in [
+                            "distance_through_centers_km",
+                            "distance_optimized_km",
+                        ]:
+                            print(f"  {key}: {float(value):.1f}km")
+                        else:
+                            print(f"  {key}: {value}")
+                else:
+                    print("No metadata found")
+
+                if turnpoints:
+                    print(f"\nFound {len(turnpoints)} turnpoints:")
+                    for tp in turnpoints:
+                        print(f"  {tp}")
+                else:
+                    print("\nNo turnpoints extracted")
                     # For debugging - Check table structure
                     soup = BeautifulSoup(html, "html.parser")
                     tables = soup.find_all("table")
                     print(f"Number of tables found: {len(tables)}")
                     for i, table in enumerate(tables):
                         print(f"Table {i+1} classes: {table.get('class', 'No class')}")
+
+                save_task_json(task_data, filename)
+
+                if geojson_data is not None:
+                    # Make sure geojson_data is a dictionary with features
+                    if isinstance(geojson_data, dict) and "features" in geojson_data:
+                        try:
+                            feature_count = len(geojson_data.get("features", []))
+                            print(f"\nGeoJSON data found with {feature_count} features")
+
+                            # Safely get data type and keys
+                            print(f"GeoJSON data type: {type(geojson_data)}")
+                            if isinstance(geojson_data, dict):
+                                print(f"GeoJSON data keys: {list(geojson_data.keys())}")
+
+                            # Save the GeoJSON data
+                            save_geojson(geojson_data, filename)
+                        except Exception as e:
+                            print(f"Error handling GeoJSON data: {e}")
+                            print(f"GeoJSON data type: {type(geojson_data)}")
+                    else:
+                        print(
+                            f"\nGeoJSON data found but not in the expected format: {type(geojson_data)}"
+                        )
+                else:
+                    print("\nNo GeoJSON data found in the file")
 
                 files_processed += 1
 
@@ -260,9 +453,12 @@ def process_directory(directory_path, max_files=None):
                 continue
 
 
-print("\n==== TESTING CLEANED HTML FILES ====")
-process_directory("downloaded_tasks/html_cleaned", max_files=2)
+if __name__ == "__main__":
+    print("\n==== PROCESSING HTML FILES AND SAVING JSON AND GEOJSON ====")
 
-# Uncomment to process all files in the directory
-# print("\n==== PROCESSING ALL FILES ====")
-# process_directory("downloaded_tasks/html_cleaned")
+    # Process a couple of files first (for testing)
+    process_directory(
+        "downloaded_tasks/html_cleaned",
+        # comment out max_files to process all files
+        max_files=2,
+    )
