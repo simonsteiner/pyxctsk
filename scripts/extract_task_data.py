@@ -154,17 +154,6 @@ def extract_turnpoints(html):
 
         # Extract row data
         entry = {}
-        row_class = row.get("class", [])
-
-        # Add special attributes based on row class for debugging
-        if "table-primary" in row_class:
-            if "Start of speed section" in row.get("title", ""):
-                entry["Special"] = "Start of Speed Section"
-            elif "End of speed section" in row.get("title", ""):
-                entry["Special"] = "End of Speed Section"
-
-        if "table-danger" in row_class:
-            entry["Special"] = "Goal"
 
         # Process each cell
         for i, header in enumerate(headers):
@@ -191,6 +180,23 @@ def extract_turnpoints(html):
             except (ValueError, TypeError) as e:
                 print(f"Error parsing value '{text}' for header '{header}': {e}")
                 entry[header] = text
+
+        # Add specific type information based on row class if Type is empty
+        if "Type" in entry and not entry["Type"]:
+            row_class = row.get("class", [])
+            row_title = row.get("title", "")
+
+            if "table-primary" in row_class:
+                if "Start of speed section" in row_title:
+                    entry["Type"] = "SSS"
+                elif "End of speed section" in row_title:
+                    entry["Type"] = "ESS"
+            elif "table-danger" in row_class:
+                entry["Type"] = "Goal"
+            else:
+                entry["Type"] = "Turnpoint"
+        elif "Type" in headers and "Type" not in entry:
+            entry["Type"] = "Turnpoint"
 
         if entry:
             turnpoints.append(entry)
