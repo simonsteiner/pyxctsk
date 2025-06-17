@@ -1,164 +1,167 @@
-from bs4 import BeautifulSoup
-import os
 import json
+import logging
+import os
 import re
+from bs4 import BeautifulSoup
+from typing import Any, Dict, List, Optional, Tuple
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+logger = logging.getLogger(__name__)
 
 
-def preprocess_html(html):
-    """Preprocess HTML by removing embedded base64 images"""
-    soup = BeautifulSoup(html, "html.parser")
+class TaskDataExtractor:
+    """Class to handle XCTrack task data extraction from HTML files"""
 
-    # Remove embedded base64 images
-    for img in soup.find_all("img", src=True):
-        if img["src"].startswith("data:image/svg+xml;base64,"):
-            img.decompose()
+    def __init__(self, output_base_dir: str = "downloaded_tasks"):
+        """Initialize with output directory structure"""
+        self.output_dirs = {
+            "html_cleaned": os.path.join(output_base_dir, "html_cleaned"),
+            "json": os.path.join(output_base_dir, "json"),
+            "geojson": os.path.join(output_base_dir, "geojson"),
+        }
 
-    return soup
+        # Create output directories
+        for directory in self.output_dirs.values():
+            os.makedirs(directory, exist_ok=True)
 
+    def preprocess_html(self, html: str) -> BeautifulSoup:
+        """Preprocess HTML by removing embedded base64 images"""
+        soup = BeautifulSoup(html, "html.parser")
 
-def save_cleaned_html(
-    soup, original_filename, output_dir="downloaded_tasks/html_cleaned"
-):
-    """Save the cleaned HTML to a new file"""
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, original_filename)
+        # Remove embedded base64 images
+        for img in soup.find_all("img", src=True):
+            if img["src"].startswith("data:image/svg+xml;base64,"):
+                img.decompose()
 
-    with open(output_path, "w", encoding="utf-8") as f:
-        f.write(str(soup))
+        return soup
 
-    print(f"Saved cleaned HTML to: {output_path}")
-    return output_path
+    def save_cleaned_html(self, soup: BeautifulSoup, original_filename: str) -> str:
+        """Save the cleaned HTML to a new file"""
+        output_path = os.path.join(self.output_dirs["html_cleaned"], original_filename)
 
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write(str(soup))
 
-# Example usage for a directory
-def preprocess_directory(directory_path):
-    for filename in sorted(os.listdir(directory_path)):
-        if filename.endswith(".html"):
-            with open(
-                os.path.join(directory_path, filename), "r", encoding="utf-8"
-            ) as f:
-                html_content = f.read()
+        logger.info(f"Saved cleaned HTML to: {output_path}")
+        return output_path
 
-            # Preprocess HTML to remove base64 images
-            cleaned_soup = preprocess_html(html_content)
-            # Save cleaned HTML
-            save_cleaned_html(cleaned_soup.prettify(), filename)
+    def extract_task_metadata(self, html: str) -> Dict[str, Any]:
+        """Extract all metadata from the HTML task details"""
+        soup = BeautifulSoup(html, "html.parser")
+        dt_elements = soup.find_all("dt")
+        dd_elements = soup.find_all("dd")
 
+        metadata = {}
 
-# preprocess_directory("downloaded_tasks/html")
+        # Extract all metadata from definition list
+        for i, dt in enumerate(dt_elements):
+            if i < len(dd_elements):
+                key = dt.get_text(strip=True).rstrip(":")
+                value = dd_elements[i].get_text(strip=True)
 
+                # Special handling for task distance
+                if key == "Task distance":
+                    metadata["task_distance_through_centers"] = value
 
-def extract_task_metadata(html):
-    """Extract all metadata from the HTML task details"""
-    soup = BeautifulSoup(html, "html.parser")
-    dt_elements = soup.find_all("dt")
-    dd_elements = soup.find_all("dd")
-
-    metadata = {}
-
-    # Extract all metadata from definition list
-    for i, dt in enumerate(dt_elements):
-        if i < len(dd_elements):
-            key = dt.get_text(strip=True).rstrip(":")
-            value = dd_elements[i].get_text(strip=True)
-
-            # Special handling for task distance
-            if key == "Task distance":
-                metadata["task_distance_through_centers"] = value
-
-                # Check for optimized distance in next entry
-                if i + 1 < len(dd_elements) and not dt_elements[i + 1].get_text(
-                    strip=True
-                ):
-                    metadata["task_distance_optimized"] = dd_elements[i + 1].get_text(
+                    # Check for optimized distance in next entry
+                    if i + 1 < len(dd_elements) and not dt_elements[i + 1].get_text(
                         strip=True
-                    )
-            else:
-                # Convert key to snake_case
-                key = key.lower().replace(" ", "_")
-                metadata[key] = value
+                    ):
+                        metadata["task_distance_optimized"] = dd_elements[
+                            i + 1
+                        ].get_text(strip=True)
+                else:
+                    # Convert key to snake_case
+                    key = key.lower().replace(" ", "_")
+                    metadata[key] = value
 
-    # Extract distance values as numbers
-    if "task_distance_through_centers" in metadata:
-        through_centers_text = metadata["task_distance_through_centers"]
-        through_centers_value = "".join(
-            c for c in through_centers_text if c.isdigit() or c == "."
-        )
-        metadata["distance_through_centers_km"] = (
-            float(through_centers_value) if through_centers_value else 0.0
-        )
+        # Extract distance values as numbers
+        self._extract_distance_values(metadata)
 
-    if "task_distance_optimized" in metadata:
-        optimized_text = metadata["task_distance_optimized"]
-        optimized_value = "".join(c for c in optimized_text if c.isdigit() or c == ".")
-        metadata["distance_optimized_km"] = (
-            float(optimized_value) if optimized_value else 0.0
-        )
+        return metadata
 
-    return metadata
+    def _extract_distance_values(self, metadata: Dict[str, Any]) -> None:
+        """Helper to extract numerical distance values from metadata strings"""
+        distance_keys = [
+            ("task_distance_through_centers", "distance_through_centers_km"),
+            ("task_distance_optimized", "distance_optimized_km"),
+        ]
 
+        for source_key, target_key in distance_keys:
+            if source_key in metadata:
+                text_value = metadata[source_key]
+                numeric_value = "".join(
+                    c for c in text_value if c.isdigit() or c == "."
+                )
+                metadata[target_key] = float(numeric_value) if numeric_value else 0.0
 
-def extract_task_distances_from_dl(html):
-    """Legacy function kept for backward compatibility"""
-    metadata = extract_task_metadata(html)
+    def extract_turnpoints(self, html: str) -> List[Dict[str, Any]]:
+        """Extract turnpoint data from the task HTML"""
+        soup = BeautifulSoup(html, "html.parser")
+        table = soup.find("table", class_="table")
+        turnpoints = []
 
-    if "distance_through_centers_km" in metadata:
-        result = {"through_centers": metadata["distance_through_centers_km"]}
+        if not table:
+            logger.warning("No table found with class 'table'")
+            return []
 
-        if "distance_optimized_km" in metadata:
-            result["optimized"] = metadata["distance_optimized_km"]
+        # Find table headers
+        headers = self._extract_table_headers(table)
+        if not headers:
+            return []
 
-        return result
+        # Extract table rows
+        tbody = table.find("tbody")
+        if not tbody:
+            logger.warning("Table has no tbody element")
+            return []
 
-    return None
+        rows = tbody.find_all("tr")
+        logger.info(f"Found {len(rows)} rows in table")
 
+        for row in rows:
+            turnpoint = self._process_turnpoint_row(row, headers)
+            if turnpoint:
+                turnpoints.append(turnpoint)
 
-def extract_turnpoints(html):
-    soup = BeautifulSoup(html, "html.parser")
-    table = soup.find("table", class_="table")
-    turnpoints = []
+        logger.info(f"Extracted {len(turnpoints)} turnpoints from table")
+        return turnpoints
 
-    if not table:
-        print("No table found with class 'table'")
-        return []
+    def _extract_table_headers(self, table: BeautifulSoup) -> List[str]:
+        """Extract headers from a table element"""
+        thead = table.find("thead")
+        if not thead:
+            logger.warning("Table has no thead element")
+            return []
 
-    # Find the table header row and extract headers
-    thead = table.find("thead")
-    if not thead:
-        print("Table has no thead element")
-        return []
+        header_row = thead.find("tr")
+        if not header_row:
+            logger.warning("Table header row not found")
+            return []
 
-    header_row = thead.find("tr")
-    if not header_row:
-        print("Table header row not found")
-        return []
+        th_elements = header_row.find_all("th")
+        if not th_elements:
+            logger.warning("No header cells found in header row")
+            return []
 
-    th_elements = header_row.find_all("th")
-    if not th_elements:
-        print("No header cells found in header row")
-        return []
+        headers = [
+            th.get_text(strip=True) for th in th_elements if th.get_text(strip=True)
+        ]
+        if not headers:
+            logger.warning("No valid headers found in table")
+            return []
 
-    # Only use headers from the header row, not all th elements in the table
-    headers = [th.get_text(strip=True) for th in th_elements if th.get_text(strip=True)]
-    if not headers:
-        print("No valid headers found in table")
-        return []
+        logger.info(f"Found table headers: {headers}")
+        return headers
 
-    print(f"Found table headers: {headers}")
-
-    # Check if tbody exists
-    tbody = table.find("tbody")
-    if not tbody:
-        print("Table has no tbody element")
-        return []
-
-    rows = tbody.find_all("tr")
-    print(f"Found {len(rows)} rows in table")
-
-    for row in rows:
+    def _process_turnpoint_row(
+        self, row: BeautifulSoup, headers: List[str]
+    ) -> Optional[Dict[str, Any]]:
+        """Process a single turnpoint row from the table"""
         # Skip rows with no content
         if not row.contents:
-            continue
+            return None
 
         # Collect all cells from the row (th for the first column, td for the rest)
         cells = []
@@ -171,22 +174,32 @@ def extract_turnpoints(html):
 
         # Skip empty rows
         if not cells or not any(cell.get_text(strip=True) for cell in cells):
-            continue
+            return None
 
         # Make sure we have enough cells for the headers
         if len(cells) < len(headers):
-            print(
+            logger.warning(
                 f"Row has {len(cells)} cells but expected {len(headers)} cells (skipping)"
             )
-            continue
+            return None
 
         # Only use the cells that match our headers
         cells = cells[: len(headers)]
 
         # Extract row data
+        entry = self._extract_cell_values(cells, headers)
+
+        # Add specific type information based on row class if Type is empty
+        self._set_turnpoint_type(entry, row)
+
+        return entry if entry else None
+
+    def _extract_cell_values(
+        self, cells: List[BeautifulSoup], headers: List[str]
+    ) -> Dict[str, Any]:
+        """Extract and convert values from cells based on headers"""
         entry = {}
 
-        # Process each cell
         for i, header in enumerate(headers):
             if i >= len(cells):
                 break
@@ -209,10 +222,15 @@ def extract_turnpoints(html):
                 else:
                     entry[header] = text
             except (ValueError, TypeError) as e:
-                print(f"Error parsing value '{text}' for header '{header}': {e}")
+                logger.warning(
+                    f"Error parsing value '{text}' for header '{header}': {e}"
+                )
                 entry[header] = text
 
-        # Add specific type information based on row class if Type is empty
+        return entry
+
+    def _set_turnpoint_type(self, entry: Dict[str, Any], row: BeautifulSoup) -> None:
+        """Set the turnpoint type based on row class or defaults"""
         if "Type" in entry and not entry["Type"]:
             row_class = row.get("class", [])
             row_title = row.get("title", "")
@@ -226,239 +244,228 @@ def extract_turnpoints(html):
                 entry["Type"] = "Goal"
             else:
                 entry["Type"] = "Turnpoint"
-        elif "Type" in headers and "Type" not in entry:
+        elif "Type" in entry.keys() and "Type" not in entry:
             entry["Type"] = "Turnpoint"
 
-        if entry:
-            turnpoints.append(entry)
+    def extract_geojson(self, html: str) -> Optional[Dict[str, Any]]:
+        """Extract GeoJSON data from JavaScript in the HTML file"""
+        # Look for the geojson variable definition in the script
+        # This pattern handles both single-line and multi-line GeoJSON definitions
+        geojson_pattern = (
+            r'var\s+geojson\s*=\s*(\{\s*"type"\s*:\s*"FeatureCollection".+?});'
+        )
+        geojson_match = re.search(geojson_pattern, html, re.DOTALL)
 
-    print(f"Extracted {len(turnpoints)} turnpoints from table")
-    return turnpoints
-
-
-def extract_geojson(html):
-    """Extract GeoJSON data from JavaScript in the HTML file"""
-    # Look for the geojson variable definition in the script
-    # This pattern handles both single-line and multi-line GeoJSON definitions
-    geojson_pattern = (
-        r'var\s+geojson\s*=\s*(\{\s*"type"\s*:\s*"FeatureCollection".+?});'
-    )
-    geojson_match = re.search(geojson_pattern, html, re.DOTALL)
-
-    if not geojson_match:
-        print("No GeoJSON data found in the HTML")
-        return None
-
-    try:
-        # Extract the raw JSON string
-        geojson_str = geojson_match.group(1)
-
-        # Clean up the string to handle potential JavaScript formatting issues
-        # Remove any trailing commas in arrays or objects (invalid in strict JSON)
-        geojson_str = re.sub(r",\s*([}\]])", r"\1", geojson_str)
-
-        # Parse the JSON string into a Python dictionary
-        geojson_data = json.loads(geojson_str)
-
-        # Validate the structure of the GeoJSON data
-        if not isinstance(geojson_data, dict):
-            print(
-                f"Warning: GeoJSON data is not a dictionary, got {type(geojson_data)}"
-            )
+        if not geojson_match:
+            logger.warning("No GeoJSON data found in the HTML")
             return None
+
+        try:
+            # Extract and clean the raw JSON string
+            geojson_str = geojson_match.group(1)
+            geojson_str = re.sub(
+                r",\s*([}\]])", r"\1", geojson_str
+            )  # Remove trailing commas
+
+            # Parse the JSON string into a Python dictionary
+            geojson_data = json.loads(geojson_str)
+
+            # Validate the GeoJSON structure
+            if self._validate_geojson(geojson_data):
+                return geojson_data
+
+            return None
+        except json.JSONDecodeError as e:
+            logger.error(f"Error parsing GeoJSON data: {e}")
+            # Debug information to help diagnose JSON parsing errors
+            logger.debug(f"JSON extract starts with: {geojson_str[:100]}...")
+            logger.debug(f"JSON extract ends with: ...{geojson_str[-100:]}")
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected error processing GeoJSON: {e}")
+            return None
+
+    def _validate_geojson(self, geojson_data: Any) -> bool:
+        """Validate GeoJSON data structure"""
+        if not isinstance(geojson_data, dict):
+            logger.warning(
+                f"GeoJSON data is not a dictionary, got {type(geojson_data)}"
+            )
+            return False
 
         if "type" not in geojson_data or geojson_data["type"] != "FeatureCollection":
-            print(
-                "Warning: GeoJSON data does not appear to be a valid FeatureCollection"
+            logger.warning(
+                "GeoJSON data does not appear to be a valid FeatureCollection"
             )
-            return None
+            return False
 
         if "features" not in geojson_data or not isinstance(
             geojson_data["features"], list
         ):
-            print("Warning: GeoJSON data does not have a valid features list")
+            logger.warning("GeoJSON data does not have a valid features list")
+            return False
+
+        return True
+
+    def save_data_to_file(
+        self, data: Dict[str, Any], filename: str, data_type: str
+    ) -> Optional[str]:
+        """Save data to a file (JSON or GeoJSON)"""
+        if data_type not in ["json", "geojson"]:
+            logger.error(f"Invalid data type: {data_type}")
             return None
 
-        # All validation passed, return the data
-        return geojson_data
-    except json.JSONDecodeError as e:
-        print(f"Error parsing GeoJSON data: {e}")
-        # Debug information to help diagnose JSON parsing errors
-        print(f"JSON extract starts with: {geojson_str[:100]}...")
-        print(f"JSON extract ends with: ...{geojson_str[-100:]}")
-        return None
-    except Exception as e:
-        print(f"Unexpected error processing GeoJSON: {e}")
-        return None
+        # Type-specific validation
+        if data_type == "geojson" and not self._validate_geojson(data):
+            return None
 
+        try:
+            # Create output filename based on input filename
+            base_name = os.path.splitext(os.path.basename(filename))[0]
+            file_extension = ".json" if data_type == "json" else ".geojson"
+            output_path = os.path.join(
+                self.output_dirs[data_type], f"{base_name}{file_extension}"
+            )
 
-def save_task_json(task_data, filename, output_dir="downloaded_tasks/json"):
-    """Save task data to a JSON file"""
-    os.makedirs(output_dir, exist_ok=True)
+            with open(output_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
 
-    # Create output filename based on input filename
-    base_name = os.path.splitext(os.path.basename(filename))[0]
-    output_path = os.path.join(output_dir, f"{base_name}.json")
+            logger.info(f"Data saved to: {output_path}")
+            return output_path
+        except Exception as e:
+            logger.error(f"Error saving {data_type} file: {e}")
+            return None
 
-    with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(task_data, f, indent=2)
+    def extract_task_data(
+        self, html_content: str
+    ) -> Tuple[Dict[str, Any], Optional[Dict[str, Any]]]:
+        """Extract all task data from HTML content"""
+        # Extract metadata
+        metadata = self.extract_task_metadata(html_content)
 
-    print(f"Task data saved to: {output_path}")
-    return output_path
+        # Extract turnpoints
+        logger.info("Extracting turnpoints...")
+        turnpoints = self.extract_turnpoints(html_content)
 
+        # Extract GeoJSON data
+        logger.info("Extracting GeoJSON data...")
+        geojson_data = self.extract_geojson(html_content)
 
-def save_geojson(geojson_data, filename, output_dir="downloaded_tasks/geojson"):
-    """Save GeoJSON data to a file"""
-    print(f"Saving GeoJSON data for {filename}...")
+        # Combine data into a complete task object
+        task_data = {"metadata": metadata, "turnpoints": turnpoints}
 
-    # Check for variable name conflict (if boolean is passed instead of data)
-    if isinstance(geojson_data, bool):
-        print(
-            "ERROR: Boolean value passed to save_geojson() - possible variable name conflict"
-        )
-        return None
+        return task_data, geojson_data
 
-    if not geojson_data:
-        print("No GeoJSON data to save")
-        return None
+    def process_html_file(self, file_path: str) -> Tuple[Optional[str], Optional[str]]:
+        """Process a single HTML file and extract task data"""
+        filename = os.path.basename(file_path)
+        logger.info(f"Processing {filename}")
 
-    if not isinstance(geojson_data, dict):
-        print(f"Error: GeoJSON data is not a dictionary, got {type(geojson_data)}")
-        return None
+        try:
+            # Read the HTML file
+            with open(file_path, "r", encoding="utf-8") as f:
+                html_content = f.read()
 
-    # Validate that the geojson_data has the expected structure
-    if "type" not in geojson_data or geojson_data["type"] != "FeatureCollection":
-        print("Error: GeoJSON data does not appear to be a valid FeatureCollection")
-        return None
+            logger.info(f"File size: {len(html_content)} bytes")
 
-    if "features" not in geojson_data or not isinstance(geojson_data["features"], list):
-        print("Error: GeoJSON data does not have a valid features list")
-        return None
+            # Extract task data
+            task_data, geojson_data = self.extract_task_data(html_content)
 
-    try:
-        json_dump = json.dumps(geojson_data, indent=2)
-        print(f"GeoJSON dump (first 100 chars): {json_dump[:100]}...")
-    except Exception as e:
-        print(f"Error creating JSON dump: {e}")
-        json_dump = None
+            # Display extracted information
+            self._display_task_info(task_data, geojson_data)
 
-    try:
-        os.makedirs(output_dir, exist_ok=True)
+            # Save data to files
+            json_path = self.save_data_to_file(task_data, filename, "json")
+            geojson_path = None
+            if geojson_data:
+                geojson_path = self.save_data_to_file(geojson_data, filename, "geojson")
 
-        # Create output filename based on input filename
-        base_name = os.path.splitext(os.path.basename(filename))[0]
-        output_path = os.path.join(output_dir, f"{base_name}.geojson")
+            return json_path, geojson_path
+        except Exception as e:
+            logger.error(f"Error processing {filename}: {e}")
+            return None, None
 
-        with open(output_path, "w", encoding="utf-8") as f:
-            json.dump(geojson_data, f, indent=2)
+    def _display_task_info(
+        self, task_data: Dict[str, Any], geojson_data: Optional[Dict[str, Any]]
+    ) -> None:
+        """Display extracted task information for debugging/monitoring"""
+        metadata = task_data.get("metadata", {})
+        turnpoints = task_data.get("turnpoints", [])
 
-        print(f"GeoJSON data saved to: {output_path}")
-        return output_path
-    except Exception as e:
-        print(f"Error saving GeoJSON file: {e}")
-        return None
-
-
-# Example usage for a directory
-def process_directory(
-    directory_path,
-    max_files=None,
-):
-    files_processed = 0
-    for filename in sorted(os.listdir(directory_path)):
-        if filename.endswith(".html"):
-            if max_files is not None and files_processed >= max_files:
-                break
-
-            file_path = os.path.join(directory_path, filename)
-            print(f"\n--- Processing {filename} ---")
-
-            try:
-                with open(file_path, "r", encoding="utf-8") as f:
-                    html = f.read()
-
-                print(f"File size: {len(html)} bytes")
-
-                # Extract all task metadata
-                metadata = extract_task_metadata(html)
-
-                # Extract turnpoints
-                print("\nExtracting turnpoints...")
-                turnpoints = extract_turnpoints(html)
-
-                # Extract GeoJSON data
-                print("\nExtracting GeoJSON data...")
-                geojson_data = extract_geojson(html)
-
-                # Combine data into a complete task object
-                task_data = {"metadata": metadata, "turnpoints": turnpoints}
-
-                # Display information
-                if metadata:
-                    print("Task Metadata:")
-                    for key, value in metadata.items():
-                        if key in [
-                            "distance_through_centers_km",
-                            "distance_optimized_km",
-                        ]:
-                            print(f"  {key}: {float(value):.1f}km")
-                        else:
-                            print(f"  {key}: {value}")
+        # Display metadata
+        if metadata:
+            logger.info("Task Metadata:")
+            for key, value in metadata.items():
+                if key in ["distance_through_centers_km", "distance_optimized_km"]:
+                    logger.info(f"  {key}: {float(value):.1f}km")
                 else:
-                    print("No metadata found")
+                    logger.info(f"  {key}: {value}")
+        else:
+            logger.info("No metadata found")
 
-                if turnpoints:
-                    print(f"\nFound {len(turnpoints)} turnpoints:")
-                    for tp in turnpoints:
-                        print(f"  {tp}")
-                else:
-                    print("\nNo turnpoints extracted")
-                    # For debugging - Check table structure
-                    soup = BeautifulSoup(html, "html.parser")
-                    tables = soup.find_all("table")
-                    print(f"Number of tables found: {len(tables)}")
-                    for i, table in enumerate(tables):
-                        print(f"Table {i+1} classes: {table.get('class', 'No class')}")
+        # Display turnpoints
+        if turnpoints:
+            logger.info(f"Found {len(turnpoints)} turnpoints:")
+            for tp in turnpoints:
+                logger.info(f"  {tp}")
+        else:
+            logger.info("No turnpoints extracted")
 
-                save_task_json(task_data, filename)
+        # Display GeoJSON info
+        if geojson_data:
+            feature_count = len(geojson_data.get("features", []))
+            logger.info(f"GeoJSON data found with {feature_count} features")
+        else:
+            logger.info("No GeoJSON data found")
 
-                if geojson_data is not None:
-                    # Make sure geojson_data is a dictionary with features
-                    if isinstance(geojson_data, dict) and "features" in geojson_data:
-                        try:
-                            feature_count = len(geojson_data.get("features", []))
-                            print(f"\nGeoJSON data found with {feature_count} features")
+    def process_directory(
+        self, directory_path: str, max_files: Optional[int] = None
+    ) -> None:
+        """Process all HTML files in a directory"""
+        files_processed = 0
 
-                            # Safely get data type and keys
-                            print(f"GeoJSON data type: {type(geojson_data)}")
-                            if isinstance(geojson_data, dict):
-                                print(f"GeoJSON data keys: {list(geojson_data.keys())}")
+        for filename in sorted(os.listdir(directory_path)):
+            if filename.endswith(".html"):
+                if max_files is not None and files_processed >= max_files:
+                    break
 
-                            # Save the GeoJSON data
-                            save_geojson(geojson_data, filename)
-                        except Exception as e:
-                            print(f"Error handling GeoJSON data: {e}")
-                            print(f"GeoJSON data type: {type(geojson_data)}")
-                    else:
-                        print(
-                            f"\nGeoJSON data found but not in the expected format: {type(geojson_data)}"
-                        )
-                else:
-                    print("\nNo GeoJSON data found in the file")
+                file_path = os.path.join(directory_path, filename)
+                logger.info(f"\n--- Processing {filename} ---")
 
+                self.process_html_file(file_path)
                 files_processed += 1
 
-            except Exception as e:
-                print(f"Error processing {filename}: {e}")
-                continue
+    def preprocess_directory(self, directory_path: str) -> None:
+        """Preprocess all HTML files in a directory (clean and save)"""
+        for filename in sorted(os.listdir(directory_path)):
+            if filename.endswith(".html"):
+                file_path = os.path.join(directory_path, filename)
+
+                with open(file_path, "r", encoding="utf-8") as f:
+                    html_content = f.read()
+
+                # Preprocess HTML to remove base64 images
+                cleaned_soup = self.preprocess_html(html_content)
+                # Save cleaned HTML
+                self.save_cleaned_html(cleaned_soup.prettify(), filename)
 
 
 if __name__ == "__main__":
     print("\n==== PROCESSING HTML FILES AND SAVING JSON AND GEOJSON ====")
 
+    extractor = TaskDataExtractor()
+
+    # Preprocess HTML files to remove base64 images
+    # extractor.preprocess_directory("downloaded_tasks/html")
+    # print("\n==== PREPROCESSING HTML FILES ====")
+    # print("Preprocessed HTML files saved to:", extractor.output_dirs["html_cleaned"])
+
+    print("\n==== PROCESSING HTML FILES ====")
+    print("Processing HTML files and saving JSON and GeoJSON...")
+
     # Process a couple of files first (for testing)
-    process_directory(
+    extractor.process_directory(
         "downloaded_tasks/html_cleaned",
         # comment out max_files to process all files
-        max_files=2,
+        # max_files=2,
     )
