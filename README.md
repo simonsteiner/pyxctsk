@@ -59,6 +59,8 @@ cd python-xctrack
 # Create and activate virtual environment
 python3 -m venv venv
 source venv/bin/activate
+# in subfolder use this command
+source /home/simon/git/python-xctrack/venv/bin/activate
 
 # Install core library in development mode with dev dependencies
 pip install -e ".[dev]"
