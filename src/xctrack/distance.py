@@ -1,10 +1,10 @@
 """Distance calculation module using WGS84 ellipsoid and route optimization."""
 
-from typing import Any, Dict, List, Tuple
-import math
-
+from collections import defaultdict
 from geopy.distance import geodesic
 from pyproj import Geod
+from scipy.optimize import fminbound
+from typing import Any, Dict, List, Tuple, Optional
 
 from .task import Task
 
@@ -17,9 +17,6 @@ DEFAULT_BEAM_WIDTH = (
 
 # Initialize WGS84 ellipsoid
 geod = Geod(ellps="WGS84")
-
-# Import scipy for continuous optimization
-from scipy.optimize import fminbound
 
 
 def _calculate_distance_through_point(
@@ -207,18 +204,118 @@ def _compute_optimal_route_dp(
         )
 
     # Use optimized approach with true DP and beam search
-    return _compute_optimal_route_optimized(
+    return _compute_optimal_route_with_beam_search(
         turnpoints, show_progress, return_path, beam_width
     )
 
 
-def _compute_optimal_route_optimized(
+def _init_dp_structure(turnpoints: List[TaskTurnpoint]) -> List[defaultdict]:
+    """Initialize the dynamic programming data structure.
+
+    Args:
+        turnpoints: List of TaskTurnpoint objects
+
+    Returns:
+        List of defaultdicts for DP computation
+    """
+    # dp[i] maps candidate points on turnpoint i -> (best_distance, parent_point)
+    dp = [defaultdict(lambda: (float("inf"), None)) for _ in turnpoints]
+
+    # Initialize: start at takeoff center with distance 0
+    dp[0][turnpoints[0].center] = (0.0, None)
+    return dp
+
+
+def _process_dp_stage(
+    dp: List[defaultdict],
+    i: int,
+    turnpoints: List[TaskTurnpoint],
+    beam_width: int,
+    show_progress: bool,
+) -> defaultdict:
+    """Process one stage of the dynamic programming calculation.
+
+    Args:
+        dp: The DP structure
+        i: Current stage index
+        turnpoints: List of TaskTurnpoint objects
+        beam_width: Number of best candidates to keep
+        show_progress: Whether to show progress
+
+    Returns:
+        Updated DP structure for stage i
+    """
+    current_tp = turnpoints[i]
+    next_center = (
+        turnpoints[i + 1].center if i + 1 < len(turnpoints) else current_tp.center
+    )
+    new_candidates = defaultdict(lambda: (float("inf"), None))
+
+    # For each candidate point from previous turnpoint
+    for prev_point, (prev_dist, _) in dp[i - 1].items():
+        # Find optimal entry point on current turnpoint
+        if current_tp.radius == 0:
+            optimal_point = current_tp.center
+        else:
+            optimal_point = current_tp.optimal_point(prev_point, next_center)
+
+        # Calculate leg distance and total distance
+        leg_distance = geodesic(prev_point, optimal_point).meters
+        total_distance = prev_dist + leg_distance
+
+        # Keep the best distance for this optimal point
+        if total_distance < new_candidates[optimal_point][0]:
+            new_candidates[optimal_point] = (total_distance, prev_point)
+
+    # Beam search: keep only the best beam_width candidates
+    if len(new_candidates) > beam_width:
+        best_items = sorted(new_candidates.items(), key=lambda kv: kv[1][0])[
+            :beam_width
+        ]
+        result = dict(best_items)
+    else:
+        result = dict(new_candidates)
+
+    if show_progress:
+        print(f"    📊 Keeping {len(result)} candidates")
+
+    return result
+
+
+def _backtrack_path(
+    dp: List[defaultdict],
+    best_point: Tuple[float, float],
+    turnpoints: List[TaskTurnpoint],
+) -> List[Tuple[float, float]]:
+    """Backtrack through the DP structure to reconstruct the optimal path.
+
+    Args:
+        dp: The DP structure
+        best_point: The best final point
+        turnpoints: List of TaskTurnpoint objects
+
+    Returns:
+        List of coordinates forming the optimal path
+    """
+    path_points = []
+    current_point = best_point
+
+    for i in range(len(turnpoints) - 1, -1, -1):
+        path_points.append(current_point)
+        if i > 0:
+            _, parent_point = dp[i][current_point]
+            current_point = parent_point
+
+    return list(reversed(path_points))
+
+
+def _compute_optimal_route_with_beam_search(
     turnpoints: List[TaskTurnpoint],
     show_progress: bool = False,
     return_path: bool = False,
     beam_width: int = DEFAULT_BEAM_WIDTH,
 ) -> Tuple[float, List[Tuple[float, float]]]:
-    """Compute optimal route using true dynamic programming with beam search.
+    """Compute optimal route using dynamic programming with beam search.
 
     This method uses DP to consider multiple candidate paths and avoid
     the greedy local optimization trap that can occur with large cylinders.
@@ -235,52 +332,15 @@ def _compute_optimal_route_optimized(
     if show_progress:
         print("    🎯 Using true DP with beam search...")
 
-    from collections import defaultdict
-
-    # dp[i] maps candidate points on turnpoint i -> (best_distance, parent_point)
-    dp = [defaultdict(lambda: (float("inf"), None)) for _ in turnpoints]
-
-    # Initialize: start at takeoff center with distance 0
-    dp[0][turnpoints[0].center] = (0.0, None)
+    # Initialize DP structure
+    dp = _init_dp_structure(turnpoints)
 
     # DP forward pass
     for i in range(1, len(turnpoints)):
         if show_progress:
             print(f"    ⚡ DP stage {i}/{len(turnpoints)-1}")
 
-        current_tp = turnpoints[i]
-        next_center = (
-            turnpoints[i + 1].center if i + 1 < len(turnpoints) else current_tp.center
-        )
-        new_candidates = defaultdict(lambda: (float("inf"), None))
-
-        # For each candidate point from previous turnpoint
-        for prev_point, (prev_dist, _) in dp[i - 1].items():
-            # Find optimal entry point on current turnpoint
-            if current_tp.radius == 0:
-                optimal_point = current_tp.center
-            else:
-                optimal_point = current_tp.optimal_point(prev_point, next_center)
-
-            # Calculate leg distance and total distance
-            leg_distance = geodesic(prev_point, optimal_point).meters
-            total_distance = prev_dist + leg_distance
-
-            # Keep the best distance for this optimal point
-            if total_distance < new_candidates[optimal_point][0]:
-                new_candidates[optimal_point] = (total_distance, prev_point)
-
-        # Beam search: keep only the best beam_width candidates
-        if len(new_candidates) > beam_width:
-            best_items = sorted(new_candidates.items(), key=lambda kv: kv[1][0])[
-                :beam_width
-            ]
-            dp[i] = dict(best_items)
-        else:
-            dp[i] = dict(new_candidates)
-
-        if show_progress:
-            print(f"    📊 Keeping {len(dp[i])} candidates")
+        dp[i] = _process_dp_stage(dp, i, turnpoints, beam_width, show_progress)
 
     # Find the best final solution
     final_candidates = dp[-1]
@@ -297,17 +357,7 @@ def _compute_optimal_route_optimized(
     # Reconstruct path if needed
     route_points = []
     if return_path:
-        # Backtrack to reconstruct the optimal path
-        path_points = []
-        current_point = best_point
-
-        for i in range(len(turnpoints) - 1, -1, -1):
-            path_points.append(current_point)
-            if i > 0:
-                _, parent_point = dp[i][current_point]
-                current_point = parent_point
-
-        route_points = list(reversed(path_points))
+        route_points = _backtrack_path(dp, best_point, turnpoints)
 
     return best_distance, route_points
 
@@ -378,6 +428,85 @@ def _task_to_turnpoints(task: Task) -> List[TaskTurnpoint]:
     ]
 
 
+def _calculate_savings(center_km: float, opt_km: float) -> Tuple[float, float]:
+    """Calculate distance savings in km and percentage.
+
+    Args:
+        center_km: Center distance in km
+        opt_km: Optimized distance in km
+
+    Returns:
+        Tuple of (savings_km, savings_percent)
+    """
+    savings_km = center_km - opt_km
+    savings_percent = (savings_km / center_km * 100) if center_km > 0 else 0.0
+    return savings_km, savings_percent
+
+
+def _create_turnpoint_details(
+    task_turnpoints,
+    task_distance_turnpoints: List[TaskTurnpoint],
+    angle_step: int = DEFAULT_ANGLE_STEP,
+    beam_width: int = DEFAULT_BEAM_WIDTH,
+    show_progress: bool = False,
+) -> List[Dict[str, Any]]:
+    """Create detailed turnpoint information including cumulative distances.
+
+    Args:
+        task_turnpoints: Original task turnpoints
+        task_distance_turnpoints: Distance calculation turnpoints
+        angle_step: Angle step for optimization
+        beam_width: Beam width for DP
+        show_progress: Whether to show progress
+
+    Returns:
+        List of dictionaries with turnpoint details
+    """
+    turnpoint_details = []
+    cumulative_center = 0.0
+
+    for i, (tp, task_tp) in enumerate(zip(task_turnpoints, task_distance_turnpoints)):
+        cumulative_opt = 0.0
+
+        # Calculate cumulative distances for all turnpoints
+        if i > 0:
+            if show_progress and i > 1:
+                print(f"    🔄 Turnpoint {i+1}/{len(task_distance_turnpoints)}")
+
+            # Calculate center distance incrementally
+            prev_tp = task_distance_turnpoints[i - 1]
+            leg_distance = geodesic(prev_tp.center, task_tp.center).meters / 1000.0
+            cumulative_center += leg_distance
+
+            # For optimized distance, calculate using all turnpoints up to current
+            partial_turnpoints = task_distance_turnpoints[: i + 1]
+            if len(partial_turnpoints) >= 2:
+                cumulative_opt = (
+                    optimized_distance(
+                        partial_turnpoints,
+                        angle_step=angle_step,
+                        show_progress=False,
+                        beam_width=beam_width,
+                    )
+                    / 1000.0
+                )
+
+        turnpoint_details.append(
+            {
+                "index": i,
+                "name": tp.waypoint.name,
+                "lat": tp.waypoint.lat,
+                "lon": tp.waypoint.lon,
+                "radius": tp.radius,
+                "type": tp.type.value if tp.type else "",
+                "cumulative_center_km": round(cumulative_center, 1),
+                "cumulative_optimized_km": round(cumulative_opt, 1),
+            }
+        )
+
+    return turnpoint_details
+
+
 def calculate_task_distances(
     task: Task,
     angle_step: int = DEFAULT_ANGLE_STEP,
@@ -436,56 +565,17 @@ def calculate_task_distances(
     opt_km = opt_dist / 1000.0
 
     # Calculate savings
-    savings_km = center_km - opt_km
-    savings_percent = (savings_km / center_km * 100) if center_km > 0 else 0.0
+    savings_km, savings_percent = _calculate_savings(center_km, opt_km)
 
     if show_progress:
         print(
             f"  📊 Calculating cumulative distances for {len(turnpoints)} turnpoints..."
         )
 
-    # Calculate cumulative distances efficiently
-    turnpoint_details = []
-    cumulative_center = 0.0
-
-    for i, (tp, task_tp) in enumerate(zip(task.turnpoints, turnpoints)):
-        cumulative_opt = 0.0
-
-        # Calculate cumulative distances for all turnpoints
-        if i > 0:
-            if show_progress and i > 1:
-                print(f"    🔄 Turnpoint {i+1}/{len(turnpoints)}")
-
-            # Calculate center distance incrementally
-            prev_tp = turnpoints[i - 1]
-            leg_distance = geodesic(prev_tp.center, task_tp.center).meters / 1000.0
-            cumulative_center += leg_distance
-
-            # For optimized distance, calculate using all turnpoints up to current
-            partial_turnpoints = turnpoints[: i + 1]
-            if len(partial_turnpoints) >= 2:
-                cumulative_opt = (
-                    optimized_distance(
-                        partial_turnpoints,
-                        angle_step=angle_step,
-                        show_progress=False,
-                        beam_width=beam_width,
-                    )
-                    / 1000.0
-                )
-
-        turnpoint_details.append(
-            {
-                "index": i,
-                "name": tp.waypoint.name,
-                "lat": tp.waypoint.lat,
-                "lon": tp.waypoint.lon,
-                "radius": tp.radius,
-                "type": tp.type.value if tp.type else "",
-                "cumulative_center_km": round(cumulative_center, 1),
-                "cumulative_optimized_km": round(cumulative_opt, 1),
-            }
-        )
+    # Calculate turnpoint details
+    turnpoint_details = _create_turnpoint_details(
+        task.turnpoints, turnpoints, angle_step, beam_width, show_progress
+    )
 
     if show_progress:
         print("  ✅ All calculations complete")
@@ -603,6 +693,55 @@ def calculate_optimal_sss_entry_point(
     return best_sss_point
 
 
+def _find_sss_turnpoint(task_turnpoints) -> Optional[Tuple[int, Any]]:
+    """Find the SSS turnpoint in a task.
+
+    Args:
+        task_turnpoints: List of task turnpoints
+
+    Returns:
+        Tuple of (index, turnpoint) or None if not found
+    """
+    for i, tp in enumerate(task_turnpoints):
+        if hasattr(tp, "type") and tp.type and tp.type.value == "SSS":
+            return i, tp
+    return None
+
+
+def _get_first_tp_after_sss_point(
+    task_turnpoints, sss_index: int, route_coordinates: List[Tuple[float, float]]
+) -> Optional[Tuple[Dict[str, float], Tuple[float, float]]]:
+    """Get the first turnpoint after SSS and its route point.
+
+    Args:
+        task_turnpoints: List of task turnpoints
+        sss_index: Index of the SSS turnpoint
+        route_coordinates: List of route coordinates
+
+    Returns:
+        Tuple of (turnpoint_dict, route_point) or None if not available
+    """
+    if sss_index + 1 >= len(task_turnpoints):
+        return None
+
+    next_tp = task_turnpoints[sss_index + 1]
+    next_tp_dict = {
+        "lat": next_tp.waypoint.lat,
+        "lon": next_tp.waypoint.lon,
+    }
+
+    # Determine the optimal point on the first TP after SSS from the route
+    route_point = None
+    if len(route_coordinates) > 1:
+        # Route starts with takeoff, then first TP after SSS
+        route_point = route_coordinates[1]
+    else:
+        # Fallback to center coordinates
+        route_point = (next_tp_dict["lat"], next_tp_dict["lon"])
+
+    return next_tp_dict, route_point
+
+
 def calculate_sss_info(
     task_turnpoints,
     route_coordinates: List[Tuple[float, float]],
@@ -634,53 +773,45 @@ def calculate_sss_info(
     takeoff_center = (task_turnpoints[0].waypoint.lat, task_turnpoints[0].waypoint.lon)
 
     # Find SSS turnpoint
-    for i, tp in enumerate(task_turnpoints):
-        if hasattr(tp, "type") and tp.type and tp.type.value == "SSS":
-            # Found SSS turnpoint
-            sss_tp = {
-                "lat": tp.waypoint.lat,
-                "lon": tp.waypoint.lon,
-                "radius": tp.radius,
-            }
+    sss_result = _find_sss_turnpoint(task_turnpoints)
+    if not sss_result:
+        return None
 
-            # Check if there's a turnpoint after SSS
-            if i + 1 < len(task_turnpoints):
-                first_tp_after_sss = {
-                    "lat": task_turnpoints[i + 1].waypoint.lat,
-                    "lon": task_turnpoints[i + 1].waypoint.lon,
-                }
+    sss_index, tp = sss_result
 
-                # Determine the optimal point on the first TP after SSS from the route
-                first_tp_after_sss_route_point = None
-                if len(route_coordinates) > 1:
-                    # Route starts with takeoff, then first TP after SSS
-                    first_tp_after_sss_route_point = route_coordinates[1]
-                else:
-                    # Fallback to center coordinates
-                    first_tp_after_sss_route_point = (
-                        first_tp_after_sss["lat"],
-                        first_tp_after_sss["lon"],
-                    )
+    # Extract SSS center and radius
+    sss_tp = {
+        "lat": tp.waypoint.lat,
+        "lon": tp.waypoint.lon,
+        "radius": tp.radius,
+    }
 
-                # Calculate optimal SSS entry point using the centralized function
-                sss_task_tp = TaskTurnpoint(tp.waypoint.lat, tp.waypoint.lon, tp.radius)
-                best_sss_point = calculate_optimal_sss_entry_point(
-                    sss_task_tp,
-                    takeoff_center,
-                    first_tp_after_sss_route_point,
-                    angle_step,
-                )
+    # Get first turnpoint after SSS
+    next_tp_result = _get_first_tp_after_sss_point(
+        task_turnpoints, sss_index, route_coordinates
+    )
+    if not next_tp_result:
+        return None
 
-                optimal_sss_point = {"lat": best_sss_point[0], "lon": best_sss_point[1]}
+    first_tp_after_sss, first_tp_after_sss_route_point = next_tp_result
 
-                return {
-                    "sss_center": sss_tp,
-                    "optimal_entry_point": optimal_sss_point,
-                    "first_tp_after_sss": first_tp_after_sss,
-                    "takeoff_center": {
-                        "lat": takeoff_center[0],
-                        "lon": takeoff_center[1],
-                    },
-                }
+    # Calculate optimal SSS entry point using the centralized function
+    sss_task_tp = TaskTurnpoint(tp.waypoint.lat, tp.waypoint.lon, tp.radius)
+    best_sss_point = calculate_optimal_sss_entry_point(
+        sss_task_tp,
+        takeoff_center,
+        first_tp_after_sss_route_point,
+        angle_step,
+    )
 
-    return None
+    optimal_sss_point = {"lat": best_sss_point[0], "lon": best_sss_point[1]}
+
+    return {
+        "sss_center": sss_tp,
+        "optimal_entry_point": optimal_sss_point,
+        "first_tp_after_sss": first_tp_after_sss,
+        "takeoff_center": {
+            "lat": takeoff_center[0],
+            "lon": takeoff_center[1],
+        },
+    }
