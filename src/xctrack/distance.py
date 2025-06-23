@@ -10,8 +10,6 @@ from .task import Task
 
 # Configuration constants
 DEFAULT_ANGLE_STEP = 10  # Angle step in degrees for perimeter point generation (5-15° for good accuracy/performance balance)
-COARSE_ANGLE_STEP = 2  # Coarse step for two-stage optimization
-FINE_ANGLE_STEP = 0.05  # Fine step for two-stage optimization
 OPTIMIZATION_TOLERANCE = 0.01  # Tolerance in meters for optimization convergence
 DEFAULT_BEAM_WIDTH = (
     5  # Number of best candidates to keep at each DP stage for beam search
@@ -33,53 +31,7 @@ def _calculate_distance_through_point(
     return geodesic(start_point, point).meters + geodesic(point, end_point).meters
 
 
-def _find_optimal_cylinder_point_analytical(
-    cylinder_center: Tuple[float, float],
-    cylinder_radius: float,
-    start_point: Tuple[float, float],
-    end_point: Tuple[float, float],
-) -> Tuple[float, float]:
-    """Find optimal point on cylinder using analytical approach.
-
-    For non-overlapping circles, the optimal path is along the geodesic
-    connecting the two points, with tangent points on each circle.
-
-    Args:
-        cylinder_center: (lat, lon) of cylinder center
-        cylinder_radius: Radius in meters
-        start_point: (lat, lon) of starting point
-        end_point: (lat, lon) of ending point
-
-    Returns:
-        (lat, lon) of optimal point on cylinder perimeter
-    """
-    # Calculate the forward azimuth from start to end
-    start_lon, start_lat = start_point[1], start_point[0]
-    end_lon, end_lat = end_point[1], end_point[0]
-
-    # Get azimuth from start to end
-    azimuth, _, _ = geod.inv(start_lon, start_lat, end_lon, end_lat)
-
-    # Find the point on the cylinder that lies on this azimuth line
-    # We need the azimuth from start to cylinder center
-    cylinder_lon, cylinder_lat = cylinder_center[1], cylinder_center[0]
-    az_to_cylinder, _, dist_to_cylinder = geod.inv(
-        start_lon, start_lat, cylinder_lon, cylinder_lat
-    )
-
-    # Check if the direct path passes close enough to use analytical solution
-    if dist_to_cylinder > cylinder_radius * 3:  # Cylinder is far from direct path
-        # Use the azimuth from start towards end to find tangent point
-        lon, lat, _ = geod.fwd(cylinder_lon, cylinder_lat, azimuth, cylinder_radius)
-        return (lat, lon)
-    else:
-        # Fall back to optimization for overlapping case
-        return _find_optimal_cylinder_point_optimization(
-            cylinder_center, cylinder_radius, start_point, end_point
-        )
-
-
-def _find_optimal_cylinder_point_optimization(
+def _find_optimal_cylinder_point(
     cylinder_center: Tuple[float, float],
     cylinder_radius: float,
     start_point: Tuple[float, float],
@@ -111,88 +63,6 @@ def _find_optimal_cylinder_point_optimization(
     return (lat, lon)
 
 
-def _find_optimal_cylinder_point_two_stage(
-    cylinder_center: Tuple[float, float],
-    cylinder_radius: float,
-    start_point: Tuple[float, float],
-    end_point: Tuple[float, float],
-    coarse_step: float = COARSE_ANGLE_STEP,
-    fine_step: float = FINE_ANGLE_STEP,
-    tolerance: float = OPTIMIZATION_TOLERANCE,
-) -> Tuple[float, float]:
-    """Find optimal point on cylinder using two-stage refinement.
-
-    First does a coarse search, then refines around the best result.
-
-    Args:
-        cylinder_center: (lat, lon) of cylinder center
-        cylinder_radius: Radius in meters
-        start_point: (lat, lon) of starting point
-        end_point: (lat, lon) of ending point
-        coarse_step: Angle step for coarse search (degrees)
-        fine_step: Angle step for fine search (degrees)
-        tolerance: Convergence tolerance in meters
-
-    Returns:
-        (lat, lon) of optimal point on cylinder perimeter
-    """
-    cylinder_lon, cylinder_lat = cylinder_center[1], cylinder_center[0]
-
-    # Stage 1: Coarse search
-    best_azimuth = None
-    best_distance = float("inf")
-
-    for azimuth in range(0, 360, int(coarse_step)):
-        lon, lat, _ = geod.fwd(cylinder_lon, cylinder_lat, azimuth, cylinder_radius)
-        point = (lat, lon)
-        distance = _calculate_distance_through_point(start_point, point, end_point)
-
-        if distance < best_distance:
-            best_distance = distance
-            best_azimuth = azimuth
-
-    # Stage 2: Fine search around best result
-    search_range = coarse_step
-    prev_distance = best_distance
-
-    while search_range > fine_step:
-        search_start = best_azimuth - search_range
-        search_end = best_azimuth + search_range
-
-        current_best_azimuth = best_azimuth
-        current_best_distance = best_distance
-
-        # Generate fine search points
-        num_points = max(3, int(2 * search_range / fine_step))
-        step = (search_end - search_start) / num_points
-
-        for i in range(num_points + 1):
-            azimuth = search_start + i * step
-            # Normalize azimuth to [0, 360)
-            azimuth = azimuth % 360
-
-            lon, lat, _ = geod.fwd(cylinder_lon, cylinder_lat, azimuth, cylinder_radius)
-            point = (lat, lon)
-            distance = _calculate_distance_through_point(start_point, point, end_point)
-
-            if distance < current_best_distance:
-                current_best_distance = distance
-                current_best_azimuth = azimuth
-
-        # Check for convergence
-        if abs(prev_distance - current_best_distance) < tolerance:
-            break
-
-        best_azimuth = current_best_azimuth
-        best_distance = current_best_distance
-        prev_distance = current_best_distance
-        search_range *= 0.5  # Halve search range for next iteration
-
-    # Return the optimal point
-    lon, lat, _ = geod.fwd(cylinder_lon, cylinder_lat, best_azimuth, cylinder_radius)
-    return (lat, lon)
-
-
 def _get_optimized_perimeter_points(
     turnpoint: "TaskTurnpoint",
     prev_point: Tuple[float, float],
@@ -201,7 +71,7 @@ def _get_optimized_perimeter_points(
 ) -> List[Tuple[float, float]]:
     """Get optimized perimeter points for a turnpoint.
 
-    Finds the optimal entry/exit points using analytical methods.
+    Finds the optimal entry/exit points using scipy optimization.
 
     Args:
         turnpoint: TaskTurnpoint object
@@ -217,7 +87,7 @@ def _get_optimized_perimeter_points(
 
     if prev_point and next_point:
         # Use optimized single point
-        optimal_point = _find_optimal_cylinder_point_analytical(
+        optimal_point = _find_optimal_cylinder_point(
             turnpoint.center, turnpoint.radius, prev_point, next_point
         )
         return [optimal_point]
@@ -264,14 +134,14 @@ class TaskTurnpoint:
         self,
         prev_point: Tuple[float, float],
         next_point: Tuple[float, float],
-        method: str = "two_stage",
     ) -> Tuple[float, float]:
         """Find the optimal point on this turnpoint's cylinder.
+
+        Uses scipy's optimization for precise results.
 
         Args:
             prev_point: (lat, lon) of previous point in route
             next_point: (lat, lon) of next point in route
-            method: Optimization method ('analytical', 'optimization', 'two_stage')
 
         Returns:
             (lat, lon) of optimal point on cylinder perimeter
@@ -279,20 +149,9 @@ class TaskTurnpoint:
         if self.radius == 0:
             return self.center
 
-        if method == "analytical":
-            return _find_optimal_cylinder_point_analytical(
-                self.center, self.radius, prev_point, next_point
-            )
-        elif method == "optimization":
-            return _find_optimal_cylinder_point_optimization(
-                self.center, self.radius, prev_point, next_point
-            )
-        elif method == "two_stage":
-            return _find_optimal_cylinder_point_two_stage(
-                self.center, self.radius, prev_point, next_point
-            )
-        else:
-            raise ValueError(f"Unknown optimization method: {method}")
+        return _find_optimal_cylinder_point(
+            self.center, self.radius, prev_point, next_point
+        )
 
     def optimized_perimeter_points(
         self,
@@ -401,11 +260,7 @@ def _compute_optimal_route_optimized(
             if current_tp.radius == 0:
                 optimal_point = current_tp.center
             else:
-                optimal_point = current_tp.optimal_point(
-                    prev_point,
-                    next_center,
-                    method="optimization",  # Use continuous optimizer
-                )
+                optimal_point = current_tp.optimal_point(prev_point, next_center)
 
             # Calculate leg distance and total distance
             leg_distance = geodesic(prev_point, optimal_point).meters
