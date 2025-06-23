@@ -103,7 +103,6 @@ def _compute_optimal_route_dp(
     takeoff_center = turnpoints[0].center
 
     # Initialize distance table
-    # dp[i][point] = (minimum distance to reach 'point' on turnpoint i, previous point)
     dp = [{} for _ in turnpoints]
 
     # Initialize first turnpoint (takeoff)
@@ -117,6 +116,13 @@ def _compute_optimal_route_dp(
         if show_progress:
             print(f"    ⚡ Processing turnpoint {i+1}/{len(turnpoints)}")
 
+        # Handle non-return_path inside cylinder case before point loop
+        if not return_path and i == 1:
+            distance_to_center = geodesic(takeoff_center, turnpoints[i].center).meters
+            if distance_to_center <= turnpoints[i].radius:
+                dp[i] = {takeoff_center: 0}
+                continue
+
         for curr_pt in perimeters[i]:
             min_dist = float("inf")
             best_prev_pt = None
@@ -128,12 +134,10 @@ def _compute_optimal_route_dp(
                 and first_tp_after_sss_index is not None
             ):
                 if i == first_tp_after_sss_index:
-                    # Route from takeoff center directly to first turnpoint after SSS
                     leg_distance = geodesic(takeoff_center, curr_pt).meters
                     min_dist = leg_distance
                     best_prev_pt = takeoff_center
                 elif i > first_tp_after_sss_index:
-                    # Normal DP for turnpoints after the first post-SSS turnpoint
                     for prev_pt, (prev_dist, _) in dp[i - 1].items():
                         leg_distance = geodesic(prev_pt, curr_pt).meters
                         total_distance = prev_dist + leg_distance
@@ -141,28 +145,15 @@ def _compute_optimal_route_dp(
                             min_dist = total_distance
                             best_prev_pt = prev_pt
                 elif i <= sss_index:
-                    # For SSS and before, calculate from takeoff center
                     leg_distance = geodesic(takeoff_center, curr_pt).meters
                     min_dist = leg_distance
                     best_prev_pt = takeoff_center
             else:
-                # Standard logic for non-SSS tasks or distance calculation
                 if i == 1:
-                    # For the first actual turnpoint, calculate distance from takeoff center
-                    distance_to_center = geodesic(
-                        takeoff_center, turnpoints[i].center
-                    ).meters
-                    if distance_to_center <= turnpoints[i].radius and not return_path:
-                        # Takeoff center is inside the cylinder - only use center for distance calculation, not routes
-                        min_dist = 0
-                        best_prev_pt = takeoff_center
-                    else:
-                        # Calculate distance from takeoff center to perimeter (always for routes, or when outside cylinder)
-                        leg_distance = geodesic(takeoff_center, curr_pt).meters
-                        min_dist = leg_distance
-                        best_prev_pt = takeoff_center
+                    leg_distance = geodesic(takeoff_center, curr_pt).meters
+                    min_dist = leg_distance
+                    best_prev_pt = takeoff_center
                 else:
-                    # For subsequent turnpoints, use normal DP approach
                     for prev_pt, prev_dist_info in dp[i - 1].items():
                         prev_dist = prev_dist_info[0] if return_path else prev_dist_info
                         leg_distance = geodesic(prev_pt, curr_pt).meters
@@ -177,36 +168,25 @@ def _compute_optimal_route_dp(
             else:
                 dp[i][curr_pt] = min_dist
 
-    # Find optimal distance
+    # Find optimal distance and reconstruct path if needed
     if return_path:
         optimal_distance = min(dp[-1].values(), key=lambda x: x[0])[0]
-
-        # Find optimal end point and reconstruct path
         optimal_end_point = min(dp[-1].keys(), key=lambda p: dp[-1][p][0])
-
-        # Backtrack to reconstruct the optimal path
         route_coordinates = []
         current_point = optimal_end_point
 
-        # Work backwards through the turnpoints
         for i in range(len(turnpoints) - 1, -1, -1):
             route_coordinates.append(current_point)
             if i > 0 and current_point in dp[i]:
                 prev_point = dp[i][current_point][1]
                 current_point = prev_point if prev_point else takeoff_center
 
-        # Reverse to get the path from start to end
         route_coordinates.reverse()
 
-        # Handle SSS post-processing
         if sss_index is not None and first_tp_after_sss_index is not None:
-            # Create flight route excluding SSS turnpoints
             flight_route = [takeoff_center]
-
-            # Add the optimal perimeter point for the first TP after SSS and subsequent points
             if first_tp_after_sss_index < len(route_coordinates):
                 flight_route.extend(route_coordinates[first_tp_after_sss_index:])
-
             return optimal_distance, flight_route
 
         return optimal_distance, route_coordinates
@@ -303,31 +283,14 @@ def calculate_task_distances(
             "turnpoints": [],
         }
 
-    # Check for SSS and create appropriate turnpoint list for distance calculations
-    sss_index = None
-    first_tp_after_sss_index = None
+    # For distance calculations, always use all turnpoints
+    # SSS is just a timing marker and doesn't affect the route distance
     distance_turnpoints = turnpoints.copy()
 
-    for i, tp in enumerate(task.turnpoints):
-        if hasattr(tp, "type") and tp.type and tp.type.value == "SSS":
-            sss_index = i
-            if i + 1 < len(task.turnpoints):
-                first_tp_after_sss_index = i + 1
-                # For distance calculations, skip SSS turnpoints
-                distance_turnpoints = [turnpoints[0]] + turnpoints[
-                    first_tp_after_sss_index:
-                ]
-            break
-
     if show_progress:
-        if sss_index is not None:
-            print(
-                f"  📏 SSS task detected - calculating distance from takeoff to first TP after SSS ({len(distance_turnpoints)} turnpoints)..."
-            )
-        else:
-            print("  📏 Calculating center distance...")
+        print("  📏 Calculating center distance...")
 
-    # Calculate distances using the appropriate turnpoint list
+    # Calculate distances using all turnpoints
     center_dist = distance_through_centers(distance_turnpoints)
 
     if show_progress:
@@ -361,82 +324,27 @@ def calculate_task_distances(
     for i, (tp, task_tp) in enumerate(zip(task.turnpoints, turnpoints)):
         cumulative_opt = 0.0
 
-        # Handle SSS tasks differently
-        if sss_index is not None and first_tp_after_sss_index is not None:
-            if i <= sss_index:
-                # For takeoff and SSS turnpoints, no cumulative distance
-                cumulative_center = 0.0
-                cumulative_opt = 0.0
-            elif i == first_tp_after_sss_index:
-                # First turnpoint after SSS - distance from takeoff
-                takeoff_tp = turnpoints[0]
-                leg_distance = (
-                    geodesic(takeoff_tp.center, task_tp.center).meters / 1000.0
-                )
-                cumulative_center = leg_distance
+        # Calculate cumulative distances normally for all turnpoints
+        if i > 0:
+            if show_progress and i > 1:
+                print(f"    🔄 Turnpoint {i+1}/{len(turnpoints)}")
 
-                # For optimized, use the actual distance calculation
-                partial_distance_turnpoints = [
-                    distance_turnpoints[0],
-                    distance_turnpoints[1],
-                ]  # takeoff + first after SSS
+            # Calculate center distance incrementally
+            prev_tp = turnpoints[i - 1]
+            leg_distance = geodesic(prev_tp.center, task_tp.center).meters / 1000.0
+            cumulative_center += leg_distance
+
+            # For optimized distance, calculate using all turnpoints up to current
+            partial_turnpoints = turnpoints[: i + 1]
+            if len(partial_turnpoints) >= 2:
                 cumulative_opt = (
                     optimized_distance(
-                        partial_distance_turnpoints,
+                        partial_turnpoints,
                         angle_step=angle_step,
                         show_progress=False,
                     )
                     / 1000.0
                 )
-            else:
-                # Subsequent turnpoints
-                if show_progress and i > first_tp_after_sss_index + 1:
-                    print(f"    🔄 Turnpoint {i+1}/{len(turnpoints)}")
-
-                # Calculate center distance from previous turnpoint
-                prev_tp = turnpoints[i - 1]
-                leg_distance = geodesic(prev_tp.center, task_tp.center).meters / 1000.0
-                cumulative_center += leg_distance
-
-                # For optimized distance, calculate using the SSS-adjusted turnpoint list
-                distance_tp_index = (
-                    i - sss_index
-                )  # Adjust index for distance_turnpoints list
-                if distance_tp_index < len(distance_turnpoints):
-                    partial_distance_turnpoints = distance_turnpoints[
-                        : distance_tp_index + 1
-                    ]
-                    if len(partial_distance_turnpoints) >= 2:
-                        cumulative_opt = (
-                            optimized_distance(
-                                partial_distance_turnpoints,
-                                angle_step=angle_step,
-                                show_progress=False,
-                            )
-                            / 1000.0
-                        )
-        else:
-            # Regular (non-SSS) task handling
-            if i > 0:
-                if show_progress and i > 1:
-                    print(f"    🔄 Turnpoint {i+1}/{len(turnpoints)}")
-
-                # Calculate center distance incrementally
-                prev_tp = turnpoints[i - 1]
-                leg_distance = geodesic(prev_tp.center, task_tp.center).meters / 1000.0
-                cumulative_center += leg_distance
-
-                # For optimized distance, calculate using shared DP function
-                partial_turnpoints = turnpoints[: i + 1]
-                if len(partial_turnpoints) >= 2:
-                    cumulative_opt = (
-                        optimized_distance(
-                            partial_turnpoints,
-                            angle_step=angle_step,
-                            show_progress=False,
-                        )
-                        / 1000.0
-                    )
 
         turnpoint_details.append(
             {
