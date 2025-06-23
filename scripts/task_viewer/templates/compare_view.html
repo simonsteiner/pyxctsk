@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Task Comparison: {{ task_name }}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         .difference-positive { 
             color: #d63384; 
@@ -33,6 +34,50 @@
         }
         .badge-difference {
             font-size: 0.8em;
+        }
+        #comparison-map {
+            height: 500px;
+            margin-bottom: 20px;
+            border-radius: 10px;
+        }
+        .map-toggle-buttons {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+        }
+        .map-toggle-buttons .btn {
+            margin-left: 5px;
+        }
+        .map-container {
+            position: relative;
+        }
+        .map-legend {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        .legend-line {
+            width: 20px;
+            height: 3px;
+            margin-right: 8px;
+        }
+        .legend-circle {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
         }
     </style>
 </head>
@@ -108,6 +153,46 @@
                                 {% if comparison.summary.optimized_difference_km >= 0 %}+{% endif %}{{ "%.2f"|format(comparison.summary.optimized_difference_km) }} km 
                                 ({% if comparison.summary.optimized_difference_percent >= 0 %}+{% endif %}{{ "%.1f"|format(comparison.summary.optimized_difference_percent) }}%)
                             </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Map Comparison -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Route Comparison Map</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="map-container">
+                            <div id="comparison-map"></div>
+                            <div class="map-toggle-buttons">
+                                <button type="button" class="btn btn-sm btn-primary" id="show-original" onclick="toggleLayer('original')">XCContest</button>
+                                <button type="button" class="btn btn-sm btn-success" id="show-xctrack" onclick="toggleLayer('xctrack')">XCTrack</button>
+                                <button type="button" class="btn btn-sm btn-info" id="show-both" onclick="toggleLayer('both')">Both</button>
+                            </div>
+                            <div class="map-legend" id="map-legend" style="display: none;">
+                                <strong>Legend</strong>
+                                <div class="legend-item">
+                                    <div class="legend-line" style="background-color: #d63384;"></div>
+                                    <span>XCContest Optimized Route</span>
+                                </div>
+                                <div class="legend-item">
+                                    <div class="legend-line" style="background-color: #ff4136;"></div>
+                                    <span>XCTrack Optimized Route</span>
+                                </div>
+                                <div class="legend-item">
+                                    <div class="legend-circle" style="background-color: #d63384; opacity: 0.5;"></div>
+                                    <span>XCContest Turnpoints</span>
+                                </div>
+                                <div class="legend-item">
+                                    <div class="legend-circle" style="background-color: #0074d9; opacity: 0.5;"></div>
+                                    <span>XCTrack Turnpoints</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -231,5 +316,204 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // Initialize map
+        const map = L.map('comparison-map').setView([0, 0], 2);
+        
+        // Add base layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        // GeoJSON data from backend
+        const originalGeoJSON = {{ original_geojson | tojson | safe }};
+        const xctrackGeoJSON = {{ xctrack_geojson | tojson | safe }};
+
+        // Layer groups for original and xctrack data
+        let originalLayer = null;
+        let xctrackLayer = null;
+
+        // Style functions
+        function getOriginalStyle(feature) {
+            if (feature.properties.type === 'route') {
+                return {
+                    color: '#d63384',
+                    weight: 4,
+                    opacity: 0.8
+                };
+            }
+            return {
+                color: '#d63384',
+                fillColor: '#d63384',
+                fillOpacity: 0.2,
+                weight: 2
+            };
+        }
+
+        function getXCTrackStyle(feature) {
+            if (feature.properties.type === 'optimized_route') {
+                return {
+                    color: '#ff4136',
+                    weight: 3,
+                    opacity: 0.8
+                };
+            } else if (feature.properties.type === 'fallback_route') {
+                return {
+                    color: '#ff851b',
+                    weight: 2,
+                    opacity: 0.7,
+                    dashArray: '5,5'
+                };
+            }
+            return {
+                color: '#0074d9',
+                fillColor: '#0074d9',
+                fillOpacity: 0.2,
+                weight: 2
+            };
+        }
+
+        function pointToLayer(feature, latlng) {
+            if (feature.properties && feature.properties.type === 'cylinder' && feature.properties.radius) {
+                return L.circle(latlng, {
+                    radius: feature.properties.radius
+                });
+            }
+            return L.marker(latlng);
+        }
+
+        function onEachFeature(feature, layer) {
+            if (feature.properties) {
+                let popupContent = '<div>';
+                if (feature.properties.name) {
+                    popupContent += `<strong>${feature.properties.name}</strong><br>`;
+                }
+                if (feature.properties.description) {
+                    popupContent += feature.properties.description;
+                }
+                if (feature.properties.radius) {
+                    popupContent += `<br>Radius: ${feature.properties.radius}m`;
+                }
+                if (feature.properties.type) {
+                    const typeLabels = {
+                        'route': 'Optimized Route',
+                        'optimized_route': 'Optimized Route',
+                        'fallback_route': 'Fallback Route',
+                        'cylinder': 'Turnpoint'
+                    };
+                    popupContent += `<br>Type: ${typeLabels[feature.properties.type] || feature.properties.type}`;
+                }
+                popupContent += '</div>';
+                layer.bindPopup(popupContent);
+            }
+        }
+
+        // Create layers
+        function createLayers() {
+            if (originalGeoJSON && originalGeoJSON.features && originalGeoJSON.features.length > 0) {
+                originalLayer = L.geoJSON(originalGeoJSON, {
+                    style: getOriginalStyle,
+                    pointToLayer: pointToLayer,
+                    onEachFeature: function(feature, layer) {
+                        onEachFeature(feature, layer);
+                        // Add source label to popup
+                        if (layer.getPopup()) {
+                            const content = layer.getPopup().getContent();
+                            layer.setPopupContent(content + '<br><em>Source: XCContest</em>');
+                        }
+                    }
+                });
+            }
+
+            if (xctrackGeoJSON && xctrackGeoJSON.features && xctrackGeoJSON.features.length > 0) {
+                xctrackLayer = L.geoJSON(xctrackGeoJSON, {
+                    style: getXCTrackStyle,
+                    pointToLayer: pointToLayer,
+                    onEachFeature: function(feature, layer) {
+                        onEachFeature(feature, layer);
+                        // Add source label to popup
+                        if (layer.getPopup()) {
+                            const content = layer.getPopup().getContent();
+                            layer.setPopupContent(content + '<br><em>Source: XCTrack</em>');
+                        }
+                    }
+                });
+            }
+        }
+
+        // Toggle layer visibility
+        function toggleLayer(type) {
+            // Remove existing layers
+            if (originalLayer && map.hasLayer(originalLayer)) {
+                map.removeLayer(originalLayer);
+            }
+            if (xctrackLayer && map.hasLayer(xctrackLayer)) {
+                map.removeLayer(xctrackLayer);
+            }
+
+            // Update button states
+            document.querySelectorAll('.map-toggle-buttons .btn').forEach(btn => {
+                btn.classList.remove('btn-primary', 'btn-success', 'btn-info');
+                btn.classList.add('btn-outline-secondary');
+            });
+
+            // Show/hide legend
+            const legend = document.getElementById('map-legend');
+            legend.style.display = 'block';
+
+            // Add selected layers and update button
+            if (type === 'original' && originalLayer) {
+                originalLayer.addTo(map);
+                document.getElementById('show-original').classList.remove('btn-outline-secondary');
+                document.getElementById('show-original').classList.add('btn-primary');
+                map.fitBounds(originalLayer.getBounds(), { padding: [20, 20] });
+            } else if (type === 'xctrack' && xctrackLayer) {
+                xctrackLayer.addTo(map);
+                document.getElementById('show-xctrack').classList.remove('btn-outline-secondary');
+                document.getElementById('show-xctrack').classList.add('btn-success');
+                map.fitBounds(xctrackLayer.getBounds(), { padding: [20, 20] });
+            } else if (type === 'both') {
+                let bounds = null;
+                if (originalLayer) {
+                    originalLayer.addTo(map);
+                    bounds = originalLayer.getBounds();
+                }
+                if (xctrackLayer) {
+                    xctrackLayer.addTo(map);
+                    if (bounds) {
+                        bounds.extend(xctrackLayer.getBounds());
+                    } else {
+                        bounds = xctrackLayer.getBounds();
+                    }
+                }
+                document.getElementById('show-both').classList.remove('btn-outline-secondary');
+                document.getElementById('show-both').classList.add('btn-info');
+                
+                if (bounds && bounds.isValid()) {
+                    map.fitBounds(bounds, { padding: [20, 20] });
+                }
+            }
+        }
+
+        // Initialize the map
+        createLayers();
+        
+        // Default to showing both layers
+        toggleLayer('both');
+
+        // If no data available, show message
+        if ((!originalGeoJSON || !originalGeoJSON.features || originalGeoJSON.features.length === 0) && 
+            (!xctrackGeoJSON || !xctrackGeoJSON.features || xctrackGeoJSON.features.length === 0)) {
+            
+            const noDataMsg = L.control({position: 'bottomleft'});
+            noDataMsg.onAdd = function() {
+                const div = L.DomUtil.create('div', 'no-data-message');
+                div.innerHTML = '<div class="alert alert-warning">No map data available for comparison</div>';
+                return div;
+            };
+            noDataMsg.addTo(map);
+        }
+    </script>
 </body>
 </html>
