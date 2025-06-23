@@ -289,7 +289,7 @@ def analyze_results(all_results: List[Dict[str, Any]]) -> None:
 
     # Summary statistics
     print(f"\n📊 SUMMARY STATISTICS ({len(valid_results)} tasks analyzed)")
-    print("-" * 60)
+    print("-" * 80)
 
     times = [r["optimization"]["total_time"] for r in valid_results]
     distances = [r["optimization"]["total_distance"] for r in valid_results]
@@ -307,7 +307,7 @@ def analyze_results(all_results: List[Dict[str, Any]]) -> None:
 
     if has_json_data:
         print(f"\n📊 JSON REFERENCE DATA COMPARISON")
-        print("-" * 60)
+        print("-" * 80)
         print(f"Comparing against pre-calculated reference distances from JSON files:")
 
         # Calculate differences against JSON reference data
@@ -326,7 +326,7 @@ def analyze_results(all_results: List[Dict[str, Any]]) -> None:
 
     # Detailed task-by-task results
     print(f"\n📋 DETAILED TASK RESULTS")
-    print("-" * 60)
+    print("-" * 80)
 
     # Check if any tasks have JSON data
     tasks_with_json = [
@@ -338,16 +338,16 @@ def analyze_results(all_results: List[Dict[str, Any]]) -> None:
 
     if tasks_with_json:
         print(
-            f"{'Task':<15} {'TPs':<4} {'Center':<8} {'JSON Ref':<10} {'Optimized':<12} {'Diff':<8}"
+            f"{'Task':<15} {'TPs':<4} {'Center':<8} {'JSON Ref':<10} {'Optimized':<8} {'Diff':<8} {'Time':<8}"
         )
         print(
-            f"{'Name':<15} {'#':<4} {'(km)':<8} {'Opt (km)':<10} {'km (time)':<12} {'(km)':<8}"
+            f"{'Name':<15} {'#':<4} {'(km)':<8} {'Opt (km)':<10} {'(km)':<9} {'(km)':<8} {'(s)':<8}"
         )
-        print("-" * 65)
+        print("-" * 80)
     else:
-        print(f"{'Task':<15} {'TPs':<4} {'Center':<8} {'Optimized':<12}")
-        print(f"{'Name':<15} {'#':<4} {'(km)':<8} {'km (time)':<12}")
-        print("-" * 45)
+        print(f"{'Task':<15} {'TPs':<4} {'Center':<8} {'Optimized':<8} {'Time':<8}")
+        print(f"{'Name':<15} {'#':<4} {'(km)':<8} {'(km)':<8} {'(s)':<8}")
+        print("-" * 80)
 
     for result in valid_results:
         task_name = result["task_info"]["name"][:14]
@@ -359,11 +359,12 @@ def analyze_results(all_results: List[Dict[str, Any]]) -> None:
 
         if "json_optimized_distance_km" in result["task_info"]:
             json_opt_km = result["task_info"]["json_optimized_distance_km"]
-            diff_km = abs(optimization_km - json_opt_km)
+            diff_km = optimization_km - json_opt_km
+            sign = "+" if diff_km > 0 else "-" if diff_km < 0 else " "
             print(
                 f"{task_name:<15} {num_tps:<4} {center_km:<8.2f} {json_opt_km:<10.2f} "
-                f"{optimization_km:.2f}({optimization_time:.3f}s) "
-                f"{diff_km:<8.2f}"
+                f"{optimization_km:.2f} {sign}{abs(diff_km):<7.2f} "
+                f"{optimization_time:.3f}s"
             )
         else:
             if (
@@ -371,13 +372,13 @@ def analyze_results(all_results: List[Dict[str, Any]]) -> None:
             ):  # If some tasks have JSON data, show N/A for those that don't
                 print(
                     f"{task_name:<15} {num_tps:<4} {center_km:<8.2f} {'N/A':<10} "
-                    f"{optimization_km:.2f}({optimization_time:.3f}s) "
-                    f"{'N/A':<8}"
+                    f"{optimization_km:.2f} {'N/A':<8} "
+                    f"{optimization_time:.3f}s"
                 )
             else:
                 print(
                     f"{task_name:<15} {num_tps:<4} {center_km:<8.2f} "
-                    f"{optimization_km:.2f}({optimization_time:.3f}s)"
+                    f"{optimization_km:.2f} {optimization_time:.3f}s"
                 )
 
 
@@ -406,7 +407,7 @@ def main():
     args = parser.parse_args()
 
     print("🚀 XCTrack Optimization Comparison with Reference Data")
-    print("=" * 50)
+    print("=" * 80)
 
     # Load all tasks
     tasks = load_all_tasks(args.tasks_dir)
