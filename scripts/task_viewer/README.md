@@ -30,6 +30,7 @@ task_viewer/
 ```bash
 python -m venv venv
 source venv/bin/activate  # Use venv/bin/activate.fish for fish shell
+source /home/simon/git/python-xctrack/venv/bin/activate
 ```
 
 2. Install required dependencies:

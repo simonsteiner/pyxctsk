@@ -32,6 +32,12 @@
             <div class="col">
                 <h1>Available Tasks</h1>
                 <p class="lead">Select a task to view its metadata and visualization</p>
+                <div class="mt-3">
+                    <a href="/compare" class="btn btn-outline-primary me-2">
+                        <i class="bi bi-calculator"></i> Compare Distances
+                    </a>
+                    <small class="text-muted">Compare XCContest data with XCTrack algorithm calculations</small>
+                </div>
             </div>
         </div>
 
@@ -45,6 +51,7 @@
                     </div>
                     <div class="card-footer">
                         <a href="{{ url_for('show_task', task_name=task) }}" class="btn btn-primary">View Task</a>
+                        <a href="/compare/{{ task }}" class="btn btn-outline-secondary ms-2">Compare</a>
                     </div>
                 </div>
             </div>
