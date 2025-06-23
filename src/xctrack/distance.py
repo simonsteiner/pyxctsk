@@ -15,6 +15,33 @@ DEFAULT_BEAM_WIDTH = (
 )
 DEFAULT_NUM_ITERATIONS = 5  # Default number of iterations for iterative refinement
 
+
+def get_optimization_config(
+    angle_step: Optional[int] = None,
+    beam_width: Optional[int] = None,
+    num_iterations: Optional[int] = None,
+) -> Dict[str, int]:
+    """Get centralized optimization configuration parameters.
+
+    This ensures consistent optimization parameters are used throughout the code.
+
+    Args:
+        angle_step: Optional angle step override
+        beam_width: Optional beam width override
+        num_iterations: Optional iteration count override
+
+    Returns:
+        Dictionary containing optimization configuration parameters
+    """
+    return {
+        "angle_step": angle_step if angle_step is not None else DEFAULT_ANGLE_STEP,
+        "beam_width": beam_width if beam_width is not None else DEFAULT_BEAM_WIDTH,
+        "num_iterations": (
+            num_iterations if num_iterations is not None else DEFAULT_NUM_ITERATIONS
+        ),
+    }
+
+
 # Initialize WGS84 ellipsoid
 geod = Geod(ellps="WGS84")
 
@@ -364,10 +391,10 @@ def _compute_optimal_route_with_beam_search(
 
 def optimized_distance(
     turnpoints: List[TaskTurnpoint],
-    angle_step: int = DEFAULT_ANGLE_STEP,
+    angle_step: Optional[int] = None,
     show_progress: bool = False,
-    beam_width: int = DEFAULT_BEAM_WIDTH,
-    num_iterations: int = DEFAULT_NUM_ITERATIONS,
+    beam_width: Optional[int] = None,
+    num_iterations: Optional[int] = None,
 ) -> float:
     """Compute the fully optimized distance through turnpoints using iterative refinement.
 
@@ -389,12 +416,14 @@ def optimized_distance(
     Returns:
         Optimized distance in meters
     """
+    config = get_optimization_config(angle_step, beam_width, num_iterations)
+
     distance, _ = calculate_iteratively_refined_route(
         turnpoints,
-        num_iterations=num_iterations,
-        angle_step=angle_step,
+        num_iterations=config["num_iterations"],
+        angle_step=config["angle_step"],
         show_progress=show_progress,
-        beam_width=beam_width,
+        beam_width=config["beam_width"],
     )
     return distance
 
@@ -452,8 +481,8 @@ def _calculate_savings(center_km: float, opt_km: float) -> Tuple[float, float]:
 def _create_turnpoint_details(
     task_turnpoints,
     task_distance_turnpoints: List[TaskTurnpoint],
-    angle_step: int = DEFAULT_ANGLE_STEP,
-    beam_width: int = DEFAULT_BEAM_WIDTH,
+    angle_step: Optional[int] = None,
+    beam_width: Optional[int] = None,
     show_progress: bool = False,
 ) -> List[Dict[str, Any]]:
     """Create detailed turnpoint information including cumulative distances.
@@ -468,6 +497,7 @@ def _create_turnpoint_details(
     Returns:
         List of dictionaries with turnpoint details
     """
+    config = get_optimization_config(angle_step, beam_width)
     turnpoint_details = []
     cumulative_center = 0.0
 
@@ -490,9 +520,9 @@ def _create_turnpoint_details(
                 cumulative_opt = (
                     optimized_distance(
                         partial_turnpoints,
-                        angle_step=angle_step,
+                        angle_step=config["angle_step"],
                         show_progress=False,
-                        beam_width=beam_width,
+                        beam_width=config["beam_width"],
                     )
                     / 1000.0
                 )
@@ -515,10 +545,10 @@ def _create_turnpoint_details(
 
 def calculate_task_distances(
     task: Task,
-    angle_step: int = DEFAULT_ANGLE_STEP,
+    angle_step: Optional[int] = None,
     show_progress: bool = False,
-    beam_width: int = DEFAULT_BEAM_WIDTH,
-    num_iterations: int = DEFAULT_NUM_ITERATIONS,
+    beam_width: Optional[int] = None,
+    num_iterations: Optional[int] = None,
 ) -> Dict[str, Any]:
     """Calculate both center and optimized distances for a task.
 
@@ -532,6 +562,7 @@ def calculate_task_distances(
     Returns:
         Dictionary containing distance calculations and turnpoint details
     """
+    config = get_optimization_config(angle_step, beam_width, num_iterations)
     # Convert to TaskTurnpoint objects
     turnpoints = _task_to_turnpoints(task)
 
@@ -560,10 +591,10 @@ def calculate_task_distances(
 
     opt_dist = optimized_distance(
         distance_turnpoints,
-        angle_step=angle_step,
+        angle_step=config["angle_step"],
         show_progress=show_progress,
-        beam_width=beam_width,
-        num_iterations=num_iterations,
+        beam_width=config["beam_width"],
+        num_iterations=config["num_iterations"],
     )
 
     if show_progress:
@@ -583,7 +614,11 @@ def calculate_task_distances(
 
     # Calculate turnpoint details
     turnpoint_details = _create_turnpoint_details(
-        task.turnpoints, turnpoints, angle_step, beam_width, show_progress
+        task.turnpoints,
+        turnpoints,
+        config["angle_step"],
+        config["beam_width"],
+        show_progress,
     )
 
     if show_progress:
@@ -595,16 +630,16 @@ def calculate_task_distances(
         "savings_km": round(savings_km, 1),
         "savings_percent": round(savings_percent, 1),
         "turnpoints": turnpoint_details,
-        "optimization_angle_step": angle_step,
-        "beam_width": beam_width,
+        "optimization_angle_step": config["angle_step"],
+        "beam_width": config["beam_width"],
     }
 
 
 def calculate_cumulative_distances(
     turnpoints: List[TaskTurnpoint],
     index: int,
-    angle_step: int = DEFAULT_ANGLE_STEP,
-    beam_width: int = DEFAULT_BEAM_WIDTH,
+    angle_step: Optional[int] = None,
+    beam_width: Optional[int] = None,
 ) -> Tuple[float, float]:
     """Calculate cumulative distances up to a specific turnpoint index.
 
@@ -620,15 +655,16 @@ def calculate_cumulative_distances(
     if index == 0 or len(turnpoints) <= 1:
         return 0.0, 0.0
 
+    config = get_optimization_config(angle_step, beam_width)
+
     partial_turnpoints = turnpoints[: index + 1]
     center_dist = distance_through_centers(partial_turnpoints) / 1000.0
     opt_dist = (
         optimized_distance(
             partial_turnpoints,
-            angle_step=angle_step,
+            angle_step=config["angle_step"],
             show_progress=False,
-            beam_width=beam_width,
-            num_iterations=DEFAULT_NUM_ITERATIONS,
+            beam_width=config["beam_width"],
         )
         / 1000.0
     )
@@ -639,9 +675,9 @@ def calculate_cumulative_distances(
 def optimized_route_coordinates(
     turnpoints: List[TaskTurnpoint],
     task_turnpoints=None,  # Kept for backward compatibility
-    angle_step: int = DEFAULT_ANGLE_STEP,
-    beam_width: int = DEFAULT_BEAM_WIDTH,
-    num_iterations: int = DEFAULT_NUM_ITERATIONS,
+    angle_step: Optional[int] = None,
+    beam_width: Optional[int] = None,
+    num_iterations: Optional[int] = None,
 ) -> List[Tuple[float, float]]:
     """Compute the fully optimized route coordinates through turnpoints using iterative refinement.
 
@@ -664,12 +700,14 @@ def optimized_route_coordinates(
     Returns:
         List of (lat, lon) tuples representing the optimized route coordinates
     """
+    config = get_optimization_config(angle_step, beam_width, num_iterations)
+
     _, route_coordinates = calculate_iteratively_refined_route(
         turnpoints,
-        num_iterations=num_iterations,
-        angle_step=angle_step,
+        num_iterations=config["num_iterations"],
+        angle_step=config["angle_step"],
         show_progress=False,
-        beam_width=beam_width,
+        beam_width=config["beam_width"],
     )
     return route_coordinates
 
@@ -678,7 +716,7 @@ def calculate_optimal_sss_entry_point(
     sss_turnpoint: TaskTurnpoint,
     takeoff_center: Tuple[float, float],
     first_tp_after_sss_point: Tuple[float, float],
-    angle_step: int = DEFAULT_ANGLE_STEP,
+    angle_step: Optional[int] = None,
 ) -> Tuple[float, float]:
     """Calculate the optimal entry point for an SSS (Start Speed Section) turnpoint.
 
@@ -695,8 +733,9 @@ def calculate_optimal_sss_entry_point(
     Returns:
         Tuple of (lat, lon) representing the optimal SSS entry point
     """
+    config = get_optimization_config(angle_step)
     # Generate perimeter points for the SSS turnpoint
-    sss_perimeter = sss_turnpoint.perimeter_points(angle_step)
+    sss_perimeter = sss_turnpoint.perimeter_points(config["angle_step"])
 
     # Find the point that minimizes total distance: takeoff -> SSS entry -> first TP after SSS
     best_sss_point = min(
@@ -760,7 +799,7 @@ def _get_first_tp_after_sss_point(
 def calculate_sss_info(
     task_turnpoints,
     route_coordinates: List[Tuple[float, float]],
-    angle_step: int = DEFAULT_ANGLE_STEP,
+    angle_step: Optional[int] = None,
 ) -> Dict[str, Any]:
     """Calculate SSS (Start Speed Section) information for a task.
 
@@ -781,6 +820,7 @@ def calculate_sss_info(
             'takeoff_center': {'lat': float, 'lon': float}
         }
     """
+    config = get_optimization_config(angle_step)
     if not task_turnpoints or len(task_turnpoints) < 2:
         return None
 
@@ -816,7 +856,7 @@ def calculate_sss_info(
         sss_task_tp,
         takeoff_center,
         first_tp_after_sss_route_point,
-        angle_step,
+        config["angle_step"],
     )
 
     optimal_sss_point = {"lat": best_sss_point[0], "lon": best_sss_point[1]}
@@ -834,10 +874,10 @@ def calculate_sss_info(
 
 def calculate_iteratively_refined_route(
     turnpoints: List[TaskTurnpoint],
-    num_iterations: int = DEFAULT_NUM_ITERATIONS,
-    angle_step: int = DEFAULT_ANGLE_STEP,
+    num_iterations: Optional[int] = None,
+    angle_step: Optional[int] = None,
     show_progress: bool = False,
-    beam_width: int = DEFAULT_BEAM_WIDTH,
+    beam_width: Optional[int] = None,
 ) -> Tuple[float, List[Tuple[float, float]]]:
     """Calculate optimized route with iterative refinement to reduce look-ahead bias.
 
@@ -859,6 +899,7 @@ def calculate_iteratively_refined_route(
     Returns:
         Tuple of (optimized_distance_meters, route_coordinates)
     """
+    config = get_optimization_config(angle_step, beam_width, num_iterations)
     if len(turnpoints) < 2:
         distance = 0.0
         path = [(tp.center[0], tp.center[1]) for tp in turnpoints]
@@ -870,10 +911,10 @@ def calculate_iteratively_refined_route(
 
     current_distance, current_route = _compute_optimal_route_dp(
         turnpoints,
-        angle_step=angle_step,
+        angle_step=config["angle_step"],
         show_progress=show_progress,
         return_path=True,
-        beam_width=beam_width,
+        beam_width=config["beam_width"],
     )
 
     # Store initial results
@@ -881,9 +922,11 @@ def calculate_iteratively_refined_route(
     best_route = current_route
 
     # Perform iterative refinement
-    for iteration in range(1, num_iterations):
+    for iteration in range(1, config["num_iterations"]):
         if show_progress:
-            print(f"    🔄 Refinement iteration {iteration}/{num_iterations-1}...")
+            print(
+                f"    🔄 Refinement iteration {iteration}/{config['num_iterations']-1}..."
+            )
 
         # Create modified turnpoints that use previous optimal points as targets
         refined_turnpoints = _create_refined_turnpoints(turnpoints, current_route)
@@ -892,9 +935,9 @@ def calculate_iteratively_refined_route(
         new_distance, new_route = _compute_optimal_route_with_refined_targets(
             refined_turnpoints,
             current_route,
-            angle_step=angle_step,
+            angle_step=config["angle_step"],
             show_progress=show_progress,
-            beam_width=beam_width,
+            beam_width=config["beam_width"],
         )
 
         # Check for improvement
@@ -938,9 +981,9 @@ def _create_refined_turnpoints(
 def _compute_optimal_route_with_refined_targets(
     turnpoints: List[TaskTurnpoint],
     previous_route: List[Tuple[float, float]],
-    angle_step: int = DEFAULT_ANGLE_STEP,
+    angle_step: Optional[int] = None,
     show_progress: bool = False,
-    beam_width: int = DEFAULT_BEAM_WIDTH,
+    beam_width: Optional[int] = None,
 ) -> Tuple[float, List[Tuple[float, float]]]:
     """Compute optimal route using previous route points as look-ahead targets.
 
@@ -958,6 +1001,7 @@ def _compute_optimal_route_with_refined_targets(
     Returns:
         Tuple of (optimized_distance_meters, route_coordinates)
     """
+    config = get_optimization_config(angle_step, beam_width)
     if show_progress:
         print("    🎯 Using refined targets for DP optimization...")
 
@@ -979,7 +1023,7 @@ def _compute_optimal_route_with_refined_targets(
 
         # Process this stage using the refined target for look-ahead
         dp[i] = _process_dp_stage_with_refined_target(
-            dp, i, turnpoints, next_target, beam_width, show_progress
+            dp, i, turnpoints, next_target, config["beam_width"], show_progress
         )
 
     # Find the best final solution
