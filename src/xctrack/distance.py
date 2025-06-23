@@ -76,17 +76,6 @@ def _compute_optimal_route_dp(
         )
         return distance, path
 
-    # Find SSS information if task_turnpoints provided
-    sss_index = None
-    first_tp_after_sss_index = None
-    if task_turnpoints:
-        for i, tp in enumerate(task_turnpoints):
-            if hasattr(tp, "type") and tp.type and tp.type.value == "SSS":
-                sss_index = i
-                if i + 1 < len(task_turnpoints):
-                    first_tp_after_sss_index = i + 1
-                break
-
     if show_progress:
         print(
             f"    🔄 Optimizing route through {len(turnpoints)} turnpoints (angle step: {angle_step}°)..."
@@ -127,40 +116,19 @@ def _compute_optimal_route_dp(
             min_dist = float("inf")
             best_prev_pt = None
 
-            # Handle SSS logic for route coordinates
-            if (
-                return_path
-                and sss_index is not None
-                and first_tp_after_sss_index is not None
-            ):
-                if i == first_tp_after_sss_index:
-                    leg_distance = geodesic(takeoff_center, curr_pt).meters
-                    min_dist = leg_distance
-                    best_prev_pt = takeoff_center
-                elif i > first_tp_after_sss_index:
-                    for prev_pt, (prev_dist, _) in dp[i - 1].items():
-                        leg_distance = geodesic(prev_pt, curr_pt).meters
-                        total_distance = prev_dist + leg_distance
-                        if total_distance < min_dist:
-                            min_dist = total_distance
-                            best_prev_pt = prev_pt
-                elif i <= sss_index:
-                    leg_distance = geodesic(takeoff_center, curr_pt).meters
-                    min_dist = leg_distance
-                    best_prev_pt = takeoff_center
+            # Standard DP approach for all turnpoints
+            if i == 1:
+                leg_distance = geodesic(takeoff_center, curr_pt).meters
+                min_dist = leg_distance
+                best_prev_pt = takeoff_center
             else:
-                if i == 1:
-                    leg_distance = geodesic(takeoff_center, curr_pt).meters
-                    min_dist = leg_distance
-                    best_prev_pt = takeoff_center
-                else:
-                    for prev_pt, prev_dist_info in dp[i - 1].items():
-                        prev_dist = prev_dist_info[0] if return_path else prev_dist_info
-                        leg_distance = geodesic(prev_pt, curr_pt).meters
-                        total_distance = prev_dist + leg_distance
-                        if total_distance < min_dist:
-                            min_dist = total_distance
-                            best_prev_pt = prev_pt
+                for prev_pt, prev_dist_info in dp[i - 1].items():
+                    prev_dist = prev_dist_info[0] if return_path else prev_dist_info
+                    leg_distance = geodesic(prev_pt, curr_pt).meters
+                    total_distance = prev_dist + leg_distance
+                    if total_distance < min_dist:
+                        min_dist = total_distance
+                        best_prev_pt = prev_pt
 
             # Store result
             if return_path:
@@ -182,13 +150,6 @@ def _compute_optimal_route_dp(
                 current_point = prev_point if prev_point else takeoff_center
 
         route_coordinates.reverse()
-
-        if sss_index is not None and first_tp_after_sss_index is not None:
-            flight_route = [takeoff_center]
-            if first_tp_after_sss_index < len(route_coordinates):
-                flight_route.extend(route_coordinates[first_tp_after_sss_index:])
-            return optimal_distance, flight_route
-
         return optimal_distance, route_coordinates
     else:
         optimal_distance = min(dp[-1].values())
@@ -283,8 +244,8 @@ def calculate_task_distances(
             "turnpoints": [],
         }
 
-    # For distance calculations, always use all turnpoints
-    # SSS is just a timing marker and doesn't affect the route distance
+    # For distance calculations, use all turnpoints in sequence
+    # SSS turnpoints are treated like any other turnpoint
     distance_turnpoints = turnpoints.copy()
 
     if show_progress:
@@ -324,7 +285,7 @@ def calculate_task_distances(
     for i, (tp, task_tp) in enumerate(zip(task.turnpoints, turnpoints)):
         cumulative_opt = 0.0
 
-        # Calculate cumulative distances normally for all turnpoints
+        # Calculate cumulative distances for all turnpoints
         if i > 0:
             if show_progress and i > 1:
                 print(f"    🔄 Turnpoint {i+1}/{len(turnpoints)}")
@@ -408,8 +369,8 @@ def optimized_route_coordinates(
     """Compute the fully optimized route coordinates through turnpoints using Dynamic Programming.
 
     This algorithm finds the shortest possible route through all turnpoint cylinders
-    and returns the actual coordinates of the optimal path. For tasks with SSS,
-    it starts from takeoff center to the first turnpoint after SSS, bypassing SSS turnpoints.
+    and returns the actual coordinates of the optimal path. All turnpoints including SSS
+    are treated uniformly in the route calculation.
 
     Args:
         turnpoints: List of TaskTurnpoint objects
@@ -419,27 +380,7 @@ def optimized_route_coordinates(
     Returns:
         List of (lat, lon) tuples representing the optimized route coordinates
     """
-    # Check for SSS and create appropriate turnpoint list for route calculations
-    if task_turnpoints:
-        for i, tp in enumerate(task_turnpoints):
-            if hasattr(tp, "type") and tp.type and tp.type.value == "SSS":
-                if i + 1 < len(task_turnpoints):
-                    first_tp_after_sss_index = i + 1
-                    # For route calculations, skip SSS turnpoints
-                    route_turnpoints = [turnpoints[0]] + turnpoints[
-                        first_tp_after_sss_index:
-                    ]
-                    _, route_coordinates = _compute_optimal_route_dp(
-                        route_turnpoints,
-                        task_turnpoints=None,  # No SSS handling needed for the reduced list
-                        angle_step=angle_step,
-                        show_progress=False,
-                        return_path=True,
-                    )
-                    return route_coordinates
-                break
-
-    # Regular (non-SSS) task handling
+    # Calculate route through all turnpoints in sequence
     _, route_coordinates = _compute_optimal_route_dp(
         turnpoints,
         task_turnpoints=task_turnpoints,
