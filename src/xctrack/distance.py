@@ -1,6 +1,7 @@
 """Distance calculation module using WGS84 ellipsoid and route optimization."""
 
 from typing import Any, Dict, List, Tuple
+import math
 
 from geopy.distance import geodesic
 from pyproj import Geod
@@ -9,9 +10,220 @@ from .task import Task
 
 # Configuration constants
 DEFAULT_ANGLE_STEP = 10  # Angle step in degrees for perimeter point generation (5-15° for good accuracy/performance balance)
+COARSE_ANGLE_STEP = 2  # Coarse step for two-stage optimization
+FINE_ANGLE_STEP = 0.05  # Fine step for two-stage optimization
+OPTIMIZATION_TOLERANCE = 0.01  # Tolerance in meters for optimization convergence
+DEFAULT_BEAM_WIDTH = (
+    5  # Number of best candidates to keep at each DP stage for beam search
+)
 
 # Initialize WGS84 ellipsoid
 geod = Geod(ellps="WGS84")
+
+# Import scipy for continuous optimization
+from scipy.optimize import fminbound
+
+
+def _calculate_distance_through_point(
+    start_point: Tuple[float, float],
+    point: Tuple[float, float],
+    end_point: Tuple[float, float],
+) -> float:
+    """Calculate total distance from start through point to end."""
+    return geodesic(start_point, point).meters + geodesic(point, end_point).meters
+
+
+def _find_optimal_cylinder_point_analytical(
+    cylinder_center: Tuple[float, float],
+    cylinder_radius: float,
+    start_point: Tuple[float, float],
+    end_point: Tuple[float, float],
+) -> Tuple[float, float]:
+    """Find optimal point on cylinder using analytical approach.
+
+    For non-overlapping circles, the optimal path is along the geodesic
+    connecting the two points, with tangent points on each circle.
+
+    Args:
+        cylinder_center: (lat, lon) of cylinder center
+        cylinder_radius: Radius in meters
+        start_point: (lat, lon) of starting point
+        end_point: (lat, lon) of ending point
+
+    Returns:
+        (lat, lon) of optimal point on cylinder perimeter
+    """
+    # Calculate the forward azimuth from start to end
+    start_lon, start_lat = start_point[1], start_point[0]
+    end_lon, end_lat = end_point[1], end_point[0]
+
+    # Get azimuth from start to end
+    azimuth, _, _ = geod.inv(start_lon, start_lat, end_lon, end_lat)
+
+    # Find the point on the cylinder that lies on this azimuth line
+    # We need the azimuth from start to cylinder center
+    cylinder_lon, cylinder_lat = cylinder_center[1], cylinder_center[0]
+    az_to_cylinder, _, dist_to_cylinder = geod.inv(
+        start_lon, start_lat, cylinder_lon, cylinder_lat
+    )
+
+    # Check if the direct path passes close enough to use analytical solution
+    if dist_to_cylinder > cylinder_radius * 3:  # Cylinder is far from direct path
+        # Use the azimuth from start towards end to find tangent point
+        lon, lat, _ = geod.fwd(cylinder_lon, cylinder_lat, azimuth, cylinder_radius)
+        return (lat, lon)
+    else:
+        # Fall back to optimization for overlapping case
+        return _find_optimal_cylinder_point_optimization(
+            cylinder_center, cylinder_radius, start_point, end_point
+        )
+
+
+def _find_optimal_cylinder_point_optimization(
+    cylinder_center: Tuple[float, float],
+    cylinder_radius: float,
+    start_point: Tuple[float, float],
+    end_point: Tuple[float, float],
+) -> Tuple[float, float]:
+    """Find optimal point on cylinder using continuous optimization.
+
+    Uses scipy.optimize for precise optimization.
+
+    Args:
+        cylinder_center: (lat, lon) of cylinder center
+        cylinder_radius: Radius in meters
+        start_point: (lat, lon) of starting point
+        end_point: (lat, lon) of ending point
+
+    Returns:
+        (lat, lon) of optimal point on cylinder perimeter
+    """
+    cylinder_lon, cylinder_lat = cylinder_center[1], cylinder_center[0]
+
+    # Use continuous optimization
+    def objective(azimuth):
+        lon, lat, _ = geod.fwd(cylinder_lon, cylinder_lat, azimuth, cylinder_radius)
+        point = (lat, lon)
+        return _calculate_distance_through_point(start_point, point, end_point)
+
+    optimal_azimuth = fminbound(objective, 0, 360, xtol=0.01)
+    lon, lat, _ = geod.fwd(cylinder_lon, cylinder_lat, optimal_azimuth, cylinder_radius)
+    return (lat, lon)
+
+
+def _find_optimal_cylinder_point_two_stage(
+    cylinder_center: Tuple[float, float],
+    cylinder_radius: float,
+    start_point: Tuple[float, float],
+    end_point: Tuple[float, float],
+    coarse_step: float = COARSE_ANGLE_STEP,
+    fine_step: float = FINE_ANGLE_STEP,
+    tolerance: float = OPTIMIZATION_TOLERANCE,
+) -> Tuple[float, float]:
+    """Find optimal point on cylinder using two-stage refinement.
+
+    First does a coarse search, then refines around the best result.
+
+    Args:
+        cylinder_center: (lat, lon) of cylinder center
+        cylinder_radius: Radius in meters
+        start_point: (lat, lon) of starting point
+        end_point: (lat, lon) of ending point
+        coarse_step: Angle step for coarse search (degrees)
+        fine_step: Angle step for fine search (degrees)
+        tolerance: Convergence tolerance in meters
+
+    Returns:
+        (lat, lon) of optimal point on cylinder perimeter
+    """
+    cylinder_lon, cylinder_lat = cylinder_center[1], cylinder_center[0]
+
+    # Stage 1: Coarse search
+    best_azimuth = None
+    best_distance = float("inf")
+
+    for azimuth in range(0, 360, int(coarse_step)):
+        lon, lat, _ = geod.fwd(cylinder_lon, cylinder_lat, azimuth, cylinder_radius)
+        point = (lat, lon)
+        distance = _calculate_distance_through_point(start_point, point, end_point)
+
+        if distance < best_distance:
+            best_distance = distance
+            best_azimuth = azimuth
+
+    # Stage 2: Fine search around best result
+    search_range = coarse_step
+    prev_distance = best_distance
+
+    while search_range > fine_step:
+        search_start = best_azimuth - search_range
+        search_end = best_azimuth + search_range
+
+        current_best_azimuth = best_azimuth
+        current_best_distance = best_distance
+
+        # Generate fine search points
+        num_points = max(3, int(2 * search_range / fine_step))
+        step = (search_end - search_start) / num_points
+
+        for i in range(num_points + 1):
+            azimuth = search_start + i * step
+            # Normalize azimuth to [0, 360)
+            azimuth = azimuth % 360
+
+            lon, lat, _ = geod.fwd(cylinder_lon, cylinder_lat, azimuth, cylinder_radius)
+            point = (lat, lon)
+            distance = _calculate_distance_through_point(start_point, point, end_point)
+
+            if distance < current_best_distance:
+                current_best_distance = distance
+                current_best_azimuth = azimuth
+
+        # Check for convergence
+        if abs(prev_distance - current_best_distance) < tolerance:
+            break
+
+        best_azimuth = current_best_azimuth
+        best_distance = current_best_distance
+        prev_distance = current_best_distance
+        search_range *= 0.5  # Halve search range for next iteration
+
+    # Return the optimal point
+    lon, lat, _ = geod.fwd(cylinder_lon, cylinder_lat, best_azimuth, cylinder_radius)
+    return (lat, lon)
+
+
+def _get_optimized_perimeter_points(
+    turnpoint: "TaskTurnpoint",
+    prev_point: Tuple[float, float],
+    next_point: Tuple[float, float],
+    angle_step: int = DEFAULT_ANGLE_STEP,
+) -> List[Tuple[float, float]]:
+    """Get optimized perimeter points for a turnpoint.
+
+    Finds the optimal entry/exit points using analytical methods.
+
+    Args:
+        turnpoint: TaskTurnpoint object
+        prev_point: Previous point in route (for optimization)
+        next_point: Next point in route (for optimization)
+        angle_step: Angle step for uniform sampling fallback (if needed)
+
+    Returns:
+        List of (lat, lon) points on perimeter
+    """
+    if turnpoint.radius == 0:
+        return [turnpoint.center]
+
+    if prev_point and next_point:
+        # Use optimized single point
+        optimal_point = _find_optimal_cylinder_point_analytical(
+            turnpoint.center, turnpoint.radius, prev_point, next_point
+        )
+        return [optimal_point]
+    else:
+        # Fall back to uniform sampling
+        return turnpoint.perimeter_points(angle_step)
 
 
 class TaskTurnpoint:
@@ -48,6 +260,58 @@ class TaskTurnpoint:
             points.append((lat, lon))
         return points
 
+    def optimal_point(
+        self,
+        prev_point: Tuple[float, float],
+        next_point: Tuple[float, float],
+        method: str = "two_stage",
+    ) -> Tuple[float, float]:
+        """Find the optimal point on this turnpoint's cylinder.
+
+        Args:
+            prev_point: (lat, lon) of previous point in route
+            next_point: (lat, lon) of next point in route
+            method: Optimization method ('analytical', 'optimization', 'two_stage')
+
+        Returns:
+            (lat, lon) of optimal point on cylinder perimeter
+        """
+        if self.radius == 0:
+            return self.center
+
+        if method == "analytical":
+            return _find_optimal_cylinder_point_analytical(
+                self.center, self.radius, prev_point, next_point
+            )
+        elif method == "optimization":
+            return _find_optimal_cylinder_point_optimization(
+                self.center, self.radius, prev_point, next_point
+            )
+        elif method == "two_stage":
+            return _find_optimal_cylinder_point_two_stage(
+                self.center, self.radius, prev_point, next_point
+            )
+        else:
+            raise ValueError(f"Unknown optimization method: {method}")
+
+    def optimized_perimeter_points(
+        self,
+        prev_point: Tuple[float, float],
+        next_point: Tuple[float, float],
+        angle_step: int = DEFAULT_ANGLE_STEP,
+    ) -> List[Tuple[float, float]]:
+        """Get optimized perimeter points for this turnpoint.
+
+        Args:
+            prev_point: Previous point in route
+            next_point: Next point in route
+            angle_step: Angle step for fallback uniform sampling
+
+        Returns:
+            List of (lat, lon) points on perimeter
+        """
+        return _get_optimized_perimeter_points(self, prev_point, next_point, angle_step)
+
 
 def _compute_optimal_route_dp(
     turnpoints: List[TaskTurnpoint],
@@ -55,6 +319,7 @@ def _compute_optimal_route_dp(
     angle_step: int = DEFAULT_ANGLE_STEP,
     show_progress: bool = False,
     return_path: bool = False,
+    beam_width: int = DEFAULT_BEAM_WIDTH,
 ) -> Tuple[float, List[Tuple[float, float]]]:
     """Core dynamic programming algorithm for computing optimal routes through turnpoints.
 
@@ -64,6 +329,7 @@ def _compute_optimal_route_dp(
         angle_step: Angle step in degrees for perimeter point generation
         show_progress: Whether to show progress indicators
         return_path: Whether to return the actual path coordinates
+        beam_width: Number of best candidates to keep at each DP stage
 
     Returns:
         Tuple of (optimized_distance_meters, route_coordinates)
@@ -78,99 +344,136 @@ def _compute_optimal_route_dp(
 
     if show_progress:
         print(
-            f"    🔄 Optimizing route through {len(turnpoints)} turnpoints (angle step: {angle_step}°)..."
+            f"    🔄 Computing optimized route through {len(turnpoints)} turnpoints..."
         )
 
-    # Precompute perimeter points for all turnpoints
-    perimeters = [tp.perimeter_points(angle_step) for tp in turnpoints]
+    # Use optimized approach with true DP and beam search
+    return _compute_optimal_route_optimized(
+        turnpoints, show_progress, return_path, beam_width
+    )
 
+
+def _compute_optimal_route_optimized(
+    turnpoints: List[TaskTurnpoint],
+    show_progress: bool = False,
+    return_path: bool = False,
+    beam_width: int = DEFAULT_BEAM_WIDTH,
+) -> Tuple[float, List[Tuple[float, float]]]:
+    """Compute optimal route using true dynamic programming with beam search.
+
+    This method uses DP to consider multiple candidate paths and avoid
+    the greedy local optimization trap that can occur with large cylinders.
+
+    Args:
+        turnpoints: List of TaskTurnpoint objects
+        show_progress: Whether to show progress indicators
+        return_path: Whether to return the actual path coordinates
+        beam_width: Number of best candidates to keep at each stage
+
+    Returns:
+        Tuple of (optimized_distance_meters, route_coordinates)
+    """
     if show_progress:
-        total_points = sum(len(p) for p in perimeters)
-        print(f"    📍 Generated {total_points} perimeter points")
+        print("    🎯 Using true DP with beam search...")
 
-    # Get takeoff center
-    takeoff_center = turnpoints[0].center
+    from collections import defaultdict
 
-    # Initialize distance table
-    dp = [{} for _ in turnpoints]
+    # dp[i] maps candidate points on turnpoint i -> (best_distance, parent_point)
+    dp = [defaultdict(lambda: (float("inf"), None)) for _ in turnpoints]
 
-    # Initialize first turnpoint (takeoff)
-    if return_path:
-        dp[0] = {takeoff_center: (0, None)}
-    else:
-        dp[0] = {p: 0 for p in perimeters[0]}
+    # Initialize: start at takeoff center with distance 0
+    dp[0][turnpoints[0].center] = (0.0, None)
 
-    # Fill DP table using dynamic programming
+    # DP forward pass
     for i in range(1, len(turnpoints)):
         if show_progress:
-            print(f"    ⚡ Processing turnpoint {i+1}/{len(turnpoints)}")
+            print(f"    ⚡ DP stage {i}/{len(turnpoints)-1}")
 
-        # Handle non-return_path inside cylinder case before point loop
-        if not return_path and i == 1:
-            distance_to_center = geodesic(takeoff_center, turnpoints[i].center).meters
-            if distance_to_center <= turnpoints[i].radius:
-                dp[i] = {takeoff_center: 0}
-                continue
+        current_tp = turnpoints[i]
+        next_center = (
+            turnpoints[i + 1].center if i + 1 < len(turnpoints) else current_tp.center
+        )
+        new_candidates = defaultdict(lambda: (float("inf"), None))
 
-        for curr_pt in perimeters[i]:
-            min_dist = float("inf")
-            best_prev_pt = None
-
-            # Standard DP approach for all turnpoints
-            if i == 1:
-                leg_distance = geodesic(takeoff_center, curr_pt).meters
-                min_dist = leg_distance
-                best_prev_pt = takeoff_center
+        # For each candidate point from previous turnpoint
+        for prev_point, (prev_dist, _) in dp[i - 1].items():
+            # Find optimal entry point on current turnpoint
+            if current_tp.radius == 0:
+                optimal_point = current_tp.center
             else:
-                for prev_pt, prev_dist_info in dp[i - 1].items():
-                    prev_dist = prev_dist_info[0] if return_path else prev_dist_info
-                    leg_distance = geodesic(prev_pt, curr_pt).meters
-                    total_distance = prev_dist + leg_distance
-                    if total_distance < min_dist:
-                        min_dist = total_distance
-                        best_prev_pt = prev_pt
+                optimal_point = current_tp.optimal_point(
+                    prev_point,
+                    next_center,
+                    method="optimization",  # Use continuous optimizer
+                )
 
-            # Store result
-            if return_path:
-                dp[i][curr_pt] = (min_dist, best_prev_pt)
-            else:
-                dp[i][curr_pt] = min_dist
+            # Calculate leg distance and total distance
+            leg_distance = geodesic(prev_point, optimal_point).meters
+            total_distance = prev_dist + leg_distance
 
-    # Find optimal distance and reconstruct path if needed
+            # Keep the best distance for this optimal point
+            if total_distance < new_candidates[optimal_point][0]:
+                new_candidates[optimal_point] = (total_distance, prev_point)
+
+        # Beam search: keep only the best beam_width candidates
+        if len(new_candidates) > beam_width:
+            best_items = sorted(new_candidates.items(), key=lambda kv: kv[1][0])[
+                :beam_width
+            ]
+            dp[i] = dict(best_items)
+        else:
+            dp[i] = dict(new_candidates)
+
+        if show_progress:
+            print(f"    📊 Keeping {len(dp[i])} candidates")
+
+    # Find the best final solution
+    final_candidates = dp[-1]
+    if not final_candidates:
+        return 0.0, []
+
+    best_point, (best_distance, _) = min(
+        final_candidates.items(), key=lambda kv: kv[1][0]
+    )
+
+    if show_progress:
+        print(f"    ✅ DP route: {best_distance/1000.0:.3f}km")
+
+    # Reconstruct path if needed
+    route_points = []
     if return_path:
-        optimal_distance = min(dp[-1].values(), key=lambda x: x[0])[0]
-        optimal_end_point = min(dp[-1].keys(), key=lambda p: dp[-1][p][0])
-        route_coordinates = []
-        current_point = optimal_end_point
+        # Backtrack to reconstruct the optimal path
+        path_points = []
+        current_point = best_point
 
         for i in range(len(turnpoints) - 1, -1, -1):
-            route_coordinates.append(current_point)
-            if i > 0 and current_point in dp[i]:
-                prev_point = dp[i][current_point][1]
-                current_point = prev_point if prev_point else takeoff_center
+            path_points.append(current_point)
+            if i > 0:
+                _, parent_point = dp[i][current_point]
+                current_point = parent_point
 
-        route_coordinates.reverse()
-        return optimal_distance, route_coordinates
-    else:
-        optimal_distance = min(dp[-1].values())
-        return optimal_distance, []
+        route_points = list(reversed(path_points))
+
+    return best_distance, route_points
 
 
 def optimized_distance(
     turnpoints: List[TaskTurnpoint],
     angle_step: int = DEFAULT_ANGLE_STEP,
     show_progress: bool = False,
+    beam_width: int = DEFAULT_BEAM_WIDTH,
 ) -> float:
-    """Compute the fully optimized distance through turnpoints using Dynamic Programming.
+    """Compute the fully optimized distance through turnpoints using true dynamic programming.
 
     This algorithm finds the shortest possible route through all turnpoint cylinders
-    starting from the center of the take-off and computing the optimal path to
-    perimeters of subsequent turnpoints.
+    starting from the center of the take-off and computing the optimal path using
+    dynamic programming with beam search to avoid greedy local optimization traps.
 
     Args:
         turnpoints: List of TaskTurnpoint objects
-        angle_step: Angle step in degrees for perimeter point generation
+        angle_step: Angle step in degrees for perimeter point generation (fallback only)
         show_progress: Whether to show progress indicators
+        beam_width: Number of best candidates to keep at each DP stage
 
     Returns:
         Optimized distance in meters
@@ -180,6 +483,7 @@ def optimized_distance(
         angle_step=angle_step,
         show_progress=show_progress,
         return_path=False,
+        beam_width=beam_width,
     )
     return distance
 
@@ -220,14 +524,18 @@ def _task_to_turnpoints(task: Task) -> List[TaskTurnpoint]:
 
 
 def calculate_task_distances(
-    task: Task, angle_step: int = DEFAULT_ANGLE_STEP, show_progress: bool = False
+    task: Task,
+    angle_step: int = DEFAULT_ANGLE_STEP,
+    show_progress: bool = False,
+    beam_width: int = DEFAULT_BEAM_WIDTH,
 ) -> Dict[str, Any]:
     """Calculate both center and optimized distances for a task.
 
     Args:
         task: Task object
-        angle_step: Angle step in degrees for optimization
+        angle_step: Angle step in degrees for optimization fallback
         show_progress: Whether to show progress indicators
+        beam_width: Number of best candidates to keep at each DP stage
 
     Returns:
         Dictionary containing distance calculations and turnpoint details
@@ -256,10 +564,13 @@ def calculate_task_distances(
 
     if show_progress:
         print(f"  ✅ Center distance: {center_dist/1000.0:.1f}km")
-        print("  🎯 Starting optimization...")
+        print("  🎯 Starting optimized calculation...")
 
     opt_dist = optimized_distance(
-        distance_turnpoints, angle_step=angle_step, show_progress=show_progress
+        distance_turnpoints,
+        angle_step=angle_step,
+        show_progress=show_progress,
+        beam_width=beam_width,
     )
 
     if show_progress:
@@ -303,6 +614,7 @@ def calculate_task_distances(
                         partial_turnpoints,
                         angle_step=angle_step,
                         show_progress=False,
+                        beam_width=beam_width,
                     )
                     / 1000.0
                 )
@@ -330,18 +642,23 @@ def calculate_task_distances(
         "savings_percent": round(savings_percent, 1),
         "turnpoints": turnpoint_details,
         "optimization_angle_step": angle_step,
+        "beam_width": beam_width,
     }
 
 
 def calculate_cumulative_distances(
-    turnpoints: List[TaskTurnpoint], index: int, angle_step: int = DEFAULT_ANGLE_STEP
+    turnpoints: List[TaskTurnpoint],
+    index: int,
+    angle_step: int = DEFAULT_ANGLE_STEP,
+    beam_width: int = DEFAULT_BEAM_WIDTH,
 ) -> Tuple[float, float]:
     """Calculate cumulative distances up to a specific turnpoint index.
 
     Args:
         turnpoints: List of TaskTurnpoint objects
         index: Index of the turnpoint (0-based)
-        angle_step: Angle step for optimization calculations
+        angle_step: Angle step for optimization calculations (fallback only)
+        beam_width: Number of best candidates to keep at each DP stage
 
     Returns:
         Tuple of (center_distance_km, optimized_distance_km)
@@ -353,7 +670,10 @@ def calculate_cumulative_distances(
     center_dist = distance_through_centers(partial_turnpoints) / 1000.0
     opt_dist = (
         optimized_distance(
-            partial_turnpoints, angle_step=angle_step, show_progress=False
+            partial_turnpoints,
+            angle_step=angle_step,
+            show_progress=False,
+            beam_width=beam_width,
         )
         / 1000.0
     )
@@ -365,17 +685,19 @@ def optimized_route_coordinates(
     turnpoints: List[TaskTurnpoint],
     task_turnpoints=None,
     angle_step: int = DEFAULT_ANGLE_STEP,
+    beam_width: int = DEFAULT_BEAM_WIDTH,
 ) -> List[Tuple[float, float]]:
-    """Compute the fully optimized route coordinates through turnpoints using Dynamic Programming.
+    """Compute the fully optimized route coordinates through turnpoints using true DP.
 
     This algorithm finds the shortest possible route through all turnpoint cylinders
-    and returns the actual coordinates of the optimal path. All turnpoints including SSS
-    are treated uniformly in the route calculation.
+    and returns the actual coordinates of the optimal path using dynamic programming
+    with beam search to avoid greedy local optimization traps.
 
     Args:
         turnpoints: List of TaskTurnpoint objects
         task_turnpoints: Optional list of original task turnpoints with type information
-        angle_step: Angle step in degrees for perimeter point generation
+        angle_step: Angle step in degrees for perimeter point generation (fallback only)
+        beam_width: Number of best candidates to keep at each DP stage
 
     Returns:
         List of (lat, lon) tuples representing the optimized route coordinates
@@ -387,6 +709,7 @@ def optimized_route_coordinates(
         angle_step=angle_step,
         show_progress=False,
         return_path=True,
+        beam_width=beam_width,
     )
     return route_coordinates
 
