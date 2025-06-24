@@ -1,0 +1,79 @@
+{
+  "metadata": {
+    "file_name": "wovi",
+    "created": "2025-06-16 13:49:23 UTC",
+    "author": "Simon",
+    "start_type": "Race",
+    "sss_open": "16:40 (UTC)",
+    "goal_type": "CYLINDER",
+    "task_deadline": "22:00 (UTC)",
+    "earth_model": "WGS84 ellipsoid",
+    "task_distance_through_centers": "127.6km (through centers)",
+    "task_distance_optimized": "95.6km (optimized)",
+    "": "95.6km (optimized)",
+    "distance_through_centers_km": 127.6,
+    "distance_optimized_km": 95.6
+  },
+  "turnpoints": [
+    {
+      "#": 1,
+      "Name": "D01",
+      "Radius (m)": 1000,
+      "Distance (km)": 0.0,
+      "Optimized (km)": 0.0,
+      "Type": "Takeoff"
+    },
+    {
+      "#": 2,
+      "Name": "P08",
+      "Radius (m)": 8000,
+      "Distance (km)": 13.7,
+      "Optimized (km)": 5.7,
+      "Type": "SSS"
+    },
+    {
+      "#": 3,
+      "Name": "P08",
+      "Radius (m)": 500,
+      "Distance (km)": 13.7,
+      "Optimized (km)": 13.3
+    },
+    {
+      "#": 4,
+      "Name": "P13",
+      "Radius (m)": 2000,
+      "Distance (km)": 39.5,
+      "Optimized (km)": 37.1
+    },
+    {
+      "#": 5,
+      "Name": "G04",
+      "Radius (m)": 2000,
+      "Distance (km)": 49.2,
+      "Optimized (km)": 43.5
+    },
+    {
+      "#": 6,
+      "Name": "P11",
+      "Radius (m)": 4000,
+      "Distance (km)": 64.5,
+      "Optimized (km)": 55.4
+    },
+    {
+      "#": 7,
+      "Name": "P16",
+      "Radius (m)": 11000,
+      "Distance (km)": 114.7,
+      "Optimized (km)": 93.7,
+      "Type": "ESS"
+    },
+    {
+      "#": 8,
+      "Name": "G02",
+      "Radius (m)": 200,
+      "Distance (km)": 127.6,
+      "Optimized (km)": 95.6,
+      "Type": "Goal"
+    }
+  ]
+}

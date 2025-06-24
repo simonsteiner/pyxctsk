@@ -1,0 +1,86 @@
+{
+  "metadata": {
+    "file_name": "pepi",
+    "created": "2025-06-16 13:49:18 UTC",
+    "author": "Simon",
+    "start_type": "Race",
+    "sss_open": "16:45 (UTC)",
+    "goal_type": "CYLINDER",
+    "task_deadline": "22:00 (UTC)",
+    "earth_model": "WGS84 ellipsoid",
+    "task_distance_through_centers": "321.4km (through centers)",
+    "task_distance_optimized": "92.9km (optimized)",
+    "": "92.9km (optimized)",
+    "distance_through_centers_km": 321.4,
+    "distance_optimized_km": 92.9
+  },
+  "turnpoints": [
+    {
+      "#": 1,
+      "Name": "D01",
+      "Radius (m)": 0,
+      "Distance (km)": 0.0,
+      "Optimized (km)": 0.0,
+      "Type": "Takeoff"
+    },
+    {
+      "#": 2,
+      "Name": "X09",
+      "Radius (m)": 37000,
+      "Distance (km)": 39.9,
+      "Optimized (km)": 3.7,
+      "Type": "SSS"
+    },
+    {
+      "#": 3,
+      "Name": "P37",
+      "Radius (m)": 4000,
+      "Distance (km)": 66.1,
+      "Optimized (km)": 13.2
+    },
+    {
+      "#": 4,
+      "Name": "D03",
+      "Radius (m)": 12000,
+      "Distance (km)": 90.0,
+      "Optimized (km)": 29.7
+    },
+    {
+      "#": 5,
+      "Name": "G02",
+      "Radius (m)": 1000,
+      "Distance (km)": 115.4,
+      "Optimized (km)": 43.4
+    },
+    {
+      "#": 6,
+      "Name": "P01",
+      "Radius (m)": 3000,
+      "Distance (km)": 130.7,
+      "Optimized (km)": 56.4
+    },
+    {
+      "#": 7,
+      "Name": "X25",
+      "Radius (m)": 66600,
+      "Distance (km)": 208.5,
+      "Optimized (km)": 67.5
+    },
+    {
+      "#": 8,
+      "Name": "P16",
+      "Radius (m)": 11000,
+      "Distance (km)": 308.5,
+      "Optimized (km)": 91.1,
+      "Type": "ESS"
+    },
+    {
+      "#": 9,
+      "Name": "G02",
+      "Radius (m)": 200,
+      "Distance (km)": 321.4,
+      "Optimized (km)": 92.9,
+      "Type": "Goal"
+    }
+  ]
+}

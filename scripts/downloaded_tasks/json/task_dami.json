@@ -1,0 +1,61 @@
+{
+  "metadata": {
+    "file_name": "dami",
+    "created": "2025-06-16 13:49:19 UTC",
+    "author": "Simon",
+    "task_distance_through_centers": "119.7km",
+    "distance_through_centers_km": 119.7
+  },
+  "turnpoints": [
+    {
+      "#": 1,
+      "Name": "WPT1",
+      "Distance (km)": 0.0
+    },
+    {
+      "#": 2,
+      "Name": "WPT2",
+      "Distance (km)": 50.5
+    },
+    {
+      "#": 3,
+      "Name": "WPT3",
+      "Distance (km)": 9.4
+    },
+    {
+      "#": 4,
+      "Name": "WPT4",
+      "Distance (km)": 9.3
+    },
+    {
+      "#": 5,
+      "Name": "WPT5",
+      "Distance (km)": 9.0
+    },
+    {
+      "#": 6,
+      "Name": "WPT6",
+      "Distance (km)": 6.3
+    },
+    {
+      "#": 7,
+      "Name": "WPT7",
+      "Distance (km)": 12.2
+    },
+    {
+      "#": 8,
+      "Name": "WPT8",
+      "Distance (km)": 11.2
+    },
+    {
+      "#": 9,
+      "Name": "WPT9",
+      "Distance (km)": 6.1
+    },
+    {
+      "#": 10,
+      "Name": "WPT10",
+      "Distance (km)": 5.7
+    }
+  ]
+}

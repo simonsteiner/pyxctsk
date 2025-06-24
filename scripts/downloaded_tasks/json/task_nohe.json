@@ -1,0 +1,100 @@
+{
+  "metadata": {
+    "file_name": "nohe",
+    "created": "2025-06-16 13:49:36 UTC",
+    "author": "Simon",
+    "start_type": "Race",
+    "sss_open": "16:45 (UTC)",
+    "goal_type": "CYLINDER",
+    "task_deadline": "22:00 (UTC)",
+    "earth_model": "WGS84 ellipsoid",
+    "task_distance_through_centers": "82.6km (through centers)",
+    "task_distance_optimized": "96.3km (optimized)",
+    "": "96.3km (optimized)",
+    "distance_through_centers_km": 82.6,
+    "distance_optimized_km": 96.3
+  },
+  "turnpoints": [
+    {
+      "#": 1,
+      "Name": "D02",
+      "Radius (m)": 50,
+      "Distance (km)": 0.0,
+      "Optimized (km)": 0.0,
+      "Type": "Takeoff"
+    },
+    {
+      "#": 2,
+      "Name": "P17",
+      "Radius (m)": 10000,
+      "Distance (km)": 18.2,
+      "Optimized (km)": 8.2,
+      "Type": "SSS"
+    },
+    {
+      "#": 3,
+      "Name": "P17",
+      "Radius (m)": 200,
+      "Distance (km)": 18.2,
+      "Optimized (km)": 18.0
+    },
+    {
+      "#": 4,
+      "Name": "P17",
+      "Radius (m)": 10000,
+      "Distance (km)": 18.2,
+      "Optimized (km)": 27.8
+    },
+    {
+      "#": 5,
+      "Name": "P17",
+      "Radius (m)": 100,
+      "Distance (km)": 18.2,
+      "Optimized (km)": 37.7
+    },
+    {
+      "#": 6,
+      "Name": "P33",
+      "Radius (m)": 2000,
+      "Distance (km)": 40.5,
+      "Optimized (km)": 59.2
+    },
+    {
+      "#": 7,
+      "Name": "X30",
+      "Radius (m)": 2000,
+      "Distance (km)": 57.8,
+      "Optimized (km)": 73.8
+    },
+    {
+      "#": 8,
+      "Name": "P37",
+      "Radius (m)": 4000,
+      "Distance (km)": 69.6,
+      "Optimized (km)": 80.0
+    },
+    {
+      "#": 9,
+      "Name": "G02",
+      "Radius (m)": 300,
+      "Distance (km)": 82.6,
+      "Optimized (km)": 88.8
+    },
+    {
+      "#": 10,
+      "Name": "G02",
+      "Radius (m)": 4000,
+      "Distance (km)": 82.6,
+      "Optimized (km)": 92.5,
+      "Type": "ESS"
+    },
+    {
+      "#": 11,
+      "Name": "G02",
+      "Radius (m)": 200,
+      "Distance (km)": 82.6,
+      "Optimized (km)": 96.3,
+      "Type": "Goal"
+    }
+  ]
+}

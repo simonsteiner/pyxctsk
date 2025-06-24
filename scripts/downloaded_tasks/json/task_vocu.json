@@ -1,0 +1,93 @@
+{
+  "metadata": {
+    "file_name": "vocu",
+    "created": "2025-06-16 13:49:21 UTC",
+    "author": "Simon",
+    "start_type": "Race",
+    "sss_open": "11:40 (UTC)",
+    "goal_type": "CYLINDER",
+    "task_deadline": "17:00 (UTC)",
+    "earth_model": "WGS84 ellipsoid",
+    "task_distance_through_centers": "185.7km (through centers)",
+    "task_distance_optimized": "65.6km (optimized)",
+    "": "65.6km (optimized)",
+    "distance_through_centers_km": 185.7,
+    "distance_optimized_km": 65.6
+  },
+  "turnpoints": [
+    {
+      "#": 1,
+      "Name": "D01",
+      "Radius (m)": 400,
+      "Distance (km)": 0.0,
+      "Optimized (km)": 0.0,
+      "Type": "Takeoff"
+    },
+    {
+      "#": 2,
+      "Name": "B05",
+      "Radius (m)": 4000,
+      "Distance (km)": 5.0,
+      "Optimized (km)": 1.2,
+      "Type": "SSS"
+    },
+    {
+      "#": 3,
+      "Name": "B24",
+      "Radius (m)": 12500,
+      "Distance (km)": 26.4,
+      "Optimized (km)": 6.4
+    },
+    {
+      "#": 4,
+      "Name": "N20",
+      "Radius (m)": 15500,
+      "Distance (km)": 68.3,
+      "Optimized (km)": 20.6
+    },
+    {
+      "#": 5,
+      "Name": "B24",
+      "Radius (m)": 12000,
+      "Distance (km)": 110.2,
+      "Optimized (km)": 34.9
+    },
+    {
+      "#": 6,
+      "Name": "B47",
+      "Radius (m)": 4000,
+      "Distance (km)": 131.6,
+      "Optimized (km)": 40.8
+    },
+    {
+      "#": 7,
+      "Name": "N30",
+      "Radius (m)": 10000,
+      "Distance (km)": 154.4,
+      "Optimized (km)": 50.0
+    },
+    {
+      "#": 8,
+      "Name": "B47",
+      "Radius (m)": 3000,
+      "Distance (km)": 177.2,
+      "Optimized (km)": 60.1
+    },
+    {
+      "#": 9,
+      "Name": "A30",
+      "Radius (m)": 1200,
+      "Distance (km)": 185.7,
+      "Optimized (km)": 64.6,
+      "Type": "ESS"
+    },
+    {
+      "#": 10,
+      "Name": "A30",
+      "Radius (m)": 200,
+      "Distance (km)": 185.7,
+      "Optimized (km)": 65.6,
+      "Type": "Goal"
+    }
+  ]
+}
