@@ -1,4 +1,11 @@
-# Copilot Instructions for XCTrack Project
+# General Copilot Instructions
+
+- Do not implement unnecessary fallbacks or extra features. However, advise on best practices or possible improvements where relevant.
+- If requirements are unclear, ask for clarification before proceeding.
+- Prioritize simplicity and maintainability in all solutions.
+- Assume scripts or commands will be run manually unless automation is explicitly requested.
+
+## Copilot Instructions for XCTrack Project
 
 ## Project Context
 This is a Python project implementing XCTrack's task format.
