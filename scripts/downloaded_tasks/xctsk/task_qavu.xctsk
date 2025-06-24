@@ -1,1 +1,131 @@
-{"earthModel":"WGS84","goal":{"deadline":"17:00:00Z","type":"CYLINDER"},"sss":{"direction":"EXIT","timeGates":["12:00:00Z"],"type":"RACE"},"taskType":"CLASSIC","turnpoints":[{"radius":400,"type":"TAKEOFF","waypoint":{"altSmoothed":1550,"description":"","lat":43.97850036621094,"lon":6.480000019073486,"name":"D01"}},{"radius":18000,"type":"SSS","waypoint":{"altSmoothed":1720,"description":"","lat":44.140838623046875,"lon":6.393670082092285,"name":"B30"}},{"radius":6000,"waypoint":{"altSmoothed":1720,"description":"","lat":44.140838623046875,"lon":6.393670082092285,"name":"B30"}},{"radius":500,"waypoint":{"altSmoothed":1590,"description":"","lat":43.98749923706055,"lon":6.431829929351807,"name":"B04"}},{"radius":5000,"waypoint":{"altSmoothed":1140,"description":"","lat":44.09149932861328,"lon":6.499670028686523,"name":"B29"}},{"radius":2000,"waypoint":{"altSmoothed":720,"description":"","lat":43.951171875,"lon":6.370830059051514,"name":"B20"}},{"radius":1000,"waypoint":{"altSmoothed":1740,"description":"","lat":43.85483169555664,"lon":6.418330192565918,"name":"B18"}},{"radius":18000,"waypoint":{"altSmoothed":1540,"description":"","lat":43.813838958740234,"lon":6.8113298416137695,"name":"D05"}},{"radius":2000,"type":"ESS","waypoint":{"altSmoothed":1779,"description":"","lat":43.9658317565918,"lon":6.557829856872559,"name":"B37"}},{"radius":1000,"waypoint":{"altSmoothed":1779,"description":"","lat":43.9658317565918,"lon":6.557829856872559,"name":"B37"}},{"radius":200,"waypoint":{"altSmoothed":880,"description":"","lat":43.95867156982422,"lon":6.510499954223633,"name":"A01"}}],"version":1}
+{
+    "earthModel": "WGS84",
+    "goal": {
+        "deadline": "17:00:00Z",
+        "type": "CYLINDER"
+    },
+    "sss": {
+        "direction": "EXIT",
+        "timeGates": [
+            "12:00:00Z"
+        ],
+        "type": "RACE"
+    },
+    "taskType": "CLASSIC",
+    "turnpoints": [
+        {
+            "radius": 400,
+            "type": "TAKEOFF",
+            "waypoint": {
+                "altSmoothed": 1550,
+                "description": "",
+                "lat": 43.97850036621094,
+                "lon": 6.480000019073486,
+                "name": "D01"
+            }
+        },
+        {
+            "radius": 18000,
+            "type": "SSS",
+            "waypoint": {
+                "altSmoothed": 1720,
+                "description": "",
+                "lat": 44.140838623046875,
+                "lon": 6.393670082092285,
+                "name": "B30"
+            }
+        },
+        {
+            "radius": 6000,
+            "waypoint": {
+                "altSmoothed": 1720,
+                "description": "",
+                "lat": 44.140838623046875,
+                "lon": 6.393670082092285,
+                "name": "B30"
+            }
+        },
+        {
+            "radius": 500,
+            "waypoint": {
+                "altSmoothed": 1590,
+                "description": "",
+                "lat": 43.98749923706055,
+                "lon": 6.431829929351807,
+                "name": "B04"
+            }
+        },
+        {
+            "radius": 5000,
+            "waypoint": {
+                "altSmoothed": 1140,
+                "description": "",
+                "lat": 44.09149932861328,
+                "lon": 6.499670028686523,
+                "name": "B29"
+            }
+        },
+        {
+            "radius": 2000,
+            "waypoint": {
+                "altSmoothed": 720,
+                "description": "",
+                "lat": 43.951171875,
+                "lon": 6.370830059051514,
+                "name": "B20"
+            }
+        },
+        {
+            "radius": 1000,
+            "waypoint": {
+                "altSmoothed": 1740,
+                "description": "",
+                "lat": 43.85483169555664,
+                "lon": 6.418330192565918,
+                "name": "B18"
+            }
+        },
+        {
+            "radius": 18000,
+            "waypoint": {
+                "altSmoothed": 1540,
+                "description": "",
+                "lat": 43.813838958740234,
+                "lon": 6.8113298416137695,
+                "name": "D05"
+            }
+        },
+        {
+            "radius": 2000,
+            "type": "ESS",
+            "waypoint": {
+                "altSmoothed": 1779,
+                "description": "",
+                "lat": 43.9658317565918,
+                "lon": 6.557829856872559,
+                "name": "B37"
+            }
+        },
+        {
+            "radius": 1000,
+            "waypoint": {
+                "altSmoothed": 1779,
+                "description": "",
+                "lat": 43.9658317565918,
+                "lon": 6.557829856872559,
+                "name": "B37"
+            }
+        },
+        {
+            "radius": 200,
+            "waypoint": {
+                "altSmoothed": 880,
+                "description": "",
+                "lat": 43.95867156982422,
+                "lon": 6.510499954223633,
+                "name": "A01"
+            }
+        }
+    ],
+    "version": 1
+}

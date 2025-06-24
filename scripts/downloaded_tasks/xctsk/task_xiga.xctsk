@@ -1,1 +1,81 @@
-{"earthModel":"WGS84","goal":{"deadline":"22:00:00Z","type":"CYLINDER"},"sss":{"direction":"EXIT","timeGates":["17:00:00Z"],"type":"RACE"},"taskType":"CLASSIC","turnpoints":[{"radius":50,"type":"TAKEOFF","waypoint":{"altSmoothed":1702,"description":"Take Off Los Tanques","lat":4.476049900054932,"lon":-76.15351867675781,"name":"D01"}},{"radius":9000,"type":"SSS","waypoint":{"altSmoothed":930,"description":"PUENTE ZARZAL - LA PAILA","lat":4.359833240509033,"lon":-76.07133483886719,"name":"P31"}},{"radius":500,"waypoint":{"altSmoothed":930,"description":"PUENTE ZARZAL - LA PAILA","lat":4.359833240509033,"lon":-76.07133483886719,"name":"P31"}},{"radius":16000,"waypoint":{"altSmoothed":949,"description":"PEAJE TORO","lat":4.691333293914795,"lon":-76.03883361816406,"name":"P14"}},{"radius":12000,"type":"ESS","waypoint":{"altSmoothed":995,"description":"","lat":4.09593,"lon":-76.2235,"name":"G10"}},{"radius":200,"waypoint":{"altSmoothed":998,"description":"","lat":4.1996,"lon":-76.16564,"name":"G04"}}],"version":1}
+{
+    "earthModel": "WGS84",
+    "goal": {
+        "deadline": "22:00:00Z",
+        "type": "CYLINDER"
+    },
+    "sss": {
+        "direction": "EXIT",
+        "timeGates": [
+            "17:00:00Z"
+        ],
+        "type": "RACE"
+    },
+    "taskType": "CLASSIC",
+    "turnpoints": [
+        {
+            "radius": 50,
+            "type": "TAKEOFF",
+            "waypoint": {
+                "altSmoothed": 1702,
+                "description": "Take Off Los Tanques",
+                "lat": 4.476049900054932,
+                "lon": -76.15351867675781,
+                "name": "D01"
+            }
+        },
+        {
+            "radius": 9000,
+            "type": "SSS",
+            "waypoint": {
+                "altSmoothed": 930,
+                "description": "PUENTE ZARZAL - LA PAILA",
+                "lat": 4.359833240509033,
+                "lon": -76.07133483886719,
+                "name": "P31"
+            }
+        },
+        {
+            "radius": 500,
+            "waypoint": {
+                "altSmoothed": 930,
+                "description": "PUENTE ZARZAL - LA PAILA",
+                "lat": 4.359833240509033,
+                "lon": -76.07133483886719,
+                "name": "P31"
+            }
+        },
+        {
+            "radius": 16000,
+            "waypoint": {
+                "altSmoothed": 949,
+                "description": "PEAJE TORO",
+                "lat": 4.691333293914795,
+                "lon": -76.03883361816406,
+                "name": "P14"
+            }
+        },
+        {
+            "radius": 12000,
+            "type": "ESS",
+            "waypoint": {
+                "altSmoothed": 995,
+                "description": "",
+                "lat": 4.09593,
+                "lon": -76.2235,
+                "name": "G10"
+            }
+        },
+        {
+            "radius": 200,
+            "waypoint": {
+                "altSmoothed": 998,
+                "description": "",
+                "lat": 4.1996,
+                "lon": -76.16564,
+                "name": "G04"
+            }
+        }
+    ],
+    "version": 1
+}

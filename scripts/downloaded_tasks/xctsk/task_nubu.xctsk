@@ -1,1 +1,91 @@
-{"earthModel":"WGS84","goal":{"deadline":"22:00:00Z","type":"CYLINDER"},"sss":{"direction":"EXIT","timeGates":["17:00:00Z"],"type":"RACE"},"taskType":"CLASSIC","turnpoints":[{"radius":400,"type":"TAKEOFF","waypoint":{"altSmoothed":1860,"description":"Take--Off--AGUAPANELA","lat":4.403883457183838,"lon":-76.21138000488281,"name":"D02"}},{"radius":8000,"type":"SSS","waypoint":{"altSmoothed":961,"description":"ANTENAS ZARZAL","lat":4.391166687011719,"lon":-76.06416320800781,"name":"P08"}},{"radius":500,"waypoint":{"altSmoothed":961,"description":"ANTENAS ZARZAL","lat":4.391166687011719,"lon":-76.06416320800781,"name":"P08"}},{"radius":40000,"waypoint":{"altSmoothed":1617,"description":"X26","lat":3.9601666927337646,"lon":-76.36866760253906,"name":"X26"}},{"radius":58000,"waypoint":{"altSmoothed":1019,"description":"X14","lat":5.101833343505859,"lon":-75.72599792480469,"name":"X14"}},{"radius":2000,"type":"ESS","waypoint":{"altSmoothed":905,"description":"X29","lat":4.598978042602539,"lon":-76.02178192138672,"name":"X29"}},{"radius":200,"waypoint":{"altSmoothed":945,"description":"GOL PISTA OBANDO","lat":4.5879998207092285,"lon":-75.96849822998047,"name":"G02"}}],"version":1}
+{
+    "earthModel": "WGS84",
+    "goal": {
+        "deadline": "22:00:00Z",
+        "type": "CYLINDER"
+    },
+    "sss": {
+        "direction": "EXIT",
+        "timeGates": [
+            "17:00:00Z"
+        ],
+        "type": "RACE"
+    },
+    "taskType": "CLASSIC",
+    "turnpoints": [
+        {
+            "radius": 400,
+            "type": "TAKEOFF",
+            "waypoint": {
+                "altSmoothed": 1860,
+                "description": "Take--Off--AGUAPANELA",
+                "lat": 4.403883457183838,
+                "lon": -76.21138000488281,
+                "name": "D02"
+            }
+        },
+        {
+            "radius": 8000,
+            "type": "SSS",
+            "waypoint": {
+                "altSmoothed": 961,
+                "description": "ANTENAS ZARZAL",
+                "lat": 4.391166687011719,
+                "lon": -76.06416320800781,
+                "name": "P08"
+            }
+        },
+        {
+            "radius": 500,
+            "waypoint": {
+                "altSmoothed": 961,
+                "description": "ANTENAS ZARZAL",
+                "lat": 4.391166687011719,
+                "lon": -76.06416320800781,
+                "name": "P08"
+            }
+        },
+        {
+            "radius": 40000,
+            "waypoint": {
+                "altSmoothed": 1617,
+                "description": "X26",
+                "lat": 3.9601666927337646,
+                "lon": -76.36866760253906,
+                "name": "X26"
+            }
+        },
+        {
+            "radius": 58000,
+            "waypoint": {
+                "altSmoothed": 1019,
+                "description": "X14",
+                "lat": 5.101833343505859,
+                "lon": -75.72599792480469,
+                "name": "X14"
+            }
+        },
+        {
+            "radius": 2000,
+            "type": "ESS",
+            "waypoint": {
+                "altSmoothed": 905,
+                "description": "X29",
+                "lat": 4.598978042602539,
+                "lon": -76.02178192138672,
+                "name": "X29"
+            }
+        },
+        {
+            "radius": 200,
+            "waypoint": {
+                "altSmoothed": 945,
+                "description": "GOL PISTA OBANDO",
+                "lat": 4.5879998207092285,
+                "lon": -75.96849822998047,
+                "name": "G02"
+            }
+        }
+    ],
+    "version": 1
+}

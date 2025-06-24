@@ -1,1 +1,111 @@
-{"earthModel":"WGS84","goal":{"deadline":"22:00:00Z","type":"CYLINDER"},"sss":{"direction":"EXIT","timeGates":["16:45:00Z"],"type":"RACE"},"taskType":"CLASSIC","turnpoints":[{"radius":400,"type":"TAKEOFF","waypoint":{"altSmoothed":1860,"description":"Take--Off--AGUAPANELA","lat":4.403883457183838,"lon":-76.21138000488281,"name":"D02"}},{"radius":4000,"type":"SSS","waypoint":{"altSmoothed":1117,"description":"ANTENAS ROLDANILLO","lat":4.386333465576172,"lon":-76.14266967773438,"name":"P09"}},{"radius":15000,"waypoint":{"altSmoothed":1650,"description":"SEVILLA","lat":4.263500213623047,"lon":-75.93199920654297,"name":"P25"}},{"radius":25000,"waypoint":{"altSmoothed":2512,"description":"X03","lat":4.132833480834961,"lon":-76.46766662597656,"name":"X03"}},{"radius":20000,"waypoint":{"altSmoothed":2075,"description":"X24","lat":4.061500072479248,"lon":-75.96766662597656,"name":"X24"}},{"radius":23000,"waypoint":{"altSmoothed":1685,"description":"X28","lat":4.464166641235352,"lon":-76.29733276367188,"name":"X28"}},{"radius":500,"waypoint":{"altSmoothed":907,"description":"ZANJAS LA UNION","lat":4.5329999923706055,"lon":-76.0548324584961,"name":"P32"}},{"radius":2000,"type":"ESS","waypoint":{"altSmoothed":945,"description":"GOL PISTA OBANDO","lat":4.5879998207092285,"lon":-75.96849822998047,"name":"G02"}},{"radius":200,"waypoint":{"altSmoothed":945,"description":"GOL PISTA OBANDO","lat":4.5879998207092285,"lon":-75.96849822998047,"name":"G02"}}],"version":1}
+{
+    "earthModel": "WGS84",
+    "goal": {
+        "deadline": "22:00:00Z",
+        "type": "CYLINDER"
+    },
+    "sss": {
+        "direction": "EXIT",
+        "timeGates": [
+            "16:45:00Z"
+        ],
+        "type": "RACE"
+    },
+    "taskType": "CLASSIC",
+    "turnpoints": [
+        {
+            "radius": 400,
+            "type": "TAKEOFF",
+            "waypoint": {
+                "altSmoothed": 1860,
+                "description": "Take--Off--AGUAPANELA",
+                "lat": 4.403883457183838,
+                "lon": -76.21138000488281,
+                "name": "D02"
+            }
+        },
+        {
+            "radius": 4000,
+            "type": "SSS",
+            "waypoint": {
+                "altSmoothed": 1117,
+                "description": "ANTENAS ROLDANILLO",
+                "lat": 4.386333465576172,
+                "lon": -76.14266967773438,
+                "name": "P09"
+            }
+        },
+        {
+            "radius": 15000,
+            "waypoint": {
+                "altSmoothed": 1650,
+                "description": "SEVILLA",
+                "lat": 4.263500213623047,
+                "lon": -75.93199920654297,
+                "name": "P25"
+            }
+        },
+        {
+            "radius": 25000,
+            "waypoint": {
+                "altSmoothed": 2512,
+                "description": "X03",
+                "lat": 4.132833480834961,
+                "lon": -76.46766662597656,
+                "name": "X03"
+            }
+        },
+        {
+            "radius": 20000,
+            "waypoint": {
+                "altSmoothed": 2075,
+                "description": "X24",
+                "lat": 4.061500072479248,
+                "lon": -75.96766662597656,
+                "name": "X24"
+            }
+        },
+        {
+            "radius": 23000,
+            "waypoint": {
+                "altSmoothed": 1685,
+                "description": "X28",
+                "lat": 4.464166641235352,
+                "lon": -76.29733276367188,
+                "name": "X28"
+            }
+        },
+        {
+            "radius": 500,
+            "waypoint": {
+                "altSmoothed": 907,
+                "description": "ZANJAS LA UNION",
+                "lat": 4.5329999923706055,
+                "lon": -76.0548324584961,
+                "name": "P32"
+            }
+        },
+        {
+            "radius": 2000,
+            "type": "ESS",
+            "waypoint": {
+                "altSmoothed": 945,
+                "description": "GOL PISTA OBANDO",
+                "lat": 4.5879998207092285,
+                "lon": -75.96849822998047,
+                "name": "G02"
+            }
+        },
+        {
+            "radius": 200,
+            "waypoint": {
+                "altSmoothed": 945,
+                "description": "GOL PISTA OBANDO",
+                "lat": 4.5879998207092285,
+                "lon": -75.96849822998047,
+                "name": "G02"
+            }
+        }
+    ],
+    "version": 1
+}

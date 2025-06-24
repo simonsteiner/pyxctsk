@@ -1,1 +1,81 @@
-{"earthModel":"WGS84","goal":{"deadline":"22:00:00Z","type":"CYLINDER"},"sss":{"direction":"EXIT","timeGates":["16:40:00Z"],"type":"RACE"},"taskType":"CLASSIC","turnpoints":[{"radius":400,"type":"TAKEOFF","waypoint":{"altSmoothed":1702,"description":"Take Off Los Tanques","lat":4.476049900054932,"lon":-76.15351867675781,"name":"D01"}},{"radius":26000,"type":"SSS","waypoint":{"altSmoothed":923,"description":"B36-","lat":4.696666717529297,"lon":-75.92416381835938,"name":"P16"}},{"radius":11000,"waypoint":{"altSmoothed":923,"description":"B36-","lat":4.696666717529297,"lon":-75.92416381835938,"name":"P16"}},{"radius":14000,"waypoint":{"altSmoothed":988,"description":"GOL BUGALAGRANDE","lat":4.199598789215088,"lon":-76.16564178466797,"name":"G04"}},{"radius":23000,"type":"ESS","waypoint":{"altSmoothed":923,"description":"B36-","lat":4.696666717529297,"lon":-75.92416381835938,"name":"P16"}},{"radius":200,"waypoint":{"altSmoothed":968,"description":"GOL LA VICTORIA","lat":4.509069919586182,"lon":-76.05122375488281,"name":"G01"}}],"version":1}
+{
+    "earthModel": "WGS84",
+    "goal": {
+        "deadline": "22:00:00Z",
+        "type": "CYLINDER"
+    },
+    "sss": {
+        "direction": "EXIT",
+        "timeGates": [
+            "16:40:00Z"
+        ],
+        "type": "RACE"
+    },
+    "taskType": "CLASSIC",
+    "turnpoints": [
+        {
+            "radius": 400,
+            "type": "TAKEOFF",
+            "waypoint": {
+                "altSmoothed": 1702,
+                "description": "Take Off Los Tanques",
+                "lat": 4.476049900054932,
+                "lon": -76.15351867675781,
+                "name": "D01"
+            }
+        },
+        {
+            "radius": 26000,
+            "type": "SSS",
+            "waypoint": {
+                "altSmoothed": 923,
+                "description": "B36-",
+                "lat": 4.696666717529297,
+                "lon": -75.92416381835938,
+                "name": "P16"
+            }
+        },
+        {
+            "radius": 11000,
+            "waypoint": {
+                "altSmoothed": 923,
+                "description": "B36-",
+                "lat": 4.696666717529297,
+                "lon": -75.92416381835938,
+                "name": "P16"
+            }
+        },
+        {
+            "radius": 14000,
+            "waypoint": {
+                "altSmoothed": 988,
+                "description": "GOL BUGALAGRANDE",
+                "lat": 4.199598789215088,
+                "lon": -76.16564178466797,
+                "name": "G04"
+            }
+        },
+        {
+            "radius": 23000,
+            "type": "ESS",
+            "waypoint": {
+                "altSmoothed": 923,
+                "description": "B36-",
+                "lat": 4.696666717529297,
+                "lon": -75.92416381835938,
+                "name": "P16"
+            }
+        },
+        {
+            "radius": 200,
+            "waypoint": {
+                "altSmoothed": 968,
+                "description": "GOL LA VICTORIA",
+                "lat": 4.509069919586182,
+                "lon": -76.05122375488281,
+                "name": "G01"
+            }
+        }
+    ],
+    "version": 1
+}

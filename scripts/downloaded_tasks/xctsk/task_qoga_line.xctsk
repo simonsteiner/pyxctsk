@@ -1,1 +1,121 @@
-{"earthModel":"WGS84","goal":{"deadline":"16:00:00Z","type":"LINE"},"sss":{"direction":"EXIT","timeGates":["11:30:00Z"],"type":"RACE"},"taskType":"CLASSIC","turnpoints":[{"radius":400,"type":"TAKEOFF","waypoint":{"altSmoothed":1149,"description":"CUARNAN T OFF","lat":46.273834228515625,"lon":13.175666809082031,"name":"D01"}},{"radius":32000,"type":"SSS","waypoint":{"altSmoothed":175,"description":"W09","lat":46.125,"lon":12.791666984558105,"name":"W09"}},{"radius":24500,"waypoint":{"altSmoothed":698,"description":"E04","lat":46.16666793823242,"lon":13.583333015441895,"name":"E04"}},{"radius":13000,"waypoint":{"altSmoothed":153,"description":"B13","lat":46.20833206176758,"lon":12.958333015441895,"name":"B13"}},{"radius":14000,"waypoint":{"altSmoothed":969,"description":"B34","lat":46.27783203125,"lon":13.37833309173584,"name":"B34"}},{"radius":4000,"waypoint":{"altSmoothed":170,"description":"B47","lat":46.23550033569336,"lon":13.07349967956543,"name":"B47"}},{"radius":2000,"waypoint":{"altSmoothed":1152,"description":"S-SIMEONE T OFF","lat":46.33016586303711,"lon":13.101499557495117,"name":"D02"}},{"radius":500,"waypoint":{"altSmoothed":1720,"description":"N23","lat":46.35316848754883,"lon":13.174833297729492,"name":"N23"}},{"radius":3000,"type":"ESS","waypoint":{"altSmoothed":1011,"description":"B02","lat":46.300498962402344,"lon":13.084500312805176,"name":"B02"}},{"radius":100,"waypoint":{"altSmoothed":225,"description":"A30","lat":46.306983947753906,"lon":13.112296104431152,"name":"A30"}}],"version":1}
+{
+    "earthModel": "WGS84",
+    "goal": {
+        "deadline": "16:00:00Z",
+        "type": "LINE"
+    },
+    "sss": {
+        "direction": "EXIT",
+        "timeGates": [
+            "11:30:00Z"
+        ],
+        "type": "RACE"
+    },
+    "taskType": "CLASSIC",
+    "turnpoints": [
+        {
+            "radius": 400,
+            "type": "TAKEOFF",
+            "waypoint": {
+                "altSmoothed": 1149,
+                "description": "CUARNAN T OFF",
+                "lat": 46.273834228515625,
+                "lon": 13.175666809082031,
+                "name": "D01"
+            }
+        },
+        {
+            "radius": 32000,
+            "type": "SSS",
+            "waypoint": {
+                "altSmoothed": 175,
+                "description": "W09",
+                "lat": 46.125,
+                "lon": 12.791666984558105,
+                "name": "W09"
+            }
+        },
+        {
+            "radius": 24500,
+            "waypoint": {
+                "altSmoothed": 698,
+                "description": "E04",
+                "lat": 46.16666793823242,
+                "lon": 13.583333015441895,
+                "name": "E04"
+            }
+        },
+        {
+            "radius": 13000,
+            "waypoint": {
+                "altSmoothed": 153,
+                "description": "B13",
+                "lat": 46.20833206176758,
+                "lon": 12.958333015441895,
+                "name": "B13"
+            }
+        },
+        {
+            "radius": 14000,
+            "waypoint": {
+                "altSmoothed": 969,
+                "description": "B34",
+                "lat": 46.27783203125,
+                "lon": 13.37833309173584,
+                "name": "B34"
+            }
+        },
+        {
+            "radius": 4000,
+            "waypoint": {
+                "altSmoothed": 170,
+                "description": "B47",
+                "lat": 46.23550033569336,
+                "lon": 13.07349967956543,
+                "name": "B47"
+            }
+        },
+        {
+            "radius": 2000,
+            "waypoint": {
+                "altSmoothed": 1152,
+                "description": "S-SIMEONE T OFF",
+                "lat": 46.33016586303711,
+                "lon": 13.101499557495117,
+                "name": "D02"
+            }
+        },
+        {
+            "radius": 500,
+            "waypoint": {
+                "altSmoothed": 1720,
+                "description": "N23",
+                "lat": 46.35316848754883,
+                "lon": 13.174833297729492,
+                "name": "N23"
+            }
+        },
+        {
+            "radius": 3000,
+            "type": "ESS",
+            "waypoint": {
+                "altSmoothed": 1011,
+                "description": "B02",
+                "lat": 46.300498962402344,
+                "lon": 13.084500312805176,
+                "name": "B02"
+            }
+        },
+        {
+            "radius": 100,
+            "waypoint": {
+                "altSmoothed": 225,
+                "description": "A30",
+                "lat": 46.306983947753906,
+                "lon": 13.112296104431152,
+                "name": "A30"
+            }
+        }
+    ],
+    "version": 1
+}

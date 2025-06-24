@@ -1,1 +1,141 @@
-{"earthModel":"WGS84","goal":{"deadline":"16:00:00Z","type":"LINE"},"sss":{"direction":"EXIT","timeGates":["11:30:00Z"],"type":"RACE"},"taskType":"CLASSIC","turnpoints":[{"radius":400,"type":"TAKEOFF","waypoint":{"altSmoothed":1149,"description":"CUARNAN T OFF","lat":46.273834228515625,"lon":13.175666809082031,"name":"D01"}},{"radius":10500,"type":"SSS","waypoint":{"altSmoothed":170,"description":"B47","lat":46.23550033569336,"lon":13.07349967956543,"name":"B47"}},{"radius":3000,"waypoint":{"altSmoothed":606,"description":"B10","lat":46.25,"lon":13.333333015441895,"name":"B10"}},{"radius":22000,"waypoint":{"altSmoothed":1679,"description":"E20","lat":46.35300064086914,"lon":13.625499725341797,"name":"E20"}},{"radius":5300,"waypoint":{"altSmoothed":170,"description":"B47","lat":46.23550033569336,"lon":13.07349967956543,"name":"B47"}},{"radius":15000,"waypoint":{"altSmoothed":563,"description":"E14","lat":46.25,"lon":13.416666984558105,"name":"E14"}},{"radius":4500,"waypoint":{"altSmoothed":170,"description":"B47","lat":46.23550033569336,"lon":13.07349967956543,"name":"B47"}},{"radius":1000,"waypoint":{"altSmoothed":1149,"description":"CUARNAN T OFF","lat":46.273834228515625,"lon":13.175666809082031,"name":"D01"}},{"radius":5000,"waypoint":{"altSmoothed":170,"description":"B47","lat":46.23550033569336,"lon":13.07349967956543,"name":"B47"}},{"radius":1500,"type":"ESS","waypoint":{"altSmoothed":1152,"description":"S-SIMEONE T OFF","lat":46.33016586303711,"lon":13.101499557495117,"name":"D02"}},{"radius":400,"waypoint":{"altSmoothed":1152,"description":"S-SIMEONE T OFF","lat":46.33016586303711,"lon":13.101499557495117,"name":"D02"}},{"radius":100,"waypoint":{"altSmoothed":225,"description":"A30","lat":46.306983947753906,"lon":13.112296104431152,"name":"A30"}}],"version":1}
+{
+    "earthModel": "WGS84",
+    "goal": {
+        "deadline": "16:00:00Z",
+        "type": "LINE"
+    },
+    "sss": {
+        "direction": "EXIT",
+        "timeGates": [
+            "11:30:00Z"
+        ],
+        "type": "RACE"
+    },
+    "taskType": "CLASSIC",
+    "turnpoints": [
+        {
+            "radius": 400,
+            "type": "TAKEOFF",
+            "waypoint": {
+                "altSmoothed": 1149,
+                "description": "CUARNAN T OFF",
+                "lat": 46.273834228515625,
+                "lon": 13.175666809082031,
+                "name": "D01"
+            }
+        },
+        {
+            "radius": 10500,
+            "type": "SSS",
+            "waypoint": {
+                "altSmoothed": 170,
+                "description": "B47",
+                "lat": 46.23550033569336,
+                "lon": 13.07349967956543,
+                "name": "B47"
+            }
+        },
+        {
+            "radius": 3000,
+            "waypoint": {
+                "altSmoothed": 606,
+                "description": "B10",
+                "lat": 46.25,
+                "lon": 13.333333015441895,
+                "name": "B10"
+            }
+        },
+        {
+            "radius": 22000,
+            "waypoint": {
+                "altSmoothed": 1679,
+                "description": "E20",
+                "lat": 46.35300064086914,
+                "lon": 13.625499725341797,
+                "name": "E20"
+            }
+        },
+        {
+            "radius": 5300,
+            "waypoint": {
+                "altSmoothed": 170,
+                "description": "B47",
+                "lat": 46.23550033569336,
+                "lon": 13.07349967956543,
+                "name": "B47"
+            }
+        },
+        {
+            "radius": 15000,
+            "waypoint": {
+                "altSmoothed": 563,
+                "description": "E14",
+                "lat": 46.25,
+                "lon": 13.416666984558105,
+                "name": "E14"
+            }
+        },
+        {
+            "radius": 4500,
+            "waypoint": {
+                "altSmoothed": 170,
+                "description": "B47",
+                "lat": 46.23550033569336,
+                "lon": 13.07349967956543,
+                "name": "B47"
+            }
+        },
+        {
+            "radius": 1000,
+            "waypoint": {
+                "altSmoothed": 1149,
+                "description": "CUARNAN T OFF",
+                "lat": 46.273834228515625,
+                "lon": 13.175666809082031,
+                "name": "D01"
+            }
+        },
+        {
+            "radius": 5000,
+            "waypoint": {
+                "altSmoothed": 170,
+                "description": "B47",
+                "lat": 46.23550033569336,
+                "lon": 13.07349967956543,
+                "name": "B47"
+            }
+        },
+        {
+            "radius": 1500,
+            "type": "ESS",
+            "waypoint": {
+                "altSmoothed": 1152,
+                "description": "S-SIMEONE T OFF",
+                "lat": 46.33016586303711,
+                "lon": 13.101499557495117,
+                "name": "D02"
+            }
+        },
+        {
+            "radius": 400,
+            "waypoint": {
+                "altSmoothed": 1152,
+                "description": "S-SIMEONE T OFF",
+                "lat": 46.33016586303711,
+                "lon": 13.101499557495117,
+                "name": "D02"
+            }
+        },
+        {
+            "radius": 100,
+            "waypoint": {
+                "altSmoothed": 225,
+                "description": "A30",
+                "lat": 46.306983947753906,
+                "lon": 13.112296104431152,
+                "name": "A30"
+            }
+        }
+    ],
+    "version": 1
+}
