@@ -37,6 +37,11 @@
                         <i class="bi bi-calculator"></i> Compare Distances
                     </a>
                     <small class="text-muted">Compare XCContest data with XCTrack algorithm calculations</small>
+                    {% if airscore_available %}
+                    <div class="mt-2">
+                        <span class="badge bg-success">AirScore calculations available</span>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -52,6 +57,9 @@
                     <div class="card-footer">
                         <a href="{{ url_for('show_task', task_name=task) }}" class="btn btn-primary">View Task</a>
                         <a href="/compare/{{ task }}" class="btn btn-outline-secondary ms-2">Compare</a>
+                        {% if airscore_available %}
+                        <a href="/airscore/{{ task }}" class="btn btn-outline-warning ms-2">AirScore</a>
+                        {% endif %}
                     </div>
                 </div>
             </div>

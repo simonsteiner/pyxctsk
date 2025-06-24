@@ -16,13 +16,41 @@ from flask import Flask, render_template, request, jsonify, abort
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 try:
-    import xctrack
     from xctrack import parse_task, calculate_task_distances
 
     XCTRACK_AVAILABLE = True
 except ImportError as e:
     print(f"Warning: xctrack module not available: {e}")
     XCTRACK_AVAILABLE = False
+
+# Add task_viewer and its subdirectories to path to import AirScore utilities
+task_viewer_path = Path(__file__).parent
+sys.path.insert(0, str(task_viewer_path))
+sys.path.insert(0, str(task_viewer_path / "airscore_clone"))
+
+# Also ensure that the airscore_clone directory is in Python's import path
+airscore_clone_path = task_viewer_path / "airscore_clone"
+if airscore_clone_path.exists():
+    print(f"AirScore clone directory found at {airscore_clone_path}")
+else:
+    print(f"Warning: AirScore clone directory not found at {airscore_clone_path}")
+
+# Import AirScore utilities
+try:
+    # Try importing from task_viewer.airscore_utils
+    from airscore_utils import (
+        calculate_airscore_distances,
+        generate_airscore_geojson,
+        AIRSCORE_AVAILABLE,
+    )
+
+    # The airscore_utils.py module already checks and sets AIRSCORE_AVAILABLE appropriately
+    print(
+        f"AirScore distance calculation {'available' if AIRSCORE_AVAILABLE else 'not available (using fallback)'}"
+    )
+except ImportError as e:
+    AIRSCORE_AVAILABLE = False
+    print(f"AirScore distance calculation not available: {e}")
 
 app = Flask(__name__)
 
@@ -51,7 +79,12 @@ XCTSK_DIR = (
 def index():
     """Render the main page with task selection."""
     tasks = get_available_tasks()
-    return render_template("index.html", tasks=tasks)
+    return render_template(
+        "index.html",
+        tasks=tasks,
+        xctrack_available=XCTRACK_AVAILABLE,
+        airscore_available=AIRSCORE_AVAILABLE,
+    )
 
 
 @app.route("/compare")
@@ -79,6 +112,7 @@ def show_task(task_name: str):
         metadata=json_data.get("metadata", {}),
         turnpoints=json_data.get("turnpoints", []),
         geojson=geojson_data,
+        airscore_available=AIRSCORE_AVAILABLE,
     )
 
 
@@ -118,10 +152,19 @@ def compare_task(task_name: str):
             original_metadata=json_data.get("metadata", {}),
             original_geojson=geojson_data,
             xctrack_geojson=xctrack_geojson,
+            airscore_available=AIRSCORE_AVAILABLE,
         )
 
     except Exception as e:
-        abort(500, f"Error calculating distances: {str(e)}")
+        import traceback
+
+        stacktrace = traceback.format_exc()
+        return render_template(
+            "compare_view.html",
+            task_name=task_name,
+            error=f"Error calculating distances: {str(e)}",
+            stacktrace=stacktrace,
+        )
 
 
 @app.route("/api/task/<task_name>")
@@ -170,7 +213,101 @@ def compare_task_api(task_name: str):
         )
 
     except Exception as e:
-        return jsonify({"error": f"Error calculating distances: {str(e)}"}), 500
+        import traceback
+
+        stacktrace = traceback.format_exc()
+        return (
+            jsonify(
+                {
+                    "error": f"Error calculating distances: {str(e)}",
+                    "stacktrace": stacktrace,
+                }
+            ),
+            500,
+        )
+
+
+@app.route("/airscore/<task_name>")
+def airscore_task(task_name: str):
+    """Display AirScore calculations for a specific task."""
+    if not AIRSCORE_AVAILABLE:
+        return render_template(
+            "airscore_view.html",
+            task_name=task_name,
+            error="AirScore utilities not available",
+        )
+
+    # Load and parse XCTSK file using xctrack module
+    xctsk_path = XCTSK_DIR / f"{task_name}.xctsk"
+    if not xctsk_path.exists():
+        abort(404, "XCTSK file not found")
+
+    try:
+        # Parse task using xctrack
+        task = parse_task(str(xctsk_path))
+
+        # Calculate distances using AirScore clone
+        airscore_results = calculate_airscore_distances(task)
+
+        # Generate AirScore GeoJSON for mapping
+        airscore_geojson = generate_airscore_geojson(task, airscore_results)
+
+        return render_template(
+            "airscore_view.html",
+            task_name=task_name,
+            airscore_results=airscore_results,
+            airscore_geojson=airscore_geojson,
+        )
+
+    except Exception as e:
+        import traceback
+
+        stacktrace = traceback.format_exc()
+        return render_template(
+            "airscore_view.html",
+            task_name=task_name,
+            error=f"Error calculating distances: {str(e)}",
+            stacktrace=stacktrace,
+        )
+
+
+@app.route("/api/airscore/<task_name>")
+def airscore_task_api(task_name: str):
+    """API endpoint to get AirScore calculation data in JSON format."""
+    if not AIRSCORE_AVAILABLE:
+        return jsonify({"error": "AirScore utilities not available"}), 500
+
+    # Load and parse XCTSK file
+    xctsk_path = XCTSK_DIR / f"{task_name}.xctsk"
+    if not xctsk_path.exists():
+        return jsonify({"error": "XCTSK file not found"}), 404
+
+    try:
+        task = parse_task(str(xctsk_path))
+        airscore_results = calculate_airscore_distances(task)
+        airscore_geojson = generate_airscore_geojson(task, airscore_results)
+
+        return jsonify(
+            {
+                "task_name": task_name,
+                "airscore_results": airscore_results,
+                "airscore_geojson": airscore_geojson,
+            }
+        )
+
+    except Exception as e:
+        import traceback
+
+        stacktrace = traceback.format_exc()
+        return (
+            jsonify(
+                {
+                    "error": f"Error calculating distances: {str(e)}",
+                    "stacktrace": stacktrace,
+                }
+            ),
+            500,
+        )
 
 
 def get_available_tasks() -> List[str]:

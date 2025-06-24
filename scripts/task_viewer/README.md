@@ -8,6 +8,8 @@ A standalone Flask application for displaying and comparing XCTrack task metadat
 - Visualize task routes and turnpoints on an interactive map
 - View detailed task metadata and turnpoint information
 - Compare task representation between different formats (JSON and GeoJSON)
+- Calculate task distances using the XCTrack algorithm implementation
+- Calculate task distances using the AirScore algorithm implementation
 - API endpoints for programmatic access to task data
 
 ## Directory Structure
@@ -16,6 +18,7 @@ A standalone Flask application for displaying and comparing XCTrack task metadat
 task_viewer/
 ├── app.py                  # Main Flask application
 ├── README.md               # This file
+├── airscore_utils.py       # Utilities for AirScore distance calculations
 ├── static/
 │   └── style.css          # Custom CSS styles
 └── templates/

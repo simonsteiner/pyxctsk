@@ -49,6 +49,14 @@
             <a class="navbar-brand" href="/">XCTrack Task Viewer</a>
             <ul class="navbar-nav ms-auto">
                 <li class="nav-item">
+                    <a class="nav-link" href="/compare/{{ task_name }}">Compare Calculations</a>
+                </li>
+                {% if airscore_available is defined and airscore_available %}
+                <li class="nav-item">
+                    <a class="nav-link" href="/airscore/{{ task_name }}">AirScore Calculations</a>
+                </li>
+                {% endif %}
+                <li class="nav-item">
                     <a class="nav-link" href="/">Task List</a>
                 </li>
             </ul>
