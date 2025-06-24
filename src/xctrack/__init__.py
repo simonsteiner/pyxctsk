@@ -18,6 +18,7 @@ from .exceptions import (
     InvalidFormatError,
     InvalidTimeOfDayError,
 )
+from .geojson import generate_task_geojson
 from .parser import parse_task
 from .qrcode_task import QRCodeTask
 from .task import (
@@ -56,6 +57,7 @@ __all__ = [
     "SSSType",
     "TaskType",
     "TurnpointType",
+    "generate_task_geojson",
     "QRCodeTask",
     "parse_task",
     "calculate_task_distances",

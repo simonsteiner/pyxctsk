@@ -16,7 +16,7 @@ from flask import Flask, render_template, request, jsonify, abort
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 try:
-    from xctrack import parse_task, calculate_task_distances
+    from xctrack import parse_task, calculate_task_distances, generate_task_geojson
 
     XCTRACK_AVAILABLE = True
 except ImportError as e:
@@ -140,7 +140,7 @@ def compare_task(task_name: str):
         distance_results = calculate_task_distances(task, show_progress=False)
 
         # Generate XCTrack GeoJSON data
-        xctrack_geojson = generate_xctrack_geojson(task)
+        xctrack_geojson = generate_task_geojson(task)
 
         # Prepare comparison data
         comparison_data = prepare_comparison_data(json_data, distance_results, task)
@@ -199,7 +199,7 @@ def compare_task_api(task_name: str):
     try:
         task = parse_task(str(xctsk_path))
         distance_results = calculate_task_distances(task, show_progress=False)
-        xctrack_geojson = generate_xctrack_geojson(task)
+        xctrack_geojson = generate_task_geojson(task)
         comparison_data = prepare_comparison_data(json_data, distance_results, task)
 
         return jsonify(
@@ -449,65 +449,6 @@ def prepare_comparison_data(original_data: Dict, xctrack_results: Dict, task) ->
         comparison["turnpoints"].append(tp_comparison)
 
     return comparison
-
-
-def generate_xctrack_geojson(task) -> Dict:
-    """Generate GeoJSON data from XCTrack task object."""
-    features = []
-
-    # Add turnpoints as point features with cylinders
-    for i, tp in enumerate(task.turnpoints):
-        # Point feature for the turnpoint
-        point_feature = {
-            "type": "Feature",
-            "geometry": {
-                "type": "Point",
-                "coordinates": [tp.waypoint.lon, tp.waypoint.lat],
-            },
-            "properties": {
-                "name": tp.waypoint.name or f"TP{i+1}",
-                "type": "cylinder",
-                "radius": tp.radius,
-                "description": f"Radius: {tp.radius}m",
-                "turnpoint_index": i,
-            },
-        }
-        features.append(point_feature)
-
-    # Add optimized route using xctrack function
-    try:
-        from xctrack.distance import optimized_route_coordinates, _task_to_turnpoints
-
-        # Convert task to TaskTurnpoint objects
-        task_turnpoints = _task_to_turnpoints(task)
-
-        # Get optimized route coordinates
-        opt_coords = optimized_route_coordinates(task_turnpoints, task.turnpoints)
-
-        if len(opt_coords) >= 2:
-            # Convert from (lat, lon) to [lon, lat] format for GeoJSON
-            opt_coordinates = [[coord[1], coord[0]] for coord in opt_coords]
-
-            opt_line_feature = {
-                "type": "Feature",
-                "geometry": {
-                    "type": "LineString",
-                    "coordinates": opt_coordinates,
-                },
-                "properties": {
-                    "name": "Optimized Route",
-                    "type": "optimized_route",
-                    "stroke": "#ff4136",
-                    "stroke-width": 3,
-                    "stroke-opacity": 0.8,
-                },
-            }
-            features.append(opt_line_feature)
-
-    except (ImportError, Exception) as e:
-        print(f"Warning: Could not generate optimized route: {e}")
-
-    return {"type": "FeatureCollection", "features": features}
 
 
 if __name__ == "__main__":
