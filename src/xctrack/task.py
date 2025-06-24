@@ -238,10 +238,16 @@ class SSS:
 
 @dataclass
 class Goal:
-    """Goal representation."""
+    """Goal representation.
+
+    For goal type LINE, the line_length represents the total length of the goal line.
+    The radius of the last turnpoint represents half of this length.
+    The goal line orientation is perpendicular to the azimuth to the last turnpoint center.
+    """
 
     type: Optional[GoalType] = None
     deadline: Optional[TimeOfDay] = None
+    line_length: Optional[float] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -250,6 +256,9 @@ class Goal:
             result["type"] = self.type.value
         if self.deadline:
             result["deadline"] = self.deadline.to_json_string()
+        if self.type == GoalType.LINE and self.line_length is not None:
+            # For goal LINE type, lineLength represents the total length of the goal line
+            result["lineLength"] = self.line_length
         return result
 
     @classmethod
@@ -257,13 +266,16 @@ class Goal:
         """Create from dictionary."""
         goal_type = None
         deadline = None
+        line_length = None  # No default line length
 
         if "type" in data:
             goal_type = GoalType(data["type"])
         if "deadline" in data:
             deadline = TimeOfDay.from_json_string(data["deadline"])
+        if "lineLength" in data and data["lineLength"] is not None:
+            line_length = float(data["lineLength"])
 
-        return cls(type=goal_type, deadline=deadline)
+        return cls(type=goal_type, deadline=deadline, line_length=line_length)
 
 
 @dataclass
@@ -278,8 +290,55 @@ class Task:
     sss: Optional[SSS] = None
     goal: Optional[Goal] = None
 
+    def __post_init__(self):
+        """Post-initialization validation and processing."""
+        if not self.turnpoints or len(self.turnpoints) == 0:
+            return
+
+        # Find ESS turnpoint (if any)
+        ess_tp = None
+        for tp in self.turnpoints:
+            if tp.type == TurnpointType.ESS:
+                ess_tp = tp
+                break
+
+        # The last turnpoint is always the goal
+        last_tp = self.turnpoints[-1]
+
+        # Create goal object if it doesn't exist yet
+        if not self.goal and len(self.turnpoints) > 0:
+            self.goal = Goal()
+
+        # Only process goal settings if a goal object exists
+        if self.goal:
+            # If goal type is not specified, default to CYLINDER
+            if not self.goal.type:
+                self.goal.type = GoalType.CYLINDER
+
+            # If goal type is LINE, set goal line length from last turnpoint radius
+            if self.goal.type == GoalType.LINE:
+                # The last turnpoint's radius represents half of the goal line length
+                self.goal.line_length = float(last_tp.radius * 2)
+
+        # If the last turnpoint is marked as ESS, it shares goal settings
+        # Otherwise, ESS is always a cylinder (if present)
+        if ess_tp and ess_tp != self.turnpoints[-1]:
+            # ESS is not the last turnpoint, so it's always a cylinder
+            pass
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
+        # Apply goal line length logic before serializing
+        if (
+            self.goal
+            and self.goal.type == GoalType.LINE
+            and self.turnpoints
+            and len(self.turnpoints) > 0
+        ):
+            # For goal LINE type, make sure the line length is set to twice the last turnpoint radius
+            # as the radius represents half of the total goal line length
+            self.goal.line_length = float(self.turnpoints[-1].radius * 2)
+
         result = {
             "taskType": self.task_type.value,
             "version": self.version,
@@ -317,6 +376,21 @@ class Task:
         goal = None
         if "goal" in data:
             goal = Goal.from_dict(data["goal"])
+        elif turnpoints:  # Create goal object even if not explicitly in data
+            goal = Goal()
+
+        # Process goal settings if it exists
+        if goal and turnpoints:
+            # If goal type is not specified, default to CYLINDER
+            if not goal.type:
+                goal.type = GoalType.CYLINDER
+
+            # If goal type is LINE, make sure line length is correctly set
+            if goal.type == GoalType.LINE:
+                if goal.line_length is None and turnpoints:
+                    # For goal LINE type, the line length is twice the last turnpoint radius
+                    # as the radius represents half of the total goal line length
+                    goal.line_length = float(turnpoints[-1].radius * 2)
 
         return cls(
             task_type=TaskType(data["taskType"]),
@@ -343,3 +417,29 @@ class Task:
         from .qrcode_task import QRCodeTask
 
         return QRCodeTask.from_task(self)
+
+    def find_ess_turnpoint(self) -> Optional[Turnpoint]:
+        """Find and return the ESS turnpoint, if any.
+
+        Returns:
+            The turnpoint marked as ESS or None if no ESS turnpoint exists.
+        """
+        for tp in self.turnpoints:
+            if tp.type == TurnpointType.ESS:
+                return tp
+        return None
+
+    def is_ess_goal(self) -> bool:
+        """Check if the ESS turnpoint is the same as the goal (last turnpoint).
+
+        Returns:
+            True if ESS is the same as goal, False otherwise.
+        """
+        if not self.turnpoints:
+            return False
+
+        ess_tp = self.find_ess_turnpoint()
+        if not ess_tp:
+            return False
+
+        return ess_tp == self.turnpoints[-1]
