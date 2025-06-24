@@ -102,13 +102,13 @@ def load_json_metadata(json_dir: str) -> Dict[str, Dict[str, Any]]:
     return metadata
 
 
-def test_optimization(
+def test_distance_calculations(
     turnpoints: List[TaskTurnpoint],
     verbose: bool = False,
     use_iterative_refinement: bool = False,
     num_iterations: int = 3,
 ) -> Dict[str, Any]:
-    """Test optimization on a list of turnpoints.
+    """Test distance calcultations on a list of turnpoints.
 
     Args:
         turnpoints: List of TaskTurnpoint objects
@@ -230,7 +230,7 @@ def compare_with_reference(
             method_name += f" with {num_iterations} refinement iterations"
         print(f"  🧮 Running {method_name}...")
 
-    result = test_optimization(
+    result = test_distance_calculations(
         turnpoints,
         verbose,
         use_iterative_refinement=use_iterative_refinement,
