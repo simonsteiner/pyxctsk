@@ -27,6 +27,35 @@ from xctrack.distance import (
     calculate_iteratively_refined_route,
 )
 
+# Add task_viewer and its subdirectories to path to import AirScore utilities
+task_viewer_path = Path(__file__).parent / "task_viewer"
+sys.path.insert(0, str(task_viewer_path))
+sys.path.insert(0, str(task_viewer_path / "airscore_clone"))
+
+# Also ensure that the airscore_clone directory is in Python's import path
+airscore_clone_path = task_viewer_path / "airscore_clone"
+if airscore_clone_path.exists():
+    print(f"AirScore clone directory found at {airscore_clone_path}")
+else:
+    print(f"Warning: AirScore clone directory not found at {airscore_clone_path}")
+
+
+# Import AirScore utilities
+try:
+    # Try importing from task_viewer.airscore_utils
+    from task_viewer.airscore_utils import (
+        calculate_airscore_distances,
+        AIRSCORE_AVAILABLE,
+    )
+
+    # The airscore_utils.py module already checks and sets AIRSCORE_AVAILABLE appropriately
+    print(
+        f"AirScore distance calculation {'available' if AIRSCORE_AVAILABLE else 'not available (using fallback)'}"
+    )
+except ImportError as e:
+    AIRSCORE_AVAILABLE = False
+    print(f"AirScore distance calculation not available: {e}")
+
 
 def load_all_tasks(tasks_dir: str) -> Dict[str, Any]:
     """Load all .xctsk files from the given directory.
@@ -162,11 +191,89 @@ def test_distance_calculations(
     return result
 
 
+def test_airscore_calculations(
+    task: Any,
+    verbose: bool = False,
+) -> Dict[str, Any]:
+    """Test AirScore distance calculations on a task.
+
+    Args:
+        task: Parsed task object
+        verbose: Whether to print detailed progress
+
+    Returns:
+        Dictionary with timing and distance results
+    """
+    # We use the calculate_airscore_distances function which handles
+    # availability internally with fallbacks, so we don't need to check
+    # AIRSCORE_AVAILABLE here
+
+    start_time = time.time()
+
+    try:
+        if verbose:
+            print(
+                f"    🔄 Using AirScore distance calculation (with {'real' if AIRSCORE_AVAILABLE else 'fallback'} implementation)"
+            )
+
+        # Ensure AirScore modules are in the path
+        airscore_clone_path = Path(__file__).parent / "task_viewer" / "airscore_clone"
+        if (
+            AIRSCORE_AVAILABLE
+            and str(airscore_clone_path) not in sys.path
+            and airscore_clone_path.exists()
+        ):
+            sys.path.insert(0, str(airscore_clone_path))
+            if verbose:
+                print(
+                    f"    📂 Added AirScore clone path to sys.path: {airscore_clone_path}"
+                )
+
+        # Use the calculate_airscore_distances function
+        # This function already handles fallbacks internally
+        airscore_results = calculate_airscore_distances(task)
+
+        if verbose:
+            print(f"    ✅ Successfully used calculate_airscore_distances")
+
+        total_time = time.time() - start_time
+
+        return {
+            "total_time": total_time,
+            "total_distance": airscore_results["optimized_distance_m"],
+            "center_distance": airscore_results["center_distance_m"],
+            "route_coordinates": airscore_results.get("optimized_coordinates", []),
+            "method": "airscore" if AIRSCORE_AVAILABLE else "airscore_fallback",
+            "available": True,
+        }
+
+    except Exception as e:
+
+        print(f"    ⚠️  Error in AirScore calculation: {e}")
+        if verbose:
+            import traceback
+
+            print(f"    📜 Stack trace:")
+            print(f"    {traceback.format_exc().replace(chr(10), chr(10)+'    ')}")
+
+        total_time = time.time() - start_time
+
+        return {
+            "total_time": total_time,
+            "total_distance": 0.0,
+            "route_coordinates": [],
+            "method": "airscore_error",
+            "available": False,
+            "error": str(e),
+        }
+
+
 def compare_with_reference(
     task_name: str,
     task: Any,
     json_metadata: Optional[Dict[str, Any]] = None,
     verbose: bool = False,
+    use_airscore: bool = True,
 ) -> Dict[str, Any]:
     """Compare optimization results with reference data.
 
@@ -175,6 +282,7 @@ def compare_with_reference(
         task: Parsed task object
         json_metadata: Optional JSON metadata for reference
         verbose: Whether to print detailed progress
+        use_airscore: Whether to use AirScore calculation
 
     Returns:
         Dictionary with comparison results
@@ -200,21 +308,39 @@ def compare_with_reference(
             f"  📏 {len(turnpoints)} turnpoints, center distance: {center_distance/1000:.2f}km"
         )
 
-    # Test optimization
+    # Test XCTrack optimization
     if verbose:
-        print(f"  🧮 Running optimized distance calculation...")
+        print(f"  🧮 Running XCTrack optimized distance calculation...")
 
-    result = test_distance_calculations(
+    xctrack_result = test_distance_calculations(
         turnpoints,
         verbose,
     )
 
     if verbose:
-        savings = (center_distance - result["total_distance"]) / 1000
-        print(f"    ⏱️  Time: {result['total_time']:.4f}s")
+        savings = (center_distance - xctrack_result["total_distance"]) / 1000
+        print(f"    ⏱️  Time: {xctrack_result['total_time']:.4f}s")
         print(
-            f"    📐 Distance: {result['total_distance']/1000:.2f}km (saves {savings:.2f}km)"
+            f"    📐 Distance: {xctrack_result['total_distance']/1000:.2f}km (saves {savings:.2f}km)"
         )
+
+    # Test AirScore optimization if available and requested
+    airscore_result = None
+
+    if use_airscore:
+        if verbose:
+            print(f"  🧮 Running AirScore distance calculation...")
+        airscore_result = test_airscore_calculations(
+            task,
+            verbose,
+        )
+
+        if verbose and airscore_result.get("available", False):
+            savings = (center_distance - airscore_result["total_distance"]) / 1000
+            print(f"    ⏱️  Time: {airscore_result['total_time']:.4f}s")
+            print(
+                f"    📐 Distance: {airscore_result['total_distance']/1000:.2f}km (saves {savings:.2f}km)"
+            )
 
     # Add task metadata including JSON reference data if available
     task_info = {
@@ -265,7 +391,14 @@ def compare_with_reference(
             if verbose:
                 print(f"  ⚠️  No JSON metadata found for '{lookup_name}'")
 
-    return {"optimization": result, "task_info": task_info}
+    # Create composite result
+    result = {
+        "xctrack": xctrack_result,
+        "airscore": airscore_result,
+        "task_info": task_info,
+    }
+
+    return result
 
 
 def analyze_results(all_results: List[Dict[str, Any]]) -> None:
@@ -285,21 +418,75 @@ def analyze_results(all_results: List[Dict[str, Any]]) -> None:
         print("❌ No valid results to analyze")
         return
 
+    # Check if AirScore is available in results
+    has_airscore = any(
+        r.get("airscore") and r["airscore"].get("available", False)
+        for r in valid_results
+    )
+
     # Summary statistics
     print(f"\n📊 SUMMARY STATISTICS ({len(valid_results)} tasks analyzed)")
     print("-" * 80)
 
-    # Display optimization method used
-    print(f"  🔧 Optimization method: optimized_distance with default settings")
+    # Display optimization methods used
+    print(f"  🔧 XCTrack method: optimized_distance with default settings")
+    if has_airscore:
+        print(f"  🔧 AirScore method: get_shortest_path")
 
-    times = [r["optimization"]["total_time"] for r in valid_results]
-    distances = [r["optimization"]["total_distance"] for r in valid_results]
+    # XCTrack statistics
+    xctrack_times = [r["xctrack"]["total_time"] for r in valid_results]
+    xctrack_distances = [r["xctrack"]["total_distance"] for r in valid_results]
 
-    print(f"  ⏱️  Average time per task: {statistics.mean(times):.4f}s")
-    print(f"  ⏱️  Median time per task: {statistics.median(times):.4f}s")
-    print(f"  ⏱️  Min/Max time: {min(times):.4f}s / {max(times):.4f}s")
-    print(f"  📐 Average distance: {statistics.mean(distances)/1000:.2f}km")
-    print(f"  📐 Distance std dev: {statistics.stdev(distances)/1000:.3f}km")
+    print(f"\n🧩 XCTrack optimization:")
+    print(f"  ⏱️  Average time per task: {statistics.mean(xctrack_times):.4f}s")
+    print(f"  ⏱️  Median time per task: {statistics.median(xctrack_times):.4f}s")
+    print(f"  ⏱️  Min/Max time: {min(xctrack_times):.4f}s / {max(xctrack_times):.4f}s")
+    print(f"  📐 Average distance: {statistics.mean(xctrack_distances)/1000:.2f}km")
+    print(f"  📐 Distance std dev: {statistics.stdev(xctrack_distances)/1000:.3f}km")
+
+    # AirScore statistics if available
+    if has_airscore:
+        airscore_results = [
+            r
+            for r in valid_results
+            if r.get("airscore") and r["airscore"].get("available", False)
+        ]
+
+        if airscore_results:
+            airscore_times = [r["airscore"]["total_time"] for r in airscore_results]
+            airscore_distances = [
+                r["airscore"]["total_distance"] for r in airscore_results
+            ]
+
+            print(f"\n🧩 AirScore optimization:")
+            print(f"  ⏱️  Average time per task: {statistics.mean(airscore_times):.4f}s")
+            print(
+                f"  ⏱️  Median time per task: {statistics.median(airscore_times):.4f}s"
+            )
+            print(
+                f"  ⏱️  Min/Max time: {min(airscore_times):.4f}s / {max(airscore_times):.4f}s"
+            )
+            print(
+                f"  📐 Average distance: {statistics.mean(airscore_distances)/1000:.2f}km"
+            )
+            print(
+                f"  📐 Distance std dev: {statistics.stdev(airscore_distances)/1000:.3f}km"
+            )
+
+            # Compare XCTrack vs AirScore
+            print(f"\n🔍 XCTrack vs AirScore comparison:")
+            diffs = []
+            for r in airscore_results:
+                xctrack_dist = r["xctrack"]["total_distance"]
+                airscore_dist = r["airscore"]["total_distance"]
+                diffs.append(xctrack_dist - airscore_dist)
+
+            mean_diff = statistics.mean(diffs) / 1000
+            sign = "+" if mean_diff > 0 else "-" if mean_diff < 0 else ""
+            print(f"  📏 Average difference: {sign}{abs(mean_diff):.2f}km")
+            print(
+                f"  📏 XCTrack is {'longer' if mean_diff > 0 else 'shorter'} by {abs(mean_diff):.2f}km on average"
+            )
 
     # Add JSON comparison if available
     has_json_data = any(
@@ -312,18 +499,35 @@ def analyze_results(all_results: List[Dict[str, Any]]) -> None:
         print(f"Comparing against pre-calculated reference distances from JSON files:")
 
         # Calculate differences against JSON reference data
-        json_diffs_optimization = []
+        json_diffs_xctrack = []
+        json_diffs_airscore = []
 
         for result in valid_results:
             task_info = result["task_info"]
             if "json_optimized_distance_km" in task_info:
                 json_opt_km = task_info["json_optimized_distance_km"]
-                opt_km = result["optimization"]["total_distance"] / 1000
-                json_diffs_optimization.append(abs(opt_km - json_opt_km))
 
-        if json_diffs_optimization:
-            print(f"Average difference vs JSON reference optimized distance:")
-            print(f"  🔸 Difference: {statistics.mean(json_diffs_optimization):.2f}km")
+                # XCTrack comparison
+                xctrack_km = result["xctrack"]["total_distance"] / 1000
+                json_diffs_xctrack.append(abs(xctrack_km - json_opt_km))
+
+                # AirScore comparison if available
+                if result.get("airscore") and result["airscore"].get(
+                    "available", False
+                ):
+                    airscore_km = result["airscore"]["total_distance"] / 1000
+                    json_diffs_airscore.append(abs(airscore_km - json_opt_km))
+
+        if json_diffs_xctrack:
+            print(f"\nAverage difference vs JSON reference optimized distance:")
+            print(
+                f"  🔸 XCTrack difference: {statistics.mean(json_diffs_xctrack):.2f}km"
+            )
+
+            if json_diffs_airscore:
+                print(
+                    f"  🔸 AirScore difference: {statistics.mean(json_diffs_airscore):.2f}km"
+                )
 
     # Detailed task-by-task results
     print(f"\n📋 DETAILED TASK RESULTS")
@@ -333,54 +537,130 @@ def analyze_results(all_results: List[Dict[str, Any]]) -> None:
     tasks_with_json = [
         r for r in valid_results if "json_optimized_distance_km" in r["task_info"]
     ]
+
+    # Check if AirScore is available
+    has_airscore_detail = has_airscore
+
     print(
         f"{len(tasks_with_json)} tasks have JSON data out of {len(valid_results)} total"
     )
 
-    if tasks_with_json:
+    if has_airscore_detail:
         print(
-            f"{'Task':<15} {'TPs':<4} {'Center':<8} {'JSON Ref':<10} {'Optimized':<8} {'Diff':<8} {'Time':<8}"
+            f"AirScore optimization available for {sum(1 for r in valid_results if r.get('airscore') and r['airscore'].get('available', False))} tasks"
         )
-        print(
-            f"{'Name':<15} {'#':<4} {'(km)':<8} {'Opt (km)':<10} {'(km)':<9} {'(km)':<8} {'(s)':<8}"
-        )
-        print("-" * 80)
-    else:
-        print(f"{'Task':<15} {'TPs':<4} {'Center':<8} {'Optimized':<8} {'Time':<8}")
-        print(f"{'Name':<15} {'#':<4} {'(km)':<8} {'(km)':<8} {'(s)':<8}")
-        print("-" * 80)
 
+    # Create header based on available data
+    header_parts = ["Task", "TPs", "Center"]
+    header_values = ["Name", "#", "(km)"]
+
+    if tasks_with_json:
+        header_parts.extend(["JSON Ref", "XCTrack", "XC Diff"])
+        header_values.extend(["Opt (km)", "(km)", "(km)"])
+    else:
+        header_parts.extend(["XCTrack"])
+        header_values.extend(["(km)"])
+
+    if has_airscore_detail:
+        header_parts.extend(["AirScore", "AS Diff"])
+        header_values.extend(["(km)", "(km)"])
+
+    header_parts.append("Time")
+    header_values.append("(s)")
+
+    # Calculate column widths
+    col_widths = [max(len(h1), len(h2)) for h1, h2 in zip(header_parts, header_values)]
+    col_widths = [w + 2 for w in col_widths]  # Add padding
+    col_widths[0] = 15  # Fixed width for task name
+
+    # Print header
+    header1 = " ".join(f"{h:{w}s}" for h, w in zip(header_parts, col_widths))
+    header2 = " ".join(f"{h:{w}s}" for h, w in zip(header_values, col_widths))
+    print(header1)
+    print(header2)
+    print("-" * 80)
+
+    # Print task details
     for result in valid_results:
         task_name = result["task_info"]["name"][:14]
         num_tps = result["task_info"]["num_turnpoints"]
         center_km = result["task_info"]["center_distance_km"]
 
-        optimization_km = result["optimization"]["total_distance"] / 1000
-        optimization_time = result["optimization"]["total_time"]
+        xctrack_km = result["xctrack"]["total_distance"] / 1000
+        xctrack_time = result["xctrack"]["total_time"]
 
+        # Prepare row values list
+        row_values = [
+            task_name,
+            f"{num_tps}",
+            f"{center_km:.2f}",
+        ]
+
+        # Add JSON reference and XCTrack data
         if "json_optimized_distance_km" in result["task_info"]:
             json_opt_km = result["task_info"]["json_optimized_distance_km"]
-            diff_km = optimization_km - json_opt_km
-            sign = "+" if diff_km > 0 else "-" if diff_km < 0 else " "
-            print(
-                f"{task_name:<15} {num_tps:<4} {center_km:<8.2f} {json_opt_km:<10.2f} "
-                f"{optimization_km:.2f} {sign}{abs(diff_km):<7.2f} "
-                f"{optimization_time:.3f}s"
+            xctrack_diff_km = xctrack_km - json_opt_km
+            xctrack_sign = (
+                "+" if xctrack_diff_km > 0 else "-" if xctrack_diff_km < 0 else " "
+            )
+
+            row_values.extend(
+                [
+                    f"{json_opt_km:.2f}",
+                    f"{xctrack_km:.2f}",
+                    f"{xctrack_sign}{abs(xctrack_diff_km):.2f}",
+                ]
             )
         else:
-            if (
-                tasks_with_json
-            ):  # If some tasks have JSON data, show N/A for those that don't
-                print(
-                    f"{task_name:<15} {num_tps:<4} {center_km:<8.2f} {'N/A':<10} "
-                    f"{optimization_km:.2f} {'N/A':<8} "
-                    f"{optimization_time:.3f}s"
+            if tasks_with_json:
+                row_values.extend(
+                    [
+                        "N/A",
+                        f"{xctrack_km:.2f}",
+                        "N/A",
+                    ]
                 )
             else:
-                print(
-                    f"{task_name:<15} {num_tps:<4} {center_km:<8.2f} "
-                    f"{optimization_km:.2f} {optimization_time:.3f}s"
-                )
+                row_values.append(f"{xctrack_km:.2f}")
+
+        # Add AirScore data if available
+        if has_airscore_detail:
+            if result.get("airscore") and result["airscore"].get("available", False):
+                airscore_km = result["airscore"]["total_distance"] / 1000
+
+                # Compare with JSON ref if available
+                if "json_optimized_distance_km" in result["task_info"]:
+                    json_opt_km = result["task_info"]["json_optimized_distance_km"]
+                    airscore_diff_km = airscore_km - json_opt_km
+                    airscore_sign = (
+                        "+"
+                        if airscore_diff_km > 0
+                        else "-" if airscore_diff_km < 0 else " "
+                    )
+                    row_values.extend(
+                        [
+                            f"{airscore_km:.2f}",
+                            f"{airscore_sign}{abs(airscore_diff_km):.2f}",
+                        ]
+                    )
+                else:
+                    row_values.extend(
+                        [
+                            f"{airscore_km:.2f}",
+                            "N/A",
+                        ]
+                    )
+            else:
+                row_values.extend(["N/A", "N/A"])
+
+        # Add time
+        row_values.append(f"{xctrack_time:.3f}s")
+
+        # Print the row with appropriate formatting
+        row = []
+        for value, width in zip(row_values, col_widths):
+            row.append(f"{value:{width}s}")
+        print(" ".join(row))
 
 
 def main():
@@ -404,10 +684,14 @@ def main():
     parser.add_argument(
         "--limit", type=int, help="Limit number of tasks to analyze (for testing)"
     )
+    parser.add_argument(
+        "--no-airscore", action="store_true", help="Skip AirScore distance calculations"
+    )
 
     args = parser.parse_args()
+    use_airscore = not args.no_airscore
 
-    print("🚀 XCTrack Optimization Comparison with Reference Data")
+    print("🚀 XCTrack and AirScore Optimization Comparison with Reference Data")
     print("=" * 80)
 
     # Load all tasks
@@ -429,10 +713,16 @@ def main():
     # Run comparison on all tasks
     all_results = []
 
-    # Display optimization method
-    print(
-        f"\n🔄 Starting analysis of {len(tasks)} tasks using optimized_distance with default settings..."
-    )
+    # Display optimization methods
+    print(f"\n🔄 Starting analysis of {len(tasks)} tasks...")
+    print(f"  📐 XCTrack: Using optimized_distance with default settings")
+    if use_airscore:
+        if AIRSCORE_AVAILABLE:
+            print(f"  📐 AirScore: Using AirScore distance calculations")
+        else:
+            print(f"  ⚠️  AirScore calculations not available, will be skipped")
+    else:
+        print(f"  ℹ️  AirScore calculations skipped (--no-airscore option)")
 
     for i, (task_name, task) in enumerate(tasks.items(), 1):
         if not args.verbose:
@@ -444,6 +734,7 @@ def main():
                 task,
                 metadata,
                 args.verbose,
+                use_airscore,
             )
             if result:
                 all_results.append(result)
