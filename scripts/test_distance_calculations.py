@@ -2,9 +2,9 @@
 """
 Comparison script for XCTrack distance calculations.
 
-This script compares the scipy-based optimization method with reference data from JSON files.
-Now that the code has been simplified to use only the scipy optimization method,
-this tool validates that the results match expected reference values.
+This script compares the optimized_distance calculation with reference data from JSON files.
+It uses the default settings of the optimized_distance function and validates that the results
+match expected reference values.
 """
 
 import sys
@@ -105,16 +105,12 @@ def load_json_metadata(json_dir: str) -> Dict[str, Dict[str, Any]]:
 def test_distance_calculations(
     turnpoints: List[TaskTurnpoint],
     verbose: bool = False,
-    use_iterative_refinement: bool = False,
-    num_iterations: int = 3,
 ) -> Dict[str, Any]:
-    """Test distance calcultations on a list of turnpoints.
+    """Test distance calculations on a list of turnpoints.
 
     Args:
         turnpoints: List of TaskTurnpoint objects
         verbose: Whether to print detailed progress
-        use_iterative_refinement: Whether to use iterative refinement to reduce look-ahead bias
-        num_iterations: Number of refinement iterations when using iterative refinement
 
     Returns:
         Dictionary with timing and distance results
@@ -122,7 +118,6 @@ def test_distance_calculations(
     if len(turnpoints) < 2:
         return {
             "total_time": 0.0,
-            "avg_time_per_point": 0.0,
             "total_distance": 0.0,
             "num_points": 0,
         }
@@ -131,35 +126,21 @@ def test_distance_calculations(
     route_points = []
 
     try:
-        # Always use optimized_distance for consistency with the library
+        # Always use optimized_distance with default parameters
         if verbose:
-            if use_iterative_refinement:
-                print(
-                    f"    🔄 Using optimized_distance with {num_iterations} iterations"
-                )
-            else:
-                print(f"    🔄 Using optimized_distance with default parameters")
+            print(f"    🔄 Using optimized_distance with default parameters")
 
-        # Use optimized_distance with appropriate parameters
-        if use_iterative_refinement:
-            # Get route coordinates for detailed analysis
-            distance, route_points = calculate_iteratively_refined_route(
-                turnpoints,
-                num_iterations=num_iterations,
-                show_progress=verbose,
-            )
-        else:
-            # Use default parameters for standard optimization
-            distance = optimized_distance(
-                turnpoints,
-                show_progress=verbose,
-            )
+        # Use default parameters for standard optimization
+        distance = optimized_distance(
+            turnpoints,
+            show_progress=verbose,
+        )
 
-            # Get route coordinates if needed for analysis
-            _, route_points = calculate_iteratively_refined_route(
-                turnpoints,
-                show_progress=False,
-            )
+        # Get route coordinates if needed for analysis
+        _, route_points = calculate_iteratively_refined_route(
+            turnpoints,
+            show_progress=False,
+        )
     except Exception as e:
         if verbose:
             print(f"    ⚠️  Error in optimization: {e}")
@@ -186,8 +167,6 @@ def compare_with_reference(
     task: Any,
     json_metadata: Optional[Dict[str, Any]] = None,
     verbose: bool = False,
-    use_iterative_refinement: bool = False,
-    num_iterations: int = 3,
 ) -> Dict[str, Any]:
     """Compare optimization results with reference data.
 
@@ -196,8 +175,6 @@ def compare_with_reference(
         task: Parsed task object
         json_metadata: Optional JSON metadata for reference
         verbose: Whether to print detailed progress
-        use_iterative_refinement: Whether to use iterative refinement to reduce look-ahead bias
-        num_iterations: Number of refinement iterations when using iterative refinement
 
     Returns:
         Dictionary with comparison results
@@ -225,16 +202,11 @@ def compare_with_reference(
 
     # Test optimization
     if verbose:
-        method_name = "optimized distance calculation"
-        if use_iterative_refinement:
-            method_name += f" with {num_iterations} refinement iterations"
-        print(f"  🧮 Running {method_name}...")
+        print(f"  🧮 Running optimized distance calculation...")
 
     result = test_distance_calculations(
         turnpoints,
         verbose,
-        use_iterative_refinement=use_iterative_refinement,
-        num_iterations=num_iterations,
     )
 
     if verbose:
@@ -317,16 +289,8 @@ def analyze_results(all_results: List[Dict[str, Any]]) -> None:
     print(f"\n📊 SUMMARY STATISTICS ({len(valid_results)} tasks analyzed)")
     print("-" * 80)
 
-    # Display optimization methods used
-    optimization_methods = set(
-        r["optimization"]["method"]
-        for r in valid_results
-        if "method" in r["optimization"]
-    )
-    if len(optimization_methods) == 1:
-        print(f"  🔧 Optimization method: optimized_distance")
-    else:
-        print(f"  🔧 Mixed optimization methods used: {optimization_methods}")
+    # Display optimization method used
+    print(f"  🔧 Optimization method: optimized_distance with default settings")
 
     times = [r["optimization"]["total_time"] for r in valid_results]
     distances = [r["optimization"]["total_distance"] for r in valid_results]
@@ -440,17 +404,6 @@ def main():
     parser.add_argument(
         "--limit", type=int, help="Limit number of tasks to analyze (for testing)"
     )
-    parser.add_argument(
-        "--iterative-refinement",
-        action="store_true",
-        help="Use iterative refinement with custom number of iterations",
-    )
-    parser.add_argument(
-        "--iterations",
-        type=int,
-        default=5,
-        help="Number of refinement iterations when --iterative-refinement is used (default: 5)",
-    )
 
     args = parser.parse_args()
 
@@ -477,15 +430,9 @@ def main():
     all_results = []
 
     # Display optimization method
-    optimization_method = "optimized distance calculation"
-    if args.iterative_refinement:
-        print(
-            f"\n🔄 Starting analysis of {len(tasks)} tasks using {optimization_method} with {args.iterations} refinement iterations..."
-        )
-    else:
-        print(
-            f"\n🔄 Starting analysis of {len(tasks)} tasks using standard {optimization_method}..."
-        )
+    print(
+        f"\n🔄 Starting analysis of {len(tasks)} tasks using optimized_distance with default settings..."
+    )
 
     for i, (task_name, task) in enumerate(tasks.items(), 1):
         if not args.verbose:
@@ -497,8 +444,6 @@ def main():
                 task,
                 metadata,
                 args.verbose,
-                use_iterative_refinement=args.iterative_refinement,
-                num_iterations=args.iterations,
             )
             if result:
                 all_results.append(result)
