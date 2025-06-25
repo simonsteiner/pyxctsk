@@ -96,6 +96,15 @@ def compare_index():
     )
 
 
+@app.route("/debug")
+def debug_index():
+    """Render the debug page with task selection."""
+    tasks = get_available_tasks()
+    return render_template(
+        "debug.html", tasks=tasks, xctrack_available=XCTRACK_AVAILABLE
+    )
+
+
 @app.route("/task/<task_name>")
 def show_task(task_name: str):
     """Display visualization and details for a specific task."""
@@ -163,6 +172,49 @@ def compare_task(task_name: str):
             "compare_view.html",
             task_name=task_name,
             error=f"Error calculating distances: {str(e)}",
+            stacktrace=stacktrace,
+        )
+
+
+@app.route("/debug/<task_name>")
+def debug_task(task_name: str):
+    """Display debug information for generate_task_geojson with focus on goal lines."""
+    if not XCTRACK_AVAILABLE:
+        abort(500, "XCTrack module not available for calculations")
+
+    # Load original task data
+    json_data, geojson_data = load_task_data(task_name)
+    if not json_data:
+        abort(404, "Task data not found")
+
+    # Load and parse XCTSK file using xctrack module
+    xctsk_path = XCTSK_DIR / f"{task_name}.xctsk"
+    if not xctsk_path.exists():
+        abort(404, "XCTSK file not found")
+
+    try:
+        # Parse task using xctrack
+        task = parse_task(str(xctsk_path))
+
+        # Generate XCTrack GeoJSON data with debug information
+        xctrack_geojson = generate_task_geojson(task)
+
+        return render_template(
+            "debug_view.html",
+            task_name=task_name,
+            task=task,
+            original_geojson=geojson_data,
+            xctrack_geojson=xctrack_geojson,
+        )
+
+    except Exception as e:
+        import traceback
+
+        stacktrace = traceback.format_exc()
+        return render_template(
+            "debug_view.html",
+            task_name=task_name,
+            error=f"Error generating debug data: {str(e)}",
             stacktrace=stacktrace,
         )
 
