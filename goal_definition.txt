@@ -1,0 +1,32 @@
+Goal definition
+one of "CYLINDER"/"LINE", optional (default CYLINDER)
+
+The last turnpoint is always goal. If the last turnpoint is marked ESS than it is identical to goal and shares his line/cylinder settings. Otherwise ESS is always cylinder.
+goal.type - line. In the case of line, the radius of the turnpoint corresponds to the 1/2 of the total length of the goal line. Ground orientation of the line is always perpendicular to the azimuth to the center of last turnpoint.
+
+<https://xctrack.org/Competition_Interfaces.html>
+
+-----
+
+FAI Sporting Code, Section 7F XC scoring – 1st May 2020
+
+6.2.2 Definition of goal 
+A goal can be 
+• A turnpointcylinder or 
+• A goal line, defined by:
+A centre point c, given as WGS84 coordinates
+A length l, given in meters 
+A previous point p, given as WGS84 coordinates 
+
+6.2.2.1 Goal line 
+The goal linecontrol zone consists of the semi-circle with radius l/2 behind the goal line, when coming from the 
+last turn point that is different from the goal line centre. Entering that zone without prior crossing of the goal line 
+is equivalent to crossing the goal line. 
+Physical lines can be used in addition to the official, virtual goal line as defined by WGS84 coordinates, to increase 
+attractiveness for spectators and media, and to increase visibility for pilots. Physical lines must be at least 50m 
+long and 1m wide, made of white material and securely attached to the ground. The physical line must match as 
+closely as possible the corresponding virtual line as defined by the goal GPS coordinates and the direction of the 
+last task leg. It must not be laid out further from the previous turn point than the goal GPS coordinates. 
+By default, the goal line length l is set to 400m.
+
+<https://www.fai.org/sites/default/files/civl/documents/sporting_code_s7_f_-_xc_scoring_2020_v2.0.pdf>
