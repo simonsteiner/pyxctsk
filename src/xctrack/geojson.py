@@ -13,6 +13,18 @@ COORD_TOLERANCE = 1e-9
 
 def _create_turnpoint_feature(turnpoint, index: int) -> Dict:
     """Create a GeoJSON feature for a turnpoint."""
+    # Determine color based on turnpoint type
+    tp_type = getattr(turnpoint, "type", None)
+
+    if tp_type == "takeoff":
+        color = "#204d74"  # takeoff
+    elif tp_type in ["SSS", "ESS"]:
+        color = "#ac2925"  # SSS and ESS
+    elif tp_type == "goal":
+        color = "#398439"  # goal
+    else:
+        color = "#269abc"  # default turnpoint
+
     return {
         "type": "Feature",
         "geometry": {
@@ -25,6 +37,12 @@ def _create_turnpoint_feature(turnpoint, index: int) -> Dict:
             "radius": turnpoint.radius,
             "description": f"Radius: {turnpoint.radius}m",
             "turnpoint_index": index,
+            "tp_type": tp_type,
+            "color": color,
+            "fillColor": color,
+            "fillOpacity": 0.1,
+            "weight": 2,
+            "opacity": 0.7,
         },
     }
 
@@ -48,9 +66,13 @@ def _create_optimized_route_feature(
         "properties": {
             "name": "Optimized Route",
             "type": "optimized_route",
-            "stroke": "#ff4136",
-            "stroke-width": 3,
-            "stroke-opacity": 0.8,
+            "color": "#ff4136",
+            "weight": 3,
+            "opacity": 0.8,
+            "arrowheads": True,
+            "arrow_color": "#ff4136",
+            "arrow_size": 8,
+            "arrow_spacing": 100,  # meters between arrows
         },
     }
 
