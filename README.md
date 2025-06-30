@@ -2,10 +2,9 @@
 
 A comprehensive Python ecosystem for parsing, analyzing, and visualizing XCTrack task files and formats.
 
-This repository contains two complementary modules:
+This repository contains the core module:
 
 - **`xctrack`** - Core library for parsing and manipulating XCTrack task files
-- **`xctrack-web`** - Web interface for visual task analysis and sharing
 
 ## Modules Overview
 
@@ -19,33 +18,12 @@ The core Python library providing:
 - Converting tasks to KML format for visualization
 - Command-line interface for format conversion
 
-### XCTrack Web (`src/xctrack-web/`)
-
-A modern web interface providing:
-
-- Interactive task visualization with maps
-- Task file upload and analysis
-- QR code generation for XCTrack app
-- Task sharing and export features
-- RESTful API for programmatic access
-
 ## Installation
 
 ### Core Library Only
 
 ```bash
 pip install xctrack
-```
-
-### Web Interface
-
-```bash
-# Install core library first
-pip install xctrack
-
-# Then install web interface
-cd src/xctrack-web
-pip install -e .
 ```
 
 ### Development Installation
@@ -64,11 +42,6 @@ source /home/simon/git/python-xctrack/venv/bin/activate
 
 # Install core library in development mode with dev dependencies
 pip install -e ".[dev]"
-
-# Install web interface in development mode (optional)
-cd src/xctrack_web
-pip install -e .
-cd ../..
 ```
 
 #### Development Workflow
@@ -129,27 +102,6 @@ print(f"Task type: {task.task_type}")
 print(f"Number of turnpoints: {len(task.turnpoints)}")
 ```
 
-### Web Interface Usage
-
-Start the web server:
-
-```bash
-xctrack-web serve
-```
-
-Or with custom settings:
-
-```bash
-xctrack-web serve --host 0.0.0.0 --port 8080 --debug
-```
-
-Then open <http://localhost:5000> in your browser to:
-
-- Upload and analyze .xctsk task files
-- View tasks on interactive maps
-- Generate QR codes for XCTrack app
-- Export tasks in multiple formats
-
 ### Command Line Tools
 
 Core XCTrack CLI:
@@ -160,16 +112,6 @@ xctrack convert task.xctsk --format json
 
 # Generate QR code
 xctrack convert task.xctsk --format png --output qr.png
-```
-
-Web interface CLI:
-
-```bash
-# Start development server
-xctrack-web serve --debug
-
-# Generate deployment files
-xctrack-web install --output /etc/xctrack-web
 ```
 
 ### Creating a task
