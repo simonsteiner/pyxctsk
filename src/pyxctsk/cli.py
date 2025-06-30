@@ -1,4 +1,4 @@
-"""Command line interface for XCTrack."""
+"""Command line interface for pyxctsk."""
 
 import sys
 from io import BytesIO
@@ -11,7 +11,7 @@ from .utils import generate_qr_code, task_to_kml
 
 @click.group()
 def main():
-    """XCTrack task analysis tools."""
+    """pyxctsk XCTrack task analysis tools."""
     pass
 
 

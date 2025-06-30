@@ -16,7 +16,7 @@ from flask import Flask, render_template, request, jsonify, abort
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 try:
-    from xctrack import parse_task, calculate_task_distances, generate_task_geojson
+    from pyxctsk import parse_task, calculate_task_distances, generate_task_geojson
 
     XCTRACK_AVAILABLE = True
 except ImportError as e:

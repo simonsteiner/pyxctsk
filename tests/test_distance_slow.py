@@ -8,8 +8,8 @@ import os
 
 import pytest
 
-from xctrack import parse_task
-from xctrack.distance import calculate_task_distances
+from pyxctsk import parse_task
+from pyxctsk.distance import calculate_task_distances
 
 
 class TestDistanceAlgorithmThorough:

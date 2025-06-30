@@ -52,7 +52,7 @@ I've created a comprehensive automation solution for uploading and downloading X
 ### 1. Install Dependencies
 
 ```bash
-cd /home/simon/DEV/git/python-xctrack
+cd /home/simon/DEV/git/pyxctsk
 python3 -m venv venv
 source venv/bin/activate
 pip install -e ".[dev]"
@@ -61,7 +61,7 @@ pip install -e ".[dev]"
 ### 2. Upload All XCTSK Files
 
 ```bash
-cd tests
+cd scripts
 source ../venv/bin/activate
 python xcontest_xctsk_tool.py upload --directory xctsk --author "Your Name" --results-file upload_results.json
 ```

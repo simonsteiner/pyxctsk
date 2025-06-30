@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Comparison script for XCTrack distance calculations.
+Comparison script for XCTrack task distance calculations.
 
 This script compares the optimized_distance calculation with reference data from JSON files.
 It uses the default settings of the optimized_distance function and validates that the results
@@ -15,11 +15,11 @@ from pathlib import Path
 from typing import Dict, List, Any, Optional
 import argparse
 
-# Add the xctrack module to the path
+# Add the pyxctsk module to the path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-from xctrack.parser import parse_task
-from xctrack.distance import (
+from pyxctsk.parser import parse_task
+from pyxctsk.distance import (
     TaskTurnpoint,
     _task_to_turnpoints,
     optimized_distance,
@@ -308,20 +308,20 @@ def compare_with_reference(
             f"  📏 {len(turnpoints)} turnpoints, center distance: {center_distance/1000:.2f}km"
         )
 
-    # Test XCTrack optimization
+    # Test pyxctsk optimization
     if verbose:
-        print(f"  🧮 Running XCTrack optimized distance calculation...")
+        print(f"  🧮 Running pyxctsk optimized distance calculation...")
 
-    xctrack_result = test_distance_calculations(
+    pyxctsk_result = test_distance_calculations(
         turnpoints,
         verbose,
     )
 
     if verbose:
-        savings = (center_distance - xctrack_result["total_distance"]) / 1000
-        print(f"    ⏱️  Time: {xctrack_result['total_time']:.4f}s")
+        savings = (center_distance - pyxctsk_result["total_distance"]) / 1000
+        print(f"    ⏱️  Time: {pyxctsk_result['total_time']:.4f}s")
         print(
-            f"    📐 Distance: {xctrack_result['total_distance']/1000:.2f}km (saves {savings:.2f}km)"
+            f"    📐 Distance: {pyxctsk_result['total_distance']/1000:.2f}km (saves {savings:.2f}km)"
         )
 
     # Test AirScore optimization if available and requested
@@ -393,7 +393,7 @@ def compare_with_reference(
 
     # Create composite result
     result = {
-        "xctrack": xctrack_result,
+        "pyxctsk": pyxctsk_result,
         "airscore": airscore_result,
         "task_info": task_info,
     }
@@ -429,20 +429,20 @@ def analyze_results(all_results: List[Dict[str, Any]]) -> None:
     print("-" * 80)
 
     # Display optimization methods used
-    print(f"  🔧 XCTrack method: optimized_distance with default settings")
+    print(f"  🔧 pyxctsk method: optimized_distance with default settings")
     if has_airscore:
         print(f"  🔧 AirScore method: get_shortest_path")
 
-    # XCTrack statistics
-    xctrack_times = [r["xctrack"]["total_time"] for r in valid_results]
-    xctrack_distances = [r["xctrack"]["total_distance"] for r in valid_results]
+    # pyxctsk statistics
+    pyxctsk_times = [r["pyxctsk"]["total_time"] for r in valid_results]
+    pyxctsk_distances = [r["pyxctsk"]["total_distance"] for r in valid_results]
 
-    print(f"\n🧩 XCTrack optimization:")
-    print(f"  ⏱️  Average time per task: {statistics.mean(xctrack_times):.4f}s")
-    print(f"  ⏱️  Median time per task: {statistics.median(xctrack_times):.4f}s")
-    print(f"  ⏱️  Min/Max time: {min(xctrack_times):.4f}s / {max(xctrack_times):.4f}s")
-    print(f"  📐 Average distance: {statistics.mean(xctrack_distances)/1000:.2f}km")
-    print(f"  📐 Distance std dev: {statistics.stdev(xctrack_distances)/1000:.3f}km")
+    print(f"\n🧩 pyxctsk optimization:")
+    print(f"  ⏱️  Average time per task: {statistics.mean(pyxctsk_times):.4f}s")
+    print(f"  ⏱️  Median time per task: {statistics.median(pyxctsk_times):.4f}s")
+    print(f"  ⏱️  Min/Max time: {min(pyxctsk_times):.4f}s / {max(pyxctsk_times):.4f}s")
+    print(f"  📐 Average distance: {statistics.mean(pyxctsk_distances)/1000:.2f}km")
+    print(f"  📐 Distance std dev: {statistics.stdev(pyxctsk_distances)/1000:.3f}km")
 
     # AirScore statistics if available
     if has_airscore:
@@ -473,19 +473,19 @@ def analyze_results(all_results: List[Dict[str, Any]]) -> None:
                 f"  📐 Distance std dev: {statistics.stdev(airscore_distances)/1000:.3f}km"
             )
 
-            # Compare XCTrack vs AirScore
-            print(f"\n🔍 XCTrack vs AirScore comparison:")
+            # Compare pyxctsk vs AirScore
+            print(f"\n🔍 pyxctsk vs AirScore comparison:")
             diffs = []
             for r in airscore_results:
-                xctrack_dist = r["xctrack"]["total_distance"]
+                pyxctsk_dist = r["pyxctsk"]["total_distance"]
                 airscore_dist = r["airscore"]["total_distance"]
-                diffs.append(xctrack_dist - airscore_dist)
+                diffs.append(pyxctsk_dist - airscore_dist)
 
             mean_diff = statistics.mean(diffs) / 1000
             sign = "+" if mean_diff > 0 else "-" if mean_diff < 0 else ""
             print(f"  📏 Average difference: {sign}{abs(mean_diff):.2f}km")
             print(
-                f"  📏 XCTrack is {'longer' if mean_diff > 0 else 'shorter'} by {abs(mean_diff):.2f}km on average"
+                f"  📏 pyxctsk is {'longer' if mean_diff > 0 else 'shorter'} by {abs(mean_diff):.2f}km on average"
             )
 
     # Add JSON comparison if available
@@ -499,7 +499,7 @@ def analyze_results(all_results: List[Dict[str, Any]]) -> None:
         print(f"Comparing against pre-calculated reference distances from JSON files:")
 
         # Calculate differences against JSON reference data
-        json_diffs_xctrack = []
+        json_diffs_pyxctsk = []
         json_diffs_airscore = []
 
         for result in valid_results:
@@ -507,9 +507,9 @@ def analyze_results(all_results: List[Dict[str, Any]]) -> None:
             if "json_optimized_distance_km" in task_info:
                 json_opt_km = task_info["json_optimized_distance_km"]
 
-                # XCTrack comparison
-                xctrack_km = result["xctrack"]["total_distance"] / 1000
-                json_diffs_xctrack.append(abs(xctrack_km - json_opt_km))
+                # pyxctsk comparison
+                pyxctsk_km = result["pyxctsk"]["total_distance"] / 1000
+                json_diffs_pyxctsk.append(abs(pyxctsk_km - json_opt_km))
 
                 # AirScore comparison if available
                 if result.get("airscore") and result["airscore"].get(
@@ -518,10 +518,10 @@ def analyze_results(all_results: List[Dict[str, Any]]) -> None:
                     airscore_km = result["airscore"]["total_distance"] / 1000
                     json_diffs_airscore.append(abs(airscore_km - json_opt_km))
 
-        if json_diffs_xctrack:
+        if json_diffs_pyxctsk:
             print(f"\nAverage difference vs JSON reference optimized distance:")
             print(
-                f"  🔸 XCTrack difference: {statistics.mean(json_diffs_xctrack):.2f}km"
+                f"  🔸 pyxctsk difference: {statistics.mean(json_diffs_pyxctsk):.2f}km"
             )
 
             if json_diffs_airscore:
@@ -555,10 +555,10 @@ def analyze_results(all_results: List[Dict[str, Any]]) -> None:
     header_values = ["Name", "#", "(km)"]
 
     if tasks_with_json:
-        header_parts.extend(["JSON Ref", "XCTrack", "XC Diff"])
+        header_parts.extend(["JSON Ref", "pyxctsk", "XC Diff"])
         header_values.extend(["Opt (km)", "(km)", "(km)"])
     else:
-        header_parts.extend(["XCTrack"])
+        header_parts.extend(["pyxctsk"])
         header_values.extend(["(km)"])
 
     if has_airscore_detail:
@@ -586,8 +586,8 @@ def analyze_results(all_results: List[Dict[str, Any]]) -> None:
         num_tps = result["task_info"]["num_turnpoints"]
         center_km = result["task_info"]["center_distance_km"]
 
-        xctrack_km = result["xctrack"]["total_distance"] / 1000
-        xctrack_time = result["xctrack"]["total_time"]
+        pyxctsk_km = result["pyxctsk"]["total_distance"] / 1000
+        pyxctsk_time = result["pyxctsk"]["total_time"]
 
         # Prepare row values list
         row_values = [
@@ -596,19 +596,19 @@ def analyze_results(all_results: List[Dict[str, Any]]) -> None:
             f"{center_km:.2f}",
         ]
 
-        # Add JSON reference and XCTrack data
+        # Add JSON reference and pyxctsk data
         if "json_optimized_distance_km" in result["task_info"]:
             json_opt_km = result["task_info"]["json_optimized_distance_km"]
-            xctrack_diff_km = xctrack_km - json_opt_km
-            xctrack_sign = (
-                "+" if xctrack_diff_km > 0 else "-" if xctrack_diff_km < 0 else " "
+            pyxctsk_diff_km = pyxctsk_km - json_opt_km
+            pyxctsk_sign = (
+                "+" if pyxctsk_diff_km > 0 else "-" if pyxctsk_diff_km < 0 else " "
             )
 
             row_values.extend(
                 [
                     f"{json_opt_km:.2f}",
-                    f"{xctrack_km:.2f}",
-                    f"{xctrack_sign}{abs(xctrack_diff_km):.2f}",
+                    f"{pyxctsk_km:.2f}",
+                    f"{pyxctsk_sign}{abs(pyxctsk_diff_km):.2f}",
                 ]
             )
         else:
@@ -616,12 +616,12 @@ def analyze_results(all_results: List[Dict[str, Any]]) -> None:
                 row_values.extend(
                     [
                         "N/A",
-                        f"{xctrack_km:.2f}",
+                        f"{pyxctsk_km:.2f}",
                         "N/A",
                     ]
                 )
             else:
-                row_values.append(f"{xctrack_km:.2f}")
+                row_values.append(f"{pyxctsk_km:.2f}")
 
         # Add AirScore data if available
         if has_airscore_detail:
@@ -654,7 +654,7 @@ def analyze_results(all_results: List[Dict[str, Any]]) -> None:
                 row_values.extend(["N/A", "N/A"])
 
         # Add time
-        row_values.append(f"{xctrack_time:.3f}s")
+        row_values.append(f"{pyxctsk_time:.3f}s")
 
         # Print the row with appropriate formatting
         row = []
@@ -666,7 +666,7 @@ def analyze_results(all_results: List[Dict[str, Any]]) -> None:
 def main():
     """Main function to run the optimization comparison with reference data."""
     parser = argparse.ArgumentParser(
-        description="Compare XCTrack optimization with reference data"
+        description="Compare pyxctsk optimization with reference data"
     )
     parser.add_argument(
         "--tasks-dir",
@@ -691,7 +691,7 @@ def main():
     args = parser.parse_args()
     use_airscore = not args.no_airscore
 
-    print("🚀 XCTrack and AirScore Optimization Comparison with Reference Data")
+    print("🚀 pyxctsk and AirScore Optimization Comparison with Reference Data")
     print("=" * 80)
 
     # Load all tasks
@@ -715,7 +715,7 @@ def main():
 
     # Display optimization methods
     print(f"\n🔄 Starting analysis of {len(tasks)} tasks...")
-    print(f"  📐 XCTrack: Using optimized_distance with default settings")
+    print(f"  📐 pyxctsk: Using optimized_distance with default settings")
     if use_airscore:
         if AIRSCORE_AVAILABLE:
             print(f"  📐 AirScore: Using AirScore distance calculations")

@@ -61,6 +61,8 @@ def parse_task(data: Union[bytes, str]) -> Task:
     else:
         data_bytes = data
 
+    print(f"Parsing task from data: {data_bytes[:100]}...")  # Debug output
+
     # Try parsing as XCTSK: URL
     if data_bytes.startswith(QR_CODE_SCHEME.encode("utf-8")):
         try:

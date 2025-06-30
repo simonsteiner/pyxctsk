@@ -13,7 +13,7 @@ TASK_NAMES=(
 )
 
 # Base directory where searches start
-BASE_DIR="/home/simon/DEV/git/python-xctrack/scripts/downloaded_tasks"
+BASE_DIR="/home/simon/DEV/git/pyxctsk/scripts/downloaded_tasks"
 
 # Subdirectories to check
 SUBDIRS=(

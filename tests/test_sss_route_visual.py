@@ -10,8 +10,8 @@ import os
 import pytest
 from geopy.distance import geodesic
 
-from xctrack import parse_task
-from xctrack.distance import (
+from pyxctsk import parse_task
+from pyxctsk.distance import (
     _task_to_turnpoints,
     calculate_task_distances,
     optimized_route_coordinates,

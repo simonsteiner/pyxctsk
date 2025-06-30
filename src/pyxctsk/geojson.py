@@ -254,7 +254,7 @@ def _should_skip_last_turnpoint(task) -> bool:
 
 
 def generate_task_geojson(task) -> Dict:
-    """Generate GeoJSON data from XCTrack task object."""
+    """Generate GeoJSON data from pyxctsk task object."""
     features = []
 
     # Add turnpoints as point features with cylinders

@@ -3,8 +3,8 @@ requires = ["setuptools>=45", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "xctrack"
-version = "1.0.0"
+name = "pyxctsk"
+version = "0.1.0"
 description = "Python implementation of XCTrack's task format"
 readme = "README.md"
 license = {text = "MIT"}
@@ -46,11 +46,11 @@ dev = [
 ]
 
 [project.scripts]
-xctrack = "xctrack.cli:main"
+pyxctsk = "pyxctsk.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/simonsteiner/python-xctrack"
-Repository = "https://github.com/simonsteiner/python-xctrack"
+Homepage = "https://github.com/simonsteiner/pyxctsk"
+Repository = "https://github.com/simonsteiner/pyxctsk"
 
 [tool.setuptools.packages.find]
 where = ["src"]

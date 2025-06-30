@@ -2,7 +2,7 @@
 
 import pytest
 
-from xctrack import (
+from pyxctsk import (
     SSS,
     Direction,
     EarthModel,

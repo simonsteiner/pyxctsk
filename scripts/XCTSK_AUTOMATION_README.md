@@ -208,7 +208,7 @@ For detailed debugging, you can modify the script to add more verbose logging or
 
 ## Contributing
 
-This tool is part of the python-xctrack project. Please follow the project's coding standards:
+This tool is part of the pyxctsk project. Please follow the project's coding standards:
 
 - Format code with `black`
 - Sort imports with `isort`

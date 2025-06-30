@@ -1,25 +1,25 @@
-"""Custom exceptions for the xctrack package."""
+"""Custom exceptions for the pyxctsk package."""
 
 
-class XCTrackError(Exception):
-    """Base exception for all xctrack errors."""
+class pyXCTSKError(Exception):
+    """Base exception for all pyxctsk errors."""
 
     pass
 
 
-class EmptyInputError(XCTrackError):
+class EmptyInputError(pyXCTSKError):
     """Raised when input data is empty."""
 
     pass
 
 
-class InvalidFormatError(XCTrackError):
+class InvalidFormatError(pyXCTSKError):
     """Raised when input format is invalid."""
 
     pass
 
 
-class InvalidTimeOfDayError(XCTrackError):
+class InvalidTimeOfDayError(pyXCTSKError):
     """Raised when time of day format is invalid."""
 
     def __init__(self, time_str: str):

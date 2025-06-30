@@ -1,4 +1,4 @@
-# Python XCTrack
+# pyxctsk - Python implementation of XCTrack's task format
 
 A comprehensive Python ecosystem for parsing, analyzing, and visualizing XCTrack task files and formats.
 
@@ -8,7 +8,7 @@ This repository contains the core module:
 
 ## Modules Overview
 
-### XCTrack Core (`src/xctrack/`)
+### pyxctsk Core (`src/pyxctsk/`)
 
 The core Python library providing:
 
@@ -23,7 +23,7 @@ The core Python library providing:
 ### Core Library Only
 
 ```bash
-pip install xctrack
+pip install pyxctsk
 ```
 
 ### Development Installation
@@ -31,14 +31,14 @@ pip install xctrack
 #### Setting up Virtual Environment
 
 ```bash
-git clone https://github.com/simon/python-xctrack.git
-cd python-xctrack
+git clone https://github.com/simonsteiner/pyxctsk.git
+cd pyxctsk
 
 # Create and activate virtual environment
 python3 -m venv venv
 source venv/bin/activate
 # in subfolder use this command
-source /home/simon/git/python-xctrack/venv/bin/activate
+source /home/simon/git/pyxctsk/venv/bin/activate
 
 # Install core library in development mode with dev dependencies
 pip install -e ".[dev]"
@@ -69,8 +69,8 @@ deactivate
 #### Verification
 
 ```bash
-# Test that xctrack is properly installed
-xctrack --help
+# Test that pyxctsk is properly installed
+pyxctsk --help
 
 # Run tests to ensure everything works
 pytest
@@ -87,7 +87,7 @@ mypy --version
 ### Core Library Usage
 
 ```python
-from xctrack import parse_task
+from pyxctsk import parse_task
 
 # From file
 task = parse_task('my_task.xctsk')
@@ -108,16 +108,16 @@ Core XCTrack CLI:
 
 ```bash
 # Convert task file to JSON
-xctrack convert task.xctsk --format json
+pyxctsk convert task.xctsk --format json
 
 # Generate QR code
-xctrack convert task.xctsk --format png --output qr.png
+pyxctsk convert task.xctsk --format png --output qr.png
 ```
 
 ### Creating a task
 
 ```python
-from xctrack import Task, TaskType, Turnpoint, Waypoint
+from pyxctsk import Task, TaskType, Turnpoint, Waypoint
 
 task = Task(
     task_type=TaskType.CLASSIC,
@@ -143,7 +143,7 @@ with open('task.xctsk', 'w') as f:
 ### QR Code Generation
 
 ```python
-from xctrack.utils import generate_qr_code
+from pyxctsk.utils import generate_qr_code
 
 # Convert task to QR code format and generate image
 qr_task = task.to_qr_code_task()
@@ -155,7 +155,7 @@ qr_image.save('task_qr.png')
 ### KML Export
 
 ```python
-from xctrack.utils import task_to_kml
+from pyxctsk.utils import task_to_kml
 
 kml_content = task_to_kml(task)
 with open('task.kml', 'w') as f:
@@ -168,14 +168,14 @@ The package includes a command-line tool for format conversion:
 
 ```bash
 # Convert task to different formats
-python -m xctrack task.xctsk --format json        # JSON output
-python -m xctrack task.xctsk --format kml         # KML output  
-python -m xctrack task.xctsk --format qrcode-json # XCTSK: URL
-python -m xctrack task.xctsk --format png -o qr.png # QR code image
+python -m pyxctsk task.xctsk --format json        # JSON output
+python -m pyxctsk task.xctsk --format kml         # KML output  
+python -m pyxctsk task.xctsk --format qrcode-json # XCTSK: URL
+python -m pyxctsk task.xctsk --format png -o qr.png # QR code image
 
 # Parse from different inputs
-python -m xctrack qr_code.png --format json       # From QR image
-cat task.xctsk | python -m xctrack --format kml   # From stdin
+python -m pyxctsk qr_code.png --format json       # From QR image
+cat task.xctsk | python -m pyxctsk --format kml   # From stdin
 ```
 
 ## Requirements
