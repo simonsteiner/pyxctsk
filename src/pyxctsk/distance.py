@@ -13,15 +13,15 @@ from .optimization_config import (
     DEFAULT_NUM_ITERATIONS,
     get_optimization_config,
 )
-from .turnpoint import TaskTurnpoint, distance_through_centers
 from .route_optimization import calculate_iteratively_refined_route
-from .task_distances import (
-    calculate_task_distances,
-    calculate_cumulative_distances,
-    _task_to_turnpoints,
-)
-from .sss_calculations import calculate_sss_info, calculate_optimal_sss_entry_point
+from .sss_calculations import calculate_optimal_sss_entry_point, calculate_sss_info
 from .task import Task
+from .task_distances import (
+    _task_to_turnpoints,
+    calculate_cumulative_distances,
+    calculate_task_distances,
+)
+from .turnpoint import TaskTurnpoint, distance_through_centers
 
 
 def optimized_distance(

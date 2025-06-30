@@ -2,10 +2,10 @@
 
 from typing import Any, Dict, List, Optional, Tuple
 
+from .optimization_config import get_optimization_config
+from .route_optimization import calculate_iteratively_refined_route
 from .task import Task, TurnpointType
 from .turnpoint import TaskTurnpoint, distance_through_centers
-from .route_optimization import calculate_iteratively_refined_route
-from .optimization_config import get_optimization_config
 
 
 def _task_to_turnpoints(task: Task) -> List[TaskTurnpoint]:

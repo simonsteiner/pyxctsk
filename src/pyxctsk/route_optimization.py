@@ -1,11 +1,12 @@
 """Dynamic programming route optimization algorithms."""
 
 from collections import defaultdict
-from typing import List, Tuple, Optional
+from typing import List, Optional, Tuple
+
 from geopy.distance import geodesic
 
-from .turnpoint import TaskTurnpoint
 from .optimization_config import DEFAULT_BEAM_WIDTH
+from .turnpoint import TaskTurnpoint
 
 
 def _init_dp_structure(turnpoints: List[TaskTurnpoint]) -> List[defaultdict]:

@@ -1,6 +1,7 @@
 """TaskTurnpoint class and geometry calculations for distance optimization."""
 
-from typing import List, Tuple, Optional
+from typing import List, Optional, Tuple
+
 from geopy.distance import geodesic
 from pyproj import Geod
 from scipy.optimize import fminbound

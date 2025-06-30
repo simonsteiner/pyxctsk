@@ -1,10 +1,11 @@
 """SSS (Start Speed Section) specific calculations."""
 
 from typing import Any, Dict, List, Optional, Tuple
+
 from geopy.distance import geodesic
 
-from .turnpoint import TaskTurnpoint
 from .optimization_config import get_optimization_config
+from .turnpoint import TaskTurnpoint
 
 
 def calculate_optimal_sss_entry_point(

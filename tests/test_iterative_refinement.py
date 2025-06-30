@@ -5,9 +5,9 @@ from geopy.distance import geodesic
 
 from pyxctsk.distance import (
     TaskTurnpoint,
-    optimized_distance,
-    calculate_iteratively_refined_route,
     _compute_optimal_route_dp,
+    calculate_iteratively_refined_route,
+    optimized_distance,
     optimized_route_coordinates,
 )
 
