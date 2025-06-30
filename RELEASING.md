@@ -8,7 +8,7 @@ Follow these steps to publish a new release to PyPI:
    - Code must be formatted and linted:
      - `black src/ tests/`
      - `isort src/ tests/`
-     - `flake8 src/ tests/`
+     - `flake8 src/ tests/  --extend-ignore E501`
      - `mypy src/`
 
 2. **Update Version and Changelog**
