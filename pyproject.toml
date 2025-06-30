@@ -49,7 +49,6 @@ dev = [
 pyxctsk = "pyxctsk.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/simonsteiner/pyxctsk"
 Repository = "https://github.com/simonsteiner/pyxctsk"
 
 [tool.setuptools.packages.find]
