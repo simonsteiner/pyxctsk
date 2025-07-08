@@ -1,0 +1,51 @@
+{
+  "metadata": {
+    "file_name": "noha",
+    "created": "2025-07-08 14:33:20 UTC",
+    "author": "steinerAir",
+    "task_distance_through_centers": "227.0km",
+    "distance_through_centers_km": 227.0
+  },
+  "turnpoints": [
+    {
+      "#": 1,
+      "Name": "D01",
+      "Distance (km)": 0.0
+    },
+    {
+      "#": 2,
+      "Name": "W09",
+      "Distance (km)": 33.9
+    },
+    {
+      "#": 3,
+      "Name": "B10",
+      "Distance (km)": 44.1
+    },
+    {
+      "#": 4,
+      "Name": "B55",
+      "Distance (km)": 4.3
+    },
+    {
+      "#": 5,
+      "Name": "W07",
+      "Distance (km)": 58.1
+    },
+    {
+      "#": 6,
+      "Name": "B32",
+      "Distance (km)": 58.0
+    },
+    {
+      "#": 7,
+      "Name": "A31",
+      "Distance (km)": 28.6
+    },
+    {
+      "#": 8,
+      "Name": "A31",
+      "Distance (km)": 0.0
+    }
+  ]
+}
