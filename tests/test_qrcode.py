@@ -20,6 +20,47 @@ except ImportError:
 
 
 @pytest.mark.skipif(not QR_CODE_SUPPORT, reason="QR code dependencies not available")
+def test_qr_code_generation_expected():
+    """Test QR code generation against expected results from real task files."""
+    # Load the task from the xctsk file
+    task_file = os.path.join(os.path.dirname(__file__), "../scripts/downloaded_tasks/xctsk/task_bevo.xctsk")
+    task = parse_task(task_file)
+
+    # Convert to QR code string
+    qr_task = task.to_qr_code_task()
+    qr_string = qr_task.to_string()
+
+    # Load expected QR code string from txt file
+    expected_file = os.path.join(os.path.dirname(__file__), "../scripts/downloaded_tasks/qrcode/task_bevo.txt")
+    with open(expected_file, 'r') as f:
+        expected_qr_string = f.read().strip()
+
+    # Verify the generated QR string matches the expected one
+    assert qr_string == expected_qr_string, f"Generated QR string doesn't match expected.\nGenerated: {qr_string}\nExpected: {expected_qr_string}"
+
+    # Generate QR code image and verify it can be parsed back
+    qr_image = generate_qr_code(qr_string, size=512)
+
+    # Convert to bytes and parse back
+    image_buffer = BytesIO()
+    qr_image.save(image_buffer, format="PNG")
+    image_bytes = image_buffer.getvalue()
+
+    # Parse from the generated image bytes
+    parsed_task = parse_task(image_bytes)
+
+    # Verify the roundtrip works correctly
+    assert parsed_task.task_type == task.task_type
+    assert len(parsed_task.turnpoints) == len(task.turnpoints)
+
+    # Verify key waypoint data is preserved
+    for orig_tp, parsed_tp in zip(task.turnpoints, parsed_task.turnpoints):
+        assert orig_tp.waypoint.name == parsed_tp.waypoint.name
+        assert abs(orig_tp.waypoint.lat - parsed_tp.waypoint.lat) < 0.001
+        assert abs(orig_tp.waypoint.lon - parsed_tp.waypoint.lon) < 0.001
+
+
+@pytest.mark.skipif(not QR_CODE_SUPPORT, reason="QR code dependencies not available")
 def test_qr_code_roundtrip():
     """Test complete QR code roundtrip: Task -> QR string -> QR image -> Task."""
     # Create a simple task
