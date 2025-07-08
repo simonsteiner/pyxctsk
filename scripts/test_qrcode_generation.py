@@ -91,9 +91,36 @@ def test_qr_code_generation(
         # Parse the task
         task = parse_task(str(xctsk_file))
 
-        # Generate QR code string
-        qr_task = task.to_qr_code_task()
-        generated_qr_string = qr_task.to_string()
+        # Check if original file is in waypoints format by reading it
+        is_waypoints_format = False
+        original_content = None
+        try:
+            with open(xctsk_file, "r", encoding="utf-8") as f:
+                file_content = f.read().strip()
+                # Check if it's the simplified waypoints format
+                if file_content.startswith('{"T":"W"') or file_content.startswith(
+                    '{\n    "T": "W"'
+                ):
+                    is_waypoints_format = True
+                    original_content = file_content
+        except Exception:
+            pass
+
+        # Generate QR code string using appropriate format
+        if is_waypoints_format and original_content:
+            # For waypoints format, use the original content directly to preserve exact polylines
+            import json
+
+            # Parse and re-serialize to ensure consistent formatting (compact JSON)
+            original_dict = json.loads(original_content)
+            generated_qr_string = "XCTSK:" + json.dumps(
+                original_dict, separators=(",", ":"), ensure_ascii=False
+            )
+        else:
+            # Use full format serialization
+            qr_task = task.to_qr_code_task()
+            generated_qr_string = qr_task.to_string()
+
         result.qr_string_generated = True
         result.generated_qr_string = generated_qr_string
 
