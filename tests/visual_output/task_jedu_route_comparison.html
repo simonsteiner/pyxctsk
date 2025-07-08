@@ -27,7 +27,7 @@
     
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <script>
-        var map = L.map('map').setView([46.642991002759736, 7.2078303227847185], 10);
+        var map = L.map('map').setView([46.6444635109621, 7.206959667580149], 10);
         
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap contributors'
@@ -60,14 +60,14 @@
         };
         legend.addTo(map);
 
-        // Turnpoint 0: S06161
-        L.marker([46.6252, 7.206111111111111]).addTo(map)
-            .bindPopup('<b>S06161</b><br>Type: TAKEOFF<br>Radius: 1000m');
-        L.circle([46.6252, 7.206111111111111], {
+        // Turnpoint 0: B21156
+        L.marker([46.63274444444445, 7.202591666666667]).addTo(map)
+            .bindPopup('<b>B21156</b><br>Type: TAKEOFF<br>Radius: 400m');
+        L.circle([46.63274444444445, 7.202591666666667], {
             color: 'blue',
             fillColor: 'blue',
             fillOpacity: 0.1,
-            radius: 1000
+            radius: 400
         }).addTo(map);
 
         // Turnpoint 1: B43585
@@ -131,14 +131,14 @@
         }).addTo(map);
 
         // Center route
-        var centerRoute = L.polyline([[46.6252, 7.206111111111111], [46.78876388888889, 7.541408333333333], [46.48272777777778, 6.910166666666667], [46.639516666666665, 7.241594444444445], [46.683505555555556, 7.040483333333333], [46.61811388888889, 7.169480555555555]], {
+        var centerRoute = L.polyline([[46.63274444444445, 7.202591666666667], [46.78876388888889, 7.541408333333333], [46.48272777777778, 6.910166666666667], [46.639516666666665, 7.241594444444445], [46.683505555555556, 7.040483333333333], [46.61811388888889, 7.169480555555555]], {
             color: 'red',
             weight: 3,
             opacity: 0.8
         }).addTo(map);
 
         // Optimized route
-        var optimizedRoute = L.polyline([[46.6252, 7.206111111111111], [46.64315059385848, 7.242593235663975], [46.726633813082074, 7.41296331008249], [46.513797494126216, 6.9740797284406195], [46.63636537356002, 7.229361775627651], [46.63129346443063, 7.162563414631894], [46.61895987169293, 7.169036657914417]], {
+        var optimizedRoute = L.polyline([[46.63274444444445, 7.202591666666667], [46.648547101035234, 7.237170994769567], [46.72797079649334, 7.411614275507345], [46.51387869563542, 6.973996840479124], [46.636367144873276, 7.229360813920015], [46.63129382446494, 7.162563739832335], [46.61895987896197, 7.169036687094594]], {
             color: 'blue',
             weight: 3,
             opacity: 0.8
@@ -146,12 +146,12 @@
 
         // Add distance comparison popup
         var comparisonInfo = L.popup()
-            .setLatLng([46.642991002759736, 7.2078303227847185])
+            .setLatLng([46.6444635109621, 7.206959667580149])
             .setContent(`
                 <h4>Route Comparison</h4>
-                <b>Center Route:</b> 149.77 km<br>
-                <b>Optimized Route:</b> 90.99 km<br>
-                <b>Savings:</b> 58.78 km (39.2%)
+                <b>Center Route:</b> 149.51 km<br>
+                <b>Optimized Route:</b> 90.74 km<br>
+                <b>Savings:</b> 58.78 km (39.3%)
             `);
 
     </script>
