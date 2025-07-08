@@ -233,7 +233,11 @@ class QRCodeTask:
         Returns:
             Compact JSON string suitable for QR code embedding
         """
-        return json.dumps(self.to_dict(simplified=simplified), separators=(",", ":"))
+        return json.dumps(
+            self.to_dict(simplified=simplified),
+            separators=(",", ":"),
+            ensure_ascii=False,
+        )
 
     def to_waypoints_json(self) -> str:
         """Convert to XC/Waypoints simplified JSON format.
