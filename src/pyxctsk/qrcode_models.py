@@ -205,7 +205,11 @@ class QRCodeTurnpoint:
 
         # Full format - Create result dictionary with exact order to match expected output
         result = OrderedDict()
-        result["d"] = self.description
+
+        # Only include description if it has a non-empty value
+        if self.description:
+            result["d"] = self.description
+
         result["n"] = self.name
 
         # Add type field before z - only for SSS (2) and ESS (3)
