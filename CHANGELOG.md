@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v0.2.0] - 2025-07-09
+
+### Added
+
+- Support for simplified XC/Waypoints format in QRCodeTask and QRCodeTurnpoint serialization
+- Complete XCTrack QR code format with custom polyline encoding
+
+### Enhanced
+
+- Parse_task function with improved file path checks and QR code task parsing
+
+### Fixed
+
+- JSON output to handle non-ASCII characters in QRCodeTask
+- Include description in QRCodeTurnpoint only if non-empty
+- Method naming after introducing simplified XC/Waypoints
+
+### Refactored
+
+- Split large qrcode_task.py into focused modules
+- Reorganized import statements across multiple modules for clarity
+- Enhanced code formatting for consistency and readability
+
 ## [v0.1.0] - 2025-06-30
 
 ### Added
