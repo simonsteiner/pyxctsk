@@ -37,8 +37,6 @@ import lib.viterbi as viterbi
 # from pathlib2 import Path
 
 
-
-
 def _strip_non_printable_chars(string):
     """Filters a string removing non-printable characters.
 

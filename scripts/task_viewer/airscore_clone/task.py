@@ -54,7 +54,6 @@ from route import (  # polar,
 # from igc_lib import defaultdict
 
 
-
 class Task(object):
     """Task definition, DB operations and length calculations
         Some Attributes:

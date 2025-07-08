@@ -6,7 +6,7 @@ scan on phones in direct sunlight, so this format uses compressed representation
 
 The format includes:
 - Polyline-encoded turnpoint coordinates with altitude and radius
-- Compressed time representations 
+- Compressed time representations
 - Optional fields to minimize data size
 - Backward compatibility with obsolete fields
 
@@ -38,7 +38,7 @@ QR_CODE_TASK_VERSION = 2
 
 class QRCodeDirection(IntEnum):
     """QR code direction enumeration.
-    
+
     OBSOLETE: This field is kept for backwards compatibility but ignored when reading tasks.
     """
 
@@ -48,7 +48,7 @@ class QRCodeDirection(IntEnum):
 
 class QRCodeEarthModel(IntEnum):
     """QR code earth model enumeration.
-    
+
     Specifies the earth model for distance calculations:
     - WGS84 (0): World Geodetic System 1984 (default)
     - FAI_SPHERE (1): FAI sphere model
@@ -60,7 +60,7 @@ class QRCodeEarthModel(IntEnum):
 
 class QRCodeGoalType(IntEnum):
     """QR code goal type enumeration.
-    
+
     Specifies the goal crossing type:
     - LINE (1): Goal line crossing
     - CYLINDER (2): Cylindrical goal zone (default)
@@ -72,7 +72,7 @@ class QRCodeGoalType(IntEnum):
 
 class QRCodeSSSType(IntEnum):
     """QR code SSS (Start Speed Section) type enumeration.
-    
+
     Specifies the start timing method:
     - RACE (1): Race start with time gates
     - ELAPSED_TIME (2): Elapsed time start
@@ -84,7 +84,7 @@ class QRCodeSSSType(IntEnum):
 
 class QRCodeTaskType(IntEnum):
     """QR code task type enumeration.
-    
+
     Specifies the task format:
     - CLASSIC (1): Traditional task with turnpoints
     - WAYPOINTS (2): Waypoint-based task
@@ -96,12 +96,12 @@ class QRCodeTaskType(IntEnum):
 
 class QRCodeTurnpointType(IntEnum):
     """QR code turnpoint type enumeration.
-    
+
     Specifies special turnpoint types:
     - NONE (0): Regular turnpoint
     - TAKEOFF (1): Takeoff point (not included in QR "t" field)
     - SSS (2): Start Speed Section
-    - ESS (3): End Speed Section  
+    - ESS (3): End Speed Section
     """
 
     NONE = 0
@@ -113,9 +113,9 @@ class QRCodeTurnpointType(IntEnum):
 @dataclass
 class QRCodeGoal:
     """QR code goal representation.
-    
+
     Represents goal timing and type information for QR code format.
-    
+
     Fields correspond to JSON format:
     - deadline: Goal deadline time (optional, defaults to 23:00 local time)
     - type: Goal type - LINE (1) or CYLINDER (2, default)
@@ -152,9 +152,9 @@ class QRCodeGoal:
 @dataclass
 class QRCodeSSS:
     """QR code SSS (Start Speed Section) representation.
-    
+
     Represents start timing and type information for QR code format.
-    
+
     Fields correspond to JSON format:
     - direction: OBSOLETE field kept for backwards compatibility (ignored when reading)
     - type: Start type - RACE (1) or ELAPSED_TIME (2)
@@ -204,9 +204,9 @@ class QRCodeSSS:
 @dataclass
 class QRCodeTakeoff:
     """QR code takeoff representation.
-    
+
     Represents takeoff timing information for QR code format.
-    
+
     Fields correspond to JSON format:
     - time_open: Takeoff open time (optional)
     - time_close: Takeoff close time (optional)
@@ -243,9 +243,9 @@ class QRCodeTakeoff:
 @dataclass
 class QRCodeTurnpoint:
     """QR code turnpoint representation.
-    
+
     Represents a single turnpoint in the QR code format with compressed coordinates.
-    
+
     Fields correspond to JSON format:
     - lat, lon: Geographic coordinates
     - radius: Turnpoint radius in meters
@@ -253,7 +253,7 @@ class QRCodeTurnpoint:
     - alt_smoothed: Altitude in meters
     - type: Turnpoint type - SSS (2), ESS (3), or NONE (0) for regular turnpoints
     - description: Optional turnpoint description (JSON field "d")
-    
+
     The coordinates are encoded using a custom polyline algorithm that compresses
     longitude, latitude, altitude, and radius into a single string field "z".
     This encoding is lossy with ~0.8m precision, well within FAI 5m tolerance.
@@ -269,14 +269,14 @@ class QRCodeTurnpoint:
 
     def to_dict(self, simplified: bool = False) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization.
-        
+
         Uses custom polyline encoding for turnpoint coordinates (lon, lat, alt, radius)
         following XCTrack's implementation. The encoding is lossy with ~0.8m precision
         but well within FAI 5m tolerance.
-        
+
         Args:
             simplified: If True, use simplified XC/Waypoints format with only "z" and "n"
-        
+
         Returns:
             Dictionary with fields: d (description), n (name), t (type), z (encoded coords)
             For simplified format: only n (name) and z (encoded coords)
@@ -284,7 +284,7 @@ class QRCodeTurnpoint:
         # XCTrack uses a custom implementation of polyline encoding
         # for turnpoint coordinates (lon, lat, alt, radius)
         # We need to implement the encodeCompetitionTurnpoint function from the Java code
-        
+
         # Implementation of encodeCompetitionTurnpoint based on the Java code
         def encode_num(num: int) -> str:
             """Encode a single number using the polyline algorithm."""
@@ -294,73 +294,69 @@ class QRCodeTurnpoint:
             # If negative, flip all bits
             if num < 0:
                 pnum = ~pnum
-                
+
             if pnum == 0:
                 return chr(63)
-                
-            while pnum > 0x1f:
-                char_code = ((pnum & 0x1f) | 0x20) + 63
+
+            while pnum > 0x1F:
+                char_code = ((pnum & 0x1F) | 0x20) + 63
                 result.append(chr(char_code))
                 pnum = pnum >> 5
-                
+
             result.append(chr(63 + pnum))
-            return ''.join(result)
-        
-        def encode_competition_turnpoint(lon: float, lat: float, alt: int, radius: int) -> str:
+            return "".join(result)
+
+        def encode_competition_turnpoint(
+            lon: float, lat: float, alt: int, radius: int
+        ) -> str:
             """Encode turnpoint data using the XCTrack format."""
             # Round coordinates to 5 decimal places (same as Google's polyline)
             lon_int = round(lon * 1e5)
             lat_int = round(lat * 1e5)
-            
+
             # Encode each component
             encoded_lon = encode_num(lon_int)
             encoded_lat = encode_num(lat_int)
             encoded_alt = encode_num(alt)
             encoded_radius = encode_num(radius)
-            
+
             # Concatenate all encoded values
             return encoded_lon + encoded_lat + encoded_alt + encoded_radius
-            
+
         # Use the XCTrack custom encoding
         encoded = encode_competition_turnpoint(
-            self.lon, 
-            self.lat,
-            self.alt_smoothed, 
-            self.radius
+            self.lon, self.lat, self.alt_smoothed, self.radius
         )
-        
+
         if simplified:
             # XC/Waypoints simplified format - only name and encoded coordinates
-            return OrderedDict([
-                ("n", self.name),
-                ("z", encoded)
-            ])
-        
+            return OrderedDict([("n", self.name), ("z", encoded)])
+
         # Full format - Create result dictionary with exact order to match expected output
         result = OrderedDict()
         result["d"] = self.description
         result["n"] = self.name
-        
+
         # Add type field before z - only for SSS (2) and ESS (3)
         # TAKEOFF (1) should not have the "t" field in QR code format
         if self.type == QRCodeTurnpointType.SSS or self.type == QRCodeTurnpointType.ESS:
             result["t"] = self.type.value
-            
+
         # Add z last
         result["z"] = encoded
-            
+
         return result
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "QRCodeTurnpoint":
         """Create from dictionary.
-        
+
         Decodes turnpoint data from QR code JSON format. Handles both individual
         coordinate fields (x, y, a, r) and polyline-encoded data (z field).
-        
+
         Args:
             data: Dictionary with turnpoint data
-            
+
         Returns:
             QRCodeTurnpoint instance
         """
@@ -376,24 +372,24 @@ class QRCodeTurnpoint:
             result = []
             current = 0
             pos = 0
-            
+
             for char in encoded_str:
                 c = ord(char) - 63
-                current |= (c & 0x1f) << pos
+                current |= (c & 0x1F) << pos
                 pos += 5
-                
-                if c <= 0x1f:
+
+                if c <= 0x1F:
                     # Extract the value (undo the encoding)
                     tmp_res = current >> 1
                     if (current & 0x1) == 1:
                         tmp_res = ~tmp_res
-                    
+
                     result.append(tmp_res)
                     current = 0
                     pos = 0
-                    
+
             return result
-        
+
         # Fallback: try polyline decoding if individual fields not available
         if "z" in data and ("x" not in data or "y" not in data):
             try:
@@ -413,7 +409,10 @@ class QRCodeTurnpoint:
                     coords = polyline.decode(data["z"], precision=5)
                     if coords:
                         coord = coords[0]  # Take first coordinate
-                        lon, lat = coord[1], coord[0]  # Note: polyline lib uses lat,lon order
+                        lon, lat = (
+                            coord[1],
+                            coord[0],
+                        )  # Note: polyline lib uses lat,lon order
                 except Exception:
                     # If all else fails, use defaults
                     pass
@@ -438,15 +437,15 @@ class QRCodeTurnpoint:
 @dataclass
 class QRCodeTask:
     """QR code task representation.
-    
+
     Represents a complete XCTrack task in QR code format (version 2).
-    
+
     This format is optimized for QR codes with efficient data representation:
     - Polyline-encoded turnpoint coordinates (lossy ~0.8m precision)
     - Compressed time representations
     - Optional fields to minimize data size
     - Backward compatibility with obsolete fields
-    
+
     JSON structure:
     {
         "taskType": "CLASSIC" | "WAYPOINTS",
@@ -471,13 +470,13 @@ class QRCodeTask:
 
     def to_dict(self, simplified: bool = False) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization.
-        
+
         Builds the QR code task dictionary in the precise field order required
         by the XCTrack format specification.
-        
+
         Args:
             simplified: If True, use simplified XC/Waypoints format with only T, V, and t fields
-        
+
         Returns:
             Dictionary with QR code task format fields
         """
@@ -486,37 +485,37 @@ class QRCodeTask:
             result = OrderedDict()
             result["T"] = "W"  # taskType: Waypoints
             result["V"] = self.version  # version: 2
-            
+
             # Turnpoints - only include if they exist
             if self.turnpoints:
                 result["t"] = [tp.to_dict(simplified=True) for tp in self.turnpoints]
-                
+
             return result
-        
+
         # Full format - Create an empty dict to start with
         result = {}
-        
+
         # To match the expected output exactly, we need to build the dictionary
         # in the precise order seen in the expected output
-        
+
         # 1. Goal (if exists)
         if self.goal:
             result["g"] = self.goal.to_dict()
-            
-        # 2. SSS (if exists) 
+
+        # 2. SSS (if exists)
         if self.sss:
             result["s"] = self.sss.to_dict()
-            
+
         # 3. Turnpoints (if exist)
         if self.turnpoints:
             result["t"] = [tp.to_dict() for tp in self.turnpoints]
-            
+
         # 4. Task type
         if self.task_type is not None:
             result["taskType"] = (
                 "CLASSIC" if self.task_type == QRCodeTaskType.CLASSIC else "WAYPOINTS"
             )
-            
+
         # 5. Takeoff fields - always include them as null if not set
         # This is important to match the expected test output exactly
         if self.takeoff:
@@ -526,36 +525,36 @@ class QRCodeTask:
         else:
             result["tc"] = None
             result["to"] = None
-            
+
         # 6. Earth model - only include if not default (WGS84 = 0)
         if self.earth_model is not None and self.earth_model != QRCodeEarthModel.WGS84:
             result["e"] = self.earth_model.value
-            
+
         # 7. Version - always at the end
         result["version"] = self.version
-        
+
         return result
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "QRCodeTask":
         """Create from dictionary.
-        
+
         Handles both full format and simplified XC/Waypoints format.
         """
         # Check if this is the simplified XC/Waypoints format
         is_simplified = "T" in data and "V" in data
-        
+
         if is_simplified:
             # Simplified XC/Waypoints format
             version = data.get("V", QR_CODE_TASK_VERSION)
-            
+
             # Task type is always WAYPOINTS in simplified format
             task_type = QRCodeTaskType.WAYPOINTS
-            
+
             turnpoints = []
             if "t" in data:
                 turnpoints = [QRCodeTurnpoint.from_dict(tp) for tp in data["t"]]
-            
+
             return cls(
                 version=version,
                 task_type=task_type,
@@ -566,7 +565,7 @@ class QRCodeTask:
                 sss=None,
                 goal=None,
             )
-        
+
         # Full format
         version = data.get("version", QR_CODE_TASK_VERSION)
 
@@ -588,7 +587,9 @@ class QRCodeTask:
             turnpoints = [QRCodeTurnpoint.from_dict(tp) for tp in data["t"]]
 
         takeoff = None
-        if ("to" in data and data["to"] is not None) or ("tc" in data and data["tc"] is not None):
+        if ("to" in data and data["to"] is not None) or (
+            "tc" in data and data["tc"] is not None
+        ):
             takeoff_data = {}
             if "to" in data:
                 takeoff_data["o"] = data["to"]
@@ -617,7 +618,7 @@ class QRCodeTask:
 
     def to_json(self, simplified: bool = False) -> str:
         """Convert to JSON string.
-        
+
         Returns:
             Compact JSON string suitable for QR code embedding
         """
@@ -625,7 +626,7 @@ class QRCodeTask:
 
     def to_waypoints_json(self) -> str:
         """Convert to XC/Waypoints simplified JSON format.
-        
+
         Returns:
             Compact JSON string in XC/Waypoints format
         """
@@ -633,15 +634,15 @@ class QRCodeTask:
 
     def to_string(self) -> str:
         """Convert to XCTSK: URL string.
-        
+
         Returns:
             Complete QR code string with XCTSK: scheme prefix
         """
         return QR_CODE_SCHEME + self.to_json()
-    
+
     def to_waypoints_string(self) -> str:
         """Convert to XC/Waypoints XCTSK: URL string.
-        
+
         Returns:
             Complete QR code string with XCTSK: scheme prefix in simplified format
         """
@@ -656,13 +657,13 @@ class QRCodeTask:
     @classmethod
     def from_string(cls, url_str: str) -> "QRCodeTask":
         """Create from XC/Waypoints XCTSK: URL string.
-        
+
         Args:
             url_str: Complete QR code string with XCTSK: scheme prefix
-            
+
         Returns:
             QRCodeTask instance
-            
+
         Raises:
             ValueError: If URL doesn't start with XCTSK: scheme
         """
@@ -675,13 +676,13 @@ class QRCodeTask:
     @classmethod
     def from_task(cls, task: "Task") -> "QRCodeTask":
         """Convert from regular Task format.
-        
+
         Converts a full Task object to the compressed QR code format.
         This involves encoding coordinates and reducing data size.
-        
+
         Args:
             task: Task object to convert
-            
+
         Returns:
             QRCodeTask instance optimized for QR code embedding
         """
@@ -792,12 +793,12 @@ class QRCodeTask:
     @classmethod
     def from_task_waypoints(cls, task: "Task") -> "QRCodeTask":
         """Convert from regular Task format to XC/Waypoints simplified format.
-        
+
         Creates a simplified waypoints task with only essential turnpoint data.
-        
+
         Args:
             task: Task object to convert
-            
+
         Returns:
             QRCodeTask instance optimized for XC/Waypoints format
         """
@@ -829,10 +830,10 @@ class QRCodeTask:
 
     def to_task(self) -> "Task":
         """Convert to regular Task format.
-        
+
         Converts the compressed QR code format back to a full Task object.
         This involves decoding coordinates and expanding data structures.
-        
+
         Returns:
             Task object with full format specification
         """
