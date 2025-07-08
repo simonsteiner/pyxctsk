@@ -41,8 +41,9 @@ def parse_task(data: Union[bytes, str]) -> Task:
 
     # Check if data is a file path
     if isinstance(data, str):
-        # Check if it looks like a file path (contains / or \ or ends with common extensions)
-        if (
+        # Check if it looks like a file path, but exclude QR code URLs
+        # QR code URLs start with XCTSK: and are typically very long
+        if not data.startswith(QR_CODE_SCHEME) and (
             "/" in data
             or "\\" in data
             or data.endswith((".xctsk", ".json", ".png", ".jpg", ".jpeg"))
@@ -59,7 +60,8 @@ def parse_task(data: Union[bytes, str]) -> Task:
         # Convert string to bytes for further processing
         data_bytes = data.encode("utf-8")
     else:
-        data_bytes = data
+        # Ensure we have bytes (not memoryview)
+        data_bytes = bytes(data)
 
     print(f"Parsing task from data: {data_bytes[:100]}...")  # Debug output
 
@@ -79,6 +81,16 @@ def parse_task(data: Union[bytes, str]) -> Task:
         else:
             task = Task.from_json(data_bytes.decode("utf-8"))
         return task
+    except (json.JSONDecodeError, ValueError, KeyError):
+        pass
+
+    # Try parsing as QR code task JSON (supports both full and simplified waypoints format)
+    try:
+        if isinstance(data, str):
+            qr_task = QRCodeTask.from_json(data)
+        else:
+            qr_task = QRCodeTask.from_json(data_bytes.decode("utf-8"))
+        return qr_task.to_task()
     except (json.JSONDecodeError, ValueError, KeyError):
         pass
 
