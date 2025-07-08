@@ -3,21 +3,24 @@
 Script to extract base64 SVG images from HTML files, convert them to images,
 and decode QR codes from those images.
 
+QR code images and decoded text are automatically saved to downloaded_tasks/qrcode/
+with filenames matching the source HTML file.
+
 Usage examples:
     # Process a single HTML file
-    python extract_qr_from_html.py scripts/downloaded_tasks/html/task_bevo.html
+    python extract_qr_from_html.py downloaded_tasks/html/task_bevo.html
     
     # Process multiple specific HTML files
-    python extract_qr_from_html.py scripts/downloaded_tasks/html/task_bevo.html scripts/downloaded_tasks/html/task_dami.html
+    python extract_qr_from_html.py downloaded_tasks/html/task_bevo.html downloaded_tasks/html/task_dami.html
 
     # Process all HTML files in the directory
-    python extract_qr_from_html.py scripts/downloaded_tasks/html/*.html
+    python extract_qr_from_html.py downloaded_tasks/html/*.html
 
     # Process all HTML files and save intermediate PNG images
-    python extract_qr_from_html.py scripts/downloaded_tasks/html/*.html -o output_images
+    python extract_qr_from_html.py downloaded_tasks/html/*.html -o output_images
     
     # Process with verbose output
-    python extract_qr_from_html.py scripts/downloaded_tasks/html/*.html -v
+    python extract_qr_from_html.py downloaded_tasks/html/*.html -v
 
 Prerequisites:
     pip install opencv-python pyzbar cairosvg
@@ -97,6 +100,10 @@ def process_html_file(html_file: Path, output_dir: Optional[Path] = None) -> Lis
     """Process an HTML file and extract QR codes from base64 SVG images."""
     print(f"Processing: {html_file}")
     
+    # Create QR code output directory
+    qrcode_dir = Path("downloaded_tasks/qrcode")
+    qrcode_dir.mkdir(parents=True, exist_ok=True)
+    
     # Read HTML content
     try:
         with open(html_file, 'r', encoding='utf-8') as f:
@@ -134,8 +141,22 @@ def process_html_file(html_file: Path, output_dir: Optional[Path] = None) -> Lis
         # Decode QR codes from image
         qr_codes = decode_qr_code(image)
         if qr_codes:
-            print(f"Found QR codes: {qr_codes}")
+            print(f"Found QR code: {qr_codes[0]}")
             all_qr_codes.extend(qr_codes)
+            
+            # Save QR code image (without numbering)
+            qr_image_file = qrcode_dir / f"{html_file.stem}.png"
+            cv2.imwrite(str(qr_image_file), image)
+            print(f"Saved QR code image: {qr_image_file}")
+            
+            # Save decoded QR code string (without numbering)
+            qr_text_file = qrcode_dir / f"{html_file.stem}.txt"
+            with open(qr_text_file, 'w', encoding='utf-8') as f:
+                f.write(qr_codes[0])
+            print(f"Saved QR code text: {qr_text_file}")
+            
+            # Since we expect only one QR code per HTML file, break after finding the first one
+            break
         else:
             print("No QR codes found in this image")
     
@@ -168,11 +189,6 @@ def main():
     
     print("\n=== SUMMARY ===")
     print(f"Total QR codes found: {len(all_qr_codes)}")
-    
-    if all_qr_codes:
-        print("\nAll QR codes:")
-        for i, qr_code in enumerate(all_qr_codes, 1):
-            print(f"{i}. {qr_code}")
 
 
 if __name__ == "__main__":
