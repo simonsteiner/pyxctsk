@@ -24,6 +24,7 @@ Follow these steps to publish a new release to PyPI:
      export VERSION=X.Y.Z
      git commit -m "Release v${VERSION}"
      git tag v${VERSION} -m "Version ${VERSION}"
+     git push origin main --tags
      ```
 
 4. **Publish to PyPI**
