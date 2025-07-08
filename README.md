@@ -4,7 +4,7 @@ A comprehensive Python ecosystem for parsing, analyzing, and visualizing XCTrack
 
 This repository contains the core module:
 
-- **`xctrack`** - Core library for parsing and manipulating XCTrack task files
+- **`pyxctsk`** - Core library for parsing and manipulating XCTrack task files
 
 ## Modules Overview
 
