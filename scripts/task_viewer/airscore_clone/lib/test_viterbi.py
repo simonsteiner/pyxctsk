@@ -18,7 +18,8 @@ class TestSimpleViterbiDecoder(unittest.TestCase):
         self.decoder = viterbi.SimpleViterbiDecoder(
             init_probs=self.init_probs,
             transition_probs=self.transition_probs,
-            emission_probs=self.emission_probs)
+            emission_probs=self.emission_probs,
+        )
 
     def assertDecode(self, emissions, expected_result):
         result = self.decoder.decode(emissions)

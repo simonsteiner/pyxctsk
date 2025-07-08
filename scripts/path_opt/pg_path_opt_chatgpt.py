@@ -1,8 +1,9 @@
 # pg_path_opt.py
 
-from dataclasses import dataclass
-from geographiclib.geodesic import Geodesic
 import math
+from dataclasses import dataclass
+
+from geographiclib.geodesic import Geodesic
 
 
 @dataclass

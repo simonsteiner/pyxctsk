@@ -7,25 +7,25 @@ It uses the default settings of the optimized_distance function and validates th
 match expected reference values.
 """
 
+import argparse
+import json
+import statistics
 import sys
 import time
-import statistics
-import json
 from pathlib import Path
-from typing import Dict, List, Any, Optional
-import argparse
+from typing import Any, Dict, List, Optional
 
 # Add the pyxctsk module to the path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-from pyxctsk.parser import parse_task
 from pyxctsk.distance import (
     TaskTurnpoint,
     _task_to_turnpoints,
-    optimized_distance,
-    distance_through_centers,
     calculate_iteratively_refined_route,
+    distance_through_centers,
+    optimized_distance,
 )
+from pyxctsk.parser import parse_task
 
 # Add task_viewer and its subdirectories to path to import AirScore utilities
 task_viewer_path = Path(__file__).parent / "task_viewer"
@@ -44,8 +44,8 @@ else:
 try:
     # Try importing from task_viewer.airscore_utils
     from task_viewer.airscore_utils import (
-        calculate_airscore_distances,
         AIRSCORE_AVAILABLE,
+        calculate_airscore_distances,
     )
 
     # The airscore_utils.py module already checks and sets AIRSCORE_AVAILABLE appropriately

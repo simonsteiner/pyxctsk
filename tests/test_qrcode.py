@@ -23,7 +23,9 @@ except ImportError:
 def test_qr_code_generation_expected():
     """Test QR code generation against expected results from real task files."""
     # Load the task from the xctsk file
-    task_file = os.path.join(os.path.dirname(__file__), "../scripts/downloaded_tasks/xctsk/task_bevo.xctsk")
+    task_file = os.path.join(
+        os.path.dirname(__file__), "../scripts/downloaded_tasks/xctsk/task_bevo.xctsk"
+    )
     task = parse_task(task_file)
 
     # Convert to QR code string
@@ -31,12 +33,16 @@ def test_qr_code_generation_expected():
     qr_string = qr_task.to_string()
 
     # Load expected QR code string from txt file
-    expected_file = os.path.join(os.path.dirname(__file__), "../scripts/downloaded_tasks/qrcode/task_bevo.txt")
-    with open(expected_file, 'r') as f:
+    expected_file = os.path.join(
+        os.path.dirname(__file__), "../scripts/downloaded_tasks/qrcode/task_bevo.txt"
+    )
+    with open(expected_file, "r") as f:
         expected_qr_string = f.read().strip()
 
     # Verify the generated QR string matches the expected one
-    assert qr_string == expected_qr_string, f"Generated QR string doesn't match expected.\nGenerated: {qr_string}\nExpected: {expected_qr_string}"
+    assert (
+        qr_string == expected_qr_string
+    ), f"Generated QR string doesn't match expected.\nGenerated: {qr_string}\nExpected: {expected_qr_string}"
 
     # Generate QR code image and verify it can be parsed back
     qr_image = generate_qr_code(qr_string, size=512)

@@ -8,7 +8,8 @@ requiring the full AirScore dependencies.
 import math
 import sys
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Any, Dict, List
+
 from geopy.distance import geodesic
 
 # Add the parent directory to the path to import from airscore_clone
@@ -175,13 +176,11 @@ AIRSCORE_AVAILABLE = False
 # Try to import the real implementations from AirScore
 try:
     # Import the needed functions from airscore_clone
-    from airscore_clone.route import (
-        Turnpoint as AirscoreTurnpoint,
-        distance as airscore_distance,
-        calcBearing as airscore_calcBearing,
-        opt_wp as airscore_opt_wp,
-        opt_goal as airscore_opt_goal,
-    )
+    from airscore_clone.route import Turnpoint as AirscoreTurnpoint
+    from airscore_clone.route import calcBearing as airscore_calcBearing
+    from airscore_clone.route import distance as airscore_distance
+    from airscore_clone.route import opt_goal as airscore_opt_goal
+    from airscore_clone.route import opt_wp as airscore_opt_wp
 
     # Replace our minimal implementations with the real ones
     Turnpoint = AirscoreTurnpoint
@@ -261,7 +260,6 @@ def calculate_airscore_distances(task) -> Dict[str, Any]:
     from airscore_clone.task import Task as AirscoreTask
 
     # print("Using AirScore Task class for optimization")
-
     # Create a Task object
     airscore_task = AirscoreTask()
     airscore_task.turnpoints = airscore_tps

@@ -1,8 +1,9 @@
 # pg_path_opt.py
-import numpy as np
-from scipy.optimize import minimize_scalar, brentq
-from geographiclib.geodesic import Geodesic
 from collections import namedtuple
+
+import numpy as np
+from geographiclib.geodesic import Geodesic
+from scipy.optimize import brentq, minimize_scalar
 
 # Define data structures for points and gates
 Point = namedtuple("Point", ["lat", "lon"])

@@ -37,22 +37,22 @@ from calcUtils import get_date
 # from formula import TaskFormula
 from geo import Geo
 
-# from igc_lib import defaultdict
-
 # from pilot.flightresult import (
 #     adjust_flight_results,
 #     update_all_results,
 #     verify_all_tracks,
 # )
 # from result import TaskResult, create_json_file
-from route import (
+from route import (  # polar,
     Turnpoint,
+    convert_turnpoints,
     distance,
     get_line,
     get_shortest_path,
-    # polar,
-    convert_turnpoints,
 )
+
+# from igc_lib import defaultdict
+
 
 
 class Task(object):

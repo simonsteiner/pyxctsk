@@ -29,13 +29,14 @@ import datetime
 import math
 import re
 import xml.dom.minidom
+from collections import defaultdict
+
+import lib.geo as geo
+import lib.viterbi as viterbi
 
 # from pathlib2 import Path
 
-from collections import defaultdict
 
-import lib.viterbi as viterbi
-import lib.geo as geo
 
 
 def _strip_non_printable_chars(string):

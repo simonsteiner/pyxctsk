@@ -2,8 +2,9 @@ import json
 import logging
 import os
 import re
-from bs4 import BeautifulSoup
 from typing import Any, Dict, List, Optional, Tuple
+
+from bs4 import BeautifulSoup
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")

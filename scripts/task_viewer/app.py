@@ -10,13 +10,13 @@ import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
 
-from flask import Flask, render_template, request, jsonify, abort
+from flask import Flask, abort, jsonify, render_template, request
 
 # Add the xctrack module to the path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 try:
-    from pyxctsk import parse_task, calculate_task_distances, generate_task_geojson
+    from pyxctsk import calculate_task_distances, generate_task_geojson, parse_task
 
     XCTRACK_AVAILABLE = True
 except ImportError as e:
@@ -39,9 +39,9 @@ else:
 try:
     # Try importing from task_viewer.airscore_utils
     from airscore_utils import (
+        AIRSCORE_AVAILABLE,
         calculate_airscore_distances,
         generate_airscore_geojson,
-        AIRSCORE_AVAILABLE,
     )
 
     # The airscore_utils.py module already checks and sets AIRSCORE_AVAILABLE appropriately
