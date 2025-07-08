@@ -267,15 +267,19 @@ class QRCodeTurnpoint:
     type: QRCodeTurnpointType = QRCodeTurnpointType.NONE
     description: Optional[str] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self, simplified: bool = False) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization.
         
         Uses custom polyline encoding for turnpoint coordinates (lon, lat, alt, radius)
         following XCTrack's implementation. The encoding is lossy with ~0.8m precision
         but well within FAI 5m tolerance.
         
+        Args:
+            simplified: If True, use simplified XC/Waypoints format with only "z" and "n"
+        
         Returns:
             Dictionary with fields: d (description), n (name), t (type), z (encoded coords)
+            For simplified format: only n (name) and z (encoded coords)
         """
         # XCTrack uses a custom implementation of polyline encoding
         # for turnpoint coordinates (lon, lat, alt, radius)
@@ -325,7 +329,14 @@ class QRCodeTurnpoint:
             self.radius
         )
         
-        # Create result dictionary with exact order to match expected output
+        if simplified:
+            # XC/Waypoints simplified format - only name and encoded coordinates
+            return OrderedDict([
+                ("n", self.name),
+                ("z", encoded)
+            ])
+        
+        # Full format - Create result dictionary with exact order to match expected output
         result = OrderedDict()
         result["d"] = self.description
         result["n"] = self.name
@@ -458,16 +469,31 @@ class QRCodeTask:
     sss: Optional[QRCodeSSS] = None
     goal: Optional[QRCodeGoal] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self, simplified: bool = False) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization.
         
         Builds the QR code task dictionary in the precise field order required
         by the XCTrack format specification.
         
+        Args:
+            simplified: If True, use simplified XC/Waypoints format with only T, V, and t fields
+        
         Returns:
             Dictionary with QR code task format fields
         """
-        # Create an empty dict to start with
+        if simplified:
+            # XC/Waypoints simplified format
+            result = OrderedDict()
+            result["T"] = "W"  # taskType: Waypoints
+            result["V"] = self.version  # version: 2
+            
+            # Turnpoints - only include if they exist
+            if self.turnpoints:
+                result["t"] = [tp.to_dict(simplified=True) for tp in self.turnpoints]
+                
+            return result
+        
+        # Full format - Create an empty dict to start with
         result = {}
         
         # To match the expected output exactly, we need to build the dictionary
@@ -512,14 +538,43 @@ class QRCodeTask:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "QRCodeTask":
-        """Create from dictionary."""
+        """Create from dictionary.
+        
+        Handles both full format and simplified XC/Waypoints format.
+        """
+        # Check if this is the simplified XC/Waypoints format
+        is_simplified = "T" in data and "V" in data
+        
+        if is_simplified:
+            # Simplified XC/Waypoints format
+            version = data.get("V", QR_CODE_TASK_VERSION)
+            
+            # Task type is always WAYPOINTS in simplified format
+            task_type = QRCodeTaskType.WAYPOINTS
+            
+            turnpoints = []
+            if "t" in data:
+                turnpoints = [QRCodeTurnpoint.from_dict(tp) for tp in data["t"]]
+            
+            return cls(
+                version=version,
+                task_type=task_type,
+                earth_model=None,  # Default to WGS84
+                turnpoints_polyline=None,
+                turnpoints=turnpoints,
+                takeoff=None,
+                sss=None,
+                goal=None,
+            )
+        
+        # Full format
         version = data.get("version", QR_CODE_TASK_VERSION)
 
         task_type = None
         if "taskType" in data:
             if data["taskType"] == "CLASSIC":
                 task_type = QRCodeTaskType.CLASSIC
-            elif data["taskType"] == "W":
+            elif data["taskType"] == "WAYPOINTS" or data["taskType"] == "W":
                 task_type = QRCodeTaskType.WAYPOINTS
 
         earth_model = None
@@ -560,31 +615,49 @@ class QRCodeTask:
             goal=goal,
         )
 
-    def to_json(self) -> str:
+    def to_json(self, simplified: bool = False) -> str:
         """Convert to JSON string.
+        
+        Args:
+            simplified: If True, use simplified XC/Waypoints format
         
         Returns:
             Compact JSON string suitable for QR code embedding
         """
-        return json.dumps(self.to_dict(), separators=(",", ":"))
+        return json.dumps(self.to_dict(simplified=simplified), separators=(",", ":"))
+
+    def to_waypoints_json(self) -> str:
+        """Convert to XC/Waypoints simplified JSON format.
+        
+        Returns:
+            Compact JSON string in XC/Waypoints format
+        """
+        return self.to_json(simplified=True)
+
+    def to_waypoints_string(self) -> str:
+        """Convert to XC/Waypoints XCTSK: URL string.
+        
+        Returns:
+            Complete QR code string with XCTSK: scheme prefix in simplified format
+        """
+        return QR_CODE_SCHEME + self.to_waypoints_json()
 
     @classmethod
-    def from_json(cls, json_str: str) -> "QRCodeTask":
-        """Create from JSON string."""
+    def from_waypoints_json(cls, json_str: str) -> "QRCodeTask":
+        """Create from XC/Waypoints simplified JSON format.
+        
+        Args:
+            json_str: JSON string in XC/Waypoints format
+            
+        Returns:
+            QRCodeTask instance
+        """
         data = json.loads(json_str)
         return cls.from_dict(data)
 
-    def to_string(self) -> str:
-        """Convert to XCTSK: URL string.
-        
-        Returns:
-            Complete QR code string with XCTSK: scheme prefix
-        """
-        return QR_CODE_SCHEME + self.to_json()
-
     @classmethod
-    def from_string(cls, url_str: str) -> "QRCodeTask":
-        """Create from XCTSK: URL string.
+    def from_waypoints_string(cls, url_str: str) -> "QRCodeTask":
+        """Create from XC/Waypoints XCTSK: URL string.
         
         Args:
             url_str: Complete QR code string with XCTSK: scheme prefix
@@ -599,7 +672,7 @@ class QRCodeTask:
             raise ValueError(f"Invalid QR code scheme, expected {QR_CODE_SCHEME}")
 
         json_str = url_str[len(QR_CODE_SCHEME) :]
-        return cls.from_json(json_str)
+        return cls.from_waypoints_json(json_str)
 
     @classmethod
     def from_task(cls, task: "Task") -> "QRCodeTask":
@@ -716,6 +789,44 @@ class QRCodeTask:
             takeoff=qr_takeoff,
             sss=qr_sss,
             goal=qr_goal,
+        )
+
+    @classmethod
+    def from_task_waypoints(cls, task: "Task") -> "QRCodeTask":
+        """Convert from regular Task format to XC/Waypoints simplified format.
+        
+        Creates a simplified waypoints task with only essential turnpoint data.
+        
+        Args:
+            task: Task object to convert
+            
+        Returns:
+            QRCodeTask instance optimized for XC/Waypoints format
+        """
+        # Convert turnpoints to simplified format
+        qr_turnpoints = []
+        for tp in task.turnpoints:
+            # For waypoints format, we don't need type or description
+            qr_turnpoint = QRCodeTurnpoint(
+                lat=tp.waypoint.lat,
+                lon=tp.waypoint.lon,
+                radius=tp.radius,
+                name=tp.waypoint.name,
+                alt_smoothed=tp.waypoint.alt_smoothed,
+                type=QRCodeTurnpointType.NONE,  # Simplified format doesn't use types
+                description=None,  # Simplified format doesn't use descriptions
+            )
+            qr_turnpoints.append(qr_turnpoint)
+
+        return cls(
+            version=QR_CODE_TASK_VERSION,
+            task_type=QRCodeTaskType.WAYPOINTS,
+            earth_model=None,  # Default to WGS84
+            turnpoints_polyline=None,
+            turnpoints=qr_turnpoints,
+            takeoff=None,
+            sss=None,
+            goal=None,
         )
 
     def to_task(self) -> "Task":
