@@ -42,7 +42,7 @@ The project has both CLI and web interface components.
 Always use a virtual environment for development.
 Use fish shell syntax for all terminal commands.
 Install in editable mode with dev dependencies using `pip install -e ".[dev]"`.
-Activate virtual environment with `source venv/bin/activate.fish`.
+Activate virtual environment with `source .venv/bin/activate.fish`.
 
 ## Code Structure
 Main source code is in `src/pyxctsk/` directory.

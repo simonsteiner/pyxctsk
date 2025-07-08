@@ -35,10 +35,10 @@ git clone https://github.com/simonsteiner/pyxctsk.git
 cd pyxctsk
 
 # Create and activate virtual environment
-python3 -m venv venv
-source venv/bin/activate
+python3 -m venv .venv
+source .venv/bin/activate
 # in subfolder use this command
-source /home/simon/git/pyxctsk/venv/bin/activate
+source /home/simon/git/pyxctsk/.venv/bin/activate
 
 # Install core library in development mode with dev dependencies
 pip install -e ".[dev]"
