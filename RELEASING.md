@@ -14,6 +14,7 @@ Follow these steps to publish a new release to PyPI:
 2. **Update Version and Changelog**
    - Update the version in `pyproject.toml`.
    - Add a new entry to `CHANGELOG.md` with the release date and summary of changes.
+   - To see changes since last release: `git log --oneline v0.1.0..HEAD -- src/`
 
 3. **Tag the Release**
    - Create a new git tag matching the version (e.g., `v0.1.0`).
