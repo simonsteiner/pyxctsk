@@ -618,9 +618,6 @@ class QRCodeTask:
     def to_json(self, simplified: bool = False) -> str:
         """Convert to JSON string.
         
-        Args:
-            simplified: If True, use simplified XC/Waypoints format
-        
         Returns:
             Compact JSON string suitable for QR code embedding
         """
@@ -634,6 +631,14 @@ class QRCodeTask:
         """
         return self.to_json(simplified=True)
 
+    def to_string(self) -> str:
+        """Convert to XCTSK: URL string.
+        
+        Returns:
+            Complete QR code string with XCTSK: scheme prefix
+        """
+        return QR_CODE_SCHEME + self.to_json()
+    
     def to_waypoints_string(self) -> str:
         """Convert to XC/Waypoints XCTSK: URL string.
         
@@ -643,20 +648,13 @@ class QRCodeTask:
         return QR_CODE_SCHEME + self.to_waypoints_json()
 
     @classmethod
-    def from_waypoints_json(cls, json_str: str) -> "QRCodeTask":
-        """Create from XC/Waypoints simplified JSON format.
-        
-        Args:
-            json_str: JSON string in XC/Waypoints format
-            
-        Returns:
-            QRCodeTask instance
-        """
+    def from_json(cls, json_str: str) -> "QRCodeTask":
+        """Create from JSON string."""
         data = json.loads(json_str)
         return cls.from_dict(data)
 
     @classmethod
-    def from_waypoints_string(cls, url_str: str) -> "QRCodeTask":
+    def from_string(cls, url_str: str) -> "QRCodeTask":
         """Create from XC/Waypoints XCTSK: URL string.
         
         Args:
@@ -672,7 +670,7 @@ class QRCodeTask:
             raise ValueError(f"Invalid QR code scheme, expected {QR_CODE_SCHEME}")
 
         json_str = url_str[len(QR_CODE_SCHEME) :]
-        return cls.from_waypoints_json(json_str)
+        return cls.from_json(json_str)
 
     @classmethod
     def from_task(cls, task: "Task") -> "QRCodeTask":

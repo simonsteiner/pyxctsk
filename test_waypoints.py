@@ -94,7 +94,7 @@ def test_waypoints_format():
     assert url_string.startswith("XCTSK:"), "URL should start with XCTSK:"
     
     # Parse from URL
-    parsed_from_url = QRCodeTask.from_waypoints_string(url_string)
+    parsed_from_url = QRCodeTask.from_string(url_string)
     assert len(parsed_from_url.turnpoints) == 3, "Should have 3 turnpoints from URL"
     
     print("✓ URL format tests passed")
