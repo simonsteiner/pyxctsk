@@ -273,7 +273,7 @@ def main():
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path(__file__).parent / "qrcode_test_output",
+        default=Path(__file__).parent / "downloaded_tasks" / "qrcode_test_output",
         help="Directory to save generated QR codes",
     )
     parser.add_argument(
