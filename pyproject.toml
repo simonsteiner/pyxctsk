@@ -37,10 +37,10 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "beautifulsoup4>=4.9.0",
-    "black>=21.0.0",
-    "flake8>=3.8.0",
-    "isort>=5.0.0",
-    "mypy>=0.800",
+    "black>=25.1.0",
+    "flake8>=7.3.0",
+    "isort>=6.0.1",
+    "mypy>=1.16.1",
     "pytest-cov>=2.0.0",
     "pytest>=6.0.0",
     "requests>=2.25.0",
@@ -54,17 +54,17 @@ analysis = [
     "matplotlib>=3.3.0",
 ]
 
+[tool.setuptools.package-data]
+pyxctsk = ["py.typed"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
 [project.scripts]
 pyxctsk = "pyxctsk.cli:main"
 
 [project.urls]
 Repository = "https://github.com/simonsteiner/pyxctsk"
-
-[tool.setuptools.packages.find]
-where = ["src"]
-
-[tool.setuptools.package-dir]
-"" = "src"
 
 [tool.black]
 line-length = 88
@@ -79,6 +79,16 @@ python_version = "3.8"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+strict_optional = true
+mypy_path = "stubs"
+
+[[tool.mypy.overrides]]
+module = ["geopy.*", "polyline.*", "pyzbar.*", "scipy.*", "qrcode.*", "optype.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 minversion = "6.0"

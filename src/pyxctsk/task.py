@@ -64,7 +64,7 @@ class TimeOfDay:
     minute: int
     second: int
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Validate time values."""
         if not (0 <= self.hour <= 23):
             raise ValueError("Hour must be between 0 and 23")
@@ -258,7 +258,9 @@ class Goal:
             result["deadline"] = self.deadline.to_json_string()
         if self.type == GoalType.LINE and self.line_length is not None:
             # For goal LINE type, lineLength represents the total length of the goal line
-            result["lineLength"] = self.line_length
+            result["lineLength"] = str(
+                self.line_length
+            )  # Convert to string for consistency
         return result
 
     @classmethod
@@ -290,7 +292,7 @@ class Task:
     sss: Optional[SSS] = None
     goal: Optional[Goal] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Post-initialization validation and processing."""
         if not self.turnpoints or len(self.turnpoints) == 0:
             return
@@ -337,9 +339,9 @@ class Task:
         ):
             # For goal LINE type, make sure the line length is set to twice the last turnpoint radius
             # as the radius represents half of the total goal line length
-            self.goal.line_length = float(self.turnpoints[-1].radius * 2)
+            self.goal.line_length = float(self.turnpoints[-1].radius) * 2.0
 
-        result = {
+        result: Dict[str, Any] = {
             "taskType": self.task_type.value,
             "version": self.version,
             "turnpoints": [tp.to_dict() for tp in self.turnpoints],
