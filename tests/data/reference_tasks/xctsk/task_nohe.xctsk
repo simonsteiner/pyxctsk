@@ -1,0 +1,131 @@
+{
+    "earthModel": "WGS84",
+    "goal": {
+        "deadline": "22:00:00Z",
+        "type": "CYLINDER"
+    },
+    "sss": {
+        "direction": "EXIT",
+        "timeGates": [
+            "16:45:00Z"
+        ],
+        "type": "RACE"
+    },
+    "taskType": "CLASSIC",
+    "turnpoints": [
+        {
+            "radius": 50,
+            "type": "TAKEOFF",
+            "waypoint": {
+                "altSmoothed": 1860,
+                "description": "Take--Off--AGUAPANELA",
+                "lat": 4.403883457183838,
+                "lon": -76.21138000488281,
+                "name": "D02"
+            }
+        },
+        {
+            "radius": 10000,
+            "type": "SSS",
+            "waypoint": {
+                "altSmoothed": 933,
+                "description": "PUENTE LA PAILA",
+                "lat": 4.329166889190674,
+                "lon": -76.0653305053711,
+                "name": "P17"
+            }
+        },
+        {
+            "radius": 200,
+            "waypoint": {
+                "altSmoothed": 933,
+                "description": "PUENTE LA PAILA",
+                "lat": 4.329166889190674,
+                "lon": -76.0653305053711,
+                "name": "P17"
+            }
+        },
+        {
+            "radius": 10000,
+            "waypoint": {
+                "altSmoothed": 933,
+                "description": "PUENTE LA PAILA",
+                "lat": 4.329166889190674,
+                "lon": -76.0653305053711,
+                "name": "P17"
+            }
+        },
+        {
+            "radius": 100,
+            "waypoint": {
+                "altSmoothed": 933,
+                "description": "PUENTE LA PAILA",
+                "lat": 4.329166889190674,
+                "lon": -76.0653305053711,
+                "name": "P17"
+            }
+        },
+        {
+            "radius": 2000,
+            "waypoint": {
+                "altSmoothed": 924,
+                "description": "GLORIETA LA UNION",
+                "lat": 4.5301666259765625,
+                "lon": -76.08533477783203,
+                "name": "P33"
+            }
+        },
+        {
+            "radius": 2000,
+            "waypoint": {
+                "altSmoothed": 903,
+                "description": "X30",
+                "lat": 4.646841526031494,
+                "lon": -75.9819564819336,
+                "name": "X30"
+            }
+        },
+        {
+            "radius": 4000,
+            "waypoint": {
+                "altSmoothed": 1037,
+                "description": "CERRO CRUZ TORO",
+                "lat": 4.61299991607666,
+                "lon": -76.08300018310547,
+                "name": "P37"
+            }
+        },
+        {
+            "radius": 300,
+            "waypoint": {
+                "altSmoothed": 945,
+                "description": "GOL PISTA OBANDO",
+                "lat": 4.5879998207092285,
+                "lon": -75.96849822998047,
+                "name": "G02"
+            }
+        },
+        {
+            "radius": 4000,
+            "type": "ESS",
+            "waypoint": {
+                "altSmoothed": 945,
+                "description": "GOL PISTA OBANDO",
+                "lat": 4.5879998207092285,
+                "lon": -75.96849822998047,
+                "name": "G02"
+            }
+        },
+        {
+            "radius": 200,
+            "waypoint": {
+                "altSmoothed": 945,
+                "description": "GOL PISTA OBANDO",
+                "lat": 4.5879998207092285,
+                "lon": -75.96849822998047,
+                "name": "G02"
+            }
+        }
+    ],
+    "version": 1
+}

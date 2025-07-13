@@ -1,0 +1,131 @@
+{
+    "earthModel": "WGS84",
+    "goal": {
+        "deadline": "22:00:00Z",
+        "type": "CYLINDER"
+    },
+    "sss": {
+        "direction": "EXIT",
+        "timeGates": [
+            "16:45:00Z"
+        ],
+        "type": "RACE"
+    },
+    "taskType": "CLASSIC",
+    "turnpoints": [
+        {
+            "radius": 400,
+            "type": "TAKEOFF",
+            "waypoint": {
+                "altSmoothed": 1702,
+                "description": "Take Off Los Tanques",
+                "lat": 4.476049900054932,
+                "lon": -76.15351867675781,
+                "name": "D01"
+            }
+        },
+        {
+            "radius": 35500,
+            "type": "SSS",
+            "waypoint": {
+                "altSmoothed": 599,
+                "description": "X07",
+                "lat": 4.644833087921143,
+                "lon": -76.36866760253906,
+                "name": "X07"
+            }
+        },
+        {
+            "radius": 100,
+            "waypoint": {
+                "altSmoothed": 933,
+                "description": "PUENTE LA PAILA",
+                "lat": 4.329166889190674,
+                "lon": -76.0653305053711,
+                "name": "P17"
+            }
+        },
+        {
+            "radius": 6000,
+            "waypoint": {
+                "altSmoothed": 933,
+                "description": "PUENTE LA PAILA",
+                "lat": 4.329166889190674,
+                "lon": -76.0653305053711,
+                "name": "P17"
+            }
+        },
+        {
+            "radius": 100,
+            "waypoint": {
+                "altSmoothed": 933,
+                "description": "PUENTE LA PAILA",
+                "lat": 4.329166889190674,
+                "lon": -76.0653305053711,
+                "name": "P17"
+            }
+        },
+        {
+            "radius": 2000,
+            "waypoint": {
+                "altSmoothed": 1188,
+                "description": "ANTENAS HIGERONCITO",
+                "lat": 4.506833076477051,
+                "lon": -76.09950256347656,
+                "name": "P02"
+            }
+        },
+        {
+            "radius": 100,
+            "waypoint": {
+                "altSmoothed": 907,
+                "description": "ZANJAS LA UNION",
+                "lat": 4.5329999923706055,
+                "lon": -76.0548324584961,
+                "name": "P32"
+            }
+        },
+        {
+            "radius": 8000,
+            "waypoint": {
+                "altSmoothed": 907,
+                "description": "ZANJAS LA UNION",
+                "lat": 4.5329999923706055,
+                "lon": -76.0548324584961,
+                "name": "P32"
+            }
+        },
+        {
+            "radius": 100,
+            "waypoint": {
+                "altSmoothed": 907,
+                "description": "ZANJAS LA UNION",
+                "lat": 4.5329999923706055,
+                "lon": -76.0548324584961,
+                "name": "P32"
+            }
+        },
+        {
+            "radius": 2000,
+            "type": "ESS",
+            "waypoint": {
+                "altSmoothed": 945,
+                "description": "GOL PISTA OBANDO",
+                "lat": 4.5879998207092285,
+                "lon": -75.96849822998047,
+                "name": "G02"
+            }
+        },
+        {
+            "radius": 200,
+            "waypoint": {
+                "altSmoothed": 945,
+                "description": "GOL PISTA OBANDO",
+                "lat": 4.5879998207092285,
+                "lon": -75.96849822998047,
+                "name": "G02"
+            }
+        }
+    ],
+    "version": 1
+}

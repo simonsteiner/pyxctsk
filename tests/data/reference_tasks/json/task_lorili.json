@@ -1,0 +1,65 @@
+{
+  "metadata": {
+    "file_name": "lorili",
+    "created": "2025-06-16 13:49:16 UTC",
+    "author": "Simon",
+    "start_type": "Race",
+    "sss_open": "16:45 (UTC)",
+    "goal_type": "CYLINDER",
+    "task_deadline": "22:00 (UTC)",
+    "earth_model": "WGS84 ellipsoid",
+    "task_distance_through_centers": "271.6km (through centers)",
+    "task_distance_optimized": "100.8km (optimized)",
+    "": "100.8km (optimized)",
+    "distance_through_centers_km": 271.6,
+    "distance_optimized_km": 100.8
+  },
+  "turnpoints": [
+    {
+      "#": 1,
+      "Name": "D01",
+      "Radius (m)": 400,
+      "Distance (km)": 0.0,
+      "Optimized (km)": 0.0,
+      "Type": "Takeoff"
+    },
+    {
+      "#": 2,
+      "Name": "G08",
+      "Radius (m)": 30000,
+      "Distance (km)": 38.4,
+      "Optimized (km)": 9.1,
+      "Type": "SSS"
+    },
+    {
+      "#": 3,
+      "Name": "G05",
+      "Radius (m)": 51500,
+      "Distance (km)": 163.1,
+      "Optimized (km)": 54.0
+    },
+    {
+      "#": 4,
+      "Name": "P10",
+      "Radius (m)": 5500,
+      "Distance (km)": 245.1,
+      "Optimized (km)": 79.9
+    },
+    {
+      "#": 5,
+      "Name": "G04",
+      "Radius (m)": 3000,
+      "Distance (km)": 271.6,
+      "Optimized (km)": 98.0,
+      "Type": "ESS"
+    },
+    {
+      "#": 6,
+      "Name": "G04",
+      "Radius (m)": 200,
+      "Distance (km)": 271.6,
+      "Optimized (km)": 100.8,
+      "Type": "Goal"
+    }
+  ]
+}

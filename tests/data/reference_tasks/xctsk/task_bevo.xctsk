@@ -1,0 +1,121 @@
+{
+    "earthModel": "WGS84",
+    "goal": {
+        "deadline": "22:00:00Z",
+        "type": "CYLINDER"
+    },
+    "sss": {
+        "direction": "EXIT",
+        "timeGates": [
+            "17:00:00Z"
+        ],
+        "type": "RACE"
+    },
+    "taskType": "CLASSIC",
+    "turnpoints": [
+        {
+            "radius": 400,
+            "type": "TAKEOFF",
+            "waypoint": {
+                "altSmoothed": 1860,
+                "description": "Take--Off--AGUAPANELA",
+                "lat": 4.403883457183838,
+                "lon": -76.21138000488281,
+                "name": "D02"
+            }
+        },
+        {
+            "radius": 5000,
+            "type": "SSS",
+            "waypoint": {
+                "altSmoothed": 930,
+                "description": "PUENTE ZARZAL - LA PAILA",
+                "lat": 4.359833240509033,
+                "lon": -76.07133483886719,
+                "name": "P31"
+            }
+        },
+        {
+            "radius": 4500,
+            "waypoint": {
+                "altSmoothed": 907,
+                "description": "ZANJAS LA UNION",
+                "lat": 4.5329999923706055,
+                "lon": -76.0548324584961,
+                "name": "P32"
+            }
+        },
+        {
+            "radius": 2000,
+            "waypoint": {
+                "altSmoothed": 1117,
+                "description": "ANTENAS ROLDANILLO",
+                "lat": 4.386333465576172,
+                "lon": -76.14266967773438,
+                "name": "P09"
+            }
+        },
+        {
+            "radius": 200,
+            "waypoint": {
+                "altSmoothed": 998,
+                "description": "GOL BUGALAGRANDE",
+                "lat": 4.199598789215088,
+                "lon": -76.16564178466797,
+                "name": "G04"
+            }
+        },
+        {
+            "radius": 7000,
+            "waypoint": {
+                "altSmoothed": 998,
+                "description": "GOL BUGALAGRANDE",
+                "lat": 4.199598789215088,
+                "lon": -76.16564178466797,
+                "name": "G04"
+            }
+        },
+        {
+            "radius": 200,
+            "waypoint": {
+                "altSmoothed": 998,
+                "description": "GOL BUGALAGRANDE",
+                "lat": 4.199598789215088,
+                "lon": -76.16564178466797,
+                "name": "G04"
+            }
+        },
+        {
+            "radius": 21000,
+            "waypoint": {
+                "altSmoothed": 2075,
+                "description": "X24",
+                "lat": 4.061500072479248,
+                "lon": -75.96766662597656,
+                "name": "X24"
+            }
+        },
+        {
+            "radius": 3000,
+            "type": "ESS",
+            "waypoint": {
+                "altSmoothed": 995,
+                "description": "GOL PISTA-LOS CHANCOS",
+                "lat": 4.012750148773193,
+                "lon": -76.2030258178711,
+                "name": "G11"
+            }
+        },
+        {
+            "radius": 200,
+            "waypoint": {
+                "altSmoothed": 995,
+                "description": "GOL PISTA-LOS CHANCOS",
+                "lat": 4.012750148773193,
+                "lon": -76.2030258178711,
+                "name": "G11"
+            }
+        }
+    ],
+    "version": 1
+}

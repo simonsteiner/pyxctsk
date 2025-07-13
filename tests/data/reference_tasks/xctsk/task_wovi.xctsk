@@ -1,0 +1,101 @@
+{
+    "earthModel": "WGS84",
+    "goal": {
+        "deadline": "22:00:00Z",
+        "type": "CYLINDER"
+    },
+    "sss": {
+        "direction": "EXIT",
+        "timeGates": [
+            "16:40:00Z"
+        ],
+        "type": "RACE"
+    },
+    "taskType": "CLASSIC",
+    "turnpoints": [
+        {
+            "radius": 1000,
+            "type": "TAKEOFF",
+            "waypoint": {
+                "altSmoothed": 1702,
+                "description": "Take Off Los Tanques",
+                "lat": 4.476049900054932,
+                "lon": -76.15351867675781,
+                "name": "D01"
+            }
+        },
+        {
+            "radius": 8000,
+            "type": "SSS",
+            "waypoint": {
+                "altSmoothed": 961,
+                "description": "ANTENAS ZARZAL",
+                "lat": 4.391166687011719,
+                "lon": -76.06416320800781,
+                "name": "P08"
+            }
+        },
+        {
+            "radius": 500,
+            "waypoint": {
+                "altSmoothed": 961,
+                "description": "ANTENAS ZARZAL",
+                "lat": 4.391166687011719,
+                "lon": -76.06416320800781,
+                "name": "P08"
+            }
+        },
+        {
+            "radius": 2000,
+            "waypoint": {
+                "altSmoothed": 936,
+                "description": "GUASANO",
+                "lat": 4.241000175476074,
+                "lon": -76.24266815185547,
+                "name": "P13"
+            }
+        },
+        {
+            "radius": 2000,
+            "waypoint": {
+                "altSmoothed": 988,
+                "description": "GOL BUGALAGRANDE",
+                "lat": 4.199598789215088,
+                "lon": -76.16564178466797,
+                "name": "G04"
+            }
+        },
+        {
+            "radius": 4000,
+            "waypoint": {
+                "altSmoothed": 1136,
+                "description": "CANTERA BOLIVAR",
+                "lat": 4.334333419799805,
+                "lon": -76.1961669921875,
+                "name": "P11"
+            }
+        },
+        {
+            "radius": 11000,
+            "type": "ESS",
+            "waypoint": {
+                "altSmoothed": 923,
+                "description": "B36-",
+                "lat": 4.696666717529297,
+                "lon": -75.92416381835938,
+                "name": "P16"
+            }
+        },
+        {
+            "radius": 200,
+            "waypoint": {
+                "altSmoothed": 945,
+                "description": "GOL PISTA OBANDO",
+                "lat": 4.5879998207092285,
+                "lon": -75.96849822998047,
+                "name": "G02"
+            }
+        }
+    ],
+    "version": 1
+}

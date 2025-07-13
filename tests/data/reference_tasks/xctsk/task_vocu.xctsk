@@ -1,0 +1,121 @@
+{
+    "earthModel": "WGS84",
+    "goal": {
+        "deadline": "17:00:00Z",
+        "type": "CYLINDER"
+    },
+    "sss": {
+        "direction": "EXIT",
+        "timeGates": [
+            "11:40:00Z"
+        ],
+        "type": "RACE"
+    },
+    "taskType": "CLASSIC",
+    "turnpoints": [
+        {
+            "radius": 400,
+            "type": "TAKEOFF",
+            "waypoint": {
+                "altSmoothed": 1149,
+                "description": "CUARNAN T OFF",
+                "lat": 46.273834228515625,
+                "lon": 13.175666809082031,
+                "name": "D01"
+            }
+        },
+        {
+            "radius": 4000,
+            "type": "SSS",
+            "waypoint": {
+                "altSmoothed": 199,
+                "description": "B05",
+                "lat": 46.282501220703125,
+                "lon": 13.111833572387695,
+                "name": "B05"
+            }
+        },
+        {
+            "radius": 12500,
+            "waypoint": {
+                "altSmoothed": 257,
+                "description": "B24",
+                "lat": 46.16666793823242,
+                "lon": 13.333333015441895,
+                "name": "B24"
+            }
+        },
+        {
+            "radius": 15500,
+            "waypoint": {
+                "altSmoothed": 1645,
+                "description": "N20",
+                "lat": 46.32899856567383,
+                "lon": 12.84333324432373,
+                "name": "N20"
+            }
+        },
+        {
+            "radius": 12000,
+            "waypoint": {
+                "altSmoothed": 257,
+                "description": "B24",
+                "lat": 46.16666793823242,
+                "lon": 13.333333015441895,
+                "name": "B24"
+            }
+        },
+        {
+            "radius": 4000,
+            "waypoint": {
+                "altSmoothed": 170,
+                "description": "B47",
+                "lat": 46.23550033569336,
+                "lon": 13.07349967956543,
+                "name": "B47"
+            }
+        },
+        {
+            "radius": 10000,
+            "waypoint": {
+                "altSmoothed": 1039,
+                "description": "N30",
+                "lat": 46.33333206176758,
+                "lon": 13.333333015441895,
+                "name": "N30"
+            }
+        },
+        {
+            "radius": 3000,
+            "waypoint": {
+                "altSmoothed": 170,
+                "description": "B47",
+                "lat": 46.23550033569336,
+                "lon": 13.07349967956543,
+                "name": "B47"
+            }
+        },
+        {
+            "radius": 1200,
+            "type": "ESS",
+            "waypoint": {
+                "altSmoothed": 225,
+                "description": "A30",
+                "lat": 46.306983947753906,
+                "lon": 13.112296104431152,
+                "name": "A30"
+            }
+        },
+        {
+            "radius": 200,
+            "waypoint": {
+                "altSmoothed": 225,
+                "description": "A30",
+                "lat": 46.306983947753906,
+                "lon": 13.112296104431152,
+                "name": "A30"
+            }
+        }
+    ],
+    "version": 1
+}

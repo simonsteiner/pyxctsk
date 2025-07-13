@@ -1,0 +1,100 @@
+{
+    "earthModel": "WGS84",
+    "goal": {
+        "deadline": "14:15:00Z",
+        "type": "CYLINDER"
+    },
+    "sss": {
+        "direction": "EXIT",
+        "timeGates": [
+            "09:30:00Z"
+        ],
+        "type": "ELAPSED-TIME"
+    },
+    "taskType": "CLASSIC",
+    "turnpoints": [
+        {
+            "radius": 250,
+            "type": "SSS",
+            "waypoint": {
+                "altSmoothed": 2200,
+                "description": "S03 FIESCHERALP",
+                "lat": 46.41502380371094,
+                "lon": 8.106322288513184,
+                "name": "S03 FIESCHERALP"
+            }
+        },
+        {
+            "radius": 2750,
+            "waypoint": {
+                "altSmoothed": 3401,
+                "description": "B17 WASENHORN",
+                "lat": 46.49791717529297,
+                "lon": 8.165949821472168,
+                "name": "B17"
+            }
+        },
+        {
+            "radius": 3750,
+            "waypoint": {
+                "altSmoothed": 2235,
+                "description": "B81 Münster",
+                "lat": 46.43593978881836,
+                "lon": 8.284469604492188,
+                "name": "B59"
+            }
+        },
+        {
+            "radius": 10000,
+            "waypoint": {
+                "altSmoothed": 2815,
+                "description": "B80 OCHSENALP",
+                "lat": 46.541866302490234,
+                "lon": 8.5198974609375,
+                "name": "B80"
+            }
+        },
+        {
+            "radius": 3000,
+            "waypoint": {
+                "altSmoothed": 2643,
+                "description": "B81 MÜSTER02",
+                "lat": 46.47356033325195,
+                "lon": 8.324119567871094,
+                "name": "B81 MÜSTER02"
+            }
+        },
+        {
+            "radius": 400,
+            "type": "ESS",
+            "waypoint": {
+                "altSmoothed": 2200,
+                "description": "S03 FIESCHERALP",
+                "lat": 46.41502380371094,
+                "lon": 8.106322288513184,
+                "name": "S03 FIESCHERALP"
+            }
+        },
+        {
+            "radius": 3500,
+            "waypoint": {
+                "altSmoothed": 3586,
+                "description": "WANNENHORN",
+                "lat": 46.49129867553711,
+                "lon": 8.106193542480469,
+                "name": "WANNENHORN"
+            }
+        },
+        {
+            "radius": 250,
+            "waypoint": {
+                "altSmoothed": 2313,
+                "description": "B16 BELLWALD TOP STATION",
+                "lat": 46.445472717285156,
+                "lon": 8.162304878234863,
+                "name": "B16"
+            }
+        }
+    ],
+    "version": 1
+}

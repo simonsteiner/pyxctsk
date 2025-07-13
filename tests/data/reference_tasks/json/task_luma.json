@@ -1,0 +1,78 @@
+{
+  "metadata": {
+    "file_name": "luma",
+    "created": "2025-06-16 13:49:33 UTC",
+    "author": "Simon",
+    "start_type": "Elapse time",
+    "sss_open": "09:30 (UTC)",
+    "goal_type": "CYLINDER",
+    "task_deadline": "14:15 (UTC)",
+    "earth_model": "WGS84 ellipsoid",
+    "task_distance_through_centers": "93.2km (through centers)",
+    "task_distance_optimized": "58.9km (optimized)",
+    "": "58.9km (optimized)",
+    "distance_through_centers_km": 93.2,
+    "distance_optimized_km": 58.9
+  },
+  "turnpoints": [
+    {
+      "#": 1,
+      "Name": "S03 FIESCHERALP",
+      "Radius (m)": 250,
+      "Distance (km)": 0.0,
+      "Optimized (km)": 0.0,
+      "Type": "SSS"
+    },
+    {
+      "#": 2,
+      "Name": "B17",
+      "Radius (m)": 2750,
+      "Distance (km)": 10.3,
+      "Optimized (km)": 8.5
+    },
+    {
+      "#": 3,
+      "Name": "B59",
+      "Radius (m)": 3750,
+      "Distance (km)": 21.7,
+      "Optimized (km)": 16.0
+    },
+    {
+      "#": 4,
+      "Name": "B80",
+      "Radius (m)": 10000,
+      "Distance (km)": 43.3,
+      "Optimized (km)": 26.3
+    },
+    {
+      "#": 5,
+      "Name": "B81 M\u00dcSTER02",
+      "Radius (m)": 3000,
+      "Distance (km)": 60.1,
+      "Optimized (km)": 30.2
+    },
+    {
+      "#": 6,
+      "Name": "S03 FIESCHERALP",
+      "Radius (m)": 400,
+      "Distance (km)": 78.1,
+      "Optimized (km)": 50.6,
+      "Type": "ESS"
+    },
+    {
+      "#": 7,
+      "Name": "WANNENHORN",
+      "Radius (m)": 3500,
+      "Distance (km)": 86.6,
+      "Optimized (km)": 55.7
+    },
+    {
+      "#": 8,
+      "Name": "B16",
+      "Radius (m)": 250,
+      "Distance (km)": 93.2,
+      "Optimized (km)": 58.9,
+      "Type": "Goal"
+    }
+  ]
+}

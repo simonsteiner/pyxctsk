@@ -1,0 +1,100 @@
+{
+  "metadata": {
+    "file_name": "quno",
+    "created": "2025-06-16 13:49:30 UTC",
+    "author": "Simon",
+    "start_type": "Race",
+    "sss_open": "12:20 (UTC)",
+    "goal_type": "LINE",
+    "task_deadline": "16:00 (UTC)",
+    "earth_model": "WGS84 ellipsoid",
+    "task_distance_through_centers": "80.0km (through centers)",
+    "task_distance_optimized": "49.9km (optimized)",
+    "": "49.9km (optimized)",
+    "distance_through_centers_km": 80.0,
+    "distance_optimized_km": 49.9
+  },
+  "turnpoints": [
+    {
+      "#": 1,
+      "Name": "D05",
+      "Radius (m)": 0,
+      "Distance (km)": 0.0,
+      "Optimized (km)": 0.0,
+      "Type": "Takeoff"
+    },
+    {
+      "#": 2,
+      "Name": "A01",
+      "Radius (m)": 3000,
+      "Distance (km)": 3.4,
+      "Optimized (km)": 0.4,
+      "Type": "SSS"
+    },
+    {
+      "#": 3,
+      "Name": "A01",
+      "Radius (m)": 1000,
+      "Distance (km)": 3.4,
+      "Optimized (km)": 2.5
+    },
+    {
+      "#": 4,
+      "Name": "P66",
+      "Radius (m)": 400,
+      "Distance (km)": 9.9,
+      "Optimized (km)": 7.7
+    },
+    {
+      "#": 5,
+      "Name": "P73",
+      "Radius (m)": 1000,
+      "Distance (km)": 20.3,
+      "Optimized (km)": 16.8
+    },
+    {
+      "#": 6,
+      "Name": "D01",
+      "Radius (m)": 800,
+      "Distance (km)": 27.0,
+      "Optimized (km)": 21.7
+    },
+    {
+      "#": 7,
+      "Name": "Z03",
+      "Radius (m)": 1000,
+      "Distance (km)": 37.5,
+      "Optimized (km)": 30.5
+    },
+    {
+      "#": 8,
+      "Name": "P11",
+      "Radius (m)": 8000,
+      "Distance (km)": 56.5,
+      "Optimized (km)": 40.5
+    },
+    {
+      "#": 9,
+      "Name": "P12",
+      "Radius (m)": 3000,
+      "Distance (km)": 73.4,
+      "Optimized (km)": 46.3
+    },
+    {
+      "#": 10,
+      "Name": "A01",
+      "Radius (m)": 1500,
+      "Distance (km)": 80.0,
+      "Optimized (km)": 48.4,
+      "Type": "ESS"
+    },
+    {
+      "#": 11,
+      "Name": "A01",
+      "Radius (m)": 100,
+      "Distance (km)": 80.0,
+      "Optimized (km)": 49.9,
+      "Type": "Goal Line 200m"
+    }
+  ]
+}

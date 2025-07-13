@@ -1,0 +1,114 @@
+{
+  "metadata": {
+    "file_name": "fobe",
+    "created": "2025-06-16 13:49:31 UTC",
+    "author": "Simon",
+    "start_type": "Race",
+    "sss_open": "12:20 (UTC)",
+    "goal_type": "LINE",
+    "task_deadline": "15:00 (UTC)",
+    "earth_model": "WGS84 ellipsoid",
+    "task_distance_through_centers": "218.2km (through centers)",
+    "task_distance_optimized": "47.4km (optimized)",
+    "": "47.4km (optimized)",
+    "distance_through_centers_km": 218.2,
+    "distance_optimized_km": 47.4
+  },
+  "turnpoints": [
+    {
+      "#": 1,
+      "Name": "D01",
+      "Radius (m)": 400,
+      "Distance (km)": 0.0,
+      "Optimized (km)": 0.0,
+      "Type": "Takeoff"
+    },
+    {
+      "#": 2,
+      "Name": "D01",
+      "Radius (m)": 2000,
+      "Distance (km)": 0.0,
+      "Optimized (km)": 2.0,
+      "Type": "SSS"
+    },
+    {
+      "#": 3,
+      "Name": "B23",
+      "Radius (m)": 10000,
+      "Distance (km)": 13.2,
+      "Optimized (km)": 4.0
+    },
+    {
+      "#": 4,
+      "Name": "B47",
+      "Radius (m)": 5000,
+      "Distance (km)": 28.8,
+      "Optimized (km)": 6.6
+    },
+    {
+      "#": 5,
+      "Name": "B34",
+      "Radius (m)": 14700,
+      "Distance (km)": 52.8,
+      "Optimized (km)": 11.0
+    },
+    {
+      "#": 6,
+      "Name": "B01",
+      "Radius (m)": 13000,
+      "Distance (km)": 84.4,
+      "Optimized (km)": 15.2
+    },
+    {
+      "#": 7,
+      "Name": "B34",
+      "Radius (m)": 14500,
+      "Distance (km)": 116.0,
+      "Optimized (km)": 19.5
+    },
+    {
+      "#": 8,
+      "Name": "B47",
+      "Radius (m)": 5000,
+      "Distance (km)": 140.0,
+      "Optimized (km)": 24.0
+    },
+    {
+      "#": 9,
+      "Name": "B34",
+      "Radius (m)": 14600,
+      "Distance (km)": 164.0,
+      "Optimized (km)": 28.3
+    },
+    {
+      "#": 10,
+      "Name": "B20",
+      "Radius (m)": 11000,
+      "Distance (km)": 195.7,
+      "Optimized (km)": 36.0
+    },
+    {
+      "#": 11,
+      "Name": "D02",
+      "Radius (m)": 5500,
+      "Distance (km)": 215.5,
+      "Optimized (km)": 40.4,
+      "Type": "ESS"
+    },
+    {
+      "#": 12,
+      "Name": "D02",
+      "Radius (m)": 600,
+      "Distance (km)": 215.5,
+      "Optimized (km)": 45.3
+    },
+    {
+      "#": 13,
+      "Name": "A30",
+      "Radius (m)": 100,
+      "Distance (km)": 218.2,
+      "Optimized (km)": 47.4,
+      "Type": "Goal Line 200m"
+    }
+  ]
+}
