@@ -40,47 +40,39 @@ source .venv/bin/activate
 # in subfolder use this command
 source /home/simon/git/pyxctsk/.venv/bin/activate
 
-# Install core library in development mode with dev dependencies
-pip install -e ".[dev]"
-```
-
-#### Development Workflow
-
-Once your virtual environment is set up:
-
-```bash
-# Format code before committing
-black src/ tests/
-isort src/ tests/
-
-# Run linting
-flake8 src/ tests/
-
-# Run type checking
-mypy src/
+# Test that pyxctsk is properly installed
+pyxctsk --help
 
 # Run tests
 pytest
 
-# Deactivate when done
+# Install core library in development mode with dev dependencies
+pip install -e ".[dev]"
+
+# Deactivate .venv when done
 deactivate
 ```
 
-#### Verification
+#### Code Quality & Formatting
 
-```bash
-# Test that pyxctsk is properly installed
-pyxctsk --help
+To keep the codebase clean and consistent, use the following tools on the code. You can run them manually, or automatically before each commit using pre-commit hooks:
 
-# Run tests to ensure everything works
-pytest
+##### Pre-commit Hook Setup
 
-# Check code quality tools are available
-black --version
-isort --version
-flake8 --version
-mypy --version
-```
+1. Install pre-commit (once per machine): `.venv/bin/pip install pre-commit`
+2. Install the hooks (once per clone): `.venv/bin/pre-commit install`
+3. Now, every commit will automatically run:
+
+   ```bash
+   flake8 src/ tests/ --extend-ignore E501
+   mypy src/ tests/
+   isort src/ tests/
+   black src/ tests/
+   ```
+
+You can also run all hooks manually: `.venv/bin/pre-commit run --all-files`
+
+If you need to skip hooks for a commit, use `git commit --no-verify`.
 
 ## Quick Start
 
