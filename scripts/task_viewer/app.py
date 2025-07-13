@@ -8,17 +8,17 @@ import json
 import os
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from flask import Flask, abort, jsonify, render_template
 
 # Add the xctrack module to the path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-# Initialize function variables
-parse_task = None
-calculate_task_distances = None
-generate_task_geojson = None
+# Initialize function variables with proper typing
+parse_task: Optional[Callable[[Union[bytes, str]], Any]] = None
+calculate_task_distances: Optional[Callable[..., Dict[str, Any]]] = None
+generate_task_geojson: Optional[Callable[[Any], Dict[Any, Any]]] = None
 
 try:
     from pyxctsk import calculate_task_distances, generate_task_geojson, parse_task
@@ -40,9 +40,9 @@ if airscore_clone_path.exists():
 else:
     print(f"Warning: AirScore clone directory not found at {airscore_clone_path}")
 
-# Initialize AirScore function variables
-calculate_airscore_distances = None
-generate_airscore_geojson = None
+# Initialize AirScore function variables with proper typing
+calculate_airscore_distances: Optional[Callable[[Any], Dict[str, Any]]] = None
+generate_airscore_geojson: Optional[Callable[[Any, Dict[Any, Any]], Dict[Any, Any]]] = None
 
 # Import AirScore utilities
 try:
@@ -386,7 +386,7 @@ def get_available_tasks() -> List[str]:
     return sorted(tasks)
 
 
-def load_task_data(task_name: str) -> Tuple[Optional[Dict], Optional[Dict]]:
+def load_task_data(task_name: str) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
     """Load task data from JSON and GeoJSON files."""
     json_path = JSON_DIR / f"{task_name}.json"
     geojson_path = GEOJSON_DIR / f"{task_name}.geojson"
@@ -413,9 +413,9 @@ def load_task_data(task_name: str) -> Tuple[Optional[Dict], Optional[Dict]]:
     return json_data, geojson_data
 
 
-def prepare_comparison_data(original_data: Dict, xctrack_results: Dict, task) -> Dict:
+def prepare_comparison_data(original_data: Dict[str, Any], xctrack_results: Dict[str, Any], task: Any) -> Dict[str, Any]:
     """Prepare comparison data between original and xctrack calculations."""
-    comparison = {
+    comparison: Dict[str, Any] = {
         "summary": {
             "original_center_km": original_data["metadata"].get(
                 "distance_through_centers_km", 0
