@@ -1,7 +1,6 @@
 """Tests for XCTrack task functionality."""
 
 import pytest
-
 from pyxctsk import (
     SSS,
     Direction,

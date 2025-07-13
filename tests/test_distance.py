@@ -10,7 +10,6 @@ For more comprehensive testing, see:
 import os
 
 import pytest
-
 from pyxctsk import parse_task
 from pyxctsk.distance import calculate_task_distances
 

@@ -7,7 +7,6 @@ separately when doing comprehensive testing or before releases.
 import os
 
 import pytest
-
 from pyxctsk import parse_task
 from pyxctsk.distance import calculate_task_distances
 

@@ -1,7 +1,6 @@
 """Fast basic tests for distance calculation module."""
 
 import pytest
-
 from pyxctsk.distance import (
     TaskTurnpoint,
     calculate_cumulative_distances,

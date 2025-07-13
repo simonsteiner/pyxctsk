@@ -5,7 +5,6 @@ import tempfile
 from io import BytesIO
 
 import pytest
-
 from pyxctsk import Task, TaskType, Turnpoint, Waypoint, parse_task
 from pyxctsk.qrcode_task import QRCodeTask
 from pyxctsk.utils import generate_qr_code

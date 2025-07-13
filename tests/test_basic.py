@@ -1,7 +1,6 @@
 """Basic tests for XCTrack task functionality without QR code dependencies."""
 
 import pytest
-
 from pyxctsk import (
     SSS,
     Direction,

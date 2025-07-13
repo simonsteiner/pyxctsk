@@ -2,7 +2,6 @@
 
 import pytest
 from geopy.distance import geodesic
-
 from pyxctsk.distance import (
     TaskTurnpoint,
     _compute_optimal_route_dp,

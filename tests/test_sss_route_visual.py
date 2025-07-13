@@ -9,7 +9,6 @@ import os
 
 import pytest
 from geopy.distance import geodesic
-
 from pyxctsk import parse_task
 from pyxctsk.distance import (
     _task_to_turnpoints,
