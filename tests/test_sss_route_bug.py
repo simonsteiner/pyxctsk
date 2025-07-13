@@ -22,7 +22,7 @@ class TestSSSRouteBug:
     @pytest.fixture
     def test_data_dir(self):
         """Return the path to test data directory."""
-        return os.path.join(os.path.dirname(__file__))
+        return os.path.join(os.path.dirname(__file__), "data")
 
     @pytest.fixture
     def sss_task(self, test_data_dir):

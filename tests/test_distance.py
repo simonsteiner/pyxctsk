@@ -20,7 +20,7 @@ class TestEssentialDistance:
     @pytest.fixture
     def test_data_dir(self):
         """Return the path to test data directory."""
-        return os.path.join(os.path.dirname(__file__))
+        return os.path.join(os.path.dirname(__file__), "data")
 
     def test_single_task_smoke_test(self, test_data_dir):
         """Quick smoke test to ensure basic distance calculation works."""

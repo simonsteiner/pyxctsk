@@ -22,17 +22,17 @@
         <strong>Purpose:</strong> Compare center route (red) vs optimized route (blue) for SSS tasks.<br>
         <strong>Expected:</strong> Optimized route should go to turnpoint perimeters, not centers.
     </div>
-    
+
     <div id="map"></div>
-    
+
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <script>
-        var map = L.map('map').setView([46.6444635109621, 7.206959667580149], 10);
-        
+        var map = L.map('map').setView([46.63810709099426, 7.2140247427894915], 10);
+
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap contributors'
         }).addTo(map);
-        
+
         // Add legend
         var legend = L.control({position: 'topright'});
         legend.onAdd = function (map) {
@@ -60,14 +60,14 @@
         };
         legend.addTo(map);
 
-        // Turnpoint 0: B21156
-        L.marker([46.63274444444445, 7.202591666666667]).addTo(map)
-            .bindPopup('<b>B21156</b><br>Type: TAKEOFF<br>Radius: 400m');
-        L.circle([46.63274444444445, 7.202591666666667], {
+        // Turnpoint 0: S06161
+        L.marker([46.6252, 7.206111111111111]).addTo(map)
+            .bindPopup('<b>S06161</b><br>Type: TAKEOFF<br>Radius: 1000m');
+        L.circle([46.6252, 7.206111111111111], {
             color: 'blue',
             fillColor: 'blue',
             fillOpacity: 0.1,
-            radius: 400
+            radius: 1000
         }).addTo(map);
 
         // Turnpoint 1: B43585
@@ -82,45 +82,55 @@
 
         // Turnpoint 2: B43585
         L.marker([46.78876388888889, 7.541408333333333]).addTo(map)
-            .bindPopup('<b>B43585</b><br>Type: TP<br>Radius: 12000m');
+            .bindPopup('<b>B43585</b><br>Type: TP<br>Radius: 15000m');
         L.circle([46.78876388888889, 7.541408333333333], {
             color: 'blue',
             fillColor: 'blue',
             fillOpacity: 0.1,
-            radius: 12000
+            radius: 15000
         }).addTo(map);
 
-        // Turnpoint 3: B03136
-        L.marker([46.48272777777778, 6.910166666666667]).addTo(map)
-            .bindPopup('<b>B03136</b><br>Type: TP<br>Radius: 6000m');
-        L.circle([46.48272777777778, 6.910166666666667], {
-            color: 'blue',
-            fillColor: 'blue',
-            fillOpacity: 0.1,
-            radius: 6000
-        }).addTo(map);
-
-        // Turnpoint 4: B22192
-        L.marker([46.639516666666665, 7.241594444444445]).addTo(map)
-            .bindPopup('<b>B22192</b><br>Type: TP<br>Radius: 1000m');
-        L.circle([46.639516666666665, 7.241594444444445], {
+        // Turnpoint 3: B25172
+        L.marker([46.67599166666666, 7.183988888888889]).addTo(map)
+            .bindPopup('<b>B25172</b><br>Type: TP<br>Radius: 1000m');
+        L.circle([46.67599166666666, 7.183988888888889], {
             color: 'blue',
             fillColor: 'blue',
             fillOpacity: 0.1,
             radius: 1000
         }).addTo(map);
 
-        // Turnpoint 5: B54119
-        L.marker([46.683505555555556, 7.040483333333333]).addTo(map)
-            .bindPopup('<b>B54119</b><br>Type: ESS<br>Radius: 11000m');
-        L.circle([46.683505555555556, 7.040483333333333], {
+        // Turnpoint 4: B05188
+        L.marker([46.50528055555556, 7.094433333333333]).addTo(map)
+            .bindPopup('<b>B05188</b><br>Type: TP<br>Radius: 600m');
+        L.circle([46.50528055555556, 7.094433333333333], {
             color: 'blue',
             fillColor: 'blue',
             fillOpacity: 0.1,
-            radius: 11000
+            radius: 600
         }).addTo(map);
 
-        // Turnpoint 6: L02087
+        // Turnpoint 5: B21156
+        L.marker([46.63274444444445, 7.202591666666667]).addTo(map)
+            .bindPopup('<b>B21156</b><br>Type: TP<br>Radius: 400m');
+        L.circle([46.63274444444445, 7.202591666666667], {
+            color: 'blue',
+            fillColor: 'blue',
+            fillOpacity: 0.1,
+            radius: 400
+        }).addTo(map);
+
+        // Turnpoint 6: B17141
+        L.marker([46.579972222222224, 6.9731861111111115]).addTo(map)
+            .bindPopup('<b>B17141</b><br>Type: ESS<br>Radius: 15000m');
+        L.circle([46.579972222222224, 6.9731861111111115], {
+            color: 'blue',
+            fillColor: 'blue',
+            fillOpacity: 0.1,
+            radius: 15000
+        }).addTo(map);
+
+        // Turnpoint 7: L02087
         L.marker([46.61811388888889, 7.169480555555555]).addTo(map)
             .bindPopup('<b>L02087</b><br>Type: TP<br>Radius: 100m');
         L.circle([46.61811388888889, 7.169480555555555], {
@@ -131,14 +141,14 @@
         }).addTo(map);
 
         // Center route
-        var centerRoute = L.polyline([[46.63274444444445, 7.202591666666667], [46.78876388888889, 7.541408333333333], [46.48272777777778, 6.910166666666667], [46.639516666666665, 7.241594444444445], [46.683505555555556, 7.040483333333333], [46.61811388888889, 7.169480555555555]], {
+        var centerRoute = L.polyline([[46.6252, 7.206111111111111], [46.78876388888889, 7.541408333333333], [46.67599166666666, 7.183988888888889], [46.50528055555556, 7.094433333333333], [46.63274444444445, 7.202591666666667], [46.579972222222224, 6.9731861111111115], [46.61811388888889, 7.169480555555555]], {
             color: 'red',
             weight: 3,
             opacity: 0.8
         }).addTo(map);
 
         // Optimized route
-        var optimizedRoute = L.polyline([[46.63274444444445, 7.202591666666667], [46.648547101035234, 7.237170994769567], [46.72797079649334, 7.411614275507345], [46.51387869563542, 6.973996840479124], [46.636367144873276, 7.229360813920015], [46.63129382446494, 7.162563739832335], [46.61895987896197, 7.169036687094594]], {
+        var optimizedRoute = L.polyline([[46.6252, 7.206111111111111], [46.64494588190653, 7.240755921560286], [46.71984328878993, 7.3726249194726865], [46.66961874160619, 7.193212321246183], [46.5101236797307, 7.097884431382757], [46.63028751853404, 7.198775374917533], [46.61752528586911, 7.161214754717158], [46.61802147420923, 7.168181916417274]], {
             color: 'blue',
             weight: 3,
             opacity: 0.8
@@ -146,12 +156,12 @@
 
         // Add distance comparison popup
         var comparisonInfo = L.popup()
-            .setLatLng([46.6444635109621, 7.206959667580149])
+            .setLatLng([46.63810709099426, 7.2140247427894915])
             .setContent(`
                 <h4>Route Comparison</h4>
-                <b>Center Route:</b> 149.51 km<br>
-                <b>Optimized Route:</b> 90.74 km<br>
-                <b>Savings:</b> 58.78 km (39.3%)
+                <b>Center Route:</b> 132.24 km<br>
+                <b>Optimized Route:</b> 69.69 km<br>
+                <b>Savings:</b> 62.55 km (47.3%)
             `);
 
     </script>

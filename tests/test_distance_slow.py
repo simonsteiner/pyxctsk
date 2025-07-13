@@ -17,7 +17,7 @@ class TestDistanceAlgorithmThorough:
     @pytest.fixture
     def test_data_dir(self):
         """Return the path to test data directory."""
-        return os.path.join(os.path.dirname(__file__))
+        return os.path.join(os.path.dirname(__file__), "data")
 
     @pytest.mark.slow
     def test_optimization_effectiveness_all_tasks(self, test_data_dir):
