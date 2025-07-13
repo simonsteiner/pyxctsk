@@ -1,22 +1,64 @@
-# pyxctsk - Python implementation of XCTrack's task format
+# pyxctsk
 
-A comprehensive Python ecosystem for parsing, analyzing, and visualizing XCTrack task files and formats.
+A Python implementation of XCTrack's task format for paragliding and hang gliding competitions. This library enables parsing, manipulation, and visualization of XCTrack task files used to define competition routes.
 
-This repository contains the core module:
+`pyxctsk` provides a comprehensive toolkit for working with the XCTrack task specification, including reading/writing task files, generating QR codes for task sharing, and performing distance calculations on competition routes.
 
-- **`pyxctsk`** - Core library for parsing and manipulating XCTrack task files
+The library implements the full XCTrack Competition Interfaces specification, ensuring compatibility with the XCTrack mobile app and other tools in the paragliding competition ecosystem.
 
-## Modules Overview
+## Technical Highlights
 
-### pyxctsk Core (`src/pyxctsk/`)
+- **Immutable Data Model**: Core domain objects use Python's dataclasses with strict validation to ensure task integrity ([task.py](./src/pyxctsk/task.py))
+- **Advanced Distance Calculation**: Implements sophisticated route optimization algorithms to accurately calculate task distances with iterative refinement to avoid look-ahead bias ([distance.py](./src/pyxctsk/distance.py), [route_optimization.py](./src/pyxctsk/route_optimization.py))
+- **Efficient QR Code Representation**: Implements XCTrack's compact QR code format with polyline compression for efficient task sharing via small QR codes that work well in direct sunlight ([qrcode_task.py](./src/pyxctsk/qrcode_task.py))
+- **Flexible Parsing Pipeline**: Single entry point that intelligently detects and parses multiple input formats (JSON, URL, QR code image) ([parser.py](./src/pyxctsk/parser.py))
+- **Type Safety**: Comprehensive type hints throughout the codebase with strict mypy enforcement
 
-The core Python library providing:
+## Dependencies and Libraries
 
-- Reading and writing `.xctsk` task files (JSON format)
-- Generating and parsing `XCTSK:` URLs for task sharing
-- Creating and decoding QR codes containing task data
-- Converting tasks to KML format for visualization
-- Command-line interface for format conversion
+### Core
+
+- **click**: Command-line interface framework for the CLI tools
+- **geopy**: Geographic calculations for distance and point manipulation
+- **polyline**: Polyline encoding/decoding for compact coordinate representation
+- **pyproj**: Projection calculations for accurate distance measurements
+- **scipy**: Scientific computing library used for route optimization algorithms
+
+### Optional
+
+- **Pillow**: Image processing for QR code generation and parsing
+- **qrcode**: QR code generation
+- **pyzbar**: QR code parsing from images
+
+### Development
+
+- **pytest**: Testing framework
+- **black**, **flake8**, **isort**, **mypy**: Code quality and formatting tools
+
+## Project Structure
+
+```text
+.
+├── src/
+│   └── pyxctsk/           # Core package implementation
+│       ├── __init__.py    # Package exports
+│       ├── task.py        # Core data models
+│       ├── parser.py      # Input format parser
+│       ├── distance.py    # Distance calculation interface
+│       ├── qrcode_task.py # QR code format implementation
+│       └── ...
+├── tests/                 # Test suite
+│   ├── test_basic.py
+│   ├── test_distance.py
+│   └── ...
+├── scripts/               # Utility scripts
+├── pyproject.toml         # Project configuration
+└── README.md
+```
+
+- `src/pyxctsk/`: Core library implementation with immutable data models and parsing logic
+- `tests/`: Comprehensive test suite with basic tests and specialized distance calculation tests
+- `scripts/`: Utility scripts for automation and testing
 
 ## Installation
 
@@ -28,8 +70,6 @@ pip install pyxctsk
 
 ### Development Installation
 
-#### Setting up Virtual Environment
-
 ```bash
 git clone https://github.com/simonsteiner/pyxctsk.git
 cd pyxctsk
@@ -37,80 +77,41 @@ cd pyxctsk
 # Create and activate virtual environment
 python3 -m venv .venv
 source .venv/bin/activate
-# in subfolder use this command
-source /home/simon/git/pyxctsk/.venv/bin/activate
-
-# Test that pyxctsk is properly installed
-pyxctsk --help
-
-# Run tests
-pytest
 
 # Install core library in development mode with dev dependencies
 pip install -e ".[dev]"
 
-# Deactivate .venv when done
-deactivate
+# Run tests
+.venv/bin/python -m pytest
 ```
 
-#### Code Quality & Formatting
+### Code Quality & Formatting
 
-To keep the codebase clean and consistent, use the following tools on the code. You can run them manually, or automatically before each commit using pre-commit hooks:
-
-##### Pre-commit Hook Setup
-
-1. Install pre-commit (once per machine): `.venv/bin/pip install pre-commit`
-2. Install the hooks (once per clone): `.venv/bin/pre-commit install`
-3. Now, every commit will automatically run:
-
-   ```bash
-   flake8 src/ tests/ --extend-ignore E501
-   mypy src/ tests/
-   isort src/ tests/
-   black src/ tests/
-   ```
-
-You can also run all hooks manually: `.venv/bin/pre-commit run --all-files`
-
-If you need to skip hooks for a commit, use `git commit --no-verify`.
-
-## Quick Start
-
-### Core Library Usage
-
-```python
-from pyxctsk import parse_task
-
-# From file
-task = parse_task('my_task.xctsk')
-
-# From XCTSK: URL
-task = parse_task('XCTSK:{"version":1,"taskType":"CLASSIC",...}')
-
-# From QR code image (requires pyzbar and PIL)
-task = parse_task('qr_code.png')
-
-print(f"Task type: {task.task_type}")
-print(f"Number of turnpoints: {len(task.turnpoints)}")
-```
-
-### Command Line Tools
-
-Core XCTrack CLI:
+The project uses pre-commit hooks to maintain code quality:
 
 ```bash
-# Convert task file to JSON
-pyxctsk convert task.xctsk --format json
+# Install pre-commit hooks
+.venv/bin/pre-commit install
 
-# Generate QR code
-pyxctsk convert task.xctsk --format png --output qr.png
+# Run hooks manually
+.venv/bin/pre-commit run --all-files
 ```
 
-### Creating a task
+## Usage Examples
 
 ```python
-from pyxctsk import Task, TaskType, Turnpoint, Waypoint
+from pyxctsk import parse_task, Task, TaskType, Turnpoint, Waypoint
 
+# Parse from file, URL, or QR code
+task = parse_task('task.xctsk')              # From .xctsk file
+task = parse_task('XCTSK:{...}')             # From XCTrack URL
+task = parse_task('qr_code.png')             # From QR code image
+
+# Access task data
+print(f"Task type: {task.task_type}")
+print(f"Number of turnpoints: {len(task.turnpoints)}")
+
+# Create a new task
 task = Task(
     task_type=TaskType.CLASSIC,
     version=1,
@@ -118,10 +119,7 @@ task = Task(
         Turnpoint(
             radius=1000,
             waypoint=Waypoint(
-                name="TP01",
-                lat=46.5,
-                lon=8.0,
-                alt_smoothed=1000
+                name="TP01", lat=46.5, lon=8.0, alt_smoothed=1000
             )
         )
     ]
@@ -130,86 +128,42 @@ task = Task(
 # Save as JSON
 with open('task.xctsk', 'w') as f:
     f.write(task.to_json())
-```
 
-### QR Code Generation
-
-```python
+# Generate QR code
 from pyxctsk.utils import generate_qr_code
 
-# Convert task to QR code format and generate image
 qr_task = task.to_qr_code_task()
-qr_string = qr_task.to_string()
-qr_image = generate_qr_code(qr_string)
+qr_image = generate_qr_code(qr_task.to_string())
 qr_image.save('task_qr.png')
-```
-
-### KML Export
-
-```python
-from pyxctsk.utils import task_to_kml
-
-kml_content = task_to_kml(task)
-with open('task.kml', 'w') as f:
-    f.write(kml_content)
 ```
 
 ## Command Line Interface
 
-The package includes a command-line tool for format conversion:
-
 ```bash
 # Convert task to different formats
-python -m pyxctsk task.xctsk --format json        # JSON output
-python -m pyxctsk task.xctsk --format kml         # KML output  
-python -m pyxctsk task.xctsk --format qrcode-json # XCTSK: URL
-python -m pyxctsk task.xctsk --format png -o qr.png # QR code image
+pyxctsk convert task.xctsk --format json        # JSON output
+pyxctsk convert task.xctsk --format kml         # KML output
+pyxctsk convert task.xctsk --format qrcode-json # XCTSK: URL
+pyxctsk convert task.xctsk --format png -o qr.png # QR code image
 
 # Parse from different inputs
-python -m pyxctsk qr_code.png --format json       # From QR image
-cat task.xctsk | python -m pyxctsk --format kml   # From stdin
+pyxctsk convert qr_code.png --format json       # From QR image
+cat task.xctsk | pyxctsk convert --format kml   # From stdin
 ```
 
 ## Requirements
 
 - Python 3.8+
-- Click (for CLI)
-- Optional QR code support:
-  - Pillow (PIL) for image generation
-  - qrcode for QR code generation  
-  - pyzbar for QR code reading from images
-
-## Data Structures
-
-The library provides comprehensive data classes for XCTrack task components:
-
-- `Task`: Main task container
-- `Turnpoint`: Individual waypoints with radius and type information
-- `Waypoint`: Geographic coordinates and metadata
-- `SSS`: Start of speed section configuration
-- `Goal`: Goal/finish line configuration  
-- `Takeoff`: Takeoff location
-- `TimeOfDay`: Time representation with validation
-
-All classes support JSON serialization/deserialization and maintain compatibility with the XCTrack file format.
+- Optional dependencies can be installed with extras:
+  - `pip install pyxctsk[dev]` for development tools
+  - `pip install pyxctsk[web]` for web interface components
+  - `pip install pyxctsk[analysis]` for analysis tools
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
 
-## AI-Assisted Migration
-
-This Python implementation was migrated from the original Go codebase with the assistance of GitHub Copilot. The migration process involved:
-
-- **AI Model**: Claude 4 Sonnet (via GitHub Copilot Chat)
-- **Migration Approach**: Automated code analysis and conversion with human oversight
-- **Process**: Complete rewrite maintaining API compatibility and feature parity
-- **Validation**: Comprehensive testing against XCTrack Competition Interfaces specification
-- **Quality Assurance**: Manual verification of all core functionality and edge cases
-
-The AI assistant analyzed the Go source code structure, understood the XCTrack protocol specifications, and generated equivalent Python implementations while ensuring compatibility with the original format and adding modern Python idioms and type hints.
-
-## Original Go Implementation
+## Original Implementation
 
 This Python library is based on the Go implementation by Tom Payne:
 <https://github.com/twpayne/go-xctrack>
