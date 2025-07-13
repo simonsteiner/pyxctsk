@@ -3,8 +3,7 @@
 from typing import Any, Dict, List, Optional, Tuple
 
 from .optimization_config import get_optimization_config
-from .route_optimization import calculate_iteratively_refined_route
-from .task import Task, TurnpointType
+from .task import Task
 from .turnpoint import TaskTurnpoint, distance_through_centers
 
 
@@ -21,19 +20,8 @@ def _task_to_turnpoints(task: Task) -> List[TaskTurnpoint]:
     goal_type = None
     goal_line_length = None  # No default goal line length
 
-    # Find ESS turnpoint (if any)
-    ess_tp = None
-    ess_tp_index = -1
-    for i, tp in enumerate(task.turnpoints):
-        if tp.type == TurnpointType.ESS:
-            ess_tp = tp
-            ess_tp_index = i
-            break
-
     # Process goal if there are turnpoints
     if task.turnpoints:
-        # Check if ESS is at the goal (last turnpoint)
-        is_ess_goal = ess_tp_index == len(task.turnpoints) - 1
 
         # Goal can be explicitly defined or implicitly defined by the last turnpoint
         if task.goal:

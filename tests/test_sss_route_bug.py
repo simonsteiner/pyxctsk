@@ -11,9 +11,9 @@ import pytest
 from geopy.distance import geodesic
 from pyxctsk import parse_task
 from pyxctsk.distance import (
-    _task_to_turnpoints,
     optimized_route_coordinates,
 )
+from pyxctsk.task_distances import _task_to_turnpoints
 
 
 class TestSSSRouteBug:
@@ -79,7 +79,6 @@ class TestSSSRouteBug:
 
         # Get center route coordinates (takeoff -> TP centers)
         takeoff_center = turnpoints[0].center
-        sss_center = turnpoints[1].center  # SSS center
         first_tp_after_sss_center = turnpoints[2].center  # First TP after SSS center
 
         # Calculate center route first leg distance (takeoff -> first TP after SSS center)

@@ -71,7 +71,7 @@ def test_waypoints_format():
 
     # Test round-trip conversion
     print("\nTesting round-trip conversion...")
-    parsed_task = QRCodeTask.from_waypoints_json(simplified_json)
+    parsed_task = QRCodeTask.from_json(simplified_json)
     print(f"Parsed task type: {parsed_task.task_type}")
     print(f"Parsed turnpoints: {len(parsed_task.turnpoints)}")
 

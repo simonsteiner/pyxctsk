@@ -319,7 +319,6 @@ class TaskTurnpoint:
             lon, lat, _ = geod.fwd(
                 endpoint1[1], endpoint1[0], e1_to_e2_azimuth, t * e1_to_e2_distance
             )
-            line_point = (lat, lon)
 
             # Calculate azimuth from prev_point to this point
             azimuth_to_point, _, _ = geod.inv(prev_point[1], prev_point[0], lon, lat)

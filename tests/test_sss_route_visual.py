@@ -11,10 +11,10 @@ import pytest
 from geopy.distance import geodesic
 from pyxctsk import parse_task
 from pyxctsk.distance import (
-    _task_to_turnpoints,
     calculate_task_distances,
     optimized_route_coordinates,
 )
+from pyxctsk.task_distances import _task_to_turnpoints
 
 
 class TestSSSRouteVisual:
@@ -92,17 +92,17 @@ class TestSSSRouteVisual:
         <strong>Purpose:</strong> Compare center route (red) vs optimized route (blue) for SSS tasks.<br>
         <strong>Expected:</strong> Optimized route should go to turnpoint perimeters, not centers.
     </div>
-    
+
     <div id="map"></div>
-    
+
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <script>
         var map = L.map('map').setView([{center_lat}, {center_lon}], {zoom});
-        
+
         L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png', {{
             attribution: '© OpenStreetMap contributors'
         }}).addTo(map);
-        
+
         // Add legend
         var legend = L.control({{position: 'topright'}});
         legend.onAdd = function (map) {{
@@ -350,7 +350,7 @@ class TestSSSRouteVisual:
             f.write("SSS Route Optimization Analysis\n")
             f.write("=" * 50 + "\n\n")
 
-            f.write(f"Task: {task.name if hasattr(task, 'name') else 'SSS Task'}\n")
+            f.write(f"Task: {task.name if hasattr(task, 'name') else 'SSS Task'}\n")  # type: ignore
             f.write(f"Turnpoints: {len(task.turnpoints)}\n\n")
 
             f.write("Distance Summary:\n")

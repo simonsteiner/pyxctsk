@@ -10,8 +10,8 @@ from pyxctsk.qrcode_task import QRCodeTask
 from pyxctsk.utils import generate_qr_code
 
 try:
-    from PIL import Image
-    from pyzbar import pyzbar
+    from PIL import Image  # noqa: F401
+    from pyzbar import pyzbar  # noqa: F401
 
     QR_CODE_SUPPORT = True
 except ImportError:

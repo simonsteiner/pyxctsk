@@ -30,17 +30,17 @@ task_viewer/
 
 1. Create and activate a virtual environment:
 
-```bash
-python -m venv venv
-source venv/bin/activate  # Use venv/bin/activate.fish for fish shell
-source /home/simon/git/pyxctsk/venv/bin/activate
-```
+  ```bash
+  python -m venv venv
+  source venv/bin/activate  # Use venv/bin/activate.fish for fish shell
+  source /home/simon/git/pyxctsk/venv/bin/activate
+  ```
 
 2. Install required dependencies:
 
-```bash
-pip install flask
-```
+  ```bash
+  pip install flask
+  ```
 
 ## Usage
 

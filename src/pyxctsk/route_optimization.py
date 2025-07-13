@@ -271,7 +271,7 @@ def _compute_optimal_route_dp(
 
     # Check if the last turnpoint is a goal line
     if turnpoints[-1].goal_type == "LINE" and show_progress:
-        print(f"    🏁 Last turnpoint is a goal line")
+        print("    🏁 Last turnpoint is a goal line")
 
     # Use optimized approach with true DP and beam search
     return _compute_optimal_route_with_beam_search(
@@ -405,15 +405,13 @@ def calculate_iteratively_refined_route(
         return distance, path
 
     # Check if last turnpoint is a goal line
-    has_goal_line = False
     if turnpoints[-1].goal_type == "LINE":
-        has_goal_line = True
         if show_progress:
-            print(f"    🏁 Task has a goal line finish")
+            print("    🏁 Task has a goal line finish")
 
     # Initialize with standard optimization (using centers as look-ahead targets)
     if show_progress:
-        print(f"    🔄 Initial optimization pass (using center look-ahead)...")
+        print("    🔄 Initial optimization pass (using center look-ahead)...")
 
     current_distance, current_route = _compute_optimal_route_dp(
         turnpoints,

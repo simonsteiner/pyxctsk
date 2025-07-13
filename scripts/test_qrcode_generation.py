@@ -44,7 +44,7 @@ class QRCodeTestResult:
         self.qr_string_generated = False
         self.qr_string_matches = False
         self.qr_png_generated = False
-        self.qr_png_parseable = False
+        self.qr_png_parsable = False
         self.roundtrip_success = False
         self.error_message = ""
 
@@ -146,7 +146,7 @@ def test_qr_code_generation(
                 decoded_objects = pyzbar.decode(image)
                 if decoded_objects:
                     decoded_string = decoded_objects[0].data.decode("utf-8")
-                    result.qr_png_parseable = True
+                    result.qr_png_parsable = True
 
                     # Test roundtrip: parse the decoded string back to a task
                     parse_task(decoded_string)  # Just verify it doesn't crash
@@ -171,7 +171,7 @@ def print_summary(results: List[QRCodeTestResult]):
     qr_generated = sum(1 for r in results if r.qr_string_generated)
     qr_matches = sum(1 for r in results if r.qr_string_matches)
     png_generated = sum(1 for r in results if r.qr_png_generated)
-    png_parseable = sum(1 for r in results if r.qr_png_parseable)
+    png_parsable = sum(1 for r in results if r.qr_png_parsable)
     roundtrip_success = sum(1 for r in results if r.roundtrip_success)
     errors = sum(1 for r in results if r.error_message)
 
@@ -186,7 +186,7 @@ def print_summary(results: List[QRCodeTestResult]):
     print(f"QR strings match expected: {qr_matches}")
     if QR_CODE_SUPPORT:
         print(f"QR PNGs generated:        {png_generated}")
-        print(f"QR PNGs parseable:        {png_parseable}")
+        print(f"QR PNGs parsable:        {png_parsable}")
         print(f"Roundtrip successful:     {roundtrip_success}")
     else:
         print("QR PNG generation:        SKIPPED (dependencies missing)")

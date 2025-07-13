@@ -18,7 +18,6 @@ Usage:
 
 import argparse
 import json
-import os
 import sys
 import time
 from pathlib import Path
@@ -430,7 +429,7 @@ def process_all_tasks(
     task_codes = list(upload_results.values())
     html_results = download_html_tasks(client, task_codes, html_output_dir)
 
-    print(f"\nProcess Summary:")
+    print("\nProcess Summary:")
     print(f"  Uploaded: {len(upload_results)} XCTSK files")
     print(f"  Downloaded: {len(html_results)} HTML pages")
 

@@ -2,8 +2,9 @@ from typing import Dict, List, Optional, Tuple
 
 from pyproj import Geod
 
-from .distance import _task_to_turnpoints, optimized_route_coordinates
+from .distance import optimized_route_coordinates
 from .task import GoalType
+from .task_distances import _task_to_turnpoints
 
 # Initialize WGS84 ellipsoid for geographical calculations
 geod = Geod(ellps="WGS84")

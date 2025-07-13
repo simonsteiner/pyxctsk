@@ -4,7 +4,7 @@ This module provides a simplified interface to the distance calculation function
 that has been refactored into smaller, focused modules.
 """
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 # Import all the public API from the refactored modules
 from .optimization_config import (
@@ -15,9 +15,7 @@ from .optimization_config import (
 )
 from .route_optimization import calculate_iteratively_refined_route
 from .sss_calculations import calculate_optimal_sss_entry_point, calculate_sss_info
-from .task import Task
 from .task_distances import (
-    _task_to_turnpoints,
     calculate_cumulative_distances,
     calculate_task_distances,
 )

@@ -8,9 +8,9 @@ import json
 import os
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple
 
-from flask import Flask, abort, jsonify, render_template, request
+from flask import Flask, abort, jsonify, render_template
 
 # Add the xctrack module to the path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))

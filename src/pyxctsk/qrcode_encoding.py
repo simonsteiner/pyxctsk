@@ -18,6 +18,9 @@ def encode_num(num: int) -> str:
         Encoded string
     """
     result = []
+
+    # This is to ensure the sign bit is handled correctly
+    # If num is negative, we will flip all bits later
     # Shift left by 1 (multiply by 2)
     pnum = num << 1
     # If negative, flip all bits

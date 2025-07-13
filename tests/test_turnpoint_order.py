@@ -75,6 +75,7 @@ def test_turnpoint_field_order():
     ), "Type should come before z in ESS turnpoint"
 
     # Test with actual example from the spec
+    # cspell: disable-next-line
     spec_example = """{"g":{"d":"22:00:00Z","t":2},"s":{"d":2,"g":["17:00:00Z"],"t":1},"t":[{"d":"Take--Off--AGUAPANELA","n":"D02","t":1,"z":"b`dpMgc{YgsB_X"},{"d":"PUENTE ZARZAL - LA PAILA","n":"P31","t":2,"z":"xthoM}orYcy@owH"},{"d":"ZANJAS LA UNION","n":"P32","z":"tmeoMgjtZuw@gxG"},{"d":"ANTENAS ROLDANILLO","n":"P09","z":"trvoMquwYydA_|B"},{"d":"GOL BUGALAGRANDE","n":"G04","z":"fb{oMofsXk}@oK"},{"d":"GOL BUGALAGRANDE","n":"G04","z":"fb{oMofsXk}@otL"},{"d":"GOL BUGALAGRANDE","n":"G04","z":"fb{oMofsXk}@oK"},{"d":"X24","n":"X24","z":"|ltnMkgxWu`Co_h@"},{"d":"GOL PISTA-LOS CHANCOS","n":"G11","t":3,"z":"|kbpMuvnWe}@ozD"},{"d":"GOL PISTA-LOS CHANCOS","n":"G11","z":"|kbpMuvnWe}@oK"}],"taskType":"CLASSIC","tc":null,"to":null,"version":2}"""
 
     # Parse the example and check if our code can parse it correctly
