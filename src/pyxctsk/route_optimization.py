@@ -19,7 +19,9 @@ def _init_dp_structure(turnpoints: List[TaskTurnpoint]) -> List[defaultdict]:
         List of defaultdicts for DP computation
     """
     # dp[i] maps candidate points on turnpoint i -> (best_distance, parent_point)
-    dp = [defaultdict(lambda: (float("inf"), None)) for _ in turnpoints]
+    dp: List[defaultdict] = [
+        defaultdict(lambda: (float("inf"), None)) for _ in turnpoints
+    ]
 
     # Initialize: start at takeoff center with distance 0
     dp[0][turnpoints[0].center] = (0.0, None)
@@ -49,7 +51,7 @@ def _process_dp_stage(
     next_center = (
         turnpoints[i + 1].center if i + 1 < len(turnpoints) else current_tp.center
     )
-    new_candidates = defaultdict(lambda: (float("inf"), None))
+    new_candidates: defaultdict = defaultdict(lambda: (float("inf"), None))
 
     # For each candidate point from previous turnpoint
     for prev_point, (prev_dist, _) in dp[i - 1].items():
@@ -79,14 +81,11 @@ def _process_dp_stage(
         best_items = sorted(new_candidates.items(), key=lambda kv: kv[1][0])[
             :beam_width
         ]
-        result = dict(best_items)
+        result: defaultdict = defaultdict(lambda: (float("inf"), None))
+        result.update(dict(best_items))
+        return result
     else:
-        result = dict(new_candidates)
-
-    if show_progress:
-        print(f"    📊 Keeping {len(result)} candidates")
-
-    return result
+        return new_candidates
 
 
 def _process_dp_stage_with_refined_target(
@@ -123,7 +122,7 @@ def _process_dp_stage_with_refined_target(
     else:
         next_center = next_target
 
-    new_candidates = defaultdict(lambda: (float("inf"), None))
+    new_candidates: defaultdict = defaultdict(lambda: (float("inf"), None))
 
     # For each candidate point from previous turnpoint
     for prev_point, (prev_dist, _) in dp[i - 1].items():
@@ -146,14 +145,14 @@ def _process_dp_stage_with_refined_target(
         best_items = sorted(new_candidates.items(), key=lambda kv: kv[1][0])[
             :beam_width
         ]
-        result = dict(best_items)
+        result: defaultdict = defaultdict(lambda: (float("inf"), None))
+        result.update(dict(best_items))
+        return result
     else:
-        result = dict(new_candidates)
+        return new_candidates
 
     if show_progress:
         print(f"    📊 Keeping {len(result)} candidates")
-
-    return result
 
 
 def _backtrack_path(

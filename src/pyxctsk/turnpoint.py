@@ -106,8 +106,8 @@ class TaskTurnpoint:
         lat: float,
         lon: float,
         radius: float = 0,
-        goal_type: str = None,
-        goal_line_length: float = None,
+        goal_type: Optional[str] = None,
+        goal_line_length: Optional[float] = None,
     ):
         """Initialize a task turnpoint.
 

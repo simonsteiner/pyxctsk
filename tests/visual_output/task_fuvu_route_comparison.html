@@ -27,7 +27,7 @@
     
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <script>
-        var map = L.map('map').setView([46.64299100275983, 7.207830322784678], 10);
+        var map = L.map('map').setView([46.642991002759736, 7.2078303227847185], 10);
         
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap contributors'
@@ -138,7 +138,7 @@
         }).addTo(map);
 
         // Optimized route
-        var optimizedRoute = L.polyline([[46.6252, 7.206111111111111], [46.643150593858344, 7.242593235664127], [46.726633813081875, 7.412963310082692], [46.5137974941262, 6.974079728440651], [46.63636537356026, 7.229361775627523], [46.63129346443339, 7.162563414634398], [46.618959871692034, 7.169036657910835]], {
+        var optimizedRoute = L.polyline([[46.6252, 7.206111111111111], [46.64315059385848, 7.242593235663975], [46.726633813082074, 7.41296331008249], [46.513797494126216, 6.9740797284406195], [46.63636537356002, 7.229361775627651], [46.63129346443063, 7.162563414631894], [46.61895987169293, 7.169036657914417]], {
             color: 'blue',
             weight: 3,
             opacity: 0.8
@@ -146,7 +146,7 @@
 
         // Add distance comparison popup
         var comparisonInfo = L.popup()
-            .setLatLng([46.64299100275983, 7.207830322784678])
+            .setLatLng([46.642991002759736, 7.2078303227847185])
             .setContent(`
                 <h4>Route Comparison</h4>
                 <b>Center Route:</b> 149.77 km<br>

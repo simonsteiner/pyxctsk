@@ -93,18 +93,20 @@ class QRCodeTask:
         """
         if simplified:
             # XC/Waypoints simplified format
-            result = OrderedDict()
-            result["T"] = "W"  # taskType: Waypoints
-            result["V"] = self.version  # version: 2
+            simplified_result: OrderedDict[str, Any] = OrderedDict()
+            simplified_result["T"] = "W"  # taskType: Waypoints
+            simplified_result["V"] = self.version  # version: 2
 
             # Turnpoints - only include if they exist
             if self.turnpoints:
-                result["t"] = [tp.to_dict(simplified=True) for tp in self.turnpoints]
+                simplified_result["t"] = [
+                    tp.to_dict(simplified=True) for tp in self.turnpoints
+                ]
 
-            return result
+            return simplified_result
 
         # Full format - Create an empty dict to start with
-        result = {}
+        result: Dict[str, Any] = {}
 
         # To match the expected output exactly, we need to build the dictionary
         # in the precise order seen in the expected output
@@ -160,7 +162,7 @@ class QRCodeTask:
             version = data.get("V", QR_CODE_TASK_VERSION)
 
             # Task type is always WAYPOINTS in simplified format
-            task_type = QRCodeTaskType.WAYPOINTS
+            simplified_task_type = QRCodeTaskType.WAYPOINTS
 
             turnpoints = []
             if "t" in data:
@@ -168,7 +170,7 @@ class QRCodeTask:
 
             return cls(
                 version=version,
-                task_type=task_type,
+                task_type=simplified_task_type,
                 earth_model=None,  # Default to WGS84
                 turnpoints_polyline=None,
                 turnpoints=turnpoints,
@@ -180,14 +182,14 @@ class QRCodeTask:
         # Full format
         version = data.get("version", QR_CODE_TASK_VERSION)
 
-        task_type = None
+        task_type: Optional[QRCodeTaskType] = None
         if "taskType" in data:
             if data["taskType"] == "CLASSIC":
                 task_type = QRCodeTaskType.CLASSIC
             elif data["taskType"] == "WAYPOINTS" or data["taskType"] == "W":
                 task_type = QRCodeTaskType.WAYPOINTS
 
-        earth_model = None
+        earth_model: Optional[QRCodeEarthModel] = None
         if "e" in data:
             earth_model = QRCodeEarthModel(data["e"])
 

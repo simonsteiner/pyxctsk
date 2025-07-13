@@ -9,6 +9,8 @@ try:
 
     QR_CODE_SUPPORT = True
 except ImportError:
+    qrcode = None  # type: ignore
+    Image = None  # type: ignore
     QR_CODE_SUPPORT = False
 
 
@@ -29,9 +31,9 @@ def generate_qr_code(data: str, size: int = 1024):
     if not QR_CODE_SUPPORT:
         raise ImportError("QR code support requires 'qrcode' and 'Pillow' packages")
 
-    qr = qrcode.QRCode(
+    qr = qrcode.QRCode(  # type: ignore
         version=1,
-        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        error_correction=qrcode.constants.ERROR_CORRECT_M,  # type: ignore
         box_size=10,
         border=4,
     )
@@ -41,7 +43,12 @@ def generate_qr_code(data: str, size: int = 1024):
     img = qr.make_image(fill_color="black", back_color="white")
 
     # Resize to requested size
-    img = img.resize((size, size), Image.LANCZOS)
+    try:
+        # Try new Pillow API first
+        img = img.resize((size, size), Image.Resampling.LANCZOS)  # type: ignore
+    except AttributeError:
+        # Fall back to old API for older Pillow versions
+        img = img.resize((size, size), Image.LANCZOS)  # type: ignore
     return img
 
 

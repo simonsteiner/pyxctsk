@@ -39,7 +39,7 @@ class QRCodeGoal:
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
-        result = {}
+        result: Dict[str, Any] = {}
         if self.deadline:
             result["d"] = self.deadline.to_json_string().strip('"')
         if self.type is not None:
@@ -78,10 +78,10 @@ class QRCodeSSS:
     type: QRCodeSSSType
     time_gates: List["TimeOfDay"] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> OrderedDict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         # Create an ordered dict to ensure field order
-        result = OrderedDict()
+        result: OrderedDict[str, Any] = OrderedDict()
         # Add direction first - OBSOLETE but kept for backwards compatibility
         result["d"] = self.direction.value
         # Add time_gates in the middle if they exist
@@ -180,7 +180,7 @@ class QRCodeTurnpoint:
     type: QRCodeTurnpointType = QRCodeTurnpointType.NONE
     description: Optional[str] = None
 
-    def to_dict(self, simplified: bool = False) -> Dict[str, Any]:
+    def to_dict(self, simplified: bool = False) -> OrderedDict[str, Any]:
         """Convert to dictionary for JSON serialization.
 
         Uses custom polyline encoding for turnpoint coordinates (lon, lat, alt, radius)
@@ -204,7 +204,7 @@ class QRCodeTurnpoint:
             return OrderedDict([("n", self.name), ("z", encoded)])
 
         # Full format - Create result dictionary with exact order to match expected output
-        result = OrderedDict()
+        result: OrderedDict[str, Any] = OrderedDict()
 
         # Only include description if it has a non-empty value
         if self.description:

@@ -96,7 +96,7 @@ def calculate_sss_info(
     task_turnpoints,
     route_coordinates: List[Tuple[float, float]],
     angle_step: Optional[int] = None,
-) -> Dict[str, Any]:
+) -> Optional[Dict[str, Any]]:
     """Calculate SSS (Start Speed Section) information for a task.
 
     This function analyzes a task to find SSS turnpoints and calculates the optimal

@@ -10,11 +10,13 @@ from .task import Task
 
 # Optional QR code dependencies
 try:
+    import pyzbar.pyzbar as pyzbar
     from PIL import Image
-    from pyzbar import pyzbar
 
     QR_CODE_SUPPORT = True
 except ImportError:
+    Image = None  # type: ignore
+    pyzbar = None  # type: ignore
     QR_CODE_SUPPORT = False
 
 
@@ -63,7 +65,7 @@ def parse_task(data: Union[bytes, str]) -> Task:
         # Ensure we have bytes (not memoryview)
         data_bytes = bytes(data)
 
-    print(f"Parsing task from data: {data_bytes[:100]}...")  # Debug output
+    print(f"Parsing task from data: {data_bytes[:100]!r}...")  # Debug output
 
     # Try parsing as XCTSK: URL
     if data_bytes.startswith(QR_CODE_SCHEME.encode("utf-8")):
@@ -97,8 +99,8 @@ def parse_task(data: Union[bytes, str]) -> Task:
     # Try parsing as image with QR code
     if QR_CODE_SUPPORT:
         try:
-            image = Image.open(BytesIO(data_bytes))
-            qr_codes = pyzbar.decode(image)
+            image = Image.open(BytesIO(data_bytes))  # type: ignore
+            qr_codes = pyzbar.decode(image)  # type: ignore
 
             for qr_code in qr_codes:
                 payload = qr_code.data
