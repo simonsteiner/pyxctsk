@@ -1,0 +1,26 @@
+repos:
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.3.0
+    hooks:
+      - id: flake8
+        name: flake8 (ignore E501)
+        args: ["--extend-ignore=E501"]
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.16.1
+    hooks:
+      - id: mypy
+        name: mypy
+        args: ["--explicit-package-bases", "--config-file", "mypy.ini"]
+  - repo: https://github.com/PyCQA/isort
+    rev: 6.0.1
+    hooks:
+      - id: isort
+        name: isort
+        args: ["--profile=black"]
+  - repo: https://github.com/psf/black
+    rev: 25.1.0
+    hooks:
+      - id: black
+        name: black
+        language_version: python3
+        args: ["src/", "tests/"]
