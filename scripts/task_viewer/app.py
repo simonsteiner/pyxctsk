@@ -15,6 +15,11 @@ from flask import Flask, abort, jsonify, render_template
 # Add the xctrack module to the path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
+# Initialize function variables
+parse_task = None
+calculate_task_distances = None
+generate_task_geojson = None
+
 try:
     from pyxctsk import calculate_task_distances, generate_task_geojson, parse_task
 
@@ -34,6 +39,10 @@ if airscore_clone_path.exists():
     print(f"AirScore clone directory found at {airscore_clone_path}")
 else:
     print(f"Warning: AirScore clone directory not found at {airscore_clone_path}")
+
+# Initialize AirScore function variables
+calculate_airscore_distances = None
+generate_airscore_geojson = None
 
 # Import AirScore utilities
 try:
@@ -143,13 +152,13 @@ def compare_task(task_name: str):
 
     try:
         # Parse task using xctrack
-        task = parse_task(str(xctsk_path))
+        task = parse_task(str(xctsk_path))  # type: ignore
 
         # Calculate distances using xctrack
-        distance_results = calculate_task_distances(task, show_progress=False)
+        distance_results = calculate_task_distances(task, show_progress=False)  # type: ignore
 
         # Generate XCTrack GeoJSON data
-        xctrack_geojson = generate_task_geojson(task)
+        xctrack_geojson = generate_task_geojson(task)  # type: ignore
 
         # Prepare comparison data
         comparison_data = prepare_comparison_data(json_data, distance_results, task)
@@ -194,10 +203,10 @@ def debug_task(task_name: str):
 
     try:
         # Parse task using xctrack
-        task = parse_task(str(xctsk_path))
+        task = parse_task(str(xctsk_path))  # type: ignore
 
         # Generate XCTrack GeoJSON data with debug information
-        xctrack_geojson = generate_task_geojson(task)
+        xctrack_geojson = generate_task_geojson(task)  # type: ignore
 
         return render_template(
             "debug_view.html",
@@ -249,9 +258,9 @@ def compare_task_api(task_name: str):
         return jsonify({"error": "XCTSK file not found"}), 404
 
     try:
-        task = parse_task(str(xctsk_path))
-        distance_results = calculate_task_distances(task, show_progress=False)
-        xctrack_geojson = generate_task_geojson(task)
+        task = parse_task(str(xctsk_path))  # type: ignore
+        distance_results = calculate_task_distances(task, show_progress=False)  # type: ignore
+        xctrack_geojson = generate_task_geojson(task)  # type: ignore
         comparison_data = prepare_comparison_data(json_data, distance_results, task)
 
         return jsonify(
@@ -296,13 +305,13 @@ def airscore_task(task_name: str):
 
     try:
         # Parse task using xctrack
-        task = parse_task(str(xctsk_path))
+        task = parse_task(str(xctsk_path))  # type: ignore
 
         # Calculate distances using AirScore clone
-        airscore_results = calculate_airscore_distances(task)
+        airscore_results = calculate_airscore_distances(task)  # type: ignore
 
         # Generate AirScore GeoJSON for mapping
-        airscore_geojson = generate_airscore_geojson(task, airscore_results)
+        airscore_geojson = generate_airscore_geojson(task, airscore_results)  # type: ignore
 
         return render_template(
             "airscore_view.html",
@@ -335,9 +344,9 @@ def airscore_task_api(task_name: str):
         return jsonify({"error": "XCTSK file not found"}), 404
 
     try:
-        task = parse_task(str(xctsk_path))
-        airscore_results = calculate_airscore_distances(task)
-        airscore_geojson = generate_airscore_geojson(task, airscore_results)
+        task = parse_task(str(xctsk_path))  # type: ignore
+        airscore_results = calculate_airscore_distances(task)  # type: ignore
+        airscore_geojson = generate_airscore_geojson(task, airscore_results)  # type: ignore
 
         return jsonify(
             {
