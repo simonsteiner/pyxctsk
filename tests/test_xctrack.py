@@ -156,7 +156,7 @@ def test_parse_task_json():
 
 def test_parse_real_task_file():
     """Test parsing the real task file."""
-    with open("tests/task_2020-07-07.xctsk", "r") as f:
+    with open("tests/data/task_2020-07-07.xctsk", "r") as f:
         task_data = f.read()
 
     task = parse_task(task_data)
