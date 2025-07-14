@@ -5,12 +5,14 @@ repos:
       - id: flake8
         name: flake8 (ignore E501, E203)
         args: ["--extend-ignore=E501,E203"]
+        exclude: ^scripts/
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v1.16.1
     hooks:
       - id: mypy
         name: mypy
         args: ["--explicit-package-bases", "--config-file", "mypy.ini"]
+        exclude: ^scripts/
   - repo: https://github.com/PyCQA/isort
     rev: 6.0.1
     hooks:
