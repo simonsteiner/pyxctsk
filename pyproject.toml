@@ -74,6 +74,10 @@ target-version = ['py38']
 profile = "black"
 multi_line_output = 3
 
+[tool.flake8]
+max-line-length = 88
+extend-ignore = "E501,E203"
+
 [tool.mypy]
 python_version = "3.8"
 warn_return_any = true

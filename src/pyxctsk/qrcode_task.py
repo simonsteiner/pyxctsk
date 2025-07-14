@@ -287,7 +287,7 @@ class QRCodeTask:
         if not url_str.startswith(QR_CODE_SCHEME):
             raise ValueError(f"Invalid QR code scheme, expected {QR_CODE_SCHEME}")
 
-        json_str = url_str[len(QR_CODE_SCHEME):]
+        json_str = url_str[len(QR_CODE_SCHEME) :]
         return cls.from_json(json_str)
 
     @classmethod

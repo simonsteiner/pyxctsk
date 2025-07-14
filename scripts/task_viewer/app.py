@@ -42,7 +42,9 @@ else:
 
 # Initialize AirScore function variables with proper typing
 calculate_airscore_distances: Optional[Callable[[Any], Dict[str, Any]]] = None
-generate_airscore_geojson: Optional[Callable[[Any, Dict[Any, Any]], Dict[Any, Any]]] = None
+generate_airscore_geojson: Optional[Callable[[Any, Dict[Any, Any]], Dict[Any, Any]]] = (
+    None
+)
 
 # Import AirScore utilities
 try:
@@ -386,7 +388,9 @@ def get_available_tasks() -> List[str]:
     return sorted(tasks)
 
 
-def load_task_data(task_name: str) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+def load_task_data(
+    task_name: str,
+) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
     """Load task data from JSON and GeoJSON files."""
     json_path = JSON_DIR / f"{task_name}.json"
     geojson_path = GEOJSON_DIR / f"{task_name}.geojson"
@@ -413,7 +417,9 @@ def load_task_data(task_name: str) -> Tuple[Optional[Dict[str, Any]], Optional[D
     return json_data, geojson_data
 
 
-def prepare_comparison_data(original_data: Dict[str, Any], xctrack_results: Dict[str, Any], task: Any) -> Dict[str, Any]:
+def prepare_comparison_data(
+    original_data: Dict[str, Any], xctrack_results: Dict[str, Any], task: Any
+) -> Dict[str, Any]:
     """Prepare comparison data between original and xctrack calculations."""
     comparison: Dict[str, Any] = {
         "summary": {

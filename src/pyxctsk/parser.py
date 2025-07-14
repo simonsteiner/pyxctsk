@@ -70,7 +70,7 @@ def parse_task(data: Union[bytes, str]) -> Task:
     # Try parsing as XCTSK: URL
     if data_bytes.startswith(QR_CODE_SCHEME.encode("utf-8")):
         try:
-            qr_task_json = data_bytes[len(QR_CODE_SCHEME):].decode("utf-8")
+            qr_task_json = data_bytes[len(QR_CODE_SCHEME) :].decode("utf-8")
             qr_task = QRCodeTask.from_json(qr_task_json)
             return qr_task.to_task()
         except (json.JSONDecodeError, ValueError, KeyError):
@@ -106,7 +106,7 @@ def parse_task(data: Union[bytes, str]) -> Task:
                 payload = qr_code.data
                 if payload.startswith(QR_CODE_SCHEME.encode("utf-8")):
                     try:
-                        qr_task_json = payload[len(QR_CODE_SCHEME):].decode("utf-8")
+                        qr_task_json = payload[len(QR_CODE_SCHEME) :].decode("utf-8")
                         qr_task = QRCodeTask.from_json(qr_task_json)
                         return qr_task.to_task()
                     except (json.JSONDecodeError, ValueError, KeyError):
