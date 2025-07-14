@@ -6,10 +6,10 @@ Follow these steps to publish a new release to PyPI:
    - All code must be committed and pushed to `main`.
    - All tests must pass: `pytest`
    - Code must be formatted and linted:
-     - `black src/ tests/ scripts/`
-     - `isort src/ tests/ scripts/`
-     - `flake8 src/ tests/ scripts/ --extend-ignore E501`
+     - `flake8 src/ tests/ scripts/ --extend-ignore=E501,E203 --exclude=scripts/task_viewer/airscore_clone`
      - `mypy src/`
+     - `isort src/ tests/ scripts/`
+     - `black src/ tests/ scripts/`
 
 2. **Update Version and Changelog**
    - Update the version in `pyproject.toml`.
