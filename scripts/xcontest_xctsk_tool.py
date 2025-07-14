@@ -11,9 +11,9 @@ Usage:
 
     # Individual operations:
     python xcontest_xctsk_tool.py upload --directory xctsk_files --author "Your Name"
-    python xcontest_xctsk_tool.py download --codes waku,motu,duna --output results/
+    python xcontest_xctsk_tool.py download --codes waku,motu,duna --output downloaded_tasks/xctsk
     python xcontest_xctsk_tool.py qr --file task.xctsk --output qr.svg
-    python xcontest_xctsk_tool.py html --codes waku,motu,duna --output html_pages/
+    python xcontest_xctsk_tool.py html --codes waku,motu,duna --output downloaded_tasks/html
 """
 
 import argparse
