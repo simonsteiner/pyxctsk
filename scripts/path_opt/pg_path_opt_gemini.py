@@ -1,7 +1,8 @@
 # pg_path_opt.py
-from collections import namedtuple
 
-import numpy as np
+from collections import namedtuple
+from typing import List, Optional, Tuple
+
 from geographiclib.geodesic import Geodesic
 from scipy.optimize import brentq, minimize_scalar
 
@@ -13,19 +14,27 @@ Gate = namedtuple("Gate", ["type", "center", "radius"])
 class GeodesicTools:
     """A collection of helper methods for geodesic calculations on the WGS84 ellipsoid."""
 
-    def __init__(self, geod: Geodesic = Geodesic.WGS84):
-        self.geod = geod
+    def __init__(self, geod: Optional[Geodesic] = None):
+        if geod is None:
+            # Use WGS84 instance, fallback if attribute not present
+            try:
+                self.geod = Geodesic.WGS84  # type: ignore[attr-defined]
+            except AttributeError:
+                self.geod = Geodesic(6378137, 1 / 298.257223563)
+        else:
+            self.geod = geod
 
     def get_distance(self, p1: Point, p2: Point) -> float:
         """Calculates the geodesic distance between two points."""
-        return self.geod.Inverse(p1.lat, p1.lon, p2.lat, p2.lon)["s12"]
+        s12 = self.geod.Inverse(p1.lat, p1.lon, p2.lat, p2.lon)["s12"]
+        return float(s12)
 
     def get_point_on_azimuth(self, p: Point, azimuth: float, distance: float) -> Point:
         """Calculates a point at a given azimuth and distance from another point."""
         g = self.geod.Direct(p.lat, p.lon, azimuth, distance)
-        return Point(g["lat2"], g["lon2"])
+        return Point(float(g["lat2"]), float(g["lon2"]))
 
-    def _get_path_length(self, points: list[Point]) -> float:
+    def _get_path_length(self, points: List[Point]) -> float:
         """Calculates the total length of a path defined by a sequence of points."""
         if not points or len(points) < 2:
             return 0.0
@@ -53,8 +62,7 @@ class GeodesicTools:
 
         # Minimize the objective function over all possible azimuths [0, 360)
         result = minimize_scalar(objective_func, bounds=(0, 360), method="bounded")
-        optimal_azimuth = result.x
-
+        optimal_azimuth = float(getattr(result, "x", 0.0))
         return self.get_point_on_azimuth(gate.center, optimal_azimuth, gate.radius)
 
     def _find_intersection_point(
@@ -74,7 +82,9 @@ class GeodesicTools:
             # Point on the geodesic at a certain distance from p_prev
             p_on_geodesic = self.get_point_on_azimuth(p_prev, azi1, dist_from_prev)
             # Its distance to the gate's center minus the radius
-            return self.get_distance(p_on_geodesic, gate.center) - gate.radius
+            return float(self.get_distance(p_on_geodesic, gate.center)) - float(
+                gate.radius
+            )
 
         # Find the point of closest approach on the geodesic to the circle center
         # This helps establish a search bracket for the root-finding algorithm
@@ -83,12 +93,14 @@ class GeodesicTools:
             return self.get_distance(p_on_geodesic, gate.center)
 
         res = minimize_scalar(closest_approach_objective)
-        s_closest = res.x
+        s_closest = float(getattr(res, "x", 0.0))
 
         # The two intersection points are on either side of the closest point.
         # We find the one closer to p_prev (smaller s value).
         s_root = brentq(objective_func, a=0, b=s_closest)
-
+        # Defensive: ensure s_root is float (brentq always returns float)
+        if not isinstance(s_root, float):
+            raise TypeError("brentq did not return a float")
         return self.get_point_on_azimuth(p_prev, azi1, s_root)
 
     def _get_optimal_point(self, p_prev: Point, p_next: Point, gate: Gate) -> Point:
@@ -124,7 +136,7 @@ class GeodesicTools:
         res = minimize_scalar(
             closest_approach_dist, bounds=(0, geodesic_line["s12"]), method="bounded"
         )
-        min_dist_to_center = res.fun
+        min_dist_to_center = float(getattr(res, "fun", 0.0))
 
         # If the minimum distance from the geodesic to the center is less than the radius,
         # the path intersects the circle (crossing situation). [cite: 43]
@@ -136,11 +148,11 @@ class GeodesicTools:
 
 
 def optimize_path(
-    gates: list[Gate],
-    geod: Geodesic = Geodesic.WGS84,
+    gates: List[Gate],
+    geod: Optional[Geodesic] = None,
     max_iter: int = 100,
     tol: float = 1e-6,
-) -> tuple[list[tuple], float]:
+) -> Tuple[List[Tuple[float, float]], float]:
     """
     Computes the shortest feasible flight path for a paragliding task.
 
@@ -158,19 +170,28 @@ def optimize_path(
         - route: A list of (lat, lon) tuples for the optimal contact points.
         - length: The total geodesic distance of the optimized path in meters.
     """
+
     n = len(gates)
     if n < 2:
         return ([], 0.0)
 
+    # If geod is None, use WGS84
+    if geod is None:
+        try:
+            geod = Geodesic.WGS84  # type: ignore[attr-defined]
+        except AttributeError:
+            geod = Geodesic(6378137, 1 / 298.257223563)
+    assert geod is not None, "geod must not be None"
     tools = GeodesicTools(geod)
 
     # --- Initialization Step ---
     # Per the paper, we start with an initial path. [cite: 71, 97]
     # A simple greedy initialization is used: each point is the one on its gate's
     # boundary closest to the previous point in the sequence.
-    route_points = [Point(0, 0)] * n
+    route_points: List[Point] = [Point(0, 0)] * n
 
     # First point is on gate 0, closest to the center of gate 1.
+    assert geod is not None, "geod must not be None"
     g = geod.Inverse(
         gates[0].center.lat,
         gates[0].center.lon,
@@ -182,6 +203,7 @@ def optimize_path(
     )
 
     for i in range(1, n):
+        assert geod is not None, "geod must not be None"
         g = geod.Inverse(
             gates[i].center.lat,
             gates[i].center.lon,
@@ -213,6 +235,7 @@ def optimize_path(
         for i in range(0, n, 2):
             if i == 0:
                 if n > 1:  # The first point is only influenced by the next point
+                    assert geod is not None, "geod must not be None"
                     g = geod.Inverse(
                         gates[i].center.lat,
                         gates[i].center.lon,
@@ -223,6 +246,7 @@ def optimize_path(
                         gates[i].center, g["azi1"], gates[i].radius
                     )
             elif i == n - 1:  # The last point is only influenced by the previous point
+                assert geod is not None, "geod must not be None"
                 g = geod.Inverse(
                     gates[i].center.lat,
                     gates[i].center.lon,
@@ -265,7 +289,10 @@ if __name__ == "__main__":
     gates = [takeoff, sss, tp1, ess, ess2, stp1, stp2, goal]
 
     # Optimize on WGS84
-    geod_wgs84 = Geodesic.WGS84
+    try:
+        geod_wgs84 = Geodesic.WGS84  # type: ignore[attr-defined]
+    except AttributeError:
+        geod_wgs84 = Geodesic(6378137, 1 / 298.257223563)
     route, length = optimize_path(gates, geod_wgs84, max_iter=100, tol=1e-6)
 
     print("Optimized Route (Lat, Lon):")

@@ -1,6 +1,5 @@
 # pg_path_opt.py
 
-import math
 from dataclasses import dataclass
 
 from geographiclib.geodesic import Geodesic
@@ -48,13 +47,13 @@ def _pcp_point(geod, A, B, gate):
 
     # bracket and bisect on θ ∈ [0, 2π)
     lo, hi = 0.0, 360.0
-    f_lo, f_hi = F(lo), F(hi)
+    f_lo = F(lo)
     for _ in range(50):
         mid = (lo + hi) / 2
         f_mid = F(mid)
         # choose subinterval containing zero
         if f_lo * f_mid <= 0:
-            hi, f_hi = mid, f_mid
+            hi = mid
         else:
             lo, f_lo = mid, f_mid
     theta_star = (lo + hi) / 2
@@ -112,7 +111,7 @@ def optimize_path(gates, geod=None, max_iter=100, tol=1e-6):
     Returns: (route_points, total_length_m)
     """
     if geod is None:
-        geod = Geodesic.WGS84
+        geod = Geodesic(6378137, 1 / 298.257223563)
 
     n = len(gates)
     # initialize: project each center onto next circle
@@ -148,7 +147,7 @@ def optimize_path(gates, geod=None, max_iter=100, tol=1e-6):
 
 # Example usage:
 if __name__ == "__main__":
-    geod = Geodesic.WGS84
+    geod = Geodesic(6378137, 1 / 298.257223563)
     gates = [
         Gate(center=(46.521, 6.565), radius=1000),
         Gate(center=(46.530, 6.600), radius=2000),
