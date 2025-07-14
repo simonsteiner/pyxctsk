@@ -449,10 +449,10 @@ Examples:
 
   Upload all XCTSK files in a directory:
     python xcontest_xctsk_tool.py upload --directory xctsk_files --author "John Doe"
-  
+
   Download specific tasks:
     python xcontest_xctsk_tool.py download --codes waku,motu,duna --output results/
-  
+
   Generate QR code for a task:
     python xcontest_xctsk_tool.py qr --file task.xctsk --output qr.svg
         """,
