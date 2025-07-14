@@ -82,7 +82,15 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 
 # Run tests
-.venv/bin/python -m pytest
+python -m pytest
+
+# Run single test with parameter
+# -s: disables output capturing, allowing print statements and other outputs to be shown in the terminal.
+# -vv: increases verbosity, providing more detailed test results.
+python pytest -s tests/test_qrcode.py -vv
+
+# (Optional) To check QR code dependencies, run:
+python scripts/check_qr_deps.py
 ```
 
 ### Code Quality & Formatting
