@@ -21,7 +21,7 @@
                 "description": "S03 FIESCHERALP",
                 "lat": 46.41502380371094,
                 "lon": 8.106322288513184,
-                "name": "S03 FIESCHERALP"
+                "name": "S03"
             }
         },
         {
@@ -38,7 +38,7 @@
             "radius": 3750,
             "waypoint": {
                 "altSmoothed": 2235,
-                "description": "B81 Münster",
+                "description": "B59 BLINNENTAL",
                 "lat": 46.43593978881836,
                 "lon": 8.284469604492188,
                 "name": "B59"
@@ -58,10 +58,10 @@
             "radius": 3000,
             "waypoint": {
                 "altSmoothed": 2643,
-                "description": "B81 MÜSTER02",
+                "description": "B81 TELTSCHEHORN",
                 "lat": 46.47356033325195,
                 "lon": 8.324119567871094,
-                "name": "B81 MÜSTER02"
+                "name": "B81"
             }
         },
         {
@@ -72,17 +72,17 @@
                 "description": "S03 FIESCHERALP",
                 "lat": 46.41502380371094,
                 "lon": 8.106322288513184,
-                "name": "S03 FIESCHERALP"
+                "name": "S03"
             }
         },
         {
             "radius": 3500,
             "waypoint": {
                 "altSmoothed": 3586,
-                "description": "WANNENHORN",
+                "description": "B12 WANNENHORN",
                 "lat": 46.49129867553711,
                 "lon": 8.106193542480469,
-                "name": "WANNENHORN"
+                "name": "B12"
             }
         },
         {

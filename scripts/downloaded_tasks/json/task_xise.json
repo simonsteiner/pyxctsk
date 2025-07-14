@@ -1,8 +1,7 @@
 {
   "metadata": {
-    "file_name": "luma",
-    "created": "2025-06-16 13:49:33 UTC",
-    "author": "Simon",
+    "file_name": "xise",
+    "created": "2025-07-14 21:11:34 UTC",
     "start_type": "Elapse time",
     "sss_open": "09:30 (UTC)",
     "goal_type": "CYLINDER",
@@ -17,7 +16,7 @@
   "turnpoints": [
     {
       "#": 1,
-      "Name": "S03 FIESCHERALP",
+      "Name": "S03",
       "Radius (m)": 250,
       "Distance (km)": 0.0,
       "Optimized (km)": 0.0,
@@ -46,14 +45,14 @@
     },
     {
       "#": 5,
-      "Name": "B81 M\u00dcSTER02",
+      "Name": "B81",
       "Radius (m)": 3000,
       "Distance (km)": 60.1,
       "Optimized (km)": 30.2
     },
     {
       "#": 6,
-      "Name": "S03 FIESCHERALP",
+      "Name": "S03",
       "Radius (m)": 400,
       "Distance (km)": 78.1,
       "Optimized (km)": 50.6,
@@ -61,7 +60,7 @@
     },
     {
       "#": 7,
-      "Name": "WANNENHORN",
+      "Name": "B12",
       "Radius (m)": 3500,
       "Distance (km)": 86.6,
       "Optimized (km)": 55.7

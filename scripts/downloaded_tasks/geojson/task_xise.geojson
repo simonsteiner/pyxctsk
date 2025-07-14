@@ -352,7 +352,7 @@
         "ctype": "WSSS",
         "description": "S03 FIESCHERALP",
         "index": 0,
-        "name": "S03 FIESCHERALP",
+        "name": "S03",
         "radius": 250,
         "type": "cylinder"
       },
@@ -978,7 +978,7 @@
       },
       "properties": {
         "ctype": "WNoType",
-        "description": "B81 M\u00fcnster",
+        "description": "B59 BLINNENTAL",
         "index": 2,
         "name": "B59",
         "radius": 3750,
@@ -1606,9 +1606,9 @@
       },
       "properties": {
         "ctype": "WNoType",
-        "description": "B81 M\u00dcSTER02",
+        "description": "B81 TELTSCHEHORN",
         "index": 4,
-        "name": "B81 M\u00dcSTER02",
+        "name": "B81",
         "radius": 3000,
         "type": "cylinder"
       },
@@ -1922,7 +1922,7 @@
         "ctype": "WESS",
         "description": "S03 FIESCHERALP",
         "index": 5,
-        "name": "S03 FIESCHERALP",
+        "name": "S03",
         "radius": 400,
         "type": "cylinder"
       },
@@ -2234,9 +2234,9 @@
       },
       "properties": {
         "ctype": "WNoType",
-        "description": "WANNENHORN",
+        "description": "B12 WANNENHORN",
         "index": 6,
-        "name": "WANNENHORN",
+        "name": "B12",
         "radius": 3500,
         "type": "cylinder"
       },
