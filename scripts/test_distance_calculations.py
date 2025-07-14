@@ -20,12 +20,12 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from pyxctsk.distance import (
     TaskTurnpoint,
-    _task_to_turnpoints,
     calculate_iteratively_refined_route,
     distance_through_centers,
     optimized_distance,
 )
 from pyxctsk.parser import parse_task
+from pyxctsk.task_distances import _task_to_turnpoints
 
 # Add task_viewer and its subdirectories to path to import AirScore utilities
 task_viewer_path = Path(__file__).parent / "task_viewer"
@@ -54,6 +54,7 @@ try:
     )
 except ImportError as e:
     AIRSCORE_AVAILABLE = False
+    calculate_airscore_distances = None  # type: ignore
     print(f"AirScore distance calculation not available: {e}")
 
 
@@ -66,7 +67,7 @@ def load_all_tasks(tasks_dir: str) -> Dict[str, Any]:
     Returns:
         Dictionary mapping filename to parsed task objects
     """
-    tasks = {}
+    tasks: Dict[str, Any] = {}
     tasks_path = Path(tasks_dir)
 
     if not tasks_path.exists():
@@ -94,7 +95,7 @@ def load_json_metadata(json_dir: str) -> Dict[str, Dict[str, Any]]:
     Returns:
         Dictionary mapping task name to metadata
     """
-    metadata = {}
+    metadata: Dict[str, Dict[str, Any]] = {}
     json_path = Path(json_dir)
 
     if not json_path.exists():
@@ -152,12 +153,12 @@ def test_distance_calculations(
         }
 
     start_time = time.time()
-    route_points = []
+    route_points: List[Any] = []
 
     try:
         # Always use optimized_distance with default parameters
         if verbose:
-            print(f"    🔄 Using optimized_distance with default parameters")
+            print("    🔄 Using optimized_distance with default parameters")
 
         # Use default parameters for standard optimization
         distance = optimized_distance(
@@ -231,10 +232,13 @@ def test_airscore_calculations(
 
         # Use the calculate_airscore_distances function
         # This function already handles fallbacks internally
+        # Ensure calculate_airscore_distances is defined and not None
+        if calculate_airscore_distances is None:
+            raise RuntimeError("calculate_airscore_distances is not available.")
         airscore_results = calculate_airscore_distances(task)
 
         if verbose:
-            print(f"    ✅ Successfully used calculate_airscore_distances")
+            print("    ✅ Successfully used calculate_airscore_distances")
 
         total_time = time.time() - start_time
 
@@ -253,7 +257,7 @@ def test_airscore_calculations(
         if verbose:
             import traceback
 
-            print(f"    📜 Stack trace:")
+            print("    📜 Stack trace:")
             print(f"    {traceback.format_exc().replace(chr(10), chr(10)+'    ')}")
 
         total_time = time.time() - start_time
@@ -298,7 +302,12 @@ def compare_with_reference(
             print(
                 f"  ⚠️  Skipping {task_name}: insufficient turnpoints ({len(turnpoints)})"
             )
-        return None
+        # Return a result dict with a flag indicating skip, to satisfy type checker
+        return {
+            "pyxctsk": {},
+            "airscore": None,
+            "task_info": {"name": task_name, "skipped": True},
+        }
 
     # Calculate baseline center distance
     center_distance = distance_through_centers(turnpoints)
@@ -310,7 +319,7 @@ def compare_with_reference(
 
     # Test pyxctsk optimization
     if verbose:
-        print(f"  🧮 Running pyxctsk optimized distance calculation...")
+        print("  🧮 Running pyxctsk optimized distance calculation...")
 
     pyxctsk_result = test_distance_calculations(
         turnpoints,
@@ -329,7 +338,7 @@ def compare_with_reference(
 
     if use_airscore:
         if verbose:
-            print(f"  🧮 Running AirScore distance calculation...")
+            print("  🧮 Running AirScore distance calculation...")
         airscore_result = test_airscore_calculations(
             task,
             verbose,
@@ -429,15 +438,15 @@ def analyze_results(all_results: List[Dict[str, Any]]) -> None:
     print("-" * 80)
 
     # Display optimization methods used
-    print(f"  🔧 pyxctsk method: optimized_distance with default settings")
+    print("  🔧 pyxctsk method: optimized_distance with default settings")
     if has_airscore:
-        print(f"  🔧 AirScore method: get_shortest_path")
+        print("  🔧 AirScore method: get_shortest_path")
 
     # pyxctsk statistics
     pyxctsk_times = [r["pyxctsk"]["total_time"] for r in valid_results]
     pyxctsk_distances = [r["pyxctsk"]["total_distance"] for r in valid_results]
 
-    print(f"\n🧩 pyxctsk optimization:")
+    print("\n🧩 pyxctsk optimization:")
     print(f"  ⏱️  Average time per task: {statistics.mean(pyxctsk_times):.4f}s")
     print(f"  ⏱️  Median time per task: {statistics.median(pyxctsk_times):.4f}s")
     print(f"  ⏱️  Min/Max time: {min(pyxctsk_times):.4f}s / {max(pyxctsk_times):.4f}s")
@@ -458,7 +467,7 @@ def analyze_results(all_results: List[Dict[str, Any]]) -> None:
                 r["airscore"]["total_distance"] for r in airscore_results
             ]
 
-            print(f"\n🧩 AirScore optimization:")
+            print("\n🧩 AirScore optimization:")
             print(f"  ⏱️  Average time per task: {statistics.mean(airscore_times):.4f}s")
             print(
                 f"  ⏱️  Median time per task: {statistics.median(airscore_times):.4f}s"
@@ -474,7 +483,7 @@ def analyze_results(all_results: List[Dict[str, Any]]) -> None:
             )
 
             # Compare pyxctsk vs AirScore
-            print(f"\n🔍 pyxctsk vs AirScore comparison:")
+            print("\n🔍 pyxctsk vs AirScore comparison:")
             diffs = []
             for r in airscore_results:
                 pyxctsk_dist = r["pyxctsk"]["total_distance"]
@@ -494,9 +503,9 @@ def analyze_results(all_results: List[Dict[str, Any]]) -> None:
     )
 
     if has_json_data:
-        print(f"\n📊 JSON REFERENCE DATA COMPARISON")
+        print("\n📊 JSON REFERENCE DATA COMPARISON")
         print("-" * 80)
-        print(f"Comparing against pre-calculated reference distances from JSON files:")
+        print("Comparing against pre-calculated reference distances from JSON files:")
 
         # Calculate differences against JSON reference data
         json_diffs_pyxctsk = []
@@ -519,7 +528,7 @@ def analyze_results(all_results: List[Dict[str, Any]]) -> None:
                     json_diffs_airscore.append(abs(airscore_km - json_opt_km))
 
         if json_diffs_pyxctsk:
-            print(f"\nAverage difference vs JSON reference optimized distance:")
+            print("\nAverage difference vs JSON reference optimized distance:")
             print(
                 f"  🔸 pyxctsk difference: {statistics.mean(json_diffs_pyxctsk):.2f}km"
             )
@@ -530,7 +539,7 @@ def analyze_results(all_results: List[Dict[str, Any]]) -> None:
                 )
 
     # Detailed task-by-task results
-    print(f"\n📋 DETAILED TASK RESULTS")
+    print("\n📋 DETAILED TASK RESULTS")
     print("-" * 80)
 
     # Check if any tasks have JSON data
@@ -715,14 +724,14 @@ def main():
 
     # Display optimization methods
     print(f"\n🔄 Starting analysis of {len(tasks)} tasks...")
-    print(f"  📐 pyxctsk: Using optimized_distance with default settings")
+    print("  📐 pyxctsk: Using optimized_distance with default settings")
     if use_airscore:
         if AIRSCORE_AVAILABLE:
-            print(f"  📐 AirScore: Using AirScore distance calculations")
+            print("  📐 AirScore: Using AirScore distance calculations")
         else:
-            print(f"  ⚠️  AirScore calculations not available, will be skipped")
+            print("  ⚠️  AirScore calculations not available, will be skipped")
     else:
-        print(f"  ℹ️  AirScore calculations skipped (--no-airscore option)")
+        print("  ℹ️  AirScore calculations skipped (--no-airscore option)")
 
     for i, (task_name, task) in enumerate(tasks.items(), 1):
         if not args.verbose:
