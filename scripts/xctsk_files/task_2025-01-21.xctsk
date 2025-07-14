@@ -1,1 +1,81 @@
-{"version":1,"taskType":"CLASSIC","turnpoints":[{"radius":400,"waypoint":{"lon":-76.15351867675781,"lat":4.476049900054932,"altSmoothed":1702,"name":"D01","description":"Take Off Los Tanques"},"type":"TAKEOFF"},{"radius":30000,"waypoint":{"lon":-75.95516967773438,"lat":4.761000156402588,"altSmoothed":925,"name":"G08","description":"GOL PISTA CARTAGO"},"type":"SSS"},{"radius":51500,"waypoint":{"lon":-76.30149841308594,"lat":3.688166618347168,"altSmoothed":1018,"name":"G05","description":"GOL PISTA CERRITO"}},{"radius":5500,"waypoint":{"lon":-75.98750305175781,"lat":4.359166622161865,"altSmoothed":970,"name":"P10","description":"EL MOLINO"}},{"radius":3000,"waypoint":{"lon":-76.16564178466797,"lat":4.199598789215088,"altSmoothed":988,"name":"G04","description":"GOL BUGALAGRANDE"},"type":"ESS"},{"radius":200,"waypoint":{"lon":-76.16564178466797,"lat":4.199598789215088,"altSmoothed":988,"name":"G04","description":"GOL BUGALAGRANDE"}}],"sss":{"type":"RACE","direction":"EXIT","timeGates":["16:45:00Z"]},"goal":{"type":"CYLINDER","deadline":"22:00:00Z"},"earthModel":"WGS84"}
+{
+    "version": 1,
+    "taskType": "CLASSIC",
+    "turnpoints": [
+        {
+            "radius": 400,
+            "waypoint": {
+                "lon": -76.15351867675781,
+                "lat": 4.476049900054932,
+                "altSmoothed": 1702,
+                "name": "D01",
+                "description": "Take Off Los Tanques"
+            },
+            "type": "TAKEOFF"
+        },
+        {
+            "radius": 30000,
+            "waypoint": {
+                "lon": -75.95516967773438,
+                "lat": 4.761000156402588,
+                "altSmoothed": 925,
+                "name": "G08",
+                "description": "GOL PISTA CARTAGO"
+            },
+            "type": "SSS"
+        },
+        {
+            "radius": 51500,
+            "waypoint": {
+                "lon": -76.30149841308594,
+                "lat": 3.688166618347168,
+                "altSmoothed": 1018,
+                "name": "G05",
+                "description": "GOL PISTA CERRITO"
+            }
+        },
+        {
+            "radius": 5500,
+            "waypoint": {
+                "lon": -75.98750305175781,
+                "lat": 4.359166622161865,
+                "altSmoothed": 970,
+                "name": "P10",
+                "description": "EL MOLINO"
+            }
+        },
+        {
+            "radius": 3000,
+            "waypoint": {
+                "lon": -76.16564178466797,
+                "lat": 4.199598789215088,
+                "altSmoothed": 988,
+                "name": "G04",
+                "description": "GOL BUGALAGRANDE"
+            },
+            "type": "ESS"
+        },
+        {
+            "radius": 200,
+            "waypoint": {
+                "lon": -76.16564178466797,
+                "lat": 4.199598789215088,
+                "altSmoothed": 988,
+                "name": "G04",
+                "description": "GOL BUGALAGRANDE"
+            }
+        }
+    ],
+    "sss": {
+        "type": "RACE",
+        "direction": "EXIT",
+        "timeGates": [
+            "16:45:00Z"
+        ]
+    },
+    "goal": {
+        "type": "CYLINDER",
+        "deadline": "22:00:00Z"
+    },
+    "earthModel": "WGS84"
+}

@@ -1,1 +1,111 @@
-{"version":1,"taskType":"CLASSIC","turnpoints":[{"radius":0,"waypoint":{"lon":-76.15351867675781,"lat":4.476049900054932,"altSmoothed":1702,"name":"D01","description":"Take Off Los Tanques"},"type":"TAKEOFF"},{"radius":37000,"waypoint":{"lon":-76.16266632080078,"lat":4.83650016784668,"altSmoothed":2319,"name":"X09","description":"X09"},"type":"SSS"},{"radius":4000,"waypoint":{"lon":-76.08300018310547,"lat":4.61299991607666,"altSmoothed":1037,"name":"P37","description":"CERRO CRUZ TORO"}},{"radius":12000,"waypoint":{"lon":-76.0058364868164,"lat":4.814666748046875,"altSmoothed":1456,"name":"D03","description":"Take Off ANSERMANUEVO"}},{"radius":1000,"waypoint":{"lon":-75.96849822998047,"lat":4.5879998207092285,"altSmoothed":945,"name":"G02","description":"GOL PISTA OBANDO"}},{"radius":3000,"waypoint":{"lon":-76.08983612060547,"lat":4.521833419799805,"altSmoothed":1014,"name":"P01","description":"ANTENAS HOTEL LOS VINEDOS"}},{"radius":66600,"waypoint":{"lon":-76.14350128173828,"lat":3.820333242416382,"altSmoothed":2651,"name":"X25","description":"X25"}},{"radius":11000,"waypoint":{"lon":-75.92416381835938,"lat":4.696666717529297,"altSmoothed":923,"name":"P16","description":"B36-"},"type":"ESS"},{"radius":200,"waypoint":{"lon":-75.96849822998047,"lat":4.5879998207092285,"altSmoothed":945,"name":"G02","description":"GOL PISTA OBANDO"}}],"sss":{"type":"RACE","direction":"EXIT","timeGates":["16:45:00Z"]},"goal":{"type":"CYLINDER","deadline":"22:00:00Z"},"earthModel":"WGS84"}
+{
+    "version": 1,
+    "taskType": "CLASSIC",
+    "turnpoints": [
+        {
+            "radius": 0,
+            "waypoint": {
+                "lon": -76.15351867675781,
+                "lat": 4.476049900054932,
+                "altSmoothed": 1702,
+                "name": "D01",
+                "description": "Take Off Los Tanques"
+            },
+            "type": "TAKEOFF"
+        },
+        {
+            "radius": 37000,
+            "waypoint": {
+                "lon": -76.16266632080078,
+                "lat": 4.83650016784668,
+                "altSmoothed": 2319,
+                "name": "X09",
+                "description": "X09"
+            },
+            "type": "SSS"
+        },
+        {
+            "radius": 4000,
+            "waypoint": {
+                "lon": -76.08300018310547,
+                "lat": 4.61299991607666,
+                "altSmoothed": 1037,
+                "name": "P37",
+                "description": "CERRO CRUZ TORO"
+            }
+        },
+        {
+            "radius": 12000,
+            "waypoint": {
+                "lon": -76.0058364868164,
+                "lat": 4.814666748046875,
+                "altSmoothed": 1456,
+                "name": "D03",
+                "description": "Take Off ANSERMANUEVO"
+            }
+        },
+        {
+            "radius": 1000,
+            "waypoint": {
+                "lon": -75.96849822998047,
+                "lat": 4.5879998207092285,
+                "altSmoothed": 945,
+                "name": "G02",
+                "description": "GOL PISTA OBANDO"
+            }
+        },
+        {
+            "radius": 3000,
+            "waypoint": {
+                "lon": -76.08983612060547,
+                "lat": 4.521833419799805,
+                "altSmoothed": 1014,
+                "name": "P01",
+                "description": "ANTENAS HOTEL LOS VINEDOS"
+            }
+        },
+        {
+            "radius": 66600,
+            "waypoint": {
+                "lon": -76.14350128173828,
+                "lat": 3.820333242416382,
+                "altSmoothed": 2651,
+                "name": "X25",
+                "description": "X25"
+            }
+        },
+        {
+            "radius": 11000,
+            "waypoint": {
+                "lon": -75.92416381835938,
+                "lat": 4.696666717529297,
+                "altSmoothed": 923,
+                "name": "P16",
+                "description": "B36-"
+            },
+            "type": "ESS"
+        },
+        {
+            "radius": 200,
+            "waypoint": {
+                "lon": -75.96849822998047,
+                "lat": 4.5879998207092285,
+                "altSmoothed": 945,
+                "name": "G02",
+                "description": "GOL PISTA OBANDO"
+            }
+        }
+    ],
+    "sss": {
+        "type": "RACE",
+        "direction": "EXIT",
+        "timeGates": [
+            "16:45:00Z"
+        ]
+    },
+    "goal": {
+        "type": "CYLINDER",
+        "deadline": "22:00:00Z"
+    },
+    "earthModel": "WGS84"
+}

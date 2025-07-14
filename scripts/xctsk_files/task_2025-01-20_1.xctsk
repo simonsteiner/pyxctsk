@@ -1,1 +1,131 @@
-{"version":1,"taskType":"CLASSIC","turnpoints":[{"radius":400,"waypoint":{"lon":-76.15351867675781,"lat":4.476049900054932,"altSmoothed":1702,"name":"D01","description":"Take Off Los Tanques"},"type":"TAKEOFF"},{"radius":10000,"waypoint":{"lon":-76.08300018310547,"lat":4.61299991607666,"altSmoothed":1037,"name":"P37","description":"CERRO CRUZ TORO"},"type":"SSS"},{"radius":22000,"waypoint":{"lon":-75.87433624267578,"lat":4.408666610717773,"altSmoothed":1073,"name":"X19","description":"X19"}},{"radius":18000,"waypoint":{"lon":-76.29733276367188,"lat":4.464166641235352,"altSmoothed":1685,"name":"X28","description":"X28"}},{"radius":21000,"waypoint":{"lon":-75.87433624267578,"lat":4.408666610717773,"altSmoothed":1073,"name":"X19","description":"X19"}},{"radius":19000,"waypoint":{"lon":-76.29733276367188,"lat":4.464166641235352,"altSmoothed":1685,"name":"X28","description":"X28"}},{"radius":20000,"waypoint":{"lon":-75.87433624267578,"lat":4.408666610717773,"altSmoothed":1073,"name":"X19","description":"X19"}},{"radius":66600,"waypoint":{"lon":-76.51983642578125,"lat":3.875166654586792,"altSmoothed":1513,"name":"X01","description":"X01"}},{"radius":7000,"waypoint":{"lon":-75.96849822998047,"lat":4.5879998207092285,"altSmoothed":945,"name":"G02","description":"GOL PISTA OBANDO"}},{"radius":3000,"waypoint":{"lon":-76.05122375488281,"lat":4.509069919586182,"altSmoothed":968,"name":"G01","description":"GOL LA VICTORIA"},"type":"ESS"},{"radius":200,"waypoint":{"lon":-76.05122375488281,"lat":4.509069919586182,"altSmoothed":968,"name":"G01","description":"GOL LA VICTORIA"}}],"sss":{"type":"RACE","direction":"EXIT","timeGates":["16:45:00Z"]},"goal":{"type":"CYLINDER","deadline":"22:00:00Z"},"earthModel":"WGS84"}
+{
+    "version": 1,
+    "taskType": "CLASSIC",
+    "turnpoints": [
+        {
+            "radius": 400,
+            "waypoint": {
+                "lon": -76.15351867675781,
+                "lat": 4.476049900054932,
+                "altSmoothed": 1702,
+                "name": "D01",
+                "description": "Take Off Los Tanques"
+            },
+            "type": "TAKEOFF"
+        },
+        {
+            "radius": 10000,
+            "waypoint": {
+                "lon": -76.08300018310547,
+                "lat": 4.61299991607666,
+                "altSmoothed": 1037,
+                "name": "P37",
+                "description": "CERRO CRUZ TORO"
+            },
+            "type": "SSS"
+        },
+        {
+            "radius": 22000,
+            "waypoint": {
+                "lon": -75.87433624267578,
+                "lat": 4.408666610717773,
+                "altSmoothed": 1073,
+                "name": "X19",
+                "description": "X19"
+            }
+        },
+        {
+            "radius": 18000,
+            "waypoint": {
+                "lon": -76.29733276367188,
+                "lat": 4.464166641235352,
+                "altSmoothed": 1685,
+                "name": "X28",
+                "description": "X28"
+            }
+        },
+        {
+            "radius": 21000,
+            "waypoint": {
+                "lon": -75.87433624267578,
+                "lat": 4.408666610717773,
+                "altSmoothed": 1073,
+                "name": "X19",
+                "description": "X19"
+            }
+        },
+        {
+            "radius": 19000,
+            "waypoint": {
+                "lon": -76.29733276367188,
+                "lat": 4.464166641235352,
+                "altSmoothed": 1685,
+                "name": "X28",
+                "description": "X28"
+            }
+        },
+        {
+            "radius": 20000,
+            "waypoint": {
+                "lon": -75.87433624267578,
+                "lat": 4.408666610717773,
+                "altSmoothed": 1073,
+                "name": "X19",
+                "description": "X19"
+            }
+        },
+        {
+            "radius": 66600,
+            "waypoint": {
+                "lon": -76.51983642578125,
+                "lat": 3.875166654586792,
+                "altSmoothed": 1513,
+                "name": "X01",
+                "description": "X01"
+            }
+        },
+        {
+            "radius": 7000,
+            "waypoint": {
+                "lon": -75.96849822998047,
+                "lat": 4.5879998207092285,
+                "altSmoothed": 945,
+                "name": "G02",
+                "description": "GOL PISTA OBANDO"
+            }
+        },
+        {
+            "radius": 3000,
+            "waypoint": {
+                "lon": -76.05122375488281,
+                "lat": 4.509069919586182,
+                "altSmoothed": 968,
+                "name": "G01",
+                "description": "GOL LA VICTORIA"
+            },
+            "type": "ESS"
+        },
+        {
+            "radius": 200,
+            "waypoint": {
+                "lon": -76.05122375488281,
+                "lat": 4.509069919586182,
+                "altSmoothed": 968,
+                "name": "G01",
+                "description": "GOL LA VICTORIA"
+            }
+        }
+    ],
+    "sss": {
+        "type": "RACE",
+        "direction": "EXIT",
+        "timeGates": [
+            "16:45:00Z"
+        ]
+    },
+    "goal": {
+        "type": "CYLINDER",
+        "deadline": "22:00:00Z"
+    },
+    "earthModel": "WGS84"
+}
