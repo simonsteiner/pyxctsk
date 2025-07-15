@@ -6,6 +6,19 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from bs4 import BeautifulSoup
 
+"""
+Extract and convert XCTrack task data from HTML files to structured JSON and GeoJSON formats.
+
+This script provides the TaskDataExtractor class for parsing, cleaning, and extracting
+paragliding/hang gliding competition task data from XCTrack HTML exports. It supports:
+- Metadata and turnpoint extraction
+- GeoJSON extraction from embedded JavaScript
+- Output to clean HTML, JSON, and GeoJSON files in a structured directory
+
+Usage:
+    Run as a script to process all HTML files in the input directory (downloaded_tasks/html_cleaned):
+        python scripts/extract_task_data.py
+"""
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
