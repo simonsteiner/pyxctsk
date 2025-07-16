@@ -40,6 +40,12 @@ def _find_optimal_cylinder_point(
     Returns:
         (lat, lon) of optimal point on cylinder perimeter
     """
+    # Edge case: if start and end points are identical (or very close),
+    # return the cylinder center to avoid meaningless optimization
+    start_to_end_distance = geodesic(start_point, end_point).meters
+    if start_to_end_distance < 1.0:  # Less than 1 meter difference
+        return cylinder_center
+
     cylinder_lon, cylinder_lat = cylinder_center[1], cylinder_center[0]
 
     # Use continuous optimization
