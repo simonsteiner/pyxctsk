@@ -42,12 +42,28 @@
 - Optional dependencies handled with try/except imports (see QR code support)
 
 ## Testing
+
 - Run tests with: `.venv/bin/python -m pytest`
 - Test organization:
-  - Basic tests in `test_basic.py`
-  - Distance calculation tests in `test_distance*.py` files
-  - Visual output tests create files in `tests/visual_output/`
-- Test data in `.xctsk` files in the `tests/` directory
+  - Core and utility tests: `test_core.py`, `test_utils.py`
+  - Distance calculation tests: `test_distance_essential.py`, `test_distance_reference.py`
+  - Format and parsing tests: `test_geojson.py`, `test_kml.py`, `test_qrcode.py`, `test_sss.py`
+  - Visual output tests (if any) create files in `tests/visual_output/`
+
+### Reference Test Data Structure
+
+- All test data is located in `tests/data/reference_tasks`, including `.xctsk` files and other formats.
+- Each `.xctsk` file has a corresponding `.json` file containing reference metadata and a QR code string.
+- The directory structure is as follows:
+  - `xctsk/`: XCTrack task files (`.xctsk`) used as input for both distance and QR code tests.
+  - `json/`: JSON files with reference metadata, including pre-calculated distances and QR code strings.
+  - `qrcode_string/`: Expected QR code strings in `.txt` files for QR code tests.
+
+### Test Usage
+
+- Test fixtures in `test_distance_reference.py` and related test modules automatically discover and use these files for validation.
+- QR code string and image validation is performed by `test_qrcode.py`.
+- Visual outputs (e.g., generated QR code images) are saved to `tests/data/visual_output/` during testing.
 
 ## Code Quality
 - Pre-commit hooks run: flake8, mypy, isort, black
@@ -59,3 +75,17 @@
 - QR code generation requires Pillow and qrcode libraries
 - QR code parsing requires pyzbar library
 - Distance calculations use geopy, pyproj and scipy
+        
+# Docstring Requirements
+
+All public functions, methods, and classes **must** have docstrings that follow the [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings). This includes:
+
+- A one-line summary at the top.
+- `Args:` section listing argument names, types, and descriptions.
+- `Returns:` section with return type and description (or `None`).
+- `Raises:` section for exceptions, if applicable.
+- Proper indentation and punctuation.
+
+Private methods (those starting with `_`) must include a docstring if they perform non-trivial logic.
+
+Avoid placeholder or redundant docstrings (e.g., "Returns the value").
