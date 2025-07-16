@@ -13,8 +13,8 @@ within acceptable tolerances, providing confidence in algorithm correctness.
 """
 
 import json
-import os
 import statistics
+from pathlib import Path
 from typing import Dict, List
 
 import pytest
@@ -37,33 +37,27 @@ class TestDistanceComprehensive:
     """
 
     @pytest.fixture(scope="class")
-    def reference_data(self) -> Dict[str, Dict]:
+    def reference_data(
+        self, reference_tasks_dir: Path, reference_json_dir: Path
+    ) -> Dict[str, Dict]:
         """Load reference task files and their expected JSON results."""
-        test_dir = os.path.dirname(__file__)
-        xctsk_dir = os.path.join(test_dir, "data", "reference_tasks", "xctsk")
-        json_dir = os.path.join(test_dir, "data", "reference_tasks", "json")
-
-        if not os.path.exists(xctsk_dir) or not os.path.exists(json_dir):
+        if not reference_tasks_dir.exists() or not reference_json_dir.exists():
             pytest.skip("Reference task directories not found")
 
         reference_data = {}
 
         # Load all reference tasks that have both .xctsk and .json files
-        for xctsk_file in os.listdir(xctsk_dir):
-            if not xctsk_file.endswith(".xctsk"):
-                continue
-
-            task_name = xctsk_file.replace(".xctsk", "")
+        for xctsk_file in reference_tasks_dir.glob("*.xctsk"):
+            task_name = xctsk_file.stem
             json_file = f"{task_name}.json"
-            json_path = os.path.join(json_dir, json_file)
+            json_path = reference_json_dir / json_file
 
-            if not os.path.exists(json_path):
+            if not json_path.exists():
                 continue
 
             try:
                 # Load task
-                task_path = os.path.join(xctsk_dir, xctsk_file)
-                task = parse_task(task_path)
+                task = parse_task(str(xctsk_file))
 
                 # Load reference JSON
                 with open(json_path, "r") as f:
@@ -72,7 +66,7 @@ class TestDistanceComprehensive:
                 reference_data[task_name] = {
                     "task": task,
                     "reference": json_data,
-                    "xctsk_file": xctsk_file,
+                    "xctsk_file": xctsk_file.name,
                 }
 
             except Exception as e:

@@ -1,4 +1,14 @@
-"""Tests for GeoJSON generation functionality."""
+"""Tests for GeoJSON generation functionality.
+
+Unit tests for GeoJSON generation and geometry logic in pyxctsk.
+
+This module covers:
+- Creation of GeoJSON features for turnpoints, optimized routes, and goal lines
+- Validation of feature properties, geometry, and color coding
+- Edge cases for geometry calculations (e.g., zero radius, coincident points)
+- Task-level GeoJSON output for various goal types and task structures
+- Internal helper logic for turnpoint and goal line construction
+"""
 
 from unittest.mock import Mock, patch
 

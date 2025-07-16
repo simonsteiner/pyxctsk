@@ -11,38 +11,21 @@ For comprehensive testing with reference data validation, see test_distance_refe
 which provides full coverage using real-world tasks and thorough algorithm validation.
 """
 
-import os
-
 import pytest
-from pyxctsk import parse_task
+from pyxctsk import Task
 from pyxctsk.distance import calculate_task_distances
 
 
 class TestEssentialDistance:
     """Essential distance calculation tests that should always pass quickly."""
 
-    @pytest.fixture
-    def test_data_dir(self) -> str:
-        """Return the path to test data directory."""
-        return os.path.join(
-            os.path.dirname(__file__), "data", "reference_tasks", "xctsk"
-        )
-
-    @pytest.fixture
-    def sample_task_file(self, test_data_dir: str) -> str:
-        """Return path to a representative task file for smoke testing."""
-        task_file = os.path.join(test_data_dir, "task_bevo.xctsk")
-        if not os.path.exists(task_file):
-            pytest.skip(f"Sample task file not found: {task_file}")
-        return task_file
-
-    def test_smoke_test_basic_functionality(self, sample_task_file: str):
+    def test_smoke_test_basic_functionality(self, bevo_task: Task):
         """Quick smoke test to ensure basic distance calculation works.
 
         This test validates that the core distance calculation pipeline
         functions correctly with real task data and produces sensible results.
         """
-        task = parse_task(sample_task_file)
+        task = bevo_task
 
         # Use fast settings for smoke test
         results = calculate_task_distances(task, angle_step=30)
