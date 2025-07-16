@@ -1,0 +1,141 @@
+{
+  "metadata": {
+    "file_name": "gibe",
+    "created": "2025-07-16 19:28:33 UTC",
+    "start_type": "Race",
+    "sss_open": "10:00 (UTC)",
+    "goal_type": "CYLINDER",
+    "task_deadline": "21:00 (UTC)",
+    "earth_model": "WGS84 ellipsoid",
+    "task_distance_through_centers": "190.7km (through centers)",
+    "task_distance_optimized": "174.5km (optimized)",
+    "": "174.5km (optimized)",
+    "distance_through_centers_km": 190.7,
+    "distance_optimized_km": 174.5
+  },
+  "turnpoints": [
+    {
+      "#": 1,
+      "Name": "TP01",
+      "Radius (m)": 1000,
+      "Distance (km)": 0.0,
+      "Optimized (km)": 0.0,
+      "Type": "Takeoff"
+    },
+    {
+      "#": 2,
+      "Name": "TP02",
+      "Radius (m)": 1000,
+      "Distance (km)": 4.5,
+      "Optimized (km)": 4.1,
+      "Type": "SSS"
+    },
+    {
+      "#": 3,
+      "Name": "TP31",
+      "Radius (m)": 1000,
+      "Distance (km)": 16.3,
+      "Optimized (km)": 15.2
+    },
+    {
+      "#": 4,
+      "Name": "TP33",
+      "Radius (m)": 1000,
+      "Distance (km)": 33.2,
+      "Optimized (km)": 31.3
+    },
+    {
+      "#": 5,
+      "Name": "TP34",
+      "Radius (m)": 1000,
+      "Distance (km)": 51.4,
+      "Optimized (km)": 48.7
+    },
+    {
+      "#": 6,
+      "Name": "TP41",
+      "Radius (m)": 1000,
+      "Distance (km)": 64.4,
+      "Optimized (km)": 60.9
+    },
+    {
+      "#": 7,
+      "Name": "TP43",
+      "Radius (m)": 1000,
+      "Distance (km)": 71.2,
+      "Optimized (km)": 66.4
+    },
+    {
+      "#": 8,
+      "Name": "TP49",
+      "Radius (m)": 1000,
+      "Distance (km)": 92.3,
+      "Optimized (km)": 86.7
+    },
+    {
+      "#": 9,
+      "Name": "TP51",
+      "Radius (m)": 1000,
+      "Distance (km)": 98.6,
+      "Optimized (km)": 92.8
+    },
+    {
+      "#": 10,
+      "Name": "TP25",
+      "Radius (m)": 1000,
+      "Distance (km)": 107.3,
+      "Optimized (km)": 101.2
+    },
+    {
+      "#": 11,
+      "Name": "TP23",
+      "Radius (m)": 1000,
+      "Distance (km)": 109.5,
+      "Optimized (km)": 101.6
+    },
+    {
+      "#": 12,
+      "Name": "TP17",
+      "Radius (m)": 1000,
+      "Distance (km)": 120.0,
+      "Optimized (km)": 111.4
+    },
+    {
+      "#": 13,
+      "Name": "TP16",
+      "Radius (m)": 1000,
+      "Distance (km)": 127.2,
+      "Optimized (km)": 118.1
+    },
+    {
+      "#": 14,
+      "Name": "TP03",
+      "Radius (m)": 1000,
+      "Distance (km)": 134.1,
+      "Optimized (km)": 123.9
+    },
+    {
+      "#": 15,
+      "Name": "TP30",
+      "Radius (m)": 1000,
+      "Distance (km)": 157.7,
+      "Optimized (km)": 145.6
+    },
+    {
+      "#": 16,
+      "Name": "TP14",
+      "Radius (m)": 1000,
+      "Distance (km)": 179.4,
+      "Optimized (km)": 165.3,
+      "Type": "ESS"
+    },
+    {
+      "#": 17,
+      "Name": "TP18",
+      "Radius (m)": 1000,
+      "Distance (km)": 190.7,
+      "Optimized (km)": 174.5,
+      "Type": "Goal"
+    }
+  ]
+}
