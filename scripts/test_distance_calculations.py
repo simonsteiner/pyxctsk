@@ -59,13 +59,13 @@ except ImportError as e:
 
 
 def load_all_tasks(tasks_dir: str) -> Dict[str, Any]:
-    """Load all .xctsk files from the given directory.
+    """Loads all .xctsk files from the specified directory.
 
     Args:
-        tasks_dir: Directory containing .xctsk files
+        tasks_dir (str): Directory containing .xctsk files.
 
     Returns:
-        Dictionary mapping filename to parsed task objects
+        Dict[str, Any]: Dictionary mapping filename to parsed task objects.
     """
     tasks: Dict[str, Any] = {}
     tasks_path = Path(tasks_dir)
@@ -87,13 +87,13 @@ def load_all_tasks(tasks_dir: str) -> Dict[str, Any]:
 
 
 def load_json_metadata(json_dir: str) -> Dict[str, Dict[str, Any]]:
-    """Load JSON metadata files containing pre-calculated distances.
+    """Loads JSON metadata files containing pre-calculated distances.
 
     Args:
-        json_dir: Directory containing .json files
+        json_dir (str): Directory containing .json files.
 
     Returns:
-        Dictionary mapping task name to metadata
+        Dict[str, Dict[str, Any]]: Dictionary mapping task name to metadata.
     """
     metadata: Dict[str, Dict[str, Any]] = {}
     json_path = Path(json_dir)
@@ -136,14 +136,14 @@ def test_distance_calculations(
     turnpoints: List[TaskTurnpoint],
     verbose: bool = False,
 ) -> Dict[str, Any]:
-    """Test distance calculations on a list of turnpoints.
+    """Tests distance calculations on a list of turnpoints using optimized_distance.
 
     Args:
-        turnpoints: List of TaskTurnpoint objects
-        verbose: Whether to print detailed progress
+        turnpoints (List[TaskTurnpoint]): List of TaskTurnpoint objects.
+        verbose (bool, optional): Whether to print detailed progress. Defaults to False.
 
     Returns:
-        Dictionary with timing and distance results
+        Dict[str, Any]: Dictionary with timing and distance results.
     """
     if len(turnpoints) < 2:
         return {
@@ -196,14 +196,17 @@ def test_airscore_calculations(
     task: Any,
     verbose: bool = False,
 ) -> Dict[str, Any]:
-    """Test AirScore distance calculations on a task.
+    """Tests AirScore distance calculations on a task.
 
     Args:
-        task: Parsed task object
-        verbose: Whether to print detailed progress
+        task (Any): Parsed task object.
+        verbose (bool, optional): Whether to print detailed progress. Defaults to False.
 
     Returns:
-        Dictionary with timing and distance results
+        Dict[str, Any]: Dictionary with timing and distance results.
+
+    Raises:
+        RuntimeError: If calculate_airscore_distances is not available.
     """
     # We use the calculate_airscore_distances function which handles
     # availability internally with fallbacks, so we don't need to check
@@ -279,17 +282,17 @@ def compare_with_reference(
     verbose: bool = False,
     use_airscore: bool = True,
 ) -> Dict[str, Any]:
-    """Compare optimization results with reference data.
+    """Compares optimization results with reference data for a given task.
 
     Args:
-        task_name: Name of the task file
-        task: Parsed task object
-        json_metadata: Optional JSON metadata for reference
-        verbose: Whether to print detailed progress
-        use_airscore: Whether to use AirScore calculation
+        task_name (str): Name of the task file.
+        task (Any): Parsed task object.
+        json_metadata (Optional[Dict[str, Any]], optional): Optional JSON metadata for reference. Defaults to None.
+        verbose (bool, optional): Whether to print detailed progress. Defaults to False.
+        use_airscore (bool, optional): Whether to use AirScore calculation. Defaults to True.
 
     Returns:
-        Dictionary with comparison results
+        Dict[str, Any]: Dictionary with comparison results.
     """
     if verbose:
         print(f"\n🔄 Analyzing task: {task_name}")
@@ -411,10 +414,10 @@ def compare_with_reference(
 
 
 def analyze_results(all_results: List[Dict[str, Any]]) -> None:
-    """Analyze and display comparison results with reference data.
+    """Analyzes and displays comparison results with reference data.
 
     Args:
-        all_results: List of task comparison results
+        all_results (List[Dict[str, Any]]): List of task comparison results.
     """
     print("\n" + "=" * 80)
     print("🏆 OPTIMIZATION COMPARISON WITH REFERENCE DATA")
@@ -673,7 +676,10 @@ def analyze_results(all_results: List[Dict[str, Any]]) -> None:
 
 
 def main():
-    """Main function to run the optimization comparison with reference data."""
+    """Runs the optimization comparison with reference data as a command-line tool.
+
+    Parses command-line arguments, loads tasks and metadata, runs comparisons, and prints results.
+    """
     parser = argparse.ArgumentParser(
         description="Compare pyxctsk optimization with reference data"
     )

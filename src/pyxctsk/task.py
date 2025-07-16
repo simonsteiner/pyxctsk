@@ -1,4 +1,16 @@
-"""Task data structures for XCTrack format."""
+"""
+XCTrack Task Data Structures and Domain Models.
+
+This module defines immutable dataclasses, enums, and validation logic for representing,
+parsing, and serializing XCTrack competition tasks. It covers the core domain models:
+  - Task, Turnpoint, Waypoint, Takeoff, SSS, Goal, TimeOfDay
+  - Enums for constrained values (e.g., TaskType, TurnpointType, GoalType)
+  - Serialization/deserialization to/from JSON and internal dicts
+  - Validation and logic for task structure and goal/ESS handling
+
+Intended for use in parsing, generating, and manipulating XCTrack task formats, including
+support for QR code encoding/decoding and distance calculations (see related modules).
+"""
 
 import json
 import re
@@ -13,42 +25,74 @@ if TYPE_CHECKING:
 
 
 class Direction(str, Enum):
-    """Direction enumeration."""
+    """Enumeration of direction types for turnpoints.
+
+    Attributes:
+        ENTER (str): Enter direction.
+        EXIT (str): Exit direction.
+    """
 
     ENTER = "ENTER"
     EXIT = "EXIT"
 
 
 class EarthModel(str, Enum):
-    """Earth model enumeration."""
+    """Enumeration of supported earth models.
+
+    Attributes:
+        WGS84 (str): WGS84 ellipsoid.
+        FAI_SPHERE (str): FAI sphere model.
+    """
 
     WGS84 = "WGS84"
     FAI_SPHERE = "FAI_SPHERE"
 
 
 class GoalType(str, Enum):
-    """Goal type enumeration."""
+    """Enumeration of goal types.
+
+    Attributes:
+        CYLINDER (str): Cylinder goal.
+        LINE (str): Line goal.
+    """
 
     CYLINDER = "CYLINDER"
     LINE = "LINE"
 
 
 class SSSType(str, Enum):
-    """Start of speed section type enumeration."""
+    """Enumeration of start of speed section (SSS) types.
+
+    Attributes:
+        RACE (str): Race start.
+        ELAPSED_TIME (str): Elapsed time start.
+    """
 
     RACE = "RACE"
     ELAPSED_TIME = "ELAPSED-TIME"
 
 
 class TaskType(str, Enum):
-    """Task type enumeration."""
+    """Enumeration of task types.
+
+    Attributes:
+        CLASSIC (str): Classic task.
+        WAYPOINTS (str): Waypoints task.
+    """
 
     CLASSIC = "CLASSIC"
     WAYPOINTS = "W"
 
 
 class TurnpointType(str, Enum):
-    """Turnpoint type enumeration."""
+    """Enumeration of turnpoint types.
+
+    Attributes:
+        NONE (str): No type.
+        TAKEOFF (str): Takeoff point.
+        SSS (str): Start of speed section.
+        ESS (str): End of speed section.
+    """
 
     NONE = ""
     TAKEOFF = "TAKEOFF"
@@ -58,7 +102,13 @@ class TurnpointType(str, Enum):
 
 @dataclass
 class TimeOfDay:
-    """Time of day representation."""
+    """Represents a time of day (HH:MM:SS).
+
+    Attributes:
+        hour (int): Hour (0-23).
+        minute (int): Minute (0-59).
+        second (int): Second (0-59).
+    """
 
     hour: int
     minute: int
@@ -74,12 +124,28 @@ class TimeOfDay:
             raise ValueError("Second must be between 0 and 59")
 
     def to_json_string(self) -> str:
-        """Convert to JSON string format."""
+        """
+        Convert to JSON string format.
+
+        Returns:
+            str: JSON string representation of the time.
+        """
         return f'"{self.hour:02d}:{self.minute:02d}:{self.second:02d}Z"'
 
     @classmethod
     def from_json_string(cls, time_str: str) -> "TimeOfDay":
-        """Parse from JSON string format."""
+        """
+        Parse from JSON string format.
+
+        Args:
+            time_str (str): JSON string to parse.
+
+        Returns:
+            TimeOfDay: Parsed TimeOfDay object.
+
+        Raises:
+            InvalidTimeOfDayError: If the string is not a valid time.
+        """
         # Handle both quoted and unquoted formats
         if time_str.startswith('"') and time_str.endswith('"'):
             time_str = time_str[1:-1]  # Remove quotes
@@ -96,12 +162,21 @@ class TimeOfDay:
         return cls(hour=hour, minute=minute, second=second)
 
     def __str__(self) -> str:
+        """Return string representation in HH:MM:SSZ format."""
         return f"{self.hour:02d}:{self.minute:02d}:{self.second:02d}Z"
 
 
 @dataclass
 class Waypoint:
-    """Waypoint representation."""
+    """Represents a waypoint with coordinates and optional description.
+
+    Attributes:
+        name (str): Name of the waypoint.
+        lat (float): Latitude in decimal degrees.
+        lon (float): Longitude in decimal degrees.
+        alt_smoothed (int): Smoothed altitude in meters.
+        description (Optional[str]): Optional description.
+    """
 
     name: str
     lat: float
@@ -110,7 +185,12 @@ class Waypoint:
     description: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for JSON serialization."""
+        """
+        Convert to dictionary for JSON serialization.
+
+        Returns:
+            Dict[str, Any]: Dictionary representation for JSON.
+        """
         result = {
             "name": self.name,
             "lat": self.lat,
@@ -123,7 +203,15 @@ class Waypoint:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Waypoint":
-        """Create from dictionary."""
+        """
+        Create from dictionary.
+
+        Args:
+            data (Dict[str, Any]): Dictionary to parse.
+
+        Returns:
+            Waypoint: Parsed Waypoint object.
+        """
         return cls(
             name=data["name"],
             lat=data["lat"],
@@ -135,14 +223,25 @@ class Waypoint:
 
 @dataclass
 class Turnpoint:
-    """Turnpoint representation."""
+    """Represents a turnpoint in a task.
+
+    Attributes:
+        radius (int): Turnpoint radius in meters.
+        waypoint (Waypoint): Associated waypoint.
+        type (Optional[TurnpointType]): Type of turnpoint.
+    """
 
     radius: int
     waypoint: Waypoint
     type: Optional[TurnpointType] = None
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for JSON serialization."""
+        """
+        Convert to dictionary for JSON serialization.
+
+        Returns:
+            Dict[str, Any]: Dictionary representation for JSON.
+        """
         result = {
             "radius": self.radius,
             "waypoint": self.waypoint.to_dict(),
@@ -153,7 +252,15 @@ class Turnpoint:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Turnpoint":
-        """Create from dictionary."""
+        """
+        Create from dictionary.
+
+        Args:
+            data (Dict[str, Any]): Dictionary to parse.
+
+        Returns:
+            Turnpoint: Parsed Turnpoint object.
+        """
         turnpoint_type = None
         if "type" in data and data["type"]:
             turnpoint_type = TurnpointType(data["type"])
@@ -167,13 +274,23 @@ class Turnpoint:
 
 @dataclass
 class Takeoff:
-    """Takeoff representation."""
+    """Represents takeoff window with open/close times.
+
+    Attributes:
+        time_open (Optional[TimeOfDay]): Opening time.
+        time_close (Optional[TimeOfDay]): Closing time.
+    """
 
     time_open: Optional[TimeOfDay] = None
     time_close: Optional[TimeOfDay] = None
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for JSON serialization."""
+        """
+        Convert to dictionary for JSON serialization.
+
+        Returns:
+            Dict[str, Any]: Dictionary representation for JSON.
+        """
         result = {}
         if self.time_open:
             result["timeOpen"] = self.time_open.to_json_string()
@@ -183,7 +300,15 @@ class Takeoff:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Takeoff":
-        """Create from dictionary."""
+        """
+        Create from dictionary.
+
+        Args:
+            data (Dict[str, Any]): Dictionary to parse.
+
+        Returns:
+            Takeoff: Parsed Takeoff object.
+        """
         time_open = None
         time_close = None
 
@@ -197,7 +322,14 @@ class Takeoff:
 
 @dataclass
 class SSS:
-    """Start of speed section representation."""
+    """Represents a start of speed section (SSS).
+
+    Attributes:
+        type (SSSType): SSS type.
+        direction (Direction): SSS direction.
+        time_gates (List[TimeOfDay]): List of time gates.
+        time_close (Optional[TimeOfDay]): Optional closing time.
+    """
 
     type: SSSType
     direction: Direction
@@ -205,7 +337,12 @@ class SSS:
     time_close: Optional[TimeOfDay] = None
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for JSON serialization."""
+        """
+        Convert to dictionary for JSON serialization.
+
+        Returns:
+            Dict[str, Any]: Dictionary representation for JSON.
+        """
         result = {
             "type": self.type.value,
             "direction": self.direction.value,
@@ -217,7 +354,15 @@ class SSS:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "SSS":
-        """Create from dictionary."""
+        """
+        Create from dictionary.
+
+        Args:
+            data (Dict[str, Any]): Dictionary to parse.
+
+        Returns:
+            SSS: Parsed SSS object.
+        """
         time_gates = []
         if "timeGates" in data:
             time_gates = [
@@ -238,11 +383,14 @@ class SSS:
 
 @dataclass
 class Goal:
-    """Goal representation.
+    """Represents a goal for a task.
 
-    For goal type LINE, the line_length represents the total length of the goal line.
-    The radius of the last turnpoint represents half of this length.
-    The goal line orientation is perpendicular to the azimuth to the last turnpoint center.
+    For goal type LINE, the line_length represents the total length of the goal line. The radius of the last turnpoint represents half of this length. The goal line orientation is perpendicular to the azimuth to the last turnpoint center.
+
+    Attributes:
+        type (Optional[GoalType]): Goal type.
+        deadline (Optional[TimeOfDay]): Goal deadline.
+        line_length (Optional[float]): Length of the goal line (for LINE type).
     """
 
     type: Optional[GoalType] = None
@@ -250,7 +398,12 @@ class Goal:
     line_length: Optional[float] = None
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for JSON serialization."""
+        """
+        Convert to dictionary for JSON serialization.
+
+        Returns:
+            Dict[str, Any]: Dictionary representation for JSON.
+        """
         result = {}
         if self.type:
             result["type"] = self.type.value
@@ -265,7 +418,15 @@ class Goal:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Goal":
-        """Create from dictionary."""
+        """
+        Create from dictionary.
+
+        Args:
+            data (Dict[str, Any]): Dictionary to parse.
+
+        Returns:
+            Goal: Parsed Goal object.
+        """
         goal_type = None
         deadline = None
         line_length = None  # No default line length
@@ -282,7 +443,17 @@ class Goal:
 
 @dataclass
 class Task:
-    """XCTrack task representation."""
+    """Represents an XCTrack task, including turnpoints and settings.
+
+    Attributes:
+        task_type (TaskType): Type of the task.
+        version (int): Task format version.
+        turnpoints (List[Turnpoint]): List of turnpoints.
+        earth_model (Optional[EarthModel]): Earth model used.
+        takeoff (Optional[Takeoff]): Takeoff window.
+        sss (Optional[SSS]): Start of speed section.
+        goal (Optional[Goal]): Task goal.
+    """
 
     task_type: TaskType
     version: int
@@ -329,7 +500,12 @@ class Task:
             pass
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for JSON serialization."""
+        """
+        Convert to dictionary for JSON serialization.
+
+        Returns:
+            Dict[str, Any]: Dictionary representation for JSON.
+        """
         # Apply goal line length logic before serializing
         if (
             self.goal
@@ -360,7 +536,15 @@ class Task:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Task":
-        """Create from dictionary."""
+        """
+        Create from dictionary.
+
+        Args:
+            data (Dict[str, Any]): Dictionary to parse.
+
+        Returns:
+            Task: Parsed Task object.
+        """
         turnpoints = [Turnpoint.from_dict(tp) for tp in data["turnpoints"]]
 
         earth_model = None
@@ -405,26 +589,45 @@ class Task:
         )
 
     def to_json(self) -> str:
-        """Convert to JSON string."""
+        """
+        Convert to JSON string.
+
+        Returns:
+            str: JSON string representation of the task.
+        """
         return json.dumps(self.to_dict(), separators=(",", ":"))
 
     @classmethod
     def from_json(cls, json_str: str) -> "Task":
-        """Create from JSON string."""
+        """
+        Create from JSON string.
+
+        Args:
+            json_str (str): JSON string to parse.
+
+        Returns:
+            Task: Parsed Task object.
+        """
         data = json.loads(json_str)
         return cls.from_dict(data)
 
     def to_qr_code_task(self) -> "QRCodeTask":
-        """Convert to QR code task format."""
+        """
+        Convert to QR code task format.
+
+        Returns:
+            QRCodeTask: QRCodeTask object created from this task.
+        """
         from .qrcode_task import QRCodeTask
 
         return QRCodeTask.from_task(self)
 
     def find_ess_turnpoint(self) -> Optional[Turnpoint]:
-        """Find and return the ESS turnpoint, if any.
+        """
+        Find and return the ESS turnpoint, if any.
 
         Returns:
-            The turnpoint marked as ESS or None if no ESS turnpoint exists.
+            Optional[Turnpoint]: The turnpoint marked as ESS or None if no ESS turnpoint exists.
         """
         for tp in self.turnpoints:
             if tp.type == TurnpointType.ESS:
@@ -432,10 +635,11 @@ class Task:
         return None
 
     def is_ess_goal(self) -> bool:
-        """Check if the ESS turnpoint is the same as the goal (last turnpoint).
+        """
+        Check if the ESS turnpoint is the same as the goal (last turnpoint).
 
         Returns:
-            True if ESS is the same as goal, False otherwise.
+            bool: True if ESS is the same as goal, False otherwise.
         """
         if not self.turnpoints:
             return False

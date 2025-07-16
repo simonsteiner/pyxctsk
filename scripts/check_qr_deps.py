@@ -8,7 +8,11 @@ import sys
 
 
 def get_install_hint():
-    """Get installation hint based on the detected operating system."""
+    """Get installation hint for installing the zbar system library based on the detected operating system.
+
+    Returns:
+        str: Installation command or hint appropriate for the user's OS and distribution.
+    """
     system = platform.system()
 
     if system == "Linux":

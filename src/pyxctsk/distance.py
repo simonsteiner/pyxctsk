@@ -1,7 +1,16 @@
-"""Distance calculation module using WGS84 ellipsoid and route optimization.
+"""
+Distance calculation and route optimization for XCTrack tasks using WGS84 ellipsoid.
 
-This module provides a simplified interface to the distance calculation functionality
-that has been refactored into smaller, focused modules.
+This module provides a unified, minimal interface for all distance-related calculations
+in the pyxctsk package. It exposes the main public API for:
+- Optimized route and distance calculations through turnpoint cylinders
+- Iterative refinement and beam search algorithms for shortest path
+- SSS (Start of Speed Section) entry point and info calculations
+- Cumulative and per-leg task distance calculations
+- Configuration of optimization parameters
+
+All core logic is implemented in focused submodules; this module re-exports
+main entry points for use by other code and CLI tools.
 """
 
 from typing import List, Optional, Tuple

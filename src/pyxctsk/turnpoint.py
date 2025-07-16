@@ -1,4 +1,15 @@
-"""TaskTurnpoint class and geometry calculations for distance optimization."""
+"""
+Turnpoint geometry and optimization utilities for XCTrack task calculations.
+
+This module provides:
+- The `TaskTurnpoint` class: immutable turnpoint model for paragliding/hang gliding tasks
+- Distance and geometry utilities for cylinders and goal lines
+- Perimeter and optimal point calculations for distance optimization
+- Support for both cylinder and goal line turnpoint types
+- All calculations use WGS84 ellipsoid and geodesic math
+
+Intended for use in parsing, generating, and optimizing XCTrack tasks.
+"""
 
 from typing import List, Optional, Tuple
 
@@ -115,14 +126,15 @@ class TaskTurnpoint:
         goal_type: Optional[str] = None,
         goal_line_length: Optional[float] = None,
     ):
-        """Initialize a task turnpoint.
+        """
+        Initialize a task turnpoint.
 
         Args:
-            lat: Latitude in degrees
-            lon: Longitude in degrees
-            radius: Cylinder radius in meters
-            goal_type: Type of goal (None, "CYLINDER", or "LINE")
-            goal_line_length: Length of goal line in meters (None means calculate from radius)
+            lat (float): Latitude in degrees.
+            lon (float): Longitude in degrees.
+            radius (float): Cylinder radius in meters.
+            goal_type (Optional[str]): Type of goal (None, "CYLINDER", or "LINE").
+            goal_line_length (Optional[float]): Length of goal line in meters (None means calculate from radius).
         """
         self.center = (lat, lon)
         self.radius = radius
@@ -132,13 +144,14 @@ class TaskTurnpoint:
     def perimeter_points(
         self, angle_step: int = DEFAULT_ANGLE_STEP
     ) -> List[Tuple[float, float]]:
-        """Generate perimeter points around the turnpoint at given angle steps.
+        """
+        Generate perimeter points around the turnpoint at given angle steps.
 
         Args:
-            angle_step: Angle step in degrees
+            angle_step (int): Angle step in degrees.
 
         Returns:
-            List of (lat, lon) tuples representing points on the cylinder perimeter
+            List[Tuple[float, float]]: List of (lat, lon) tuples representing points on the cylinder perimeter.
         """
         if self.goal_type == "LINE":
             # For goal lines, we need a previous point to determine orientation
@@ -157,17 +170,18 @@ class TaskTurnpoint:
     def goal_line_points(
         self, prev_point: Tuple[float, float], angle_step: int = DEFAULT_ANGLE_STEP
     ) -> List[Tuple[float, float]]:
-        """Generate points along a goal line.
+        """
+        Generate points along a goal line.
 
         The goal line is perpendicular to the line from the previous point to the center,
         with the goal line center being in the middle of the line.
 
         Args:
-            prev_point: Previous point in route (needed for goal line orientation)
-            angle_step: Angle step in degrees for sampling points
+            prev_point (Tuple[float, float]): Previous point in route (needed for goal line orientation).
+            angle_step (int): Angle step in degrees for sampling points.
 
         Returns:
-            List of (lat, lon) tuples representing points on the goal line
+            List[Tuple[float, float]]: List of (lat, lon) tuples representing points on the goal line.
         """
         if self.goal_type != "LINE":
             return self.perimeter_points(angle_step)
@@ -229,16 +243,17 @@ class TaskTurnpoint:
         prev_point: Tuple[float, float],
         next_point: Tuple[float, float],
     ) -> Tuple[float, float]:
-        """Find the optimal point on this turnpoint's cylinder or goal line.
+        """
+        Find the optimal point on this turnpoint's cylinder or goal line.
 
         Uses scipy's optimization for precise results.
 
         Args:
-            prev_point: (lat, lon) of previous point in route
-            next_point: (lat, lon) of next point in route
+            prev_point (Tuple[float, float]): (lat, lon) of previous point in route.
+            next_point (Tuple[float, float]): (lat, lon) of next point in route.
 
         Returns:
-            (lat, lon) of optimal point on cylinder perimeter or goal line
+            Tuple[float, float]: (lat, lon) of optimal point on cylinder perimeter or goal line.
         """
         if self.goal_type == "LINE":
             return self._find_optimal_goal_line_point(prev_point, next_point)
@@ -253,19 +268,20 @@ class TaskTurnpoint:
     def _find_optimal_goal_line_point(
         self, prev_point: Tuple[float, float], next_point: Tuple[float, float]
     ) -> Tuple[float, float]:
-        """Find the optimal point on the goal line.
+        """
+        Find the optimal point on the goal line.
 
         For a goal line, the optimal crossing point depends on:
-        1. Direction of approach (from prev_point)
-        2. The perpendicular line with the goal line center in the middle
-        3. The semi-circle control zone behind the goal line
+          1. Direction of approach (from prev_point)
+          2. The perpendicular line with the goal line center in the middle
+          3. The semi-circle control zone behind the goal line
 
         Args:
-            prev_point: (lat, lon) of previous point in route
-            next_point: (lat, lon) of next point in route (may not be used for goal line)
+            prev_point (Tuple[float, float]): (lat, lon) of previous point in route.
+            next_point (Tuple[float, float]): (lat, lon) of next point in route (may not be used for goal line).
 
         Returns:
-            (lat, lon) of optimal point on the goal line or semi-circle control zone
+            Tuple[float, float]: (lat, lon) of optimal point on the goal line or semi-circle control zone.
         """
         # Calculate bearing from previous point to goal center
         forward_azimuth, _, distance_to_center = geod.inv(
@@ -349,15 +365,16 @@ class TaskTurnpoint:
         next_point: Tuple[float, float],
         angle_step: int = DEFAULT_ANGLE_STEP,
     ) -> List[Tuple[float, float]]:
-        """Get optimized perimeter points for this turnpoint.
+        """
+        Get optimized perimeter points for this turnpoint.
 
         Args:
-            prev_point: Previous point in route
-            next_point: Next point in route
-            angle_step: Angle step for fallback uniform sampling
+            prev_point (Tuple[float, float]): Previous point in route.
+            next_point (Tuple[float, float]): Next point in route.
+            angle_step (int): Angle step for fallback uniform sampling.
 
         Returns:
-            List of (lat, lon) points on perimeter
+            List[Tuple[float, float]]: List of (lat, lon) points on perimeter.
         """
         if self.goal_type == "LINE":
             # For goal lines, we need both a previous point and a special handling
@@ -375,13 +392,14 @@ class TaskTurnpoint:
 
 
 def distance_through_centers(turnpoints: List[TaskTurnpoint]) -> float:
-    """Calculate distance through turnpoint centers.
+    """
+    Calculate distance through turnpoint centers.
 
     Args:
-        turnpoints: List of TaskTurnpoint objects
+        turnpoints (List[TaskTurnpoint]): List of TaskTurnpoint objects.
 
     Returns:
-        Distance through centers in meters
+        float: Distance through centers in meters.
     """
     if len(turnpoints) < 2:
         return 0.0

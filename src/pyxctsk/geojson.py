@@ -1,3 +1,18 @@
+"""
+GeoJSON generation utilities for XCTrack task visualization.
+
+This module provides functions to convert pyxctsk task objects into GeoJSON FeatureCollections for mapping and visualization.
+
+Features:
+- Turnpoints as GeoJSON Point features with styling for type (takeoff, SSS, ESS, goal, etc.)
+- Optimized route as a LineString feature (if available)
+- Goal line and control zone (for LINE type goals) as LineString and Polygon features
+
+All features include geometry and properties suitable for web map display, including color, opacity, and descriptive metadata.
+
+Intended for use in web-based or desktop mapping tools to visualize XCTrack competition tasks.
+"""
+
 from typing import Dict, List, Optional, Tuple
 
 from pyproj import Geod

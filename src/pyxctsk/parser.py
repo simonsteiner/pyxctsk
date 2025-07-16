@@ -1,4 +1,18 @@
-"""Parser for XCTrack task data."""
+"""
+XCTrack Task Parser.
+
+Parse, load, and convert XCTrack task data from various formats.
+Handles optional QR code dependencies.
+
+Supports:
+- JSON string/bytes with task data
+- XCTSK: URL string/bytes (compact QR code format)
+- Image bytes containing a QR code (if QR code dependencies are available)
+- File path (str) to any of the above (auto-detected)
+
+Functions:
+    parse_task(data: Union[bytes, str]) -> Task: Auto-detect and parse task from supported formats.
+"""
 
 import json
 from io import BytesIO
@@ -22,21 +36,15 @@ except ImportError:
 
 def parse_task(data: Union[bytes, str]) -> Task:
     """
-    Parse a Task from data.
+    Parse a XCTrack Task from a variety of input formats.
 
     Args:
-        data: Input data as bytes, string, or file path. Can be:
-            - JSON string/bytes containing task data
-            - XCTSK: URL string/bytes
-            - Image bytes containing QR code
-            - File path to any of the above
-
+        data: Input data as bytes, string, or file path.
     Returns:
-        Parsed Task object
-
+        Task: Parsed Task object.
     Raises:
-        EmptyInputError: If input data is empty
-        InvalidFormatError: If input format is invalid or cannot be parsed
+        EmptyInputError: If input is empty.
+        InvalidFormatError: If input format is invalid or cannot be parsed.
     """
     if not data:
         raise EmptyInputError("empty input")

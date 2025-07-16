@@ -34,9 +34,30 @@ except ImportError:
 
 
 class QRCodeTestResult:
-    """Result of a QR code test."""
+    """Stores the result of a QR code test for a single XCTSK file.
+
+    Attributes:
+        task_name (str): Name of the task (file stem).
+        xctsk_exists (bool): Whether the XCTSK file exists.
+        expected_txt_exists (bool): Whether the expected QR string TXT file exists.
+        expected_png_exists (bool): Whether the expected QR PNG file exists.
+        qr_string_generated (bool): Whether a QR string was generated.
+        qr_string_matches (bool): Whether the generated QR string matches the expected.
+        qr_png_generated (bool): Whether a QR PNG was generated.
+        qr_png_parsable (bool): Whether the generated QR PNG can be parsed.
+        roundtrip_success (bool): Whether the QR code roundtrip (encode/decode/parse) succeeded.
+        error_message (str): Error message if any error occurred.
+        generated_qr_string (str): The generated QR string.
+        expected_qr_string (str): The expected QR string (if available).
+        generated_png_path (str): Path to the generated PNG file.
+    """
 
     def __init__(self, task_name: str):
+        """Initializes a QRCodeTestResult instance.
+
+        Args:
+            task_name (str): Name of the task (file stem).
+        """
         self.task_name = task_name
         self.xctsk_exists = False
         self.expected_txt_exists = False
@@ -55,22 +76,32 @@ class QRCodeTestResult:
 
 
 def find_xctsk_files(xctsk_dir: Path) -> List[Path]:
-    """Find all XCTSK files in the given directory."""
+    """Finds all XCTSK files in the given directory.
+
+    Args:
+        xctsk_dir (Path): Directory to search for .xctsk files.
+
+    Returns:
+        List[Path]: List of paths to XCTSK files found in the directory.
+    """
     return list(xctsk_dir.glob("*.xctsk"))
 
 
 def test_qr_code_generation(
     xctsk_file: Path, expected_dir: Path, output_dir: Path
 ) -> QRCodeTestResult:
-    """Test QR code generation for a single XCTSK file.
+    """Tests QR code generation for a single XCTSK file.
+
+    This function generates a QR code string and PNG for the given XCTSK file, compares the results
+    with expected outputs, and checks roundtrip parsing if possible.
 
     Args:
-        xctsk_file: Path to the XCTSK file
-        expected_dir: Directory containing expected QR code results
-        output_dir: Directory to save generated QR codes
+        xctsk_file (Path): Path to the XCTSK file.
+        expected_dir (Path): Directory containing expected QR code results (TXT, PNG).
+        output_dir (Path): Directory to save generated QR code PNGs.
 
     Returns:
-        QRCodeTestResult with test results
+        QRCodeTestResult: Object containing the results of the test.
     """
     task_name = xctsk_file.stem
     result = QRCodeTestResult(task_name)
@@ -162,8 +193,15 @@ def test_qr_code_generation(
     return result
 
 
-def print_summary(results: List[QRCodeTestResult]):
-    """Print a summary of test results."""
+def print_summary(results: List[QRCodeTestResult]) -> None:
+    """Prints a summary of QR code test results.
+
+    Args:
+        results (List[QRCodeTestResult]): List of test results to summarize.
+
+    Returns:
+        None
+    """
     total = len(results)
     xctsk_found = sum(1 for r in results if r.xctsk_exists)
     expected_txt_found = sum(1 for r in results if r.expected_txt_exists)
@@ -194,8 +232,18 @@ def print_summary(results: List[QRCodeTestResult]):
     print("=" * 60)
 
 
-def print_detailed_results(results: List[QRCodeTestResult], show_matches: bool = False):
-    """Print detailed results for each task."""
+def print_detailed_results(
+    results: List[QRCodeTestResult], show_matches: bool = False
+) -> None:
+    """Prints detailed results for each task.
+
+    Args:
+        results (List[QRCodeTestResult]): List of test results to display.
+        show_matches (bool, optional): If True, show mismatched QR strings. Defaults to False.
+
+    Returns:
+        None
+    """
     print("\nDETAILED RESULTS:")
     print("-" * 80)
 
@@ -253,8 +301,14 @@ def print_detailed_results(results: List[QRCodeTestResult], show_matches: bool =
             )
 
 
-def main():
-    """Main function."""
+def main() -> int:
+    """Main entry point for the QR code generation test script.
+
+    Parses command-line arguments, runs tests for all XCTSK files, and prints a summary.
+
+    Returns:
+        int: Exit code (0 if all tests pass, 1 otherwise).
+    """
     parser = argparse.ArgumentParser(
         description="Test QR code generation for XCTSK files"
     )

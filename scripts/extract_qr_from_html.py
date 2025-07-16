@@ -44,7 +44,15 @@ except ImportError as e:
 
 
 def extract_base64_svgs(html_content: str) -> List[str]:
-    """Extract base64 encoded SVG images from HTML content."""
+    """
+    Extract base64 encoded SVG images from HTML content.
+
+    Args:
+        html_content (str): HTML content as a string.
+
+    Returns:
+        List[str]: List of base64-encoded SVG image strings.
+    """
     # Pattern to match base64 encoded SVG images
     pattern = r"data:image/svg\+xml;base64,([A-Za-z0-9+/=]+)"
     matches = re.findall(pattern, html_content)
@@ -52,7 +60,15 @@ def extract_base64_svgs(html_content: str) -> List[str]:
 
 
 def decode_base64_svg(base64_data: str) -> str:
-    """Decode base64 encoded SVG data."""
+    """
+    Decode base64 encoded SVG data.
+
+    Args:
+        base64_data (str): Base64-encoded SVG data.
+
+    Returns:
+        str: Decoded SVG XML as a string, or empty string on error.
+    """
     try:
         svg_data = base64.b64decode(base64_data)
         return svg_data.decode("utf-8")
@@ -62,7 +78,15 @@ def decode_base64_svg(base64_data: str) -> str:
 
 
 def svg_to_png(svg_data: str) -> Optional[np.ndarray]:
-    """Convert SVG data to PNG image as numpy array."""
+    """
+    Convert SVG data to PNG image as a numpy array.
+
+    Args:
+        svg_data (str): SVG XML data as a string.
+
+    Returns:
+        Optional[np.ndarray]: PNG image as a numpy array, or None on error.
+    """
     try:
         # Convert SVG to PNG bytes
         png_bytes = svg2png(bytestring=svg_data.encode("utf-8"))
@@ -80,7 +104,15 @@ def svg_to_png(svg_data: str) -> Optional[np.ndarray]:
 
 
 def decode_qr_code(image: np.ndarray) -> List[str]:
-    """Decode QR codes from an image."""
+    """
+    Decode QR codes from an image.
+
+    Args:
+        image (np.ndarray): Image as a numpy array (BGR format).
+
+    Returns:
+        List[str]: List of decoded QR code strings.
+    """
     qr_codes = []
 
     # Convert to grayscale for better QR code detection
@@ -97,7 +129,16 @@ def decode_qr_code(image: np.ndarray) -> List[str]:
 
 
 def process_html_file(html_file: Path, output_dir: Optional[Path] = None) -> List[str]:
-    """Process an HTML file and extract QR codes from base64 SVG images."""
+    """
+    Process an HTML file and extract QR codes from base64 SVG images.
+
+    Args:
+        html_file (Path): Path to the HTML file to process.
+        output_dir (Optional[Path]): Directory to save intermediate PNG files (optional).
+
+    Returns:
+        List[str]: List of decoded QR code strings found in the file.
+    """
     print(f"Processing: {html_file}")
 
     # Create QR code output directory
@@ -164,6 +205,9 @@ def process_html_file(html_file: Path, output_dir: Optional[Path] = None) -> Lis
 
 
 def main():
+    """
+    Command-line entry point for extracting QR codes from HTML files containing base64 SVG images.
+    """
     parser = argparse.ArgumentParser(
         description="Extract QR codes from base64 SVG images in HTML files"
     )

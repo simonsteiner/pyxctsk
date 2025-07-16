@@ -9,9 +9,10 @@ from enum import IntEnum
 
 
 class QRCodeDirection(IntEnum):
-    """QR code direction enumeration.
+    """QR code direction enumeration (OBSOLETE).
 
-    OBSOLETE: This field is kept for backwards compatibility but ignored when reading tasks.
+    This field is kept for backwards compatibility with older QR code tasks,
+    but is ignored when reading tasks in the current format.
     """
 
     ENTER = 1
@@ -21,9 +22,9 @@ class QRCodeDirection(IntEnum):
 class QRCodeEarthModel(IntEnum):
     """QR code earth model enumeration.
 
-    Specifies the earth model for distance calculations:
+    Specifies the earth model used for distance calculations:
     - WGS84 (0): World Geodetic System 1984 (default)
-    - FAI_SPHERE (1): FAI sphere model
+    - FAI_SPHERE (1): FAI sphere model (used in some competitions)
     """
 
     WGS84 = 0
@@ -33,7 +34,7 @@ class QRCodeEarthModel(IntEnum):
 class QRCodeGoalType(IntEnum):
     """QR code goal type enumeration.
 
-    Specifies the goal crossing type:
+    Specifies the type of goal crossing:
     - LINE (1): Goal line crossing
     - CYLINDER (2): Cylindrical goal zone (default)
     """
@@ -45,9 +46,9 @@ class QRCodeGoalType(IntEnum):
 class QRCodeSSSType(IntEnum):
     """QR code SSS (Start Speed Section) type enumeration.
 
-    Specifies the start timing method:
+    Specifies the start timing method for the task:
     - RACE (1): Race start with time gates
-    - ELAPSED_TIME (2): Elapsed time start
+    - ELAPSED_TIME (2): Elapsed time start (individual)
     """
 
     RACE = 1
@@ -57,9 +58,9 @@ class QRCodeSSSType(IntEnum):
 class QRCodeTaskType(IntEnum):
     """QR code task type enumeration.
 
-    Specifies the task format:
-    - CLASSIC (1): Traditional task with turnpoints
-    - WAYPOINTS (2): Waypoint-based task
+    Specifies the overall task format:
+    - CLASSIC (1): Traditional task with turnpoints (e.g., Race to Goal, Elapsed Time)
+    - WAYPOINTS (2): Waypoint-based task (free flight, open distance, etc.)
     """
 
     CLASSIC = 1
@@ -69,7 +70,7 @@ class QRCodeTaskType(IntEnum):
 class QRCodeTurnpointType(IntEnum):
     """QR code turnpoint type enumeration.
 
-    Specifies special turnpoint types:
+    Specifies special turnpoint types for QR code encoding:
     - NONE (0): Regular turnpoint
     - TAKEOFF (1): Takeoff point (not included in QR "t" field)
     - SSS (2): Start Speed Section

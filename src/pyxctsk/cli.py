@@ -1,4 +1,16 @@
-"""Command line interface for pyxctsk."""
+"""
+pyxctsk Command Line Interface (CLI).
+
+Tools for parsing, converting, and visualizing XCTrack task files (paragliding/hang gliding competitions).
+
+Features:
+- Parse XCTrack task files from file or stdin
+- Convert tasks to JSON, KML, PNG QR code, or compact QR string
+- Output to file or stdout
+- Strict error handling and clear messaging
+
+See project README for usage examples and supported formats.
+"""
 
 import sys
 from io import BytesIO

@@ -1,23 +1,29 @@
-"""QR code task format implementation.
+"""
+XCTrack QR Code Task Format (Version 2).
 
-This module implements the XCTrack QR code task format (version 2) for efficient
-data representation in QR codes. QR codes containing too much data are hard to
-scan on phones in direct sunlight, so this format uses compressed representations.
+Implements the XCTrack QR code task format for compact, efficient encoding of paragliding/hang gliding competition tasks.
+This format is designed for QR code transfer, minimizing data size for reliable scanning in challenging conditions (e.g., direct sunlight).
 
-The format includes:
-- Polyline-encoded turnpoint coordinates with altitude and radius
-- Compressed time representations
-- Optional fields to minimize data size
-- Backward compatibility with obsolete fields
+Features:
+- Polyline-encoded turnpoint coordinates (Google's polyline algorithm, ~0.8m lossy compression)
+- Turnpoint metadata: altitude, radius, name, type, description
+- Compressed time representations for takeoff, start, and goal
+- Optional and backward-compatible fields to reduce QR payload
+- Supports CLASSIC and WAYPOINTS task types
+- Optional earth model (WGS84 or FAI sphere)
+- Time gates for start/goal
 
-Key features:
-- Turnpoint coordinates use Google's polyline algorithm (lossy compression ~0.8m)
-- Time gates for start/goal timing
-- Support for CLASSIC and WAYPOINTS task types
-- Optional earth model specification (WGS84 or FAI sphere)
+Format details:
+- Full and simplified (waypoints-only) JSON structures
+- Field order and presence optimized for XCTrack compatibility
+- See: https://xctrack.org/Competition_Interfaces.html
+- Reference polyline implementation: https://gitlab.com/xcontest-public/xctrack-public/-/snippets/1927372
 
-see <https://xctrack.org/Competition_Interfaces.html>
-XCTrack polyline implementation: PolyLine.java <https://gitlab.com/xcontest-public/xctrack-public/-/snippets/1927372>
+This module provides:
+- `QRCodeTask` dataclass for QR code task representation
+- Conversion to/from regular Task objects
+- Serialization to JSON and XCTSK: URL strings
+- Parsing from QR code strings and JSON.
 """
 
 import json

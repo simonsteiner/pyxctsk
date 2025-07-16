@@ -25,10 +25,18 @@ logger = logging.getLogger(__name__)
 
 
 class TaskDataExtractor:
-    """Class to handle XCTrack task data extraction from HTML files"""
+    """Extracts XCTrack task data from HTML files into structured formats.
+
+    Handles parsing, cleaning, and extraction of paragliding/hang gliding competition task data
+    from XCTrack HTML exports, including metadata, turnpoints, and GeoJSON.
+    """
 
     def __init__(self, output_base_dir: str = "downloaded_tasks"):
-        """Initialize with output directory structure"""
+        """Initializes the extractor with output directory structure.
+
+        Args:
+            output_base_dir (str): Base directory for output files.
+        """
         self.output_dirs = {
             "html_cleaned": os.path.join(output_base_dir, "html_cleaned"),
             "json": os.path.join(output_base_dir, "json"),
@@ -40,7 +48,14 @@ class TaskDataExtractor:
             os.makedirs(directory, exist_ok=True)
 
     def preprocess_html(self, html: str) -> BeautifulSoup:
-        """Preprocess HTML by removing embedded base64 images"""
+        """Removes embedded base64 images from HTML content.
+
+        Args:
+            html (str): Raw HTML content.
+
+        Returns:
+            BeautifulSoup: Parsed and cleaned HTML soup.
+        """
         soup = BeautifulSoup(html, "html.parser")
 
         # Remove embedded base64 images
@@ -51,7 +66,15 @@ class TaskDataExtractor:
         return soup
 
     def save_cleaned_html(self, soup: BeautifulSoup, original_filename: str) -> str:
-        """Save the cleaned HTML to a new file"""
+        """Saves cleaned HTML to a file in the output directory.
+
+        Args:
+            soup (BeautifulSoup): Cleaned HTML soup.
+            original_filename (str): Name of the original HTML file.
+
+        Returns:
+            str: Path to the saved cleaned HTML file.
+        """
         output_path = os.path.join(self.output_dirs["html_cleaned"], original_filename)
 
         with open(output_path, "w", encoding="utf-8") as f:
@@ -61,7 +84,14 @@ class TaskDataExtractor:
         return output_path
 
     def extract_task_metadata(self, html: str) -> Dict[str, Any]:
-        """Extract all metadata from the HTML task details"""
+        """Extracts all task metadata from the HTML task details section.
+
+        Args:
+            html (str): HTML content of the task file.
+
+        Returns:
+            Dict[str, Any]: Dictionary of extracted metadata fields.
+        """
         soup = BeautifulSoup(html, "html.parser")
         dt_elements = soup.find_all("dt")
         dd_elements = soup.find_all("dd")
@@ -96,7 +126,11 @@ class TaskDataExtractor:
         return metadata
 
     def _extract_distance_values(self, metadata: Dict[str, Any]) -> None:
-        """Helper to extract numerical distance values from metadata strings"""
+        """Extracts numerical distance values from metadata strings in-place.
+
+        Args:
+            metadata (Dict[str, Any]): Metadata dictionary to update.
+        """
         distance_keys = [
             ("task_distance_through_centers", "distance_through_centers_km"),
             ("task_distance_optimized", "distance_optimized_km"),
@@ -111,7 +145,14 @@ class TaskDataExtractor:
                 metadata[target_key] = float(numeric_value) if numeric_value else 0.0
 
     def extract_turnpoints(self, html: str) -> List[Dict[str, Any]]:
-        """Extract turnpoint data from the task HTML"""
+        """Extracts turnpoint data from the task HTML table.
+
+        Args:
+            html (str): HTML content of the task file.
+
+        Returns:
+            List[Dict[str, Any]]: List of turnpoint dictionaries.
+        """
         soup = BeautifulSoup(html, "html.parser")
         table = soup.find("table", class_="table")
         turnpoints = []
@@ -143,7 +184,14 @@ class TaskDataExtractor:
         return turnpoints
 
     def _extract_table_headers(self, table: BeautifulSoup) -> List[str]:
-        """Extract headers from a table element"""
+        """Extracts header names from a table element.
+
+        Args:
+            table (BeautifulSoup): Table element containing headers.
+
+        Returns:
+            List[str]: List of header names.
+        """
         thead = table.find("thead")
         if not thead:
             logger.warning("Table has no thead element")
@@ -172,7 +220,15 @@ class TaskDataExtractor:
     def _process_turnpoint_row(
         self, row: BeautifulSoup, headers: List[str]
     ) -> Optional[Dict[str, Any]]:
-        """Process a single turnpoint row from the table"""
+        """Processes a single turnpoint row from the table.
+
+        Args:
+            row (BeautifulSoup): Table row element.
+            headers (List[str]): List of header names.
+
+        Returns:
+            Optional[Dict[str, Any]]: Dictionary of turnpoint data, or None if invalid.
+        """
         # Skip rows with no content
         if not row.contents:
             return None
@@ -211,7 +267,15 @@ class TaskDataExtractor:
     def _extract_cell_values(
         self, cells: List[BeautifulSoup], headers: List[str]
     ) -> Dict[str, Any]:
-        """Extract and convert values from cells based on headers"""
+        """Extracts and converts values from table cells based on headers.
+
+        Args:
+            cells (List[BeautifulSoup]): List of cell elements.
+            headers (List[str]): List of header names.
+
+        Returns:
+            Dict[str, Any]: Dictionary of extracted cell values.
+        """
         entry = {}
 
         for i, header in enumerate(headers):
@@ -244,7 +308,12 @@ class TaskDataExtractor:
         return entry
 
     def _set_turnpoint_type(self, entry: Dict[str, Any], row: BeautifulSoup) -> None:
-        """Set the turnpoint type based on row class or defaults"""
+        """Sets the turnpoint type based on row class or defaults.
+
+        Args:
+            entry (Dict[str, Any]): Turnpoint entry to update.
+            row (BeautifulSoup): Table row element.
+        """
         if "Type" in entry and not entry["Type"]:
             row_class = row.get("class", [])
             row_title = row.get("title", "")
@@ -262,7 +331,17 @@ class TaskDataExtractor:
             entry["Type"] = "Turnpoint"
 
     def extract_geojson(self, html: str) -> Optional[Dict[str, Any]]:
-        """Extract GeoJSON data from JavaScript in the HTML file"""
+        """Extracts GeoJSON data from JavaScript embedded in the HTML file.
+
+        Args:
+            html (str): HTML content of the task file.
+
+        Returns:
+            Optional[Dict[str, Any]]: Parsed GeoJSON dictionary, or None if not found/invalid.
+
+        Raises:
+            json.JSONDecodeError: If GeoJSON is found but cannot be parsed.
+        """
         # Look for the geojson variable definition in the script
         # This pattern handles both single-line and multi-line GeoJSON definitions
         geojson_pattern = (
@@ -300,7 +379,14 @@ class TaskDataExtractor:
             return None
 
     def _validate_geojson(self, geojson_data: Any) -> bool:
-        """Validate GeoJSON data structure"""
+        """Validates the structure of GeoJSON data.
+
+        Args:
+            geojson_data (Any): GeoJSON data to validate.
+
+        Returns:
+            bool: True if valid FeatureCollection, False otherwise.
+        """
         if not isinstance(geojson_data, dict):
             logger.warning(
                 f"GeoJSON data is not a dictionary, got {type(geojson_data)}"
@@ -324,7 +410,16 @@ class TaskDataExtractor:
     def save_data_to_file(
         self, data: Dict[str, Any], filename: str, data_type: str
     ) -> Optional[str]:
-        """Save data to a file (JSON or GeoJSON)"""
+        """Saves data to a file (JSON or GeoJSON) in the appropriate output directory.
+
+        Args:
+            data (Dict[str, Any]): Data to save.
+            filename (str): Original filename (used for output name).
+            data_type (str): Either 'json' or 'geojson'.
+
+        Returns:
+            Optional[str]: Path to the saved file, or None if error/invalid.
+        """
         if data_type not in ["json", "geojson"]:
             logger.error(f"Invalid data type: {data_type}")
             return None
@@ -353,7 +448,16 @@ class TaskDataExtractor:
     def extract_task_data(
         self, html_content: str
     ) -> Tuple[Dict[str, Any], Optional[Dict[str, Any]]]:
-        """Extract all task data from HTML content"""
+        """Extracts all task data (metadata, turnpoints, GeoJSON) from HTML content.
+
+        Args:
+            html_content (str): HTML content of the task file.
+
+        Returns:
+            Tuple[Dict[str, Any], Optional[Dict[str, Any]]]:
+                - Task data dictionary (metadata and turnpoints)
+                - GeoJSON dictionary or None
+        """
         # Extract metadata
         metadata = self.extract_task_metadata(html_content)
 
@@ -371,7 +475,14 @@ class TaskDataExtractor:
         return task_data, geojson_data
 
     def process_html_file(self, file_path: str) -> Tuple[Optional[str], Optional[str]]:
-        """Process a single HTML file and extract task data"""
+        """Processes a single HTML file and extracts task data, saving JSON and GeoJSON.
+
+        Args:
+            file_path (str): Path to the HTML file to process.
+
+        Returns:
+            Tuple[Optional[str], Optional[str]]: Paths to saved JSON and GeoJSON files, or None if error.
+        """
         filename = os.path.basename(file_path)
         logger.info(f"Processing {filename}")
 
@@ -402,7 +513,12 @@ class TaskDataExtractor:
     def _display_task_info(
         self, task_data: Dict[str, Any], geojson_data: Optional[Dict[str, Any]]
     ) -> None:
-        """Display extracted task information for debugging/monitoring"""
+        """Displays extracted task information for debugging and monitoring.
+
+        Args:
+            task_data (Dict[str, Any]): Extracted task data (metadata and turnpoints).
+            geojson_data (Optional[Dict[str, Any]]): Extracted GeoJSON data, if any.
+        """
         metadata = task_data.get("metadata", {})
         turnpoints = task_data.get("turnpoints", [])
 
@@ -435,7 +551,15 @@ class TaskDataExtractor:
     def process_directory(
         self, directory_path: str, max_files: Optional[int] = None
     ) -> None:
-        """Process all HTML files in a directory"""
+        """Processes all HTML files in a directory, extracting and saving data for each.
+
+        Args:
+            directory_path (str): Path to directory containing HTML files.
+            max_files (Optional[int]): Maximum number of files to process (for testing).
+
+        Returns:
+            None
+        """
         files_processed = 0
 
         for filename in sorted(os.listdir(directory_path)):
@@ -450,7 +574,14 @@ class TaskDataExtractor:
                 files_processed += 1
 
     def preprocess_directory(self, directory_path: str) -> None:
-        """Preprocess all HTML files in a directory (clean and save)"""
+        """Preprocesses all HTML files in a directory by cleaning and saving them.
+
+        Args:
+            directory_path (str): Path to directory containing HTML files.
+
+        Returns:
+            None
+        """
         for filename in sorted(os.listdir(directory_path)):
             if filename.endswith(".html"):
                 file_path = os.path.join(directory_path, filename)

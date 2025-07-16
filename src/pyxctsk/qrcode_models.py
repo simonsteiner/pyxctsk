@@ -1,8 +1,15 @@
-"""QR code task format data models.
+"""
+Data models for the XCTrack QR code task format.
 
-This module contains the data classes used in the XCTrack QR code task format.
-These classes represent the various components of a QR code task: Goal, SSS,
-Takeoff, and Turnpoint.
+This module defines immutable dataclasses representing the main components of an XCTrack QR code task:
+- QRCodeGoal: Goal timing and type
+- QRCodeSSS: Start Speed Section (SSS) timing and type
+- QRCodeTakeoff: Takeoff open/close times
+- QRCodeTurnpoint: Turnpoint with compressed coordinate encoding
+
+Each class provides methods for serialization to and from the compact JSON format used in QR codes,
+including custom polyline encoding for turnpoint coordinates. These models are used for parsing,
+generating, and manipulating XCTrack-compatible QR code tasks.
 """
 
 from collections import OrderedDict

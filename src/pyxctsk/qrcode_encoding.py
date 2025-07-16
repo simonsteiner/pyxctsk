@@ -1,8 +1,14 @@
-"""QR code task format encoding utilities.
+"""
+QR code task format encoding utilities for XCTrack.
 
-This module contains the polyline encoding and decoding utilities used in the
-XCTrack QR code task format. These utilities handle the compression of turnpoint
-coordinates (lon, lat, alt, radius) into polyline-encoded strings.
+This module provides polyline-based encoding and decoding utilities for the XCTrack QR code task format. It enables compact representation of turnpoint coordinates (longitude, latitude, altitude, radius) as polyline-encoded strings for use in QR codes.
+
+Functions:
+- encode_num(num: int) -> str: Polyline-encodes a single integer value.
+- encode_competition_turnpoint(lon: float, lat: float, alt: int, radius: int) -> str: Encodes a turnpoint's coordinates and parameters into a polyline string.
+- decode_nums(encoded_str: str) -> List[int]: Decodes a polyline-encoded string into a list of integers.
+
+Intended for internal use in QR code generation and parsing for paragliding/hang gliding competition tasks.
 """
 
 from typing import List

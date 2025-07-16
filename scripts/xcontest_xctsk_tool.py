@@ -29,19 +29,24 @@ from urllib3.util.retry import Retry
 
 
 class XCTSKClient:
-    """Client for interacting with XContest XCTSK API."""
+    """
+    Client for interacting with the XContest XCTSK API.
+
+    Handles upload, download, QR code generation, and HTML retrieval for XCTSK tasks via the XContest REST API.
+    """
 
     BASE_URL = "https://tools.xcontest.org"
 
     def __init__(
         self, author: Optional[str] = None, timeout: int = 30, retry_count: int = 3
     ):
-        """Initialize the client.
+        """
+        Initializes the XCTSKClient.
 
         Args:
-            author: Default author name for uploads
-            timeout: Request timeout in seconds
-            retry_count: Number of retries for failed requests
+            author (Optional[str]): Default author name for uploads.
+            timeout (int): Request timeout in seconds.
+            retry_count (int): Number of retries for failed requests.
         """
         self.author = author
         self.timeout = timeout
@@ -61,14 +66,18 @@ class XCTSKClient:
     def upload_task(
         self, xctsk_file: Path, author: Optional[str] = None
     ) -> Tuple[Optional[str], str]:
-        """Upload an XCTSK file and get a task code.
+        """
+        Uploads an XCTSK file to the XContest API and retrieves the task code.
 
         Args:
-            xctsk_file: Path to the XCTSK file
-            author: Author name (overrides default)
+            xctsk_file (Path): Path to the XCTSK file.
+            author (Optional[str]): Author name (overrides default).
 
         Returns:
-            Tuple of (task_code, message)
+            Tuple[Optional[str], str]: Tuple of (task_code, message). task_code is None if upload fails.
+
+        Raises:
+            None. All exceptions are caught and returned as part of the message.
         """
         try:
             with open(xctsk_file, "r", encoding="utf-8") as f:
@@ -131,15 +140,19 @@ class XCTSKClient:
     def download_task(
         self, task_code: str, output_file: Path, version: int = 1
     ) -> Tuple[bool, str]:
-        """Download a task by code.
+        """
+        Downloads a task by code from the XContest API.
 
         Args:
-            task_code: The task code to download
-            output_file: Path where to save the downloaded task
-            version: API version (1 or 2)
+            task_code (str): The task code to download.
+            output_file (Path): Path where to save the downloaded task.
+            version (int): API version (1 or 2).
 
         Returns:
-            Tuple of (success, message)
+            Tuple[bool, str]: Tuple of (success, message).
+
+        Raises:
+            None. All exceptions are caught and returned as part of the message.
         """
         endpoint = (
             f"/api/xctsk/load/{task_code}"
@@ -184,14 +197,18 @@ class XCTSKClient:
             return False, f"Network error downloading task {task_code}: {e}"
 
     def get_qr_code(self, xctsk_file: Path, output_file: Path) -> Tuple[bool, str]:
-        """Get QR code SVG for an XCTSK file.
+        """
+        Generates a QR code SVG for an XCTSK file using the XContest API.
 
         Args:
-            xctsk_file: Path to the XCTSK file
-            output_file: Path where to save the QR code SVG
+            xctsk_file (Path): Path to the XCTSK file.
+            output_file (Path): Path where to save the QR code SVG.
 
         Returns:
-            Tuple of (success, message)
+            Tuple[bool, str]: Tuple of (success, message).
+
+        Raises:
+            None. All exceptions are caught and returned as part of the message.
         """
         try:
             with open(xctsk_file, "r", encoding="utf-8") as f:
@@ -227,14 +244,18 @@ class XCTSKClient:
     def download_html(
         self, task_code: str, output_file: Optional[Path] = None
     ) -> Tuple[bool, str, Optional[str]]:
-        """Download HTML page for a task from XContest tools.
+        """
+        Downloads the HTML page for a task from XContest tools.
 
         Args:
-            task_code: The task code to download HTML for
-            output_file: Optional path where to save the HTML content
+            task_code (str): The task code to download HTML for.
+            output_file (Optional[Path]): Optional path where to save the HTML content.
 
         Returns:
-            Tuple of (success, message, html_content)
+            Tuple[bool, str, Optional[str]]: Tuple of (success, message, html_content).
+
+        Raises:
+            None. All exceptions are caught and returned as part of the message.
         """
         try:
             response = self.session.get(
@@ -281,15 +302,16 @@ class XCTSKClient:
 def upload_directory(
     client: XCTSKClient, directory: Path, author: Optional[str] = None
 ) -> Dict[str, str]:
-    """Upload all XCTSK files in a directory.
+    """
+    Uploads all XCTSK files in a directory to the XContest API.
 
     Args:
-        client: XCTSKClient instance
-        directory: Directory containing XCTSK files
-        author: Author name for uploads
+        client (XCTSKClient): XCTSKClient instance.
+        directory (Path): Directory containing XCTSK files.
+        author (Optional[str]): Author name for uploads.
 
     Returns:
-        Dictionary mapping filenames to task codes
+        Dict[str, str]: Dictionary mapping filenames to task codes.
     """
     results = {}
     xctsk_files = list(directory.glob("*.xctsk"))
@@ -319,16 +341,17 @@ def upload_directory(
 def download_tasks(
     client: XCTSKClient, task_codes: List[str], output_dir: Path, version: int = 1
 ) -> List[str]:
-    """Download multiple tasks by code.
+    """
+    Downloads multiple tasks by code from the XContest API.
 
     Args:
-        client: XCTSKClient instance
-        task_codes: List of task codes to download
-        output_dir: Output directory
-        version: API version (1 or 2)
+        client (XCTSKClient): XCTSKClient instance.
+        task_codes (List[str]): List of task codes to download.
+        output_dir (Path): Output directory.
+        version (int): API version (1 or 2).
 
     Returns:
-        List of success messages
+        List[str]: List of success messages for each downloaded task.
     """
     results = []
 
@@ -354,15 +377,16 @@ def download_tasks(
 def download_html_tasks(
     client: XCTSKClient, task_codes: List[str], output_dir: Path
 ) -> List[str]:
-    """Download HTML pages for multiple tasks by code.
+    """
+    Downloads HTML pages for multiple tasks by code from the XContest API.
 
     Args:
-        client: XCTSKClient instance
-        task_codes: List of task codes to download HTML for
-        output_dir: Output directory
+        client (XCTSKClient): XCTSKClient instance.
+        task_codes (List[str]): List of task codes to download HTML for.
+        output_dir (Path): Output directory.
 
     Returns:
-        List of success messages
+        List[str]: List of success messages for each downloaded HTML page.
     """
     results = []
 
@@ -392,17 +416,18 @@ def process_all_tasks(
     author: Optional[str] = None,
     results_file: Optional[Path] = None,
 ) -> Tuple[Dict[str, str], List[str]]:
-    """Upload all XCTSK files and download their HTML pages.
+    """
+    Uploads all XCTSK files in a directory and downloads their HTML pages.
 
     Args:
-        client: XCTSKClient instance
-        xctsk_directory: Directory containing XCTSK files
-        html_output_dir: Directory to save HTML files
-        author: Author name for uploads
-        results_file: Optional file to save upload results
+        client (XCTSKClient): XCTSKClient instance.
+        xctsk_directory (Path): Directory containing XCTSK files.
+        html_output_dir (Path): Directory to save HTML files.
+        author (Optional[str]): Author name for uploads.
+        results_file (Optional[Path]): Optional file to save upload results.
 
     Returns:
-        Tuple of (upload_results, html_results)
+        Tuple[Dict[str, str], List[str]]: Tuple of (upload_results, html_results).
     """
     print("=== Step 1: Uploading all XCTSK files ===")
     upload_results = upload_directory(client, xctsk_directory, author)
@@ -437,7 +462,14 @@ def process_all_tasks(
 
 
 def main():
-    """Main entry point."""
+    """
+    Main entry point for the XCTSK automation script.
+
+    Parses command-line arguments and dispatches to the appropriate command handler.
+
+    Returns:
+        int: Exit code (0 for success, 1 for error).
+    """
     parser = argparse.ArgumentParser(
         description="Automate upload/download of XCTSK files to/from XContest tools",
         formatter_class=argparse.RawDescriptionHelpFormatter,

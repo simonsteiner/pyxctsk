@@ -1,4 +1,15 @@
-"""Dynamic programming route optimization algorithms."""
+"""
+Route optimization algorithms for XCTrack tasks using dynamic programming (DP).
+
+This module provides core algorithms to compute the shortest possible route through a sequence of paragliding/hang gliding task turnpoints, accounting for cylinder radii, goal lines, and look-ahead bias. It implements:
+
+- True dynamic programming with beam search to avoid greedy local minima
+- Iterative refinement to reduce systematic bias from always targeting cylinder centers
+- Support for both standard and refined look-ahead targets
+- Utilities for reconstructing optimal paths and handling goal lines
+
+All algorithms operate on immutable TaskTurnpoint dataclasses and use geodesic distance calculations. The main entry point is `calculate_iteratively_refined_route`, which performs multi-pass optimization for best accuracy.
+"""
 
 from collections import defaultdict
 from typing import List, Optional, Tuple
@@ -10,13 +21,14 @@ from .turnpoint import TaskTurnpoint
 
 
 def _init_dp_structure(turnpoints: List[TaskTurnpoint]) -> List[defaultdict]:
-    """Initialize the dynamic programming data structure.
+    """
+    Initialize the dynamic programming data structure.
 
     Args:
-        turnpoints: List of TaskTurnpoint objects
+        turnpoints (List[TaskTurnpoint]): List of TaskTurnpoint objects.
 
     Returns:
-        List of defaultdicts for DP computation
+        List[defaultdict]: List of defaultdicts for DP computation.
     """
     # dp[i] maps candidate points on turnpoint i -> (best_distance, parent_point)
     dp: List[defaultdict] = [
@@ -35,17 +47,18 @@ def _process_dp_stage(
     beam_width: int,
     show_progress: bool,
 ) -> defaultdict:
-    """Process one stage of the dynamic programming calculation.
+    """
+    Process one stage of the dynamic programming calculation.
 
     Args:
-        dp: The DP structure
-        i: Current stage index
-        turnpoints: List of TaskTurnpoint objects
-        beam_width: Number of best candidates to keep
-        show_progress: Whether to show progress
+        dp (List[defaultdict]): The DP structure.
+        i (int): Current stage index.
+        turnpoints (List[TaskTurnpoint]): List of TaskTurnpoint objects.
+        beam_width (int): Number of best candidates to keep.
+        show_progress (bool): Whether to show progress.
 
     Returns:
-        Updated DP structure for stage i
+        defaultdict: Updated DP structure for stage i.
     """
     current_tp = turnpoints[i]
     next_center = (
@@ -96,21 +109,22 @@ def _process_dp_stage_with_refined_target(
     beam_width: int,
     show_progress: bool,
 ) -> defaultdict:
-    """Process one stage of the DP calculation using refined target for look-ahead.
+    """
+    Process one stage of the DP calculation using refined target for look-ahead.
 
     This modified version of _process_dp_stage uses the pre-calculated next target
     point instead of always using the center of the next turnpoint.
 
     Args:
-        dp: The DP structure
-        i: Current stage index
-        turnpoints: List of TaskTurnpoint objects
-        next_target: Pre-calculated target point for the next turnpoint
-        beam_width: Number of best candidates to keep
-        show_progress: Whether to show progress
+        dp (List[defaultdict]): The DP structure.
+        i (int): Current stage index.
+        turnpoints (List[TaskTurnpoint]): List of TaskTurnpoint objects.
+        next_target (Optional[Tuple[float, float]]): Pre-calculated target point for the next turnpoint.
+        beam_width (int): Number of best candidates to keep.
+        show_progress (bool): Whether to show progress.
 
     Returns:
-        Updated DP structure for stage i
+        defaultdict: Updated DP structure for stage i.
     """
     current_tp = turnpoints[i]
 
@@ -160,15 +174,16 @@ def _backtrack_path(
     best_point: Tuple[float, float],
     turnpoints: List[TaskTurnpoint],
 ) -> List[Tuple[float, float]]:
-    """Backtrack through the DP structure to reconstruct the optimal path.
+    """
+    Backtrack through the DP structure to reconstruct the optimal path.
 
     Args:
-        dp: The DP structure
-        best_point: The best final point
-        turnpoints: List of TaskTurnpoint objects
+        dp (List[defaultdict]): The DP structure.
+        best_point (Tuple[float, float]): The best final point.
+        turnpoints (List[TaskTurnpoint]): List of TaskTurnpoint objects.
 
     Returns:
-        List of coordinates forming the optimal path
+        List[Tuple[float, float]]: List of coordinates forming the optimal path.
     """
     path_points = []
     current_point = best_point
@@ -188,19 +203,20 @@ def _compute_optimal_route_with_beam_search(
     return_path: bool = False,
     beam_width: int = DEFAULT_BEAM_WIDTH,
 ) -> Tuple[float, List[Tuple[float, float]]]:
-    """Compute optimal route using dynamic programming with beam search.
+    """
+    Compute optimal route using dynamic programming with beam search.
 
     This method uses DP to consider multiple candidate paths and avoid
     the greedy local optimization trap that can occur with large cylinders.
 
     Args:
-        turnpoints: List of TaskTurnpoint objects
-        show_progress: Whether to show progress indicators
-        return_path: Whether to return the actual path coordinates
-        beam_width: Number of best candidates to keep at each stage
+        turnpoints (List[TaskTurnpoint]): List of TaskTurnpoint objects.
+        show_progress (bool): Whether to show progress indicators.
+        return_path (bool): Whether to return the actual path coordinates.
+        beam_width (int): Number of best candidates to keep at each stage.
 
     Returns:
-        Tuple of (optimized_distance_meters, route_coordinates)
+        Tuple[float, List[Tuple[float, float]]]: Tuple of (optimized_distance_meters, route_coordinates).
     """
     if show_progress:
         print("    🎯 Using true DP with beam search...")
@@ -243,19 +259,19 @@ def _compute_optimal_route_dp(
     return_path: bool = False,
     beam_width: int = DEFAULT_BEAM_WIDTH,
 ) -> Tuple[float, List[Tuple[float, float]]]:
-    """Core dynamic programming algorithm for computing optimal routes through turnpoints.
+    """
+    Core dynamic programming algorithm for computing optimal routes through turnpoints.
 
     Args:
-        turnpoints: List of TaskTurnpoint objects
-        task_turnpoints: Optional list of original task turnpoints with type information
-        angle_step: Angle step in degrees for perimeter point generation
-        show_progress: Whether to show progress indicators
-        return_path: Whether to return the actual path coordinates
-        beam_width: Number of best candidates to keep at each DP stage
+        turnpoints (List[TaskTurnpoint]): List of TaskTurnpoint objects.
+        task_turnpoints: Optional list of original task turnpoints with type information.
+        angle_step (int): Angle step in degrees for perimeter point generation.
+        show_progress (bool): Whether to show progress indicators.
+        return_path (bool): Whether to return the actual path coordinates.
+        beam_width (int): Number of best candidates to keep at each DP stage.
 
     Returns:
-        Tuple of (optimized_distance_meters, route_coordinates)
-        If return_path is False, route_coordinates will be empty
+        Tuple[float, List[Tuple[float, float]]]: Tuple of (optimized_distance_meters, route_coordinates). If return_path is False, route_coordinates will be empty.
     """
     if len(turnpoints) < 2:
         distance = 0.0
@@ -282,14 +298,15 @@ def _compute_optimal_route_dp(
 def _create_refined_turnpoints(
     turnpoints: List[TaskTurnpoint], previous_route: List[Tuple[float, float]]
 ) -> List[TaskTurnpoint]:
-    """Create turnpoints with refined target points based on previous optimization.
+    """
+    Create turnpoints with refined target points based on previous optimization.
 
     Args:
-        turnpoints: Original turnpoints
-        previous_route: Previously calculated optimal route coordinates
+        turnpoints (List[TaskTurnpoint]): Original turnpoints.
+        previous_route (List[Tuple[float, float]]): Previously calculated optimal route coordinates.
 
     Returns:
-        List of turnpoints with refined target information
+        List[TaskTurnpoint]: List of turnpoints with refined target information.
     """
     # Create a deep copy to avoid modifying originals
     refined_turnpoints = []
@@ -308,21 +325,22 @@ def _compute_optimal_route_with_refined_targets(
     show_progress: bool = False,
     beam_width: Optional[int] = None,
 ) -> Tuple[float, List[Tuple[float, float]]]:
-    """Compute optimal route using previous route points as look-ahead targets.
+    """
+    Compute optimal route using previous route points as look-ahead targets.
 
     This function modifies the standard dynamic programming approach to use
     previously calculated optimal points as look-ahead targets, rather than
     always using the center of the next turnpoint.
 
     Args:
-        turnpoints: List of TaskTurnpoint objects
-        previous_route: Previously calculated optimal route coordinates
-        angle_step: Angle step in degrees for perimeter point generation
-        show_progress: Whether to show progress indicators
-        beam_width: Number of best candidates to keep at each DP stage
+        turnpoints (List[TaskTurnpoint]): List of TaskTurnpoint objects.
+        previous_route (List[Tuple[float, float]]): Previously calculated optimal route coordinates.
+        angle_step (Optional[int]): Angle step in degrees for perimeter point generation.
+        show_progress (bool): Whether to show progress indicators.
+        beam_width (Optional[int]): Number of best candidates to keep at each DP stage.
 
     Returns:
-        Tuple of (optimized_distance_meters, route_coordinates)
+        Tuple[float, List[Tuple[float, float]]]: Tuple of (optimized_distance_meters, route_coordinates).
     """
     from .optimization_config import get_optimization_config
 
@@ -376,25 +394,26 @@ def calculate_iteratively_refined_route(
     show_progress: bool = False,
     beam_width: Optional[int] = None,
 ) -> Tuple[float, List[Tuple[float, float]]]:
-    """Calculate optimized route with iterative refinement to reduce look-ahead bias.
+    """
+    Calculate optimized route with iterative refinement to reduce look-ahead bias.
 
     This function implements a multi-pass optimization approach:
-    1. First pass: Use cylinder centers as targets for look-ahead (standard approach)
-    2. Subsequent passes: Use previously calculated optimal points as look-ahead targets
-    3. Continue for a fixed number of iterations or until convergence
+      1. First pass: Use cylinder centers as targets for look-ahead (standard approach)
+      2. Subsequent passes: Use previously calculated optimal points as look-ahead targets
+      3. Continue for a fixed number of iterations or until convergence
 
     This reduces the systematic bias created by always targeting the center of the next
     cylinder instead of its optimal entry point.
 
     Args:
-        turnpoints: List of TaskTurnpoint objects
-        num_iterations: Number of refinement iterations to perform
-        angle_step: Angle step in degrees for perimeter point generation
-        show_progress: Whether to show progress indicators
-        beam_width: Number of best candidates to keep at each DP stage
+        turnpoints (List[TaskTurnpoint]): List of TaskTurnpoint objects.
+        num_iterations (Optional[int]): Number of refinement iterations to perform.
+        angle_step (Optional[int]): Angle step in degrees for perimeter point generation.
+        show_progress (bool): Whether to show progress indicators.
+        beam_width (Optional[int]): Number of best candidates to keep at each DP stage.
 
     Returns:
-        Tuple of (optimized_distance_meters, route_coordinates)
+        Tuple[float, List[Tuple[float, float]]]: Tuple of (optimized_distance_meters, route_coordinates).
     """
     from .optimization_config import get_optimization_config
 

@@ -1,4 +1,8 @@
-"""Optimization configuration and constants for distance calculations."""
+"""
+Centralized configuration and constants for optimization routines in distance calculations.
+
+Provides default parameters and a utility function to retrieve optimization settings for algorithms such as beam search and perimeter point generation.
+"""
 
 from typing import Dict, Optional
 
@@ -15,17 +19,18 @@ def get_optimization_config(
     beam_width: Optional[int] = None,
     num_iterations: Optional[int] = None,
 ) -> Dict[str, int]:
-    """Get centralized optimization configuration parameters.
+    """
+    Get centralized optimization configuration parameters.
 
     This ensures consistent optimization parameters are used throughout the code.
 
     Args:
-        angle_step: Optional angle step override
-        beam_width: Optional beam width override
-        num_iterations: Optional iteration count override
+        angle_step (Optional[int]): Optional angle step override.
+        beam_width (Optional[int]): Optional beam width override.
+        num_iterations (Optional[int]): Optional iteration count override.
 
     Returns:
-        Dictionary containing optimization configuration parameters
+        Dict[str, int]: Dictionary containing optimization configuration parameters.
     """
     return {
         "angle_step": angle_step if angle_step is not None else DEFAULT_ANGLE_STEP,

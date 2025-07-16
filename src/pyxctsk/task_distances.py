@@ -1,4 +1,13 @@
-"""Task distance calculations and turnpoint conversion utilities."""
+"""
+Task distance calculations and turnpoint conversion utilities for XCTrack tasks.
+
+This module provides functions to:
+- Convert task turnpoints to internal representations for distance calculations
+- Compute center and optimized (shortest possible) task distances
+- Calculate cumulative and per-leg distances for each turnpoint
+- Support both cylinder and line goal types, with correct handling of goal definitions
+- Return detailed distance breakdowns for use in analysis and visualization
+"""
 
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -8,13 +17,14 @@ from .turnpoint import TaskTurnpoint, distance_through_centers
 
 
 def _task_to_turnpoints(task: Task) -> List[TaskTurnpoint]:
-    """Convert Task turnpoints to TaskTurnpoint objects.
+    """
+    Convert Task turnpoints to TaskTurnpoint objects.
 
     Args:
-        task: Task object
+        task (Task): Task object.
 
     Returns:
-        List of TaskTurnpoint objects
+        List[TaskTurnpoint]: List of TaskTurnpoint objects.
     """
     # Determine if there's a goal and its type
     goal_type = None
@@ -80,14 +90,15 @@ def _task_to_turnpoints(task: Task) -> List[TaskTurnpoint]:
 
 
 def _calculate_savings(center_km: float, opt_km: float) -> Tuple[float, float]:
-    """Calculate distance savings in km and percentage.
+    """
+    Calculate distance savings in km and percentage.
 
     Args:
-        center_km: Center distance in km
-        opt_km: Optimized distance in km
+        center_km (float): Center distance in km.
+        opt_km (float): Optimized distance in km.
 
     Returns:
-        Tuple of (savings_km, savings_percent)
+        Tuple[float, float]: Tuple of (savings_km, savings_percent).
     """
     savings_km = center_km - opt_km
     savings_percent = (savings_km / center_km * 100) if center_km > 0 else 0.0
@@ -101,17 +112,18 @@ def _create_turnpoint_details(
     beam_width: Optional[int] = None,
     show_progress: bool = False,
 ) -> List[Dict[str, Any]]:
-    """Create detailed turnpoint information including cumulative distances.
+    """
+    Create detailed turnpoint information including cumulative distances.
 
     Args:
-        task_turnpoints: Original task turnpoints
-        task_distance_turnpoints: Distance calculation turnpoints
-        angle_step: Angle step for optimization
-        beam_width: Beam width for DP
-        show_progress: Whether to show progress
+        task_turnpoints: Original task turnpoints.
+        task_distance_turnpoints (List[TaskTurnpoint]): Distance calculation turnpoints.
+        angle_step (Optional[int]): Angle step for optimization.
+        beam_width (Optional[int]): Beam width for DP.
+        show_progress (bool): Whether to show progress.
 
     Returns:
-        List of dictionaries with turnpoint details
+        List[Dict[str, Any]]: List of dictionaries with turnpoint details.
     """
     from .distance import optimized_distance  # Import here to avoid circular imports
 
@@ -170,17 +182,18 @@ def calculate_task_distances(
     beam_width: Optional[int] = None,
     num_iterations: Optional[int] = None,
 ) -> Dict[str, Any]:
-    """Calculate both center and optimized distances for a task.
+    """
+    Calculate both center and optimized distances for a task.
 
     Args:
-        task: Task object
-        angle_step: Angle step in degrees for optimization fallback
-        show_progress: Whether to show progress indicators
-        beam_width: Number of best candidates to keep at each DP stage
-        num_iterations: Number of refinement iterations
+        task (Task): Task object.
+        angle_step (Optional[int]): Angle step in degrees for optimization fallback.
+        show_progress (bool): Whether to show progress indicators.
+        beam_width (Optional[int]): Number of best candidates to keep at each DP stage.
+        num_iterations (Optional[int]): Number of refinement iterations.
 
     Returns:
-        Dictionary containing distance calculations and turnpoint details
+        Dict[str, Any]: Dictionary containing distance calculations and turnpoint details.
     """
     from .distance import optimized_distance  # Import here to avoid circular imports
 
@@ -263,16 +276,17 @@ def calculate_cumulative_distances(
     angle_step: Optional[int] = None,
     beam_width: Optional[int] = None,
 ) -> Tuple[float, float]:
-    """Calculate cumulative distances up to a specific turnpoint index.
+    """
+    Calculate cumulative distances up to a specific turnpoint index.
 
     Args:
-        turnpoints: List of TaskTurnpoint objects
-        index: Index of the turnpoint (0-based)
-        angle_step: Angle step for optimization calculations (fallback only)
-        beam_width: Number of best candidates to keep at each DP stage
+        turnpoints (List[TaskTurnpoint]): List of TaskTurnpoint objects.
+        index (int): Index of the turnpoint (0-based).
+        angle_step (Optional[int]): Angle step for optimization calculations (fallback only).
+        beam_width (Optional[int]): Number of best candidates to keep at each DP stage.
 
     Returns:
-        Tuple of (center_distance_km, optimized_distance_km)
+        Tuple[float, float]: Tuple of (center_distance_km, optimized_distance_km).
     """
     from .distance import optimized_distance  # Import here to avoid circular imports
 
