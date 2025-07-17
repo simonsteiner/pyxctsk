@@ -36,6 +36,9 @@ from .task import (
     Waypoint,
 )
 
+# Utility functions
+from .utils import generate_qr_code, task_to_kml
+
 # Constants
 EXTENSION = ".xctsk"
 MIME_TYPE = "application/xctsk"
@@ -43,30 +46,32 @@ VERSION = 1
 
 __version__ = "1.0.0"
 __all__ = [
-    "Task",
-    "Takeoff",
-    "SSS",
-    "Goal",
-    "Turnpoint",
-    "Waypoint",
-    "TimeOfDay",
-    "Direction",
-    "EarthModel",
-    "GoalType",
-    "SSSType",
-    "TaskType",
-    "TurnpointType",
-    "generate_task_geojson",
-    "QRCodeTask",
-    "parse_task",
     "calculate_task_distances",
-    "optimized_distance",
+    "Direction",
     "distance_through_centers",
-    "TaskTurnpoint",
+    "EarthModel",
     "EmptyInputError",
+    "EXTENSION",
+    "generate_qr_code",
+    "generate_task_geojson",
+    "Goal",
+    "GoalType",
     "InvalidFormatError",
     "InvalidTimeOfDayError",
-    "EXTENSION",
     "MIME_TYPE",
+    "optimized_distance",
+    "parse_task",
+    "QRCodeTask",
+    "SSS",
+    "SSSType",
+    "Takeoff",
+    "task_to_kml",
+    "Task",
+    "TaskTurnpoint",
+    "TaskType",
+    "TimeOfDay",
+    "Turnpoint",
+    "TurnpointType",
     "VERSION",
+    "Waypoint",
 ]
