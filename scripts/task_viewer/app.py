@@ -4,20 +4,22 @@
 This is a standalone application for testing purposes, to compare xcontest data with generated data.
 """
 
-import json
-import os
 import sys
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Optional, Union
 
+from api import api_bp
 from flask import (
     Blueprint,
     Flask,
-    Response,
     abort,
-    current_app,
-    jsonify,
     render_template,
+)
+from shared import (
+    XCTSK_DIR,
+    get_available_tasks,
+    load_task_data,
+    prepare_comparison_data,
 )
 
 # Add the xctrack module to the path
@@ -33,7 +35,6 @@ try:
         calculate_task_distances,
         generate_task_geojson,
         parse_task,
-        task_to_kml,
     )
 
     XCTRACK_AVAILABLE = True
@@ -77,36 +78,7 @@ except ImportError as e:
     print(f"AirScore distance calculation not available: {e}")
 
 
-# Create Blueprint for task viewer
 task_viewer_bp = Blueprint("task_viewer", __name__)
-
-
-# Configuration
-BASE_DIR = Path(os.path.dirname(os.path.abspath(__file__))) / ".." / "downloaded_tasks"
-JSON_DIR = BASE_DIR / "json"
-GEOJSON_DIR = BASE_DIR / "geojson"
-XCTSK_DIR = BASE_DIR / "xctsk"
-
-
-def get_available_tasks() -> list[str]:
-    """Get list of available task names present in all required formats.
-
-    Returns:
-        list[str]: Sorted list of task names that have JSON, GeoJSON, and XCTSK files.
-    """
-    json_files = (
-        set(f.stem for f in JSON_DIR.glob("*.json")) if JSON_DIR.exists() else set()
-    )
-    geojson_files = (
-        set(f.stem for f in GEOJSON_DIR.glob("*.geojson"))
-        if GEOJSON_DIR.exists()
-        else set()
-    )
-    xctsk_files = (
-        set(f.stem for f in XCTSK_DIR.glob("*.xctsk")) if XCTSK_DIR.exists() else set()
-    )
-    # Only include tasks that have all three files
-    return sorted(json_files & geojson_files & xctsk_files)
 
 
 @task_viewer_bp.route("/")
@@ -309,124 +281,6 @@ def debug_task(task_name: str):
         )
 
 
-@task_viewer_bp.route("/api/task/<task_name>")
-def task_api(task_name: str):
-    """Return task data in JSON format via API endpoint.
-
-    Args:
-        task_name (str): The name of the task to retrieve.
-
-    Returns:
-        Response: Flask JSON response containing task and geojson data, or 404 if not found.
-
-    Raises:
-        werkzeug.exceptions.NotFound: If the task data is missing.
-    """
-    json_data, geojson_data = load_task_data(task_name)
-
-    if not json_data or not geojson_data:
-        abort(404)
-
-    return jsonify(
-        {"task_name": task_name, "json_data": json_data, "geojson_data": geojson_data}
-    )
-
-
-@task_viewer_bp.route("/api/kml/<task_name>.kml")
-def kml_task_api(task_name: str):
-    """Return KML for a given task as a downloadable file via API endpoint.
-
-    Args:
-        task_name (str): The name of the task to retrieve as KML.
-
-    Returns:
-        Response: Flask response with KML data and appropriate headers, or error message and status code.
-    """
-    if not XCTRACK_AVAILABLE:
-        return jsonify({"error": "XCTrack module not available"}), 500
-
-    # Load and parse XCTSK file
-    xctsk_path = XCTSK_DIR / f"{task_name}.xctsk"
-    if not xctsk_path.exists():
-        return jsonify({"error": "XCTSK file not found"}), 404
-
-    try:
-        task = parse_task(str(xctsk_path))  # type: ignore
-        kml_str = task_to_kml(task)  # type: ignore
-        return Response(
-            kml_str,
-            mimetype="application/vnd.google-earth.kml+xml",
-            headers={"Content-Disposition": f"attachment; filename={task_name}.kml"},
-        )
-    except Exception as e:
-        import traceback
-
-        stacktrace = traceback.format_exc()
-        return (
-            jsonify(
-                {
-                    "error": f"Error generating KML: {str(e)}",
-                    "stacktrace": stacktrace,
-                }
-            ),
-            500,
-        )
-
-
-@task_viewer_bp.route("/api/compare/<task_name>")
-def compare_task_api(task_name: str):
-    """Return comparison data in JSON format via API endpoint.
-
-    Args:
-        task_name (str): The name of the task to compare.
-
-    Returns:
-        Response: Flask JSON response with comparison data, or error message and status code.
-    """
-    if not XCTRACK_AVAILABLE:
-        return jsonify({"error": "XCTrack module not available"}), 500
-
-    # Load original task data
-    json_data, geojson_data = load_task_data(task_name)
-    if not json_data:
-        return jsonify({"error": "Task data not found"}), 404
-
-    # Load and parse XCTSK file
-    xctsk_path = XCTSK_DIR / f"{task_name}.xctsk"
-    if not xctsk_path.exists():
-        return jsonify({"error": "XCTSK file not found"}), 404
-
-    try:
-        task = parse_task(str(xctsk_path))  # type: ignore
-        distance_results = calculate_task_distances(task, show_progress=False)  # type: ignore
-        xctrack_geojson = generate_task_geojson(task)  # type: ignore
-        comparison_data = prepare_comparison_data(json_data, distance_results, task)
-
-        return jsonify(
-            {
-                "task_name": task_name,
-                "comparison": comparison_data,
-                "original_metadata": json_data.get("metadata", {}),
-                "original_geojson": geojson_data,
-                "xctrack_geojson": xctrack_geojson,
-            }
-        )
-
-    except Exception as e:
-        import traceback
-
-        stacktrace = traceback.format_exc()
-        return (
-            jsonify(
-                {
-                    "error": f"Error calculating distances: {str(e)}",
-                    "stacktrace": stacktrace,
-                }
-            ),
-            500,
-        )
-
-
 @task_viewer_bp.route("/airscore/<task_name>")
 def airscore_task(task_name: str):
     """Display AirScore calculations for a specific task.
@@ -481,202 +335,6 @@ def airscore_task(task_name: str):
         )
 
 
-@task_viewer_bp.route("/api/airscore/<task_name>")
-def airscore_task_api(task_name: str):
-    """Return AirScore calculation data in JSON format via API endpoint.
-
-    Args:
-        task_name (str): The name of the task to process with AirScore.
-
-    Returns:
-        Response: Flask JSON response with AirScore results and geojson, or error message and status code.
-    """
-    if not AIRSCORE_AVAILABLE:
-        return jsonify({"error": "AirScore utilities not available"}), 500
-
-    # Load and parse XCTSK file
-    xctsk_path = XCTSK_DIR / f"{task_name}.xctsk"
-    if not xctsk_path.exists():
-        return jsonify({"error": "XCTSK file not found"}), 404
-
-    try:
-        task = parse_task(str(xctsk_path))  # type: ignore
-        airscore_results = calculate_airscore_distances(task)  # type: ignore
-        airscore_geojson = generate_airscore_geojson(task, airscore_results)  # type: ignore
-
-        return jsonify(
-            {
-                "task_name": task_name,
-                "airscore_results": airscore_results,
-                "airscore_geojson": airscore_geojson,
-            }
-        )
-
-    except Exception as e:
-        import traceback
-
-        stacktrace = traceback.format_exc()
-        return (
-            jsonify(
-                {
-                    "error": f"Error calculating distances: {str(e)}",
-                    "stacktrace": stacktrace,
-                }
-            ),
-            500,
-        )
-
-
-def load_task_data(
-    task_name: str,
-) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
-    """Load task data from JSON and GeoJSON files.
-
-    Args:
-        task_name (str): The name of the task to load.
-
-    Returns:
-        Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
-            A tuple containing the JSON data and GeoJSON data, or None if loading fails.
-
-    Raises:
-        None. Errors are logged and None is returned if loading fails.
-    """
-    json_path = JSON_DIR / f"{task_name}.json"
-    geojson_path = GEOJSON_DIR / f"{task_name}.geojson"
-
-    json_data = None
-    geojson_data = None
-
-    # Load JSON data
-    if json_path.exists():
-        try:
-            with open(json_path, "r") as f:
-                json_data = json.load(f)
-        except (json.JSONDecodeError, IOError) as e:
-            current_app.logger.error(f"Error loading JSON file {json_path}: {e}")
-
-    # Load GeoJSON data
-    if geojson_path.exists():
-        try:
-            with open(geojson_path, "r") as f:
-                geojson_data = json.load(f)
-        except (json.JSONDecodeError, IOError) as e:
-            current_app.logger.error(f"Error loading GeoJSON file {geojson_path}: {e}")
-
-    return json_data, geojson_data
-
-
-def prepare_comparison_data(
-    original_data: Dict[str, Any], xctrack_results: Dict[str, Any], task: Any
-) -> Dict[str, Any]:
-    """Prepare comparison data between original and xctrack calculations.
-
-    Args:
-        original_data (Dict[str, Any]): The original task data loaded from JSON.
-        xctrack_results (Dict[str, Any]): The results from XCTrack calculations.
-        task (Any): The parsed task object.
-
-    Returns:
-        Dict[str, Any]: Dictionary containing summary and turnpoint comparison data.
-    """
-    comparison: Dict[str, Any] = {
-        "summary": {
-            "original_center_km": original_data["metadata"].get(
-                "distance_through_centers_km", 0
-            ),
-            "original_optimized_km": original_data["metadata"].get(
-                "distance_optimized_km", 0
-            ),
-            "xctrack_center_km": xctrack_results.get("center_distance_km", 0),
-            "xctrack_optimized_km": xctrack_results.get("optimized_distance_km", 0),
-        },
-        "turnpoints": [],
-    }
-
-    # Calculate differences for summary
-    center_diff = (
-        comparison["summary"]["xctrack_center_km"]
-        - comparison["summary"]["original_center_km"]
-    )
-    opt_diff = (
-        comparison["summary"]["xctrack_optimized_km"]
-        - comparison["summary"]["original_optimized_km"]
-    )
-
-    comparison["summary"]["center_difference_km"] = center_diff
-    comparison["summary"]["optimized_difference_km"] = opt_diff
-    comparison["summary"]["center_difference_percent"] = (
-        (center_diff / comparison["summary"]["original_center_km"] * 100)
-        if comparison["summary"]["original_center_km"] > 0
-        else 0
-    )
-    comparison["summary"]["optimized_difference_percent"] = (
-        (opt_diff / comparison["summary"]["original_optimized_km"] * 100)
-        if comparison["summary"]["original_optimized_km"] > 0
-        else 0
-    )
-
-    # Compare turnpoint by turnpoint
-    original_tps = original_data.get("turnpoints", [])
-    xctrack_tps = xctrack_results.get("turnpoints", [])
-
-    for i, orig_tp in enumerate(original_tps):
-        tp_comparison = {
-            "index": i + 1,
-            "name": orig_tp.get("Name", f"TP{i+1}"),
-            "type": orig_tp.get("Type", ""),
-            "radius_m": orig_tp.get("Radius (m)", 0),
-            "original": {
-                "center_km": orig_tp.get("Distance (km)", 0),
-                "optimized_km": orig_tp.get("Optimized (km)", 0),
-            },
-            "xctrack": {
-                "center_km": 0,
-                "optimized_km": 0,
-            },
-        }
-
-        # Find corresponding xctrack turnpoint
-        if i < len(xctrack_tps):
-            xctrack_tp = xctrack_tps[i]
-            tp_comparison["xctrack"]["center_km"] = xctrack_tp.get(
-                "cumulative_center_km", 0
-            )
-            tp_comparison["xctrack"]["optimized_km"] = xctrack_tp.get(
-                "cumulative_optimized_km", 0
-            )
-
-        # Calculate differences
-        center_diff = (
-            tp_comparison["xctrack"]["center_km"]
-            - tp_comparison["original"]["center_km"]
-        )
-        opt_diff = (
-            tp_comparison["xctrack"]["optimized_km"]
-            - tp_comparison["original"]["optimized_km"]
-        )
-
-        tp_comparison["differences"] = {
-            "center_km": center_diff,
-            "optimized_km": opt_diff,
-            "center_percent": (
-                (center_diff / tp_comparison["original"]["center_km"] * 100)
-                if tp_comparison["original"]["center_km"] > 0
-                else 0
-            ),
-            "optimized_percent": (
-                (opt_diff / tp_comparison["original"]["optimized_km"] * 100)
-                if tp_comparison["original"]["optimized_km"] > 0
-                else 0
-            ),
-        }
-
-        comparison["turnpoints"].append(tp_comparison)
-
-    return comparison
-
-
 def create_app():
     """Create and configure the Flask app instance.
 
@@ -685,6 +343,7 @@ def create_app():
     """
     app = Flask(__name__)
     app.register_blueprint(task_viewer_bp)
+    app.register_blueprint(api_bp)
     return app
 
 
