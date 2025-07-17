@@ -60,12 +60,19 @@
     {% endif %}
 </div>
 {% else %}
+
 <div class="row mb-3">
     <div class="col">
         <h1>Task: {{ task_name }}</h1>
         {% if metadata.created %}
         <p class="text-muted">Created: {{ metadata.created }}</p>
         {% endif %}
+        <p>
+            <a href="/api/kml/{{ task_name }}.kml" class="btn btn-outline-primary btn-sm" target="_blank"
+                rel="noopener">
+                Download KML
+            </a>
+        </p>
     </div>
 </div>
 

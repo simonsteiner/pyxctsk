@@ -10,7 +10,15 @@ import sys
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional, Tuple, Union
 
-from flask import Blueprint, Flask, abort, current_app, jsonify, render_template
+from flask import (
+    Blueprint,
+    Flask,
+    Response,
+    abort,
+    current_app,
+    jsonify,
+    render_template,
+)
 
 # Add the xctrack module to the path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
@@ -21,7 +29,12 @@ calculate_task_distances: Optional[Callable[..., Dict[str, Any]]] = None
 generate_task_geojson: Optional[Callable[[Any], Dict[Any, Any]]] = None
 
 try:
-    from pyxctsk import calculate_task_distances, generate_task_geojson, parse_task
+    from pyxctsk import (
+        calculate_task_distances,
+        generate_task_geojson,
+        parse_task,
+        task_to_kml,
+    )
 
     XCTRACK_AVAILABLE = True
 except ImportError as e:
@@ -317,6 +330,47 @@ def task_api(task_name: str):
     return jsonify(
         {"task_name": task_name, "json_data": json_data, "geojson_data": geojson_data}
     )
+
+
+@task_viewer_bp.route("/api/kml/<task_name>.kml")
+def kml_task_api(task_name: str):
+    """Return KML for a given task as a downloadable file via API endpoint.
+
+    Args:
+        task_name (str): The name of the task to retrieve as KML.
+
+    Returns:
+        Response: Flask response with KML data and appropriate headers, or error message and status code.
+    """
+    if not XCTRACK_AVAILABLE:
+        return jsonify({"error": "XCTrack module not available"}), 500
+
+    # Load and parse XCTSK file
+    xctsk_path = XCTSK_DIR / f"{task_name}.xctsk"
+    if not xctsk_path.exists():
+        return jsonify({"error": "XCTSK file not found"}), 404
+
+    try:
+        task = parse_task(str(xctsk_path))  # type: ignore
+        kml_str = task_to_kml(task)  # type: ignore
+        return Response(
+            kml_str,
+            mimetype="application/vnd.google-earth.kml+xml",
+            headers={"Content-Disposition": f"attachment; filename={task_name}.kml"},
+        )
+    except Exception as e:
+        import traceback
+
+        stacktrace = traceback.format_exc()
+        return (
+            jsonify(
+                {
+                    "error": f"Error generating KML: {str(e)}",
+                    "stacktrace": stacktrace,
+                }
+            ),
+            500,
+        )
 
 
 @task_viewer_bp.route("/api/compare/<task_name>")
