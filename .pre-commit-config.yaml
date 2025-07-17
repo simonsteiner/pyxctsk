@@ -33,3 +33,9 @@ repos:
         name: pydocstyle (Google style)
         args: ["--convention=google", "src/", "tests/"]
         exclude: ^scripts/
+  - repo: https://github.com/streetsidesoftware/cspell-cli
+    rev: v9.1.1
+    hooks:
+      - id: cspell # Spell check changed files
+        name: cspell
+        args: ["--config", "cspell.json"]
