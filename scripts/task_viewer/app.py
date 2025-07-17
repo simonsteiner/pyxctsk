@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""
-Task Viewer - A simple Flask application to display XCTrack task metadata and GeoJSON visualization.
+"""Task Viewer - A simple Flask application to display XCTrack task metadata and GeoJSON visualization.
+
 This is a standalone application for testing purposes, to compare xcontest data with generated data.
 """
 
@@ -8,9 +8,9 @@ import json
 import os
 import sys
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Optional, Tuple, Union
 
-from flask import Flask, abort, jsonify, render_template
+from flask import Blueprint, Flask, abort, current_app, jsonify, render_template
 
 # Add the xctrack module to the path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
@@ -63,62 +63,101 @@ except ImportError as e:
     AIRSCORE_AVAILABLE = False
     print(f"AirScore distance calculation not available: {e}")
 
-app = Flask(__name__)
+
+# Create Blueprint for task viewer
+task_viewer_bp = Blueprint("task_viewer", __name__)
+
 
 # Configuration
-JSON_DIR = (
-    Path(os.path.dirname(os.path.abspath(__file__)))
-    / ".."
-    / "downloaded_tasks"
-    / "json"
-)
-GEOJSON_DIR = (
-    Path(os.path.dirname(os.path.abspath(__file__)))
-    / ".."
-    / "downloaded_tasks"
-    / "geojson"
-)
-XCTSK_DIR = (
-    Path(os.path.dirname(os.path.abspath(__file__)))
-    / ".."
-    / "downloaded_tasks"
-    / "xctsk"
-)
+BASE_DIR = Path(os.path.dirname(os.path.abspath(__file__))) / ".." / "downloaded_tasks"
+JSON_DIR = BASE_DIR / "json"
+GEOJSON_DIR = BASE_DIR / "geojson"
+XCTSK_DIR = BASE_DIR / "xctsk"
 
 
-@app.route("/")
+def get_available_tasks() -> list[str]:
+    """Get list of available task names present in all required formats.
+
+    Returns:
+        list[str]: Sorted list of task names that have JSON, GeoJSON, and XCTSK files.
+    """
+    json_files = (
+        set(f.stem for f in JSON_DIR.glob("*.json")) if JSON_DIR.exists() else set()
+    )
+    geojson_files = (
+        set(f.stem for f in GEOJSON_DIR.glob("*.geojson"))
+        if GEOJSON_DIR.exists()
+        else set()
+    )
+    xctsk_files = (
+        set(f.stem for f in XCTSK_DIR.glob("*.xctsk")) if XCTSK_DIR.exists() else set()
+    )
+    # Only include tasks that have all three files
+    return sorted(json_files & geojson_files & xctsk_files)
+
+
+@task_viewer_bp.route("/")
 def index():
-    """Render the main page with task selection."""
+    """Render the main page with unified task selection.
+
+    Returns:
+        Response: Rendered HTML page for the main index.
+    """
     tasks = get_available_tasks()
     return render_template(
         "index.html",
         tasks=tasks,
         xctrack_available=XCTRACK_AVAILABLE,
         airscore_available=AIRSCORE_AVAILABLE,
+        url_prefix="task_viewer.",
     )
 
 
-@app.route("/compare")
+@task_viewer_bp.route("/compare")
 def compare_index():
-    """Render the comparison page with task selection."""
+    """Render the comparison page with unified task selection.
+
+    Returns:
+        Response: Rendered HTML page for the comparison index.
+    """
     tasks = get_available_tasks()
     return render_template(
-        "compare.html", tasks=tasks, xctrack_available=XCTRACK_AVAILABLE
+        "compare.html",
+        tasks=tasks,
+        xctrack_available=XCTRACK_AVAILABLE,
+        url_prefix="task_viewer.",
     )
 
 
-@app.route("/debug")
+@task_viewer_bp.route("/debug")
 def debug_index():
-    """Render the debug page with task selection."""
+    """Render the debug page with unified task selection.
+
+    Returns:
+        Response: Rendered HTML page for the debug index.
+    """
     tasks = get_available_tasks()
     return render_template(
-        "debug.html", tasks=tasks, xctrack_available=XCTRACK_AVAILABLE
+        "debug.html",
+        tasks=tasks,
+        xctrack_available=XCTRACK_AVAILABLE,
+        url_prefix="task_viewer.",
     )
 
 
-@app.route("/task/<task_name>")
+@task_viewer_bp.route("/task/<task_name>")
 def show_task(task_name: str):
-    """Display visualization and details for a specific task."""
+    """Display visualization and details for a specific task.
+
+    Args:
+        task_name (str): The name of the task to display.
+
+    Returns:
+        Response: Rendered HTML page for the task, or 404 if not found.
+
+    Raises:
+        werkzeug.exceptions.NotFound: If the task data is missing.
+    """
     # Load task data from JSON and GeoJSON files
     json_data, geojson_data = load_task_data(task_name)
 
@@ -133,12 +172,24 @@ def show_task(task_name: str):
         turnpoints=json_data.get("turnpoints", []),
         geojson=geojson_data,
         airscore_available=AIRSCORE_AVAILABLE,
+        url_prefix="task_viewer.",
     )
 
 
-@app.route("/compare/<task_name>")
+@task_viewer_bp.route("/compare/<task_name>")
 def compare_task(task_name: str):
-    """Display comparison between downloaded data and xctrack calculations."""
+    """Display comparison between downloaded data and xctrack calculations.
+
+    Args:
+        task_name (str): The name of the task to compare.
+
+    Returns:
+        Response: Rendered HTML page with comparison data, or error page if calculation fails.
+
+    Raises:
+        werkzeug.exceptions.NotFound: If the task or XCTSK file is missing.
+        werkzeug.exceptions.InternalServerError: If the XCTrack module is not available.
+    """
     if not XCTRACK_AVAILABLE:
         abort(500, "XCTrack module not available for calculations")
 
@@ -173,6 +224,7 @@ def compare_task(task_name: str):
             original_geojson=geojson_data,
             xctrack_geojson=xctrack_geojson,
             airscore_available=AIRSCORE_AVAILABLE,
+            url_prefix="task_viewer.",
         )
 
     except Exception as e:
@@ -184,12 +236,24 @@ def compare_task(task_name: str):
             task_name=task_name,
             error=f"Error calculating distances: {str(e)}",
             stacktrace=stacktrace,
+            url_prefix="task_viewer.",
         )
 
 
-@app.route("/debug/<task_name>")
+@task_viewer_bp.route("/debug/<task_name>")
 def debug_task(task_name: str):
-    """Display debug information for generate_task_geojson with focus on goal lines."""
+    """Display debug information for generate_task_geojson with focus on goal lines.
+
+    Args:
+        task_name (str): The name of the task to debug.
+
+    Returns:
+        Response: Rendered HTML page with debug information, or error page if calculation fails.
+
+    Raises:
+        werkzeug.exceptions.NotFound: If the task or XCTSK file is missing.
+        werkzeug.exceptions.InternalServerError: If the XCTrack module is not available.
+    """
     if not XCTRACK_AVAILABLE:
         abort(500, "XCTrack module not available for calculations")
 
@@ -216,6 +280,7 @@ def debug_task(task_name: str):
             task=task,
             original_geojson=geojson_data,
             xctrack_geojson=xctrack_geojson,
+            url_prefix="task_viewer.",
         )
 
     except Exception as e:
@@ -227,12 +292,23 @@ def debug_task(task_name: str):
             task_name=task_name,
             error=f"Error generating debug data: {str(e)}",
             stacktrace=stacktrace,
+            url_prefix="task_viewer.",
         )
 
 
-@app.route("/api/task/<task_name>")
+@task_viewer_bp.route("/api/task/<task_name>")
 def task_api(task_name: str):
-    """API endpoint to get task data in JSON format."""
+    """Return task data in JSON format via API endpoint.
+
+    Args:
+        task_name (str): The name of the task to retrieve.
+
+    Returns:
+        Response: Flask JSON response containing task and geojson data, or 404 if not found.
+
+    Raises:
+        werkzeug.exceptions.NotFound: If the task data is missing.
+    """
     json_data, geojson_data = load_task_data(task_name)
 
     if not json_data or not geojson_data:
@@ -243,9 +319,16 @@ def task_api(task_name: str):
     )
 
 
-@app.route("/api/compare/<task_name>")
+@task_viewer_bp.route("/api/compare/<task_name>")
 def compare_task_api(task_name: str):
-    """API endpoint to get comparison data in JSON format."""
+    """Return comparison data in JSON format via API endpoint.
+
+    Args:
+        task_name (str): The name of the task to compare.
+
+    Returns:
+        Response: Flask JSON response with comparison data, or error message and status code.
+    """
     if not XCTRACK_AVAILABLE:
         return jsonify({"error": "XCTrack module not available"}), 500
 
@@ -290,14 +373,22 @@ def compare_task_api(task_name: str):
         )
 
 
-@app.route("/airscore/<task_name>")
+@task_viewer_bp.route("/airscore/<task_name>")
 def airscore_task(task_name: str):
-    """Display AirScore calculations for a specific task."""
+    """Display AirScore calculations for a specific task.
+
+    Args:
+        task_name (str): The name of the task to process with AirScore.
+
+    Returns:
+        Response: Rendered HTML page with AirScore results, or error page if calculation fails.
+    """
     if not AIRSCORE_AVAILABLE:
         return render_template(
             "airscore_view.html",
             task_name=task_name,
             error="AirScore utilities not available",
+            url_prefix="task_viewer.",
         )
 
     # Load and parse XCTSK file using xctrack module
@@ -320,6 +411,7 @@ def airscore_task(task_name: str):
             task_name=task_name,
             airscore_results=airscore_results,
             airscore_geojson=airscore_geojson,
+            url_prefix="task_viewer.",
         )
 
     except Exception as e:
@@ -331,12 +423,20 @@ def airscore_task(task_name: str):
             task_name=task_name,
             error=f"Error calculating distances: {str(e)}",
             stacktrace=stacktrace,
+            url_prefix="task_viewer.",
         )
 
 
-@app.route("/api/airscore/<task_name>")
+@task_viewer_bp.route("/api/airscore/<task_name>")
 def airscore_task_api(task_name: str):
-    """API endpoint to get AirScore calculation data in JSON format."""
+    """Return AirScore calculation data in JSON format via API endpoint.
+
+    Args:
+        task_name (str): The name of the task to process with AirScore.
+
+    Returns:
+        Response: Flask JSON response with AirScore results and geojson, or error message and status code.
+    """
     if not AIRSCORE_AVAILABLE:
         return jsonify({"error": "AirScore utilities not available"}), 500
 
@@ -373,25 +473,21 @@ def airscore_task_api(task_name: str):
         )
 
 
-def get_available_tasks() -> List[str]:
-    """Get list of available task names from JSON directory."""
-    tasks = []
-
-    # Find all JSON files in the JSON directory
-    if JSON_DIR.exists():
-        json_files = list(JSON_DIR.glob("*.json"))
-        for file in json_files:
-            task_name = file.stem
-            if (GEOJSON_DIR / f"{task_name}.geojson").exists():
-                tasks.append(task_name)
-
-    return sorted(tasks)
-
-
 def load_task_data(
     task_name: str,
 ) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
-    """Load task data from JSON and GeoJSON files."""
+    """Load task data from JSON and GeoJSON files.
+
+    Args:
+        task_name (str): The name of the task to load.
+
+    Returns:
+        Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+            A tuple containing the JSON data and GeoJSON data, or None if loading fails.
+
+    Raises:
+        None. Errors are logged and None is returned if loading fails.
+    """
     json_path = JSON_DIR / f"{task_name}.json"
     geojson_path = GEOJSON_DIR / f"{task_name}.geojson"
 
@@ -404,7 +500,7 @@ def load_task_data(
             with open(json_path, "r") as f:
                 json_data = json.load(f)
         except (json.JSONDecodeError, IOError) as e:
-            app.logger.error(f"Error loading JSON file {json_path}: {e}")
+            current_app.logger.error(f"Error loading JSON file {json_path}: {e}")
 
     # Load GeoJSON data
     if geojson_path.exists():
@@ -412,7 +508,7 @@ def load_task_data(
             with open(geojson_path, "r") as f:
                 geojson_data = json.load(f)
         except (json.JSONDecodeError, IOError) as e:
-            app.logger.error(f"Error loading GeoJSON file {geojson_path}: {e}")
+            current_app.logger.error(f"Error loading GeoJSON file {geojson_path}: {e}")
 
     return json_data, geojson_data
 
@@ -420,7 +516,16 @@ def load_task_data(
 def prepare_comparison_data(
     original_data: Dict[str, Any], xctrack_results: Dict[str, Any], task: Any
 ) -> Dict[str, Any]:
-    """Prepare comparison data between original and xctrack calculations."""
+    """Prepare comparison data between original and xctrack calculations.
+
+    Args:
+        original_data (Dict[str, Any]): The original task data loaded from JSON.
+        xctrack_results (Dict[str, Any]): The results from XCTrack calculations.
+        task (Any): The parsed task object.
+
+    Returns:
+        Dict[str, Any]: Dictionary containing summary and turnpoint comparison data.
+    """
     comparison: Dict[str, Any] = {
         "summary": {
             "original_center_km": original_data["metadata"].get(
@@ -518,5 +623,16 @@ def prepare_comparison_data(
     return comparison
 
 
+def create_app():
+    """Create and configure the Flask app instance.
+
+    Returns:
+        Flask: The configured Flask application instance.
+    """
+    app = Flask(__name__)
+    app.register_blueprint(task_viewer_bp)
+    return app
+
+
 if __name__ == "__main__":
-    app.run(debug=True, port=5001)
+    create_app().run(debug=True, port=5001)

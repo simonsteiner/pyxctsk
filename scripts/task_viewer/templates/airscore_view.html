@@ -1,195 +1,179 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AirScore Calculation - {{ task_name }}</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A==" crossorigin=""/>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            line-height: 1.6;
-        }
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        h1, h2, h3 {
-            color: #333;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 20px 0;
-        }
-        th, td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid #ddd;
-        }
-        th {
-            background-color: #f2f2f2;
-        }
-        tr:nth-child(even) {
-            background-color: #f9f9f9;
-        }
-        tr:hover {
-            background-color: #f1f1f1;
-        }
-        .calculation-summary {
-            background-color: #f8f9fa;
-            padding: 15px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-            border: 1px solid #ddd;
-        }
-        .map {
-            height: 500px;
-            margin: 20px 0;
-            border: 1px solid #ddd;
-        }
-        .nav-links {
-            margin-bottom: 20px;
-        }
-        .nav-links a {
-            margin-right: 15px;
-            text-decoration: none;
-            color: #0366d6;
-        }
-        .error {
-            color: red;
-            padding: 10px;
-            background-color: #ffeeee;
-            border: 1px solid #ffcccc;
-        }
-        .stacktrace {
-            margin-top: 10px;
-            padding: 10px;
-            background-color: #f8f8f8;
-            border: 1px solid #ddd;
-            font-family: monospace;
-            font-size: 12px;
-            white-space: pre-wrap;
-            overflow-x: auto;
-            color: #333;
-            max-height: 300px;
-            overflow-y: auto;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="nav-links">
-            <a href="/">Back to Task List</a>
-            <a href="/compare/{{ task_name }}">Compare Task Calculations</a>
-            <a href="/task/{{ task_name }}">View Task</a>
-        </div>
+{% extends "base.html" %}
+{% block title %}AirScore Calculation - {{ task_name }}{% endblock %}
+{% block extra_head %}
+<style>
+    h1,
+    h2,
+    h3 {
+        color: #333;
+    }
 
-        <h1>AirScore Calculations for Task: {{ task_name }}</h1>
-        
-        {% if error %}
-            <div class="error">
-                <p>Error: {{ error }}</p>
-                {% if stacktrace %}
-                <pre class="stacktrace">{{ stacktrace }}</pre>
-                {% endif %}
-            </div>
-        {% else %}
-            <div class="calculation-summary">
-                <h2>Distance Summary</h2>
-                <p><strong>Center Distance:</strong> {{ airscore_results.center_distance_km|round(2) }} km</p>
-                <p><strong>Optimized Distance:</strong> {{ airscore_results.optimized_distance_km|round(2) }} km</p>
-            </div>
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 20px 0;
+    }
 
-            <div id="map" class="map"></div>
+    th,
+    td {
+        padding: 12px;
+        text-align: left;
+        border-bottom: 1px solid #ddd;
+    }
 
-            <h2>Turnpoint Details</h2>
-            <table>
-                <thead>
-                    <tr>
-                        <th>#</th>
-                        <th>Name</th>
-                        <th>Type</th>
-                        <th>Shape</th>
-                        <th>Radius (m)</th>
-                        <th>Leg Distance (km)</th>
-                        <th>Cumulative Distance (km)</th>
-                        <th>Optimized Leg (km)</th>
-                        <th>Cumulative Optimized (km)</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for tp in airscore_results.turnpoints %}
-                    <tr>
-                        <td>{{ tp.index + 1 }}</td>
-                        <td>{{ tp.name }}</td>
-                        <td>{{ tp.type }}</td>
-                        <td>{{ tp.shape }} ({{ tp.how }})</td>
-                        <td>{{ tp.radius }}</td>
-                        <td>{{ (tp.leg_center_m / 1000)|round(2) }}</td>
-                        <td>{{ tp.cumulative_center_km|round(2) }}</td>
-                        <td>{{ (tp.leg_optimized_m / 1000)|round(2) }}</td>
-                        <td>{{ tp.cumulative_optimized_km|round(2) }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        {% endif %}
-    </div>
+    th {
+        background-color: #f2f2f2;
+    }
 
-    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js" integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA==" crossorigin=""></script>
-    {% if not error %}
-    <script>
-        // Initialize the map
-        const map = L.map('map');
-        
-        // Add base layer
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        }).addTo(map);
+    tr:nth-child(even) {
+        background-color: #f9f9f9;
+    }
 
-        // Parse the GeoJSON
-        const geojsonData = {{ airscore_geojson|tojson }};
-        
-        // Add turnpoints and route to the map
-        const geojsonLayer = L.geoJSON(geojsonData, {
-            pointToLayer: function(feature, latlng) {
-                if (feature.properties.type === 'cylinder') {
-                    // Create circle for turnpoint
-                    const circle = L.circle(latlng, {
-                        radius: feature.properties.radius,
-                        color: '#3388ff',
-                        weight: 1,
-                        fillOpacity: 0.1
-                    });
-                    
-                    // Add popup to circle
-                    circle.bindPopup(`
+    tr:hover {
+        background-color: #f1f1f1;
+    }
+
+    .calculation-summary {
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+        border: 1px solid #ddd;
+    }
+
+    .map {
+        height: 500px;
+        margin: 20px 0;
+        border: 1px solid #ddd;
+    }
+
+    .error {
+        color: red;
+        padding: 10px;
+        background-color: #ffeeee;
+        border: 1px solid #ffcccc;
+    }
+
+    .stacktrace {
+        margin-top: 10px;
+        padding: 10px;
+        background-color: #f8f8f8;
+        border: 1px solid #ddd;
+        font-family: monospace;
+        font-size: 12px;
+        white-space: pre-wrap;
+        overflow-x: auto;
+        color: #333;
+        max-height: 300px;
+        overflow-y: auto;
+    }
+</style>
+{% endblock %}
+{% block content %}
+<h1>AirScore Calculations for Task: {{ task_name }}</h1>
+{% if error %}
+<div class="error">
+    <p>Error: {{ error }}</p>
+    {% if stacktrace %}
+    <pre class="stacktrace">{{ stacktrace }}</pre>
+    {% endif %}
+</div>
+{% else %}
+<div class="calculation-summary">
+    <h2>Distance Summary</h2>
+    <p><strong>Center Distance:</strong> {{ airscore_results.center_distance_km|round(2) }} km</p>
+    <p><strong>Optimized Distance:</strong> {{ airscore_results.optimized_distance_km|round(2) }} km</p>
+</div>
+<div id="map" class="map"></div>
+<h2>Turnpoint Details</h2>
+<table>
+    <thead>
+        <tr>
+            <th>#</th>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Shape</th>
+            <th>Radius (m)</th>
+            <th>Leg Distance (km)</th>
+            <th>Cumulative Distance (km)</th>
+            <th>Optimized Leg (km)</th>
+            <th>Cumulative Optimized (km)</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for tp in airscore_results.turnpoints %}
+        <tr>
+            <td>{{ tp.index + 1 }}</td>
+            <td>{{ tp.name }}</td>
+            <td>{{ tp.type }}</td>
+            <td>{{ tp.shape }} ({{ tp.how }})</td>
+            <td>{{ tp.radius }}</td>
+            <td>{{ (tp.leg_center_m / 1000)|round(2) }}</td>
+            <td>{{ tp.cumulative_center_km|round(2) }}</td>
+            <td>{{ (tp.leg_optimized_m / 1000)|round(2) }}</td>
+            <td>{{ tp.cumulative_optimized_km|round(2) }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+{% endblock %}
+{% block extra_scripts %}
+{% if not error %}
+<script>
+    // Initialize the map
+    const map = L.map('map');
+    // Add base layer
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+    // Parse the GeoJSON
+    const geojsonData = {{ airscore_geojson| tojson }};
+    // Add turnpoints and route to the map
+    const geojsonLayer = L.geoJSON(geojsonData, {
+        pointToLayer: function (feature, latlng) {
+            if (feature.properties.type === 'cylinder') {
+                // Create circle for turnpoint
+                const circle = L.circle(latlng, {
+                    radius: feature.properties.radius,
+                    color: '#3388ff',
+                    weight: 1,
+                    fillOpacity: 0.1
+                });
+                // Add popup to circle
+                circle.bindPopup(`
                         <strong>${feature.properties.name}</strong><br>
                         ${feature.properties.description}
                     `);
-                    
-                    return circle;
-                }
-                return L.marker(latlng);
-            },
-            style: function(feature) {
-                if (feature.properties.stroke) {
-                    return {
-                        color: feature.properties.stroke,
-                        weight: feature.properties['stroke-width'] || 3,
-                        opacity: feature.properties['stroke-opacity'] || 1
-                    };
-                }
-                return {};
+                return circle;
             }
-        }).addTo(map);
-        
-        // Fit the map to bounds
-        map.fitBounds(geojsonLayer.getBounds());
-    </script>
-    {% endif %}
-</body>
-</html>
+            return L.marker(latlng);
+        },
+        style: function (feature) {
+            if (feature.properties.stroke) {
+                return {
+                    color: feature.properties.stroke,
+                    weight: feature.properties['stroke-width'] || 3,
+                    opacity: feature.properties['stroke-opacity'] || 1
+                };
+            }
+            return {};
+        }
+    }).addTo(map);
+    // Always collect all coordinates from all features and fit map to those bounds
+    let coords = [];
+    geojsonData.features.forEach(f => {
+        if (f.geometry && f.geometry.type === 'Point') {
+            coords.push([f.geometry.coordinates[1], f.geometry.coordinates[0]]);
+        } else if (f.geometry && f.geometry.type === 'LineString') {
+            f.geometry.coordinates.forEach(c => coords.push([c[1], c[0]]));
+        } else if (f.geometry && f.geometry.type === 'Polygon') {
+            f.geometry.coordinates[0].forEach(c => coords.push([c[1], c[0]]));
+        }
+    });
+    if (coords.length > 0) {
+        map.fitBounds(L.latLngBounds(coords));
+    }
+</script>
+{% endif %}
+{% endblock %}

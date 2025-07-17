@@ -1,542 +1,565 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Task Comparison: {{ task_name }}</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <style>
-        .difference-positive { 
-            color: #d63384; 
-            font-weight: bold;
-        }
-        .difference-negative { 
-            color: #198754; 
-            font-weight: bold;
-        }
-        .difference-zero { 
-            color: #6c757d; 
-        }
-        .card-header { 
-            background-color: #f8f9fa; 
-        }
-        .table-responsive { 
-            max-height: 600px; 
-            overflow-y: auto; 
-        }
-        .summary-card {
-            border-left: 4px solid #007bff;
-        }
-        .number-large {
-            font-size: 1.2em;
-            font-weight: bold;
-        }
-        .badge-difference {
-            font-size: 0.8em;
-        }
-        #comparison-map {
-            height: 500px;
-            margin-bottom: 20px;
-            border-radius: 10px;
-        }
-        .map-toggle-buttons {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            z-index: 1000;
-        }
-        .map-toggle-buttons .btn {
-            margin-left: 5px;
-        }
-        .map-container {
-            position: relative;
-        }
-        .map-legend {
-            position: absolute;
-            bottom: 10px;
-            left: 10px;
-            z-index: 1000;
-            background: rgba(255, 255, 255, 0.9);
-            padding: 10px;
-            border-radius: 5px;
-            font-size: 12px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        }
-        .legend-item {
-            display: flex;
-            align-items: center;
-            margin-bottom: 5px;
-        }
-        .legend-line {
-            width: 20px;
-            height: 3px;
-            margin-right: 8px;
-        }
-        .legend-circle {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            margin-right: 8px;
-        }
-    </style>
-</head>
-<body>
-    <div class="container mt-4">
-        <nav class="breadcrumb">
-            <a class="breadcrumb-item" href="/">Tasks</a>
-            <a class="breadcrumb-item" href="/compare">Compare</a>
-            <span class="breadcrumb-item active">{{ task_name }}</span>
-            {% if airscore_available is defined and airscore_available %}
-            <a class="breadcrumb-item ms-auto" href="/airscore/{{ task_name }}">AirScore Calculations</a>
-            {% endif %}
-            <a class="breadcrumb-item" href="/task/{{ task_name }}">View Task</a>
-        </nav>
+{% extends "base.html" %}
+{% block title %}Task Comparison: {{ task_name }}{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+    .difference-positive {
+        color: #d63384;
+        font-weight: bold;
+    }
 
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h1>Distance Comparison: {{ task_name }}</h1>
-            <div>
-                <a href="/task/{{ task_name }}" class="btn btn-outline-secondary me-2">View Task</a>
-                <a href="/compare" class="btn btn-secondary">Back to List</a>
-            </div>
-        </div>
-        
-        {% if error %}
-        <div class="alert alert-danger">
-            <h4 class="alert-heading">Error</h4>
-            <p>{{ error }}</p>
-            {% if stacktrace %}
-            <hr>
-            <div class="mt-3">
-                <details>
-                    <summary>Show Stack Trace</summary>
-                    <pre class="mt-2 p-3 bg-light">{{ stacktrace }}</pre>
-                </details>
-            </div>
-            {% endif %}
-        </div>
-        {% else %}
-            </div>
-        </div>
+    .difference-negative {
+        color: #198754;
+        font-weight: bold;
+    }
 
-        <!-- Summary Cards -->
-        <div class="row mb-4">
-            <div class="col-md-6">
-                <div class="card summary-card">
-                    <div class="card-header">
-                        <h6 class="card-title mb-0">Distance Through Centers</h6>
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-6">
-                                <small class="text-muted">XCContest</small><br>
-                                <span class="number-large">{{ "%.1f"|format(comparison.summary.original_center_km) }} km</span>
-                            </div>
-                            <div class="col-6">
-                                <small class="text-muted">XCTrack</small><br>
-                                <span class="number-large">{{ "%.1f"|format(comparison.summary.xctrack_center_km) }} km</span>
-                            </div>
-                        </div>
-                        <hr>
-                        <div class="text-center">
-                            <span class="badge badge-difference
-                                {% if comparison.summary.center_difference_km > 0.1 %}bg-danger
-                                {% elif comparison.summary.center_difference_km < -0.1 %}bg-success
-                                {% else %}bg-secondary{% endif %}">
-                                {% if comparison.summary.center_difference_km >= 0 %}+{% endif %}{{ "%.2f"|format(comparison.summary.center_difference_km) }} km 
-                                ({% if comparison.summary.center_difference_percent >= 0 %}+{% endif %}{{ "%.1f"|format(comparison.summary.center_difference_percent) }}%)
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="card summary-card">
-                    <div class="card-header">
-                        <h6 class="card-title mb-0">Optimized Distance</h6>
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-6">
-                                <small class="text-muted">XCContest</small><br>
-                                <span class="number-large">{{ "%.1f"|format(comparison.summary.original_optimized_km) }} km</span>
-                            </div>
-                            <div class="col-6">
-                                <small class="text-muted">XCTrack</small><br>
-                                <span class="number-large">{{ "%.1f"|format(comparison.summary.xctrack_optimized_km) }} km</span>
-                            </div>
-                        </div>
-                        <hr>
-                        <div class="text-center">
-                            <span class="badge badge-difference
-                                {% if comparison.summary.optimized_difference_km > 0.1 %}bg-danger
-                                {% elif comparison.summary.optimized_difference_km < -0.1 %}bg-success
-                                {% else %}bg-secondary{% endif %}">
-                                {% if comparison.summary.optimized_difference_km >= 0 %}+{% endif %}{{ "%.2f"|format(comparison.summary.optimized_difference_km) }} km 
-                                ({% if comparison.summary.optimized_difference_percent >= 0 %}+{% endif %}{{ "%.1f"|format(comparison.summary.optimized_difference_percent) }}%)
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+    .difference-zero {
+        color: #6c757d;
+    }
 
-        <!-- Map Comparison -->
-        <div class="row mb-4">
-            <div class="col-md-12">
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">Route Comparison Map</h5>
-                    </div>
-                    <div class="card-body p-0">
-                        <div class="map-container">
-                            <div id="comparison-map"></div>
-                            <div class="map-toggle-buttons">
-                                <button type="button" class="btn btn-sm btn-primary" id="show-original" onclick="toggleLayer('original')">XCContest</button>
-                                <button type="button" class="btn btn-sm btn-success" id="show-xctrack" onclick="toggleLayer('xctrack')">XCTrack</button>
-                                <button type="button" class="btn btn-sm btn-info" id="show-both" onclick="toggleLayer('both')">Both</button>
-                            </div>
-                            <div class="map-legend" id="map-legend" style="display: none;">
-                                <strong>Legend</strong>
-                                <div class="legend-item">
-                                    <div class="legend-line" style="background-color: #d63384;"></div>
-                                    <span>XCContest Optimized Route</span>
-                                </div>
-                                <div class="legend-item">
-                                    <div class="legend-line" style="background-color: #ff4136;"></div>
-                                    <span>XCTrack Optimized Route</span>
-                                </div>
-                                <div class="legend-item">
-                                    <div class="legend-circle" style="background-color: #d63384; opacity: 0.5;"></div>
-                                    <span>XCContest Turnpoints</span>
-                                </div>
-                                <div class="legend-item">
-                                    <div class="legend-circle" style="background-color: #0074d9; opacity: 0.5;"></div>
-                                    <span>XCTrack Turnpoints</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+    .card-header {
+        background-color: #f8f9fa;
+    }
 
-        <!-- Turnpoint Details -->
+    .table-responsive {
+        max-height: 600px;
+        overflow-y: auto;
+    }
+
+    .summary-card {
+        border-left: 4px solid #007bff;
+    }
+
+    .number-large {
+        font-size: 1.2em;
+        font-weight: bold;
+    }
+
+    .badge-difference {
+        font-size: 0.8em;
+    }
+
+    #comparison-map {
+        height: 500px;
+        margin-bottom: 20px;
+        border-radius: 10px;
+    }
+
+    .map-toggle-buttons {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        z-index: 1000;
+    }
+
+    .map-toggle-buttons .btn {
+        margin-left: 5px;
+    }
+
+    .map-container {
+        position: relative;
+    }
+
+    .map-legend {
+        position: absolute;
+        bottom: 10px;
+        left: 10px;
+        z-index: 1000;
+        background: rgba(255, 255, 255, 0.9);
+        padding: 10px;
+        border-radius: 5px;
+        font-size: 12px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    }
+
+    .legend-item {
+        display: flex;
+        align-items: center;
+        margin-bottom: 5px;
+    }
+
+    .legend-line {
+        width: 20px;
+        height: 3px;
+        margin-right: 8px;
+    }
+
+    .legend-circle {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        margin-right: 8px;
+    }
+</style>
+{% endblock %}
+{% block content %}
+<div class="row mb-3">
+    <h1>Task Distance Comparison</h1>
+    <p class="text-muted">Compare XCContest downloaded data with XCTrack algorithm calculations</p>
+    <div class="col-md-12">
         <div class="card">
             <div class="card-header">
-                <h5 class="card-title mb-0">Turnpoint-by-Turnpoint Comparison</h5>
+                <h6 class="card-title mb-0">About Distance Comparison</h6>
             </div>
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-striped table-hover mb-0">
-                        <thead class="table-dark sticky-top">
-                            <tr>
-                                <th>#</th>
-                                <th>Name</th>
-                                <th>Type</th>
-                                <th>Radius</th>
-                                <th colspan="2" class="text-center">Center Distance (km)</th>
-                                <th class="text-center">Diff</th>
-                                <th colspan="2" class="text-center">Optimized Distance (km)</th>
-                                <th class="text-center">Diff</th>
-                            </tr>
-                            <tr>
-                                <th></th>
-                                <th></th>
-                                <th></th>
-                                <th></th>
-                                <th class="text-center"><small>XCContest</small></th>
-                                <th class="text-center"><small>XCTrack</small></th>
-                                <th class="text-center"><small>Δ</small></th>
-                                <th class="text-center"><small>XCContest</small></th>
-                                <th class="text-center"><small>XCTrack</small></th>
-                                <th class="text-center"><small>Δ</small></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for tp in comparison.turnpoints %}
-                            <tr>
-                                <td>{{ tp.index }}</td>
-                                <td>{{ tp.name }}</td>
-                                <td>
-                                    {% if tp.type %}
-                                    <span class="badge bg-info">{{ tp.type }}</span>
-                                    {% endif %}
-                                </td>
-                                <td>{{ tp.radius_m }}m</td>
-                                <td class="text-end">{{ "%.1f"|format(tp.original.center_km) }}</td>
-                                <td class="text-end">{{ "%.1f"|format(tp.xctrack.center_km) }}</td>
-                                <td class="text-center">
-                                    <span class="{% if tp.differences.center_km > 0.1 %}difference-positive
-                                              {% elif tp.differences.center_km < -0.1 %}difference-negative
-                                              {% else %}difference-zero{% endif %}">
-                                        {% if tp.differences.center_km >= 0 %}+{% endif %}{{ "%.2f"|format(tp.differences.center_km) }}
-                                    </span>
-                                </td>
-                                <td class="text-end">{{ "%.1f"|format(tp.original.optimized_km) }}</td>
-                                <td class="text-end">{{ "%.1f"|format(tp.xctrack.optimized_km) }}</td>
-                                <td class="text-center">
-                                    <span class="{% if tp.differences.optimized_km > 0.1 %}difference-positive
-                                              {% elif tp.differences.optimized_km < -0.1 %}difference-negative
-                                              {% else %}difference-zero{% endif %}">
-                                        {% if tp.differences.optimized_km >= 0 %}+{% endif %}{{ "%.2f"|format(tp.differences.optimized_km) }}
-                                    </span>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
+            <div class="card-body">
+                <p>This tool compares distance calculations between:</p>
+                <ul>
+                    <li><strong>XCContest Data:</strong> Distance values from downloaded task metadata</li>
+                    <li><strong>XCTrack Algorithm:</strong> Recalculated distances using the local xctrack module</li>
+                </ul>
+                <p class="text-muted small mb-0">
+                    Differences may occur due to algorithm variations, precision differences, or different earth models.
+                    Large differences may indicate bugs in the implementation.
+                </p>
             </div>
         </div>
-
-        <!-- Task Metadata -->
-        <div class="row mt-4">
-            <div class="col-md-12">
-                <div class="card">
-                    <div class="card-header">
-                        <h6 class="card-title mb-0">Original Task Metadata</h6>
+    </div>
+</div>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Distance Comparison: {{ task_name }}</h2>
+</div>
+{% if error %}
+<div class="alert alert-danger">
+    <h4 class="alert-heading">Error</h4>
+    <p>{{ error }}</p>
+    {% if stacktrace %}
+    <hr>
+    <div class="mt-3">
+        <details>
+            <summary>Show Stack Trace</summary>
+            <pre class="mt-2 p-3 bg-light">{{ stacktrace }}</pre>
+        </details>
+    </div>
+    {% endif %}
+</div>
+{% else %}
+<!-- Summary Cards -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card summary-card">
+            <div class="card-header">
+                <h6 class="card-title mb-0">Distance Through Centers</h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-6">
+                        <small class="text-muted">XCContest</small><br>
+                        <span class="number-large">{{ "%.1f"|format(comparison.summary.original_center_km) }} km</span>
                     </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <dl class="row">
-                                    <dt class="col-sm-4">Author:</dt>
-                                    <dd class="col-sm-8">{{ original_metadata.get('author', 'N/A') }}</dd>
-                                    <dt class="col-sm-4">Start Type:</dt>
-                                    <dd class="col-sm-8">{{ original_metadata.get('start_type', 'N/A') }}</dd>
-                                    <dt class="col-sm-4">SSS Open:</dt>
-                                    <dd class="col-sm-8">{{ original_metadata.get('sss_open', 'N/A') }}</dd>
-                                </dl>
-                            </div>
-                            <div class="col-md-6">
-                                <dl class="row">
-                                    <dt class="col-sm-4">Goal Type:</dt>
-                                    <dd class="col-sm-8">{{ original_metadata.get('goal_type', 'N/A') }}</dd>
-                                    <dt class="col-sm-4">Deadline:</dt>
-                                    <dd class="col-sm-8">{{ original_metadata.get('task_deadline', 'N/A') }}</dd>
-                                    <dt class="col-sm-4">Earth Model:</dt>
-                                    <dd class="col-sm-8">{{ original_metadata.get('earth_model', 'N/A') }}</dd>
-                                </dl>
-                            </div>
-                        </div>
+                    <div class="col-6">
+                        <small class="text-muted">XCTrack</small><br>
+                        <span class="number-large">{{ "%.1f"|format(comparison.summary.xctrack_center_km) }} km</span>
                     </div>
                 </div>
-            </div>
-        </div>
-
-        <div class="row mt-4 mb-4">
-            <div class="col-md-12">
-                <div class="alert alert-info">
-                    <strong>Note:</strong> 
-                    <span class="difference-positive">Red differences</span> indicate your algorithm produces higher values,
-                    <span class="difference-negative">green differences</span> indicate lower values.
-                    Large differences may indicate algorithm discrepancies that need investigation.
+                <hr>
+                <div class="text-center">
+                    <span class="badge badge-difference
+                            {% if comparison.summary.center_difference_km > 0.1 %}bg-danger
+                            {% elif comparison.summary.center_difference_km < -0.1 %}bg-success
+                            {% else %}bg-secondary{% endif %}">
+                        {% if comparison.summary.center_difference_km >= 0 %}+{% endif %}{{
+                        "%.2f"|format(comparison.summary.center_difference_km) }} km
+                        ({% if comparison.summary.center_difference_percent >= 0 %}+{% endif %}{{
+                        "%.1f"|format(comparison.summary.center_difference_percent) }}%)
+                    </span>
                 </div>
             </div>
         </div>
     </div>
+    <div class="col-md-6">
+        <div class="card summary-card">
+            <div class="card-header">
+                <h6 class="card-title mb-0">Optimized Distance</h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-6">
+                        <small class="text-muted">XCContest</small><br>
+                        <span class="number-large">{{ "%.1f"|format(comparison.summary.original_optimized_km) }}
+                            km</span>
+                    </div>
+                    <div class="col-6">
+                        <small class="text-muted">XCTrack</small><br>
+                        <span class="number-large">{{ "%.1f"|format(comparison.summary.xctrack_optimized_km) }}
+                            km</span>
+                    </div>
+                </div>
+                <hr>
+                <div class="text-center">
+                    <span class="badge badge-difference
+                            {% if comparison.summary.optimized_difference_km > 0.1 %}bg-danger
+                            {% elif comparison.summary.optimized_difference_km < -0.1 %}bg-success
+                            {% else %}bg-secondary{% endif %}">
+                        {% if comparison.summary.optimized_difference_km >= 0 %}+{% endif %}{{
+                        "%.2f"|format(comparison.summary.optimized_difference_km) }} km
+                        ({% if comparison.summary.optimized_difference_percent >= 0 %}+{% endif %}{{
+                        "%.1f"|format(comparison.summary.optimized_difference_percent) }}%)
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Map Comparison -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Route Comparison Map</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="map-container">
+                    <div id="comparison-map"></div>
+                    <div class="map-toggle-buttons">
+                        <button type="button" class="btn btn-sm btn-primary" id="show-original"
+                            onclick="toggleLayer('original')">XCContest</button>
+                        <button type="button" class="btn btn-sm btn-success" id="show-xctrack"
+                            onclick="toggleLayer('xctrack')">XCTrack</button>
+                        <button type="button" class="btn btn-sm btn-info" id="show-both"
+                            onclick="toggleLayer('both')">Both</button>
+                    </div>
+                    <div class="map-legend" id="map-legend" style="display: none;">
+                        <strong>Legend</strong>
+                        <div class="legend-item">
+                            <div class="legend-line" style="background-color: #d63384;"></div>
+                            <span>XCContest Optimized Route</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-line" style="background-color: #ff4136;"></div>
+                            <span>XCTrack Optimized Route</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-circle" style="background-color: #d63384; opacity: 0.5;"></div>
+                            <span>XCContest Turnpoints</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-circle" style="background-color: #0074d9; opacity: 0.5;"></div>
+                            <span>XCTrack Turnpoints</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Turnpoint Details -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="card-title mb-0">Turnpoint-by-Turnpoint Comparison</h5>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-striped table-hover mb-0">
+                <thead class="table-dark sticky-top">
+                    <tr>
+                        <th>#</th>
+                        <th>Name</th>
+                        <th>Type</th>
+                        <th>Radius</th>
+                        <th colspan="2" class="text-center">Center Distance (km)</th>
+                        <th class="text-center">Diff</th>
+                        <th colspan="2" class="text-center">Optimized Distance (km)</th>
+                        <th class="text-center">Diff</th>
+                    </tr>
+                    <tr>
+                        <th></th>
+                        <th></th>
+                        <th></th>
+                        <th></th>
+                        <th class="text-center"><small>XCContest</small></th>
+                        <th class="text-center"><small>XCTrack</small></th>
+                        <th class="text-center"><small>Δ</small></th>
+                        <th class="text-center"><small>XCContest</small></th>
+                        <th class="text-center"><small>XCTrack</small></th>
+                        <th class="text-center"><small>Δ</small></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for tp in comparison.turnpoints %}
+                    <tr>
+                        <td>{{ tp.index }}</td>
+                        <td>{{ tp.name }}</td>
+                        <td>
+                            {% if tp.type %}
+                            <span class="badge bg-info">{{ tp.type }}</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ tp.radius_m }}m</td>
+                        <td class="text-end">{{ "%.1f"|format(tp.original.center_km) }}</td>
+                        <td class="text-end">{{ "%.1f"|format(tp.xctrack.center_km) }}</td>
+                        <td class="text-center">
+                            <span class="{% if tp.differences.center_km > 0.1 %}difference-positive
+                                          {% elif tp.differences.center_km < -0.1 %}difference-negative
+                                          {% else %}difference-zero{% endif %}">
+                                {% if tp.differences.center_km >= 0 %}+{% endif %}{{
+                                "%.2f"|format(tp.differences.center_km) }}
+                            </span>
+                        </td>
+                        <td class="text-end">{{ "%.1f"|format(tp.original.optimized_km) }}</td>
+                        <td class="text-end">{{ "%.1f"|format(tp.xctrack.optimized_km) }}</td>
+                        <td class="text-center">
+                            <span class="{% if tp.differences.optimized_km > 0.1 %}difference-positive
+                                          {% elif tp.differences.optimized_km < -0.1 %}difference-negative
+                                          {% else %}difference-zero{% endif %}">
+                                {% if tp.differences.optimized_km >= 0 %}+{% endif %}{{
+                                "%.2f"|format(tp.differences.optimized_km) }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+<!-- Task Metadata -->
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="card-title mb-0">Original Task Metadata</h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <dl class="row">
+                            <dt class="col-sm-4">Author:</dt>
+                            <dd class="col-sm-8">{{ original_metadata.get('author', 'N/A') }}</dd>
+                            <dt class="col-sm-4">Start Type:</dt>
+                            <dd class="col-sm-8">{{ original_metadata.get('start_type', 'N/A') }}</dd>
+                            <dt class="col-sm-4">SSS Open:</dt>
+                            <dd class="col-sm-8">{{ original_metadata.get('sss_open', 'N/A') }}</dd>
+                        </dl>
+                    </div>
+                    <div class="col-md-6">
+                        <dl class="row">
+                            <dt class="col-sm-4">Goal Type:</dt>
+                            <dd class="col-sm-8">{{ original_metadata.get('goal_type', 'N/A') }}</dd>
+                            <dt class="col-sm-4">Deadline:</dt>
+                            <dd class="col-sm-8">{{ original_metadata.get('task_deadline', 'N/A') }}</dd>
+                            <dt class="col-sm-4">Earth Model:</dt>
+                            <dd class="col-sm-8">{{ original_metadata.get('earth_model', 'N/A') }}</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="row mt-4 mb-4">
+    <div class="col-md-12">
+        <div class="alert alert-info">
+            <strong>Note:</strong>
+            <span class="difference-positive">Red differences</span> indicate your algorithm produces higher values,
+            <span class="difference-negative">green differences</span> indicate lower values.
+            Large differences may indicate algorithm discrepancies that need investigation.
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+{% block extra_scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    // Initialize map
+    const map = L.map('comparison-map').setView([0, 0], 2);
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script>
-        // Initialize map
-        const map = L.map('comparison-map').setView([0, 0], 2);
-        
-        // Add base layer
-        L.tileLayer('https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}{r}.png', {
-             attribution: '&copy; <a href="https://stadiamaps.com/" target="_blank">Stadia Maps</a>, &copy; <a href="https://openmaptiles.org/" target="_blank">OpenMapTiles</a> &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>'
-        }).addTo(map);
+    // Add base layer
+    L.tileLayer('https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; <a href="https://stadiamaps.com/" target="_blank">Stadia Maps</a>, &copy; <a href="https://openmaptiles.org/" target="_blank">OpenMapTiles</a> &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>'
+    }).addTo(map);
 
-        // GeoJSON data from backend
-        const originalGeoJSON = {{ original_geojson | tojson | safe }};
-        const xctrackGeoJSON = {{ xctrack_geojson | tojson | safe }};
+    // GeoJSON data from backend
+    const originalGeoJSON = {{ original_geojson | tojson | safe }};
+    const xctrackGeoJSON = {{ xctrack_geojson | tojson | safe }};
 
-        // Layer groups for original and xctrack data
-        let originalLayer = null;
-        let xctrackLayer = null;
+    // Layer groups for original and xctrack data
+    let originalLayer = null;
+    let xctrackLayer = null;
 
-        // Style functions
-        function getOriginalStyle(feature) {
-            if (feature.properties.type === 'route') {
-                return {
-                    color: '#d63384',
-                    weight: 4,
-                    opacity: 0.8
-                };
-            }
+    // Style functions
+    function getOriginalStyle(feature) {
+        if (feature.properties.type === 'route') {
             return {
                 color: '#d63384',
-                fillColor: '#d63384',
-                fillOpacity: 0.2,
-                weight: 2
+                weight: 4,
+                opacity: 0.8
             };
         }
+        return {
+            color: '#d63384',
+            fillColor: '#d63384',
+            fillOpacity: 0.2,
+            weight: 2
+        };
+    }
 
-        function getXCTrackStyle(feature) {
-            if (feature.properties.type === 'optimized_route') {
-                return {
-                    color: '#ff4136',
-                    weight: 3,
-                    opacity: 0.8
-                };
-            } else if (feature.properties.type === 'fallback_route') {
-                return {
-                    color: '#ff851b',
-                    weight: 2,
-                    opacity: 0.7,
-                    dashArray: '5,5'
-                };
-            }
+    function getXCTrackStyle(feature) {
+        if (feature.properties.type === 'optimized_route') {
             return {
-                color: '#0074d9',
-                fillColor: '#0074d9',
-                fillOpacity: 0.2,
-                weight: 2
+                color: '#ff4136',
+                weight: 3,
+                opacity: 0.8
+            };
+        } else if (feature.properties.type === 'fallback_route') {
+            return {
+                color: '#ff851b',
+                weight: 2,
+                opacity: 0.7,
+                dashArray: '5,5'
             };
         }
+        return {
+            color: '#0074d9',
+            fillColor: '#0074d9',
+            fillOpacity: 0.2,
+            weight: 2
+        };
+    }
 
-        function pointToLayer(feature, latlng) {
-            if (feature.properties && feature.properties.type === 'cylinder' && feature.properties.radius) {
-                return L.circle(latlng, {
-                    radius: feature.properties.radius
-                });
-            }
-            return L.marker(latlng);
-        }
-
-        function onEachFeature(feature, layer) {
-            if (feature.properties) {
-                let popupContent = '<div>';
-                if (feature.properties.name) {
-                    popupContent += `<strong>${feature.properties.name}</strong><br>`;
-                }
-                if (feature.properties.description) {
-                    popupContent += feature.properties.description;
-                }
-                if (feature.properties.radius) {
-                    popupContent += `<br>Radius: ${feature.properties.radius}m`;
-                }
-                if (feature.properties.type) {
-                    const typeLabels = {
-                        'route': 'Optimized Route',
-                        'optimized_route': 'Optimized Route',
-                        'fallback_route': 'Fallback Route',
-                        'cylinder': 'Turnpoint'
-                    };
-                    popupContent += `<br>Type: ${typeLabels[feature.properties.type] || feature.properties.type}`;
-                }
-                popupContent += '</div>';
-                layer.bindPopup(popupContent);
-            }
-        }
-
-        // Create layers
-        function createLayers() {
-            if (originalGeoJSON && originalGeoJSON.features && originalGeoJSON.features.length > 0) {
-                originalLayer = L.geoJSON(originalGeoJSON, {
-                    style: getOriginalStyle,
-                    pointToLayer: pointToLayer,
-                    onEachFeature: function(feature, layer) {
-                        onEachFeature(feature, layer);
-                        // Add source label to popup
-                        if (layer.getPopup()) {
-                            const content = layer.getPopup().getContent();
-                            layer.setPopupContent(content + '<br><em>Source: XCContest</em>');
-                        }
-                    }
-                });
-            }
-
-            if (xctrackGeoJSON && xctrackGeoJSON.features && xctrackGeoJSON.features.length > 0) {
-                xctrackLayer = L.geoJSON(xctrackGeoJSON, {
-                    style: getXCTrackStyle,
-                    pointToLayer: pointToLayer,
-                    onEachFeature: function(feature, layer) {
-                        onEachFeature(feature, layer);
-                        // Add source label to popup
-                        if (layer.getPopup()) {
-                            const content = layer.getPopup().getContent();
-                            layer.setPopupContent(content + '<br><em>Source: XCTrack</em>');
-                        }
-                    }
-                });
-            }
-        }
-
-        // Toggle layer visibility
-        function toggleLayer(type) {
-            // Remove existing layers
-            if (originalLayer && map.hasLayer(originalLayer)) {
-                map.removeLayer(originalLayer);
-            }
-            if (xctrackLayer && map.hasLayer(xctrackLayer)) {
-                map.removeLayer(xctrackLayer);
-            }
-
-            // Update button states
-            document.querySelectorAll('.map-toggle-buttons .btn').forEach(btn => {
-                btn.classList.remove('btn-primary', 'btn-success', 'btn-info');
-                btn.classList.add('btn-outline-secondary');
+    function pointToLayer(feature, latlng) {
+        if (feature.properties && feature.properties.type === 'cylinder' && feature.properties.radius) {
+            return L.circle(latlng, {
+                radius: feature.properties.radius
             });
+        }
+        return L.marker(latlng);
+    }
 
-            // Show/hide legend
-            const legend = document.getElementById('map-legend');
-            legend.style.display = 'block';
+    function onEachFeature(feature, layer) {
+        if (feature.properties) {
+            let popupContent = '<div>';
+            if (feature.properties.name) {
+                popupContent += `<strong>${feature.properties.name}</strong><br>`;
+            }
+            if (feature.properties.description) {
+                popupContent += feature.properties.description;
+            }
+            if (feature.properties.radius) {
+                popupContent += `<br>Radius: ${feature.properties.radius}m`;
+            }
+            if (feature.properties.type) {
+                const typeLabels = {
+                    'route': 'Optimized Route',
+                    'optimized_route': 'Optimized Route',
+                    'fallback_route': 'Fallback Route',
+                    'cylinder': 'Turnpoint'
+                };
+                popupContent += `<br>Type: ${typeLabels[feature.properties.type] || feature.properties.type}`;
+            }
+            popupContent += '</div>';
+            layer.bindPopup(popupContent);
+        }
+    }
 
-            // Add selected layers and update button
-            if (type === 'original' && originalLayer) {
-                originalLayer.addTo(map);
-                document.getElementById('show-original').classList.remove('btn-outline-secondary');
-                document.getElementById('show-original').classList.add('btn-primary');
-                map.fitBounds(originalLayer.getBounds(), { padding: [20, 20] });
-            } else if (type === 'xctrack' && xctrackLayer) {
-                xctrackLayer.addTo(map);
-                document.getElementById('show-xctrack').classList.remove('btn-outline-secondary');
-                document.getElementById('show-xctrack').classList.add('btn-success');
-                map.fitBounds(xctrackLayer.getBounds(), { padding: [20, 20] });
-            } else if (type === 'both') {
-                let bounds = null;
-                if (originalLayer) {
-                    originalLayer.addTo(map);
-                    bounds = originalLayer.getBounds();
-                }
-                if (xctrackLayer) {
-                    xctrackLayer.addTo(map);
-                    if (bounds) {
-                        bounds.extend(xctrackLayer.getBounds());
-                    } else {
-                        bounds = xctrackLayer.getBounds();
+    // Create layers
+    function createLayers() {
+        if (originalGeoJSON && originalGeoJSON.features && originalGeoJSON.features.length > 0) {
+            originalLayer = L.geoJSON(originalGeoJSON, {
+                style: getOriginalStyle,
+                pointToLayer: pointToLayer,
+                onEachFeature: function (feature, layer) {
+                    onEachFeature(feature, layer);
+                    // Add source label to popup
+                    if (layer.getPopup()) {
+                        const content = layer.getPopup().getContent();
+                        layer.setPopupContent(content + '<br><em>Source: XCContest</em>');
                     }
                 }
-                document.getElementById('show-both').classList.remove('btn-outline-secondary');
-                document.getElementById('show-both').classList.add('btn-info');
-                
-                if (bounds && bounds.isValid()) {
-                    map.fitBounds(bounds, { padding: [20, 20] });
+            });
+        }
+
+        if (xctrackGeoJSON && xctrackGeoJSON.features && xctrackGeoJSON.features.length > 0) {
+            xctrackLayer = L.geoJSON(xctrackGeoJSON, {
+                style: getXCTrackStyle,
+                pointToLayer: pointToLayer,
+                onEachFeature: function (feature, layer) {
+                    onEachFeature(feature, layer);
+                    // Add source label to popup
+                    if (layer.getPopup()) {
+                        const content = layer.getPopup().getContent();
+                        layer.setPopupContent(content + '<br><em>Source: XCTrack</em>');
+                    }
+                }
+            });
+        }
+    }
+
+    // Toggle layer visibility
+    function toggleLayer(type) {
+        // Remove existing layers
+        if (originalLayer && map.hasLayer(originalLayer)) {
+            map.removeLayer(originalLayer);
+        }
+        if (xctrackLayer && map.hasLayer(xctrackLayer)) {
+            map.removeLayer(xctrackLayer);
+        }
+
+        // Update button states
+        document.querySelectorAll('.map-toggle-buttons .btn').forEach(btn => {
+            btn.classList.remove('btn-primary', 'btn-success', 'btn-info');
+            btn.classList.add('btn-outline-secondary');
+        });
+
+        // Show/hide legend
+        const legend = document.getElementById('map-legend');
+        legend.style.display = 'block';
+
+        // Add selected layers and update button
+        if (type === 'original' && originalLayer) {
+            originalLayer.addTo(map);
+            document.getElementById('show-original').classList.remove('btn-outline-secondary');
+            document.getElementById('show-original').classList.add('btn-primary');
+            map.fitBounds(originalLayer.getBounds(), { padding: [20, 20] });
+        } else if (type === 'xctrack' && xctrackLayer) {
+            xctrackLayer.addTo(map);
+            document.getElementById('show-xctrack').classList.remove('btn-outline-secondary');
+            document.getElementById('show-xctrack').classList.add('btn-success');
+            map.fitBounds(xctrackLayer.getBounds(), { padding: [20, 20] });
+        } else if (type === 'both') {
+            let bounds = null;
+            if (originalLayer) {
+                originalLayer.addTo(map);
+                bounds = originalLayer.getBounds();
+            }
+            if (xctrackLayer) {
+                xctrackLayer.addTo(map);
+                if (bounds) {
+                    bounds.extend(xctrackLayer.getBounds());
+                } else {
+                    bounds = xctrackLayer.getBounds();
                 }
             }
-        }
+            document.getElementById('show-both').classList.remove('btn-outline-secondary');
+            document.getElementById('show-both').classList.add('btn-info');
 
-        // Initialize the map
-        createLayers();
-        
-        // Default to showing both layers
-        toggleLayer('both');
-
-        // If no data available, show message
-        if ((!originalGeoJSON || !originalGeoJSON.features || originalGeoJSON.features.length === 0) && 
-            (!xctrackGeoJSON || !xctrackGeoJSON.features || xctrackGeoJSON.features.length === 0)) {
-            
-            const noDataMsg = L.control({position: 'bottomleft'});
-            noDataMsg.onAdd = function() {
-                const div = L.DomUtil.create('div', 'no-data-message');
-                div.innerHTML = '<div class="alert alert-warning">No map data available for comparison</div>';
-                return div;
-            };
-            noDataMsg.addTo(map);
+            if (bounds && bounds.isValid()) {
+                map.fitBounds(bounds, { padding: [20, 20] });
+            }
         }
-    </script>
-{% endif %}
+    }
+
+    // Initialize the map
+    createLayers();
+
+    // Default to showing both layers
+    toggleLayer('both');
+
+    // If no data available, show message
+    if ((!originalGeoJSON || !originalGeoJSON.features || originalGeoJSON.features.length === 0) &&
+        (!xctrackGeoJSON || !xctrackGeoJSON.features || xctrackGeoJSON.features.length === 0)) {
+
+        const noDataMsg = L.control({ position: 'bottomleft' });
+        noDataMsg.onAdd = function () {
+            const div = L.DomUtil.create('div', 'no-data-message');
+            div.innerHTML = '<div class="alert alert-warning">No map data available for comparison</div>';
+            return div;
+        };
+        noDataMsg.addTo(map);
+    }
+</script>
+{% endblock %}
+
 </body>
+
 </html>

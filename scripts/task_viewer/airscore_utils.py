@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Utilities to integrate AirScore clone calculations into the task viewer.
+Integrate AirScore clone calculations into the task viewer.
+
 This module adapts the AirScore clone code to work with the task viewer without
 requiring the full AirScore dependencies.
 """
@@ -22,14 +23,18 @@ class Turnpoint:
     """A single turnpoint in a task.
 
     Attributes:
-        lat: a float, latitude in degrees
-        lon: a float, longitude in degrees
-        radius: a float, radius of cylinder or line in meters
-        type: type of turnpoint; "launch", "speed", "waypoint", "endspeed", "goal"
-        shape: "line" or "circle"
-        how: "entry" or "exit"
-        altitude: altitude in meters
-        name: name of the turnpoint
+        lat (float): Latitude in degrees.
+        lon (float): Longitude in degrees.
+        radius (float): Radius of cylinder or line in meters.
+        type (str): Type of turnpoint; "launch", "speed", "waypoint", "endspeed", "goal".
+        shape (str): "line" or "circle".
+        how (str): "entry" or "exit".
+        altitude (float): Altitude in meters.
+        name (str): Name of the turnpoint.
+        num (int): Turnpoint number.
+        description (str): Description of the turnpoint.
+        wpt_id (Any): Waypoint ID.
+        rwp_id (Any): RWP ID.
     """
 
     def __init__(
@@ -47,6 +52,22 @@ class Turnpoint:
         wpt_id=None,
         rwp_id=None,
     ):
+        """Initialize a Turnpoint instance.
+
+        Args:
+            lat (float, optional): Latitude in degrees.
+            lon (float, optional): Longitude in degrees.
+            radius (float, optional): Radius of cylinder or line in meters.
+            type (str, optional): Type of turnpoint.
+            shape (str, optional): Shape of the turnpoint.
+            how (str, optional): Entry or exit type.
+            altitude (float, optional): Altitude in meters.
+            name (str, optional): Name of the turnpoint.
+            num (int, optional): Turnpoint number.
+            description (str, optional): Description of the turnpoint.
+            wpt_id (Any, optional): Waypoint ID.
+            rwp_id (Any, optional): RWP ID.
+        """
         self.lat = lat
         self.lon = lon
         self.radius = radius
@@ -61,19 +82,47 @@ class Turnpoint:
         self.rwp_id = rwp_id
 
     def in_radius(self, other, tolerance=0, min_tol=0):
-        """Check if another point is within this turnpoint's radius plus tolerance"""
+        """Check if another point is within this turnpoint's radius plus tolerance.
+
+        Args:
+            other (Turnpoint): The other point to check.
+            tolerance (float, optional): Additional tolerance in meters.
+            min_tol (float, optional): Minimum tolerance in meters.
+
+        Returns:
+            bool: True if within radius plus tolerance, False otherwise.
+        """
         dist = geodesic((self.lat, self.lon), (other.lat, other.lon)).meters
         return dist <= (self.radius + tolerance)
 
 
 # Define minimal implementations needed for AirScore calculations
 def distance(p1, p2, method=None):
-    """Simple geodesic distance calculation between two points in meters"""
+    """Calculate geodesic distance between two points in meters.
+
+    Args:
+        p1 (Turnpoint): First point.
+        p2 (Turnpoint): Second point.
+        method (Any, optional): Not used.
+
+    Returns:
+        float: Distance in meters.
+    """
     return geodesic((p1.lat, p1.lon), (p2.lat, p2.lon)).meters
 
 
 def calcBearing(lat1, lon1, lat2, lon2):
-    """Calculate bearing between two points"""
+    """Calculate bearing between two points.
+
+    Args:
+        lat1 (float): Latitude of the first point.
+        lon1 (float): Longitude of the first point.
+        lat2 (float): Latitude of the second point.
+        lon2 (float): Longitude of the second point.
+
+    Returns:
+        float: Bearing in degrees from north.
+    """
     # Simple bearing calculation
     y = math.sin(math.radians(lon2 - lon1)) * math.cos(math.radians(lat2))
     x = math.cos(math.radians(lat1)) * math.sin(math.radians(lat2)) - math.sin(
@@ -84,7 +133,17 @@ def calcBearing(lat1, lon1, lat2, lon2):
 
 
 def opt_wp(p1, p2, p3, r2):
-    """Simplified optimization function for waypoint"""
+    """Perform simplified optimization for a waypoint.
+
+    Args:
+        p1 (Turnpoint): Previous turnpoint.
+        p2 (Turnpoint): Current turnpoint.
+        p3 (Turnpoint or None): Next turnpoint, or None if last.
+        r2 (float): Radius for optimization.
+
+    Returns:
+        Turnpoint: Optimized turnpoint.
+    """
     # In this simplified implementation, we optimize based on the bearing
     if p3 is None:
         # If there's no next point, just return the current turnpoint
@@ -139,7 +198,15 @@ def opt_wp(p1, p2, p3, r2):
 
 
 def opt_goal(p1, p2):
-    """Simplified optimization function for goal"""
+    """Perform simplified optimization for a goal.
+
+    Args:
+        p1 (Turnpoint): Previous turnpoint.
+        p2 (Turnpoint): Goal turnpoint.
+
+    Returns:
+        Turnpoint: Optimized goal turnpoint.
+    """
     # For a line goal, we find the nearest point on the goal line
     if p2.shape == "line":
         # Calculate the heading from p1 to p2
@@ -200,7 +267,17 @@ except ImportError as e:
 
 
 def convert_xctrack_to_airscore_turnpoints(task) -> List[Turnpoint]:
-    """Convert XCTrack task turnpoints to AirScore turnpoints for calculation."""
+    """Convert XCTrack task turnpoints to AirScore turnpoints for calculation.
+
+    Args:
+        task (Any): The XCTrack task object containing turnpoints.
+
+    Returns:
+        List[Turnpoint]: List of AirScore-compatible turnpoints.
+
+    Raises:
+        AttributeError: If required attributes are missing from turnpoints.
+    """
     airscore_tps = []
 
     for i, tp in enumerate(task.turnpoints):
@@ -243,7 +320,17 @@ def convert_xctrack_to_airscore_turnpoints(task) -> List[Turnpoint]:
 
 
 def calculate_airscore_distances(task) -> Dict[str, Any]:
-    """Calculate distances using AirScore clone algorithms."""
+    """Calculate distances using AirScore clone algorithms.
+
+    Args:
+        task (Any): The XCTrack task object containing turnpoints.
+
+    Returns:
+        Dict[str, Any]: Dictionary containing center and optimized distances, turnpoint data, and optimized route coordinates.
+
+    Raises:
+        ImportError: If AirScore Task class cannot be imported.
+    """
     # Convert task to AirScore format
     airscore_tps = convert_xctrack_to_airscore_turnpoints(task)
 
@@ -323,7 +410,15 @@ def calculate_airscore_distances(task) -> Dict[str, Any]:
 
 
 def generate_airscore_geojson(task, airscore_results: Dict) -> Dict:
-    """Generate GeoJSON from AirScore calculation results."""
+    """Generate GeoJSON from AirScore calculation results.
+
+    Args:
+        task (Any): The XCTrack task object containing turnpoints.
+        airscore_results (Dict): Results from AirScore calculations.
+
+    Returns:
+        Dict: GeoJSON FeatureCollection representing turnpoints and optimized route.
+    """
     features = []
 
     # Add turnpoints as point features with cylinders

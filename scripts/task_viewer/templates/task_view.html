@@ -1,439 +1,433 @@
-<!DOCTYPE html>
-<html lang="en">
+{% extends "base.html" %}
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ task_name }} - XCTrack Task Viewer</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <style>
-        #map {
-            height: 500px;
-            margin-bottom: 20px;
-            border-radius: 10px;
-        }
-        .table-responsive {
-            max-height: 500px;
-            overflow-y: auto;
-        }
-        .metadata-value {
-            font-weight: bold;
-        }
-        .turnpoint-highlight:hover {
-            background-color: #f5f5f5;
-        }
-        .nav-tabs .nav-link {
-            cursor: pointer;
-        }
-        pre {
-            max-height: 500px;
-            overflow: auto;
-        }
-        .tooltips-container {
-            position: absolute;
-            bottom: 10px;
-            left: 10px;
-            z-index: 1000;
-            background: rgba(255, 255, 255, 0.8);
-            padding: 10px;
-            border-radius: 5px;
-            max-width: 300px;
-        }
-    </style>
-</head>
+{% block title %}{{ task_name }} - XCTrack Task Viewer{% endblock %}
+{% block extra_head %}
+<style>
+    #map {
+        height: 500px !important;
+        min-height: 500px !important;
+        margin-bottom: 20px;
+        border-radius: 10px;
+        width: 100%;
+        display: block;
+    }
 
-<body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div class="container">
-            <a class="navbar-brand" href="/">XCTrack Task Viewer</a>
-            <ul class="navbar-nav ms-auto">
-                <li class="nav-item">
-                    <a class="nav-link" href="/compare/{{ task_name }}">Compare Calculations</a>
-                </li>
-                {% if airscore_available is defined and airscore_available %}
-                <li class="nav-item">
-                    <a class="nav-link" href="/airscore/{{ task_name }}">AirScore Calculations</a>
-                </li>
-                {% endif %}
-                <li class="nav-item">
-                    <a class="nav-link" href="/">Task List</a>
-                </li>
-            </ul>
-        </div>
-    </nav>
+    .table-responsive {
+        max-height: 500px;
+        overflow-y: auto;
+    }
 
-    <div class="container py-4">
-        <div class="row mb-3">
-            <div class="col">
-                <h1>Task: {{ task_name }}</h1>
-                {% if metadata.created %}
-                <p class="text-muted">Created: {{ metadata.created }}</p>
-                {% endif %}
-            </div>
-        </div>
+    .metadata-value {
+        font-weight: bold;
+    }
 
-        <div class="row mb-4">
-            <div class="col">
-                <div id="map"></div>
-            </div>
-        </div>
+    .turnpoint-highlight:hover {
+        background-color: #f5f5f5;
+    }
 
-        <ul class="nav nav-tabs mb-4" id="taskTabs" role="tablist">
-            <li class="nav-item" role="presentation">
-                <button class="nav-link active" id="metadata-tab" data-bs-toggle="tab" data-bs-target="#metadata-tab-pane" type="button" role="tab" aria-controls="metadata-tab-pane" aria-selected="true">Metadata</button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="turnpoints-tab" data-bs-toggle="tab" data-bs-target="#turnpoints-tab-pane" type="button" role="tab" aria-controls="turnpoints-tab-pane" aria-selected="false">Turnpoints</button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="json-tab" data-bs-toggle="tab" data-bs-target="#json-tab-pane" type="button" role="tab" aria-controls="json-tab-pane" aria-selected="false">JSON</button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="geojson-tab" data-bs-toggle="tab" data-bs-target="#geojson-tab-pane" type="button" role="tab" aria-controls="geojson-tab-pane" aria-selected="false">GeoJSON</button>
-            </li>
-        </ul>
+    .nav-tabs .nav-link {
+        cursor: pointer;
+    }
 
-        <div class="tab-content" id="taskTabsContent">
-            <!-- Metadata Tab -->
-            <div class="tab-pane fade show active" id="metadata-tab-pane" role="tabpanel" aria-labelledby="metadata-tab" tabindex="0">
-                <div class="card">
-                    <div class="card-body">
-                        <h4 class="card-title">Task Metadata</h4>
-                        <div class="table-responsive">
-                            <table class="table table-striped">
-                                <tbody>
-                                    {% for key, value in metadata.items() %}
-                                    <tr>
-                                        <th scope="row">{{ key }}</th>
-                                        <td class="metadata-value">{{ value }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
+    pre {
+        max-height: 500px;
+        overflow: auto;
+    }
 
-            <!-- Turnpoints Tab -->
-            <div class="tab-pane fade" id="turnpoints-tab-pane" role="tabpanel" aria-labelledby="turnpoints-tab" tabindex="0">
-                <div class="card">
-                    <div class="card-body">
-                        <h4 class="card-title">Task Turnpoints</h4>
-                        <div class="table-responsive">
-                            <table class="table table-striped">
-                                <thead>
-                                    <tr>
-                                        <th scope="col">#</th>
-                                        <th scope="col">Name</th>
-                                        <th scope="col">Type</th>
-                                        <th scope="col">Radius (m)</th>
-                                        <th scope="col">Distance (km)</th>
-                                        <th scope="col">Optimized (km)</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for tp in turnpoints %}
-                                    <tr class="turnpoint-highlight" data-turnpoint-index="{{ loop.index0 }}">
-                                        <th scope="row">{{ tp['#'] }}</th>
-                                        <td>{{ tp.Name }}</td>
-                                        <td>{% if tp.Type %}{{ tp.Type }}{% else %}Turnpoint{% endif %}</td>
-                                        <td>{{ tp['Radius (m)'] }}</td>
-                                        <td>{{ tp['Distance (km)'] }}</td>
-                                        <td>{{ tp['Optimized (km)'] }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
+    .tooltips-container {
+        position: absolute;
+        bottom: 10px;
+        left: 10px;
+        z-index: 1000;
+        background: rgba(255, 255, 255, 0.8);
+        padding: 10px;
+        border-radius: 5px;
+        max-width: 300px;
+    }
+</style>
+{% endblock %}
 
-            <!-- JSON Tab -->
-            <div class="tab-pane fade" id="json-tab-pane" role="tabpanel" aria-labelledby="json-tab" tabindex="0">
-                <div class="card">
-                    <div class="card-body">
-                        <h4 class="card-title">Raw JSON Data</h4>
-                        <pre id="json-content" class="bg-light p-3">{{ metadata | tojson(indent=2) }}</pre>
-                    </div>
-                </div>
-            </div>
+{% block content %}
+{% if error %}
+<div class="alert alert-danger" role="alert">
+    <h5>Error</h5>
+    <p>{{ error }}</p>
+    {% if stacktrace %}
+    <details>
+        <summary>Stack Trace</summary>
+        <pre>{{ stacktrace }}</pre>
+    </details>
+    {% endif %}
+</div>
+{% else %}
+<div class="row mb-3">
+    <div class="col">
+        <h1>Task: {{ task_name }}</h1>
+        {% if metadata.created %}
+        <p class="text-muted">Created: {{ metadata.created }}</p>
+        {% endif %}
+    </div>
+</div>
 
-            <!-- GeoJSON Tab -->
-            <div class="tab-pane fade" id="geojson-tab-pane" role="tabpanel" aria-labelledby="geojson-tab" tabindex="0">
-                <div class="card">
-                    <div class="card-body">
-                        <h4 class="card-title">Raw GeoJSON Data</h4>
-                        <pre id="geojson-content" class="bg-light p-3">{{ geojson | tojson(indent=2) }}</pre>
-                    </div>
+<div class="row mb-4">
+    <div class="col">
+        <div id="map"></div>
+    </div>
+</div>
+
+<ul class="nav nav-tabs mb-4" id="taskTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="metadata-tab" data-bs-toggle="tab" data-bs-target="#metadata-tab-pane"
+            type="button" role="tab" aria-controls="metadata-tab-pane" aria-selected="true">Metadata</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="turnpoints-tab" data-bs-toggle="tab" data-bs-target="#turnpoints-tab-pane"
+            type="button" role="tab" aria-controls="turnpoints-tab-pane" aria-selected="false">Turnpoints</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="json-tab" data-bs-toggle="tab" data-bs-target="#json-tab-pane" type="button"
+            role="tab" aria-controls="json-tab-pane" aria-selected="false">JSON</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="geojson-tab" data-bs-toggle="tab" data-bs-target="#geojson-tab-pane" type="button"
+            role="tab" aria-controls="geojson-tab-pane" aria-selected="false">GeoJSON</button>
+    </li>
+</ul>
+
+<div class="tab-content" id="taskTabsContent">
+    <!-- Metadata Tab -->
+    <div class="tab-pane fade show active" id="metadata-tab-pane" role="tabpanel" aria-labelledby="metadata-tab"
+        tabindex="0">
+        <div class="card">
+            <div class="card-body">
+                <h4 class="card-title">Task Metadata</h4>
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <tbody>
+                            {% for key, value in metadata.items() %}
+                            <tr>
+                                <th scope="row">{{ key }}</th>
+                                <td class="metadata-value">{{ value }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
     </div>
 
-    <footer class="bg-light py-3 mt-5">
-        <div class="container text-center">
-            <p class="mb-0">XCTrack Task Viewer - For testing purposes</p>
+    <!-- Turnpoints Tab -->
+    <div class="tab-pane fade" id="turnpoints-tab-pane" role="tabpanel" aria-labelledby="turnpoints-tab" tabindex="0">
+        <div class="card">
+            <div class="card-body">
+                <h4 class="card-title">Task Turnpoints</h4>
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th scope="col">#</th>
+                                <th scope="col">Name</th>
+                                <th scope="col">Type</th>
+                                <th scope="col">Radius (m)</th>
+                                <th scope="col">Distance (km)</th>
+                                <th scope="col">Optimized (km)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for tp in turnpoints %}
+                            <tr class="turnpoint-highlight" data-turnpoint-index="{{ loop.index0 }}">
+                                <th scope="row">{{ tp['#'] }}</th>
+                                <td>{{ tp.Name }}</td>
+                                <td>{% if tp.Type %}{{ tp.Type }}{% else %}Turnpoint{% endif %}</td>
+                                <td>{{ tp['Radius (m)'] }}</td>
+                                <td>{{ tp['Distance (km)'] }}</td>
+                                <td>{{ tp['Optimized (km)'] }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
-    </footer>
+    </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script>
-        // Initialize map
-        const map = L.map('map').setView([0, 0], 13);
-        let turnpointMarkers = [];
-        let turnpointCircles = [];
-        let tooltips = {};
-        
-        // Function to validate GeoJSON data
-        function isValidGeoJSON(data) {
-            if (!data) return false;
-            try {
-                // Check if it has the type property
-                if (!data.type) return false;
-                // Check if it has features array (for FeatureCollection)
-                if (data.type === 'FeatureCollection' && (!data.features || !Array.isArray(data.features))) {
-                    return false;
-                }
-                return true;
-            } catch (e) {
-                console.error("Error validating GeoJSON:", e);
+    <!-- JSON Tab -->
+    <div class="tab-pane fade" id="json-tab-pane" role="tabpanel" aria-labelledby="json-tab" tabindex="0">
+        <div class="card">
+            <div class="card-body">
+                <h4 class="card-title">Raw JSON Data</h4>
+                <pre id="json-content" class="bg-light p-3">{{ metadata | tojson(indent=2) }}</pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- GeoJSON Tab -->
+    <div class="tab-pane fade" id="geojson-tab-pane" role="tabpanel" aria-labelledby="geojson-tab" tabindex="0">
+        <div class="card">
+            <div class="card-body">
+                <h4 class="card-title">Raw GeoJSON Data</h4>
+                <pre id="geojson-content" class="bg-light p-3">{{ geojson | tojson(indent=2) }}</pre>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Initialize map
+    const map = L.map('map').setView([0, 0], 13);
+    let turnpointMarkers = [];
+    let turnpointCircles = [];
+    let tooltips = {};
+
+    // Function to validate GeoJSON data
+    function isValidGeoJSON(data) {
+        if (!data) return false;
+        try {
+            // Check if it has the type property
+            if (!data.type) return false;
+            // Check if it has features array (for FeatureCollection)
+            if (data.type === 'FeatureCollection' && (!data.features || !Array.isArray(data.features))) {
                 return false;
             }
+            return true;
+        } catch (e) {
+            console.error("Error validating GeoJSON:", e);
+            return false;
+        }
+    }
+
+    // Add tile layer
+    L.tileLayer('https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; <a href="https://stadiamaps.com/" target="_blank">Stadia Maps</a>, &copy; <a href="https://openmaptiles.org/" target="_blank">OpenMapTiles</a> &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>'
+    }).addTo(map);
+
+    // Parse GeoJSON data
+    const geojsonData = {{ geojson| tojson | safe }};
+
+    // Function to style features based on their properties
+    function styleGeoJSON(feature) {
+        if (!feature.properties) return {};
+
+        // Get feature index for color assignment
+        let index = 0;
+        if (feature.properties.index !== undefined) {
+            index = feature.properties.index;
+        } else if (feature.properties.order !== undefined) {
+            index = feature.properties.order;
+        } else if (feature.properties.name) {
+            // Try to extract index from name if it follows pattern "TP1", "TP 1", etc.
+            const match = feature.properties.name.match(/TP\s*(\d+)/i);
+            if (match) {
+                index = parseInt(match[1]) - 1;
+            }
         }
 
-        // Add tile layer
-        L.tileLayer('https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; <a href="https://stadiamaps.com/" target="_blank">Stadia Maps</a>, &copy; <a href="https://openmaptiles.org/" target="_blank">OpenMapTiles</a> &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>'
-        }).addTo(map);
-
-        // Parse GeoJSON data
-        const geojsonData = {{ geojson|tojson }};
-        
-        // Function to style features based on their properties
-        function styleGeoJSON(feature) {
-            if (!feature.properties) return {};
-            
-            // Get feature index for color assignment
-            let index = 0;
-            if (feature.properties.index !== undefined) {
-                index = feature.properties.index;
-            } else if (feature.properties.order !== undefined) {
-                index = feature.properties.order;
-            } else if (feature.properties.name) {
-                // Try to extract index from name if it follows pattern "TP1", "TP 1", etc.
-                const match = feature.properties.name.match(/TP\s*(\d+)/i);
-                if (match) {
-                    index = parseInt(match[1]) - 1;
-                }
-            }
-            
-            switch(feature.properties.type) {
-                case 'cylinder':
-                    return {
-                        color: getColorForIndex(index),
-                        weight: 2,
-                        opacity: 0.7,
-                        fillColor: getColorForIndex(index),
-                        fillOpacity: 0.1
-                    };
-                case 'taskline':
-                    return {
-                        color: 'blue',
-                        weight: 2,
-                        dashArray: '5, 5',
-                        opacity: 0.7
-                    };
-                case 'optiline':
-                    return {
-                        color: 'green',
-                        weight: 3,
-                        opacity: 0.8
-                    };
-                case 'start':
-                    return {
-                        color: '#00ff00',
-                        weight: 2,
-                        opacity: 0.8,
-                        fillColor: '#00ff00',
-                        fillOpacity: 0.1
-                    };
-                case 'goal':
-                    return {
-                        color: '#ff0000',
-                        weight: 2,
-                        opacity: 0.8,
-                        fillColor: '#ff0000',
-                        fillOpacity: 0.1
-                    };
-                default:
-                    return {
-                        color: '#3388ff',
-                        weight: 2
-                    };
-            }
-        }
-        
-        // Function to create custom markers and popups for points
-        function onEachFeature(feature, layer) {
-            if (feature.properties) {
-                // Create popup content based on feature properties
-                let popupContent = '';
-                
-                if (feature.properties.name) {
-                    popupContent += `<strong>${feature.properties.name}</strong><br>`;
-                }
-                
-                if (feature.properties.description) {
-                    popupContent += `${feature.properties.description}<br>`;
-                }
-                
-                if (feature.properties.ctype) {
-                    popupContent += `Type: ${feature.properties.ctype}<br>`;
-                } else if (feature.properties.type) {
-                    popupContent += `Type: ${feature.properties.type}<br>`;
-                }
-                
-                if (feature.properties.radius) {
-                    popupContent += `Radius: ${feature.properties.radius}m`;
-                }
-                
-                if (popupContent) {
-                    layer.bindPopup(popupContent);
-                }
-                
-                // Track turnpoints for later reference
-                if (feature.properties.type === 'cylinder' && layer instanceof L.Circle) {
-                    turnpointCircles.push(layer);
-                    const index = turnpointCircles.length - 1;
-                    
-                    // Save the marker when it's created (since circles don't have markers by default)
-                    if (feature.geometry && feature.geometry.type === 'Point') {
-                        const [lng, lat] = feature.geometry.coordinates;
-                        const marker = L.marker([lat, lng], {
-                            title: feature.properties.name || `Turnpoint ${index + 1}`
-                        }).addTo(map);
-                        marker.bindPopup(popupContent);
-                        turnpointMarkers.push(marker);
-                    }
-                }
-            }
-        }
-        
-        // Function to handle point features (create circles for cylinder turnpoints)
-        function pointToLayer(feature, latlng) {
-            if (feature.properties && feature.properties.type === 'cylinder' && feature.properties.radius) {
-                return L.circle(latlng, {
-                    radius: feature.properties.radius
-                });
-            }
-            return L.marker(latlng);
-        }
-        
-        // Add GeoJSON to map
-        if (isValidGeoJSON(geojsonData)) {
-            try {
-                const geoJSONLayer = L.geoJSON(geojsonData, {
-                    style: styleGeoJSON,
-                    onEachFeature: onEachFeature,
-                    pointToLayer: pointToLayer
-                }).addTo(map);
-                
-                // Fit map to bounds of all GeoJSON content
-                if (geoJSONLayer.getBounds && !geoJSONLayer.getBounds().isValid()) {
-                    console.warn("Invalid bounds detected, setting default view");
-                    map.setView([0, 0], 2); // Set world view as fallback
-                } else {
-                    map.fitBounds(geoJSONLayer.getBounds(), { padding: [50, 50] });
-                }
-            } catch (e) {
-                console.error("Error rendering GeoJSON:", e);
-                // Set a default view if rendering fails
-                map.setView([0, 0], 2);
-                
-                // Display an error message on the map
-                const errorMsg = L.control({position: 'bottomleft'});
-                errorMsg.onAdd = function() {
-                    const div = L.DomUtil.create('div', 'error-message');
-                    div.innerHTML = '<div class="alert alert-warning">Error rendering GeoJSON data</div>';
-                    return div;
+        switch (feature.properties.type) {
+            case 'cylinder':
+                return {
+                    color: getColorForIndex(index),
+                    weight: 2,
+                    opacity: 0.7,
+                    fillColor: getColorForIndex(index),
+                    fillOpacity: 0.1
                 };
-                errorMsg.addTo(map);
+            case 'taskline':
+                return {
+                    color: 'blue',
+                    weight: 2,
+                    dashArray: '5, 5',
+                    opacity: 0.7
+                };
+            case 'optiline':
+                return {
+                    color: 'green',
+                    weight: 3,
+                    opacity: 0.8
+                };
+            case 'start':
+                return {
+                    color: '#00ff00',
+                    weight: 2,
+                    opacity: 0.8,
+                    fillColor: '#00ff00',
+                    fillOpacity: 0.1
+                };
+            case 'goal':
+                return {
+                    color: '#ff0000',
+                    weight: 2,
+                    opacity: 0.8,
+                    fillColor: '#ff0000',
+                    fillOpacity: 0.1
+                };
+            default:
+                return {
+                    color: '#3388ff',
+                    weight: 2
+                };
+        }
+    }
+
+    // Function to create custom markers and popups for points
+    function onEachFeature(feature, layer) {
+        if (feature.properties) {
+            // Create popup content based on feature properties
+            let popupContent = '';
+
+            if (feature.properties.name) {
+                popupContent += `<strong>${feature.properties.name}</strong><br>`;
             }
-        } else {
-            console.warn("Invalid or missing GeoJSON data");
-            // Set default view for invalid data
+
+            if (feature.properties.description) {
+                popupContent += `${feature.properties.description}<br>`;
+            }
+
+            if (feature.properties.ctype) {
+                popupContent += `Type: ${feature.properties.ctype}<br>`;
+            } else if (feature.properties.type) {
+                popupContent += `Type: ${feature.properties.type}<br>`;
+            }
+
+            if (feature.properties.radius) {
+                popupContent += `Radius: ${feature.properties.radius}m`;
+            }
+
+            if (popupContent) {
+                layer.bindPopup(popupContent);
+            }
+
+            // Track turnpoints for later reference
+            if (feature.properties.type === 'cylinder' && layer instanceof L.Circle) {
+                turnpointCircles.push(layer);
+                const index = turnpointCircles.length - 1;
+
+                // Save the marker when it's created (since circles don't have markers by default)
+                if (feature.geometry && feature.geometry.type === 'Point') {
+                    const [lng, lat] = feature.geometry.coordinates;
+                    const marker = L.marker([lat, lng], {
+                        title: feature.properties.name || `Turnpoint ${index + 1}`
+                    }).addTo(map);
+                    marker.bindPopup(popupContent);
+                    turnpointMarkers.push(marker);
+                }
+            }
+        }
+    }
+
+    // Function to handle point features (create circles for cylinder turnpoints)
+    function pointToLayer(feature, latlng) {
+        if (feature.properties && feature.properties.type === 'cylinder' && feature.properties.radius) {
+            return L.circle(latlng, {
+                radius: feature.properties.radius
+            });
+        }
+        return L.marker(latlng);
+    }
+
+    // Add GeoJSON to map
+    if (isValidGeoJSON(geojsonData)) {
+        try {
+            const geoJSONLayer = L.geoJSON(geojsonData, {
+                style: styleGeoJSON,
+                onEachFeature: onEachFeature,
+                pointToLayer: pointToLayer
+            }).addTo(map);
+
+            // Fit map to bounds of all GeoJSON content
+            if (geoJSONLayer.getBounds && !geoJSONLayer.getBounds().isValid()) {
+                console.warn("Invalid bounds detected, setting default view");
+                map.setView([0, 0], 2); // Set world view as fallback
+            } else {
+                map.fitBounds(geoJSONLayer.getBounds(), { padding: [50, 50] });
+            }
+        } catch (e) {
+            console.error("Error rendering GeoJSON:", e);
+            // Set a default view if rendering fails
             map.setView([0, 0], 2);
-            
-            // Add a message to the map
-            const noDataMsg = L.control({position: 'bottomleft'});
-            noDataMsg.onAdd = function() {
-                const div = L.DomUtil.create('div', 'no-data-message');
-                div.innerHTML = '<div class="alert alert-info">No valid GeoJSON data available for this task</div>';
+
+            // Display an error message on the map
+            const errorMsg = L.control({ position: 'bottomleft' });
+            errorMsg.onAdd = function () {
+                const div = L.DomUtil.create('div', 'error-message');
+                div.innerHTML = '<div class="alert alert-warning">Error rendering GeoJSON data</div>';
                 return div;
             };
-            noDataMsg.addTo(map);
+            errorMsg.addTo(map);
         }
-        
-        // Highlight turnpoint on map when hovering on table row
-        const turnpointRows = document.querySelectorAll('.turnpoint-highlight');
-        turnpointRows.forEach(row => {
-            row.addEventListener('mouseenter', function() {
-                const index = parseInt(this.dataset.turnpointIndex);
-                if (turnpointMarkers[index]) {
-                    turnpointMarkers[index].openPopup();
-                    if (turnpointCircles[index]) {
-                        turnpointCircles[index].setStyle({
-                            fillOpacity: 0.3,
-                            weight: 3
-                        });
-                    }
+    } else {
+        console.warn("Invalid or missing GeoJSON data");
+        // Set default view for invalid data
+        map.setView([0, 0], 2);
+
+        // Add a message to the map
+        const noDataMsg = L.control({ position: 'bottomleft' });
+        noDataMsg.onAdd = function () {
+            const div = L.DomUtil.create('div', 'no-data-message');
+            div.innerHTML = '<div class="alert alert-info">No valid GeoJSON data available for this task</div>';
+            return div;
+        };
+        noDataMsg.addTo(map);
+    }
+
+    // Highlight turnpoint on map when hovering on table row
+    const turnpointRows = document.querySelectorAll('.turnpoint-highlight');
+    turnpointRows.forEach(row => {
+        row.addEventListener('mouseenter', function () {
+            const index = parseInt(this.dataset.turnpointIndex);
+            if (turnpointMarkers[index]) {
+                turnpointMarkers[index].openPopup();
+                if (turnpointCircles[index]) {
+                    turnpointCircles[index].setStyle({
+                        fillOpacity: 0.3,
+                        weight: 3
+                    });
                 }
-            });
-            
-            row.addEventListener('mouseleave', function() {
-                const index = parseInt(this.dataset.turnpointIndex);
-                if (turnpointMarkers[index]) {
-                    turnpointMarkers[index].closePopup();
-                    if (turnpointCircles[index]) {
-                        turnpointCircles[index].setStyle({
-                            fillOpacity: 0.1,
-                            weight: 2
-                        });
-                    }
-                }
-            });
-            
-            // Make the table row clickable to center the map on that turnpoint
-            row.addEventListener('click', function() {
-                const index = parseInt(this.dataset.turnpointIndex);
-                if (turnpointMarkers[index]) {
-                    const latlng = turnpointMarkers[index].getLatLng();
-                    map.setView(latlng, map.getZoom());
-                    turnpointMarkers[index].openPopup();
-                }
-            });
+            }
         });
-        
-        // Helper function to generate colors for turnpoints
-        function getColorForIndex(index) {
-            const colors = [
-                '#ff4136', // red
-                '#ff851b', // orange
-                '#ffdc00', // yellow
-                '#2ecc40', // green
-                '#0074d9', // blue
-                '#b10dc9', // purple
-                '#f012be', // fuchsia
-                '#01ff70', // lime
-                '#39cccc', // teal
-                '#7fdbff'  // aqua
-            ];
-            return colors[index % colors.length];
-        }
-    </script>
-</body>
-</html>
+
+        row.addEventListener('mouseleave', function () {
+            const index = parseInt(this.dataset.turnpointIndex);
+            if (turnpointMarkers[index]) {
+                turnpointMarkers[index].closePopup();
+                if (turnpointCircles[index]) {
+                    turnpointCircles[index].setStyle({
+                        fillOpacity: 0.1,
+                        weight: 2
+                    });
+                }
+            }
+        });
+
+        // Make the table row clickable to center the map on that turnpoint
+        row.addEventListener('click', function () {
+            const index = parseInt(this.dataset.turnpointIndex);
+            if (turnpointMarkers[index]) {
+                const latlng = turnpointMarkers[index].getLatLng();
+                map.setView(latlng, map.getZoom());
+                turnpointMarkers[index].openPopup();
+            }
+        });
+    });
+
+    // Helper function to generate colors for turnpoints
+    function getColorForIndex(index) {
+        const colors = [
+            '#ff4136', // red
+            '#ff851b', // orange
+            '#ffdc00', // yellow
+            '#2ecc40', // green
+            '#0074d9', // blue
+            '#b10dc9', // purple
+            '#f012be', // fuchsia
+            '#01ff70', // lime
+            '#39cccc', // teal
+            '#7fdbff'  // aqua
+        ];
+        return colors[index % colors.length];
+    }
+</script>
+{% endblock %}

@@ -1,408 +1,417 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Debug: {{ task_name }}</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <style>
-        .card-header { 
-            background-color: #f8f9fa; 
-        }
-        .table-responsive { 
-            max-height: 400px; 
-            overflow-y: auto; 
-        }
-        .debug-card {
-            border-left: 4px solid #17a2b8;
-        }
-        .feature-type {
-            font-family: monospace;
-            font-size: 0.9em;
-            background-color: #f8f9fa;
-            padding: 2px 6px;
-            border-radius: 3px;
-            margin: 2px;
-            display: inline-block;
-        }
-        .coordinate-display {
-            font-family: monospace;
-            font-size: 0.85em;
-            background-color: #f8f9fa;
-            padding: 8px;
-            border-radius: 4px;
-            white-space: pre-wrap;
-            max-height: 200px;
-            overflow-y: auto;
-        }
-        #debug-map {
-            height: 500px;
-            margin-bottom: 20px;
-            border-radius: 10px;
-        }
-        .goal-highlight {
-            background-color: #fff3cd;
-            border-left: 4px solid #ffc107;
-            padding: 10px;
-            margin: 10px 0;
-        }
-        .json-display {
-            font-family: monospace;
-            font-size: 0.8em;
-            background-color: #f8f9fa;
-            padding: 10px;
-            border-radius: 4px;
-            max-height: 300px;
-            overflow-y: auto;
-        }
-    </style>
-</head>
-<body>
-    <div class="container-fluid mt-4">
-        <nav class="breadcrumb">
-            <a class="breadcrumb-item" href="/">Tasks</a>
-            <a class="breadcrumb-item" href="/debug">Debug</a>
-            <span class="breadcrumb-item active">{{ task_name }}</span>
-        </nav>
+{% extends "base.html" %}
 
-        <div class="row mb-3">
-            <div class="col">
-                <h1>Debug: {{ task_name }}</h1>
-                <p class="text-muted">Analysis of generate_task_geojson output with focus on goal lines</p>
+{% block title %}Debug: {{ task_name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    .card-header {
+        background-color: #f8f9fa;
+    }
+
+    .table-responsive {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+
+    .debug-card {
+        border-left: 4px solid #17a2b8;
+    }
+
+    .feature-type {
+        font-family: monospace;
+        font-size: 0.9em;
+        background-color: #f8f9fa;
+        padding: 2px 6px;
+        border-radius: 3px;
+        margin: 2px;
+        display: inline-block;
+    }
+
+    .coordinate-display {
+        font-family: monospace;
+        font-size: 0.85em;
+        background-color: #f8f9fa;
+        padding: 8px;
+        border-radius: 4px;
+        white-space: pre-wrap;
+        max-height: 200px;
+        overflow-y: auto;
+    }
+
+    #debug-map {
+        height: 500px;
+        margin-bottom: 20px;
+        border-radius: 10px;
+    }
+
+    .goal-highlight {
+        background-color: #fff3cd;
+        border-left: 4px solid #ffc107;
+        padding: 10px;
+        margin: 10px 0;
+    }
+
+    .json-display {
+        font-family: monospace;
+        font-size: 0.8em;
+        background-color: #f8f9fa;
+        padding: 10px;
+        border-radius: 4px;
+        max-height: 300px;
+        overflow-y: auto;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-md-12">
+
+        <h1>Task GeoJSON Debug</h1>
+        <p class="text-muted">Debug XCTrack's generate_task_geojson function with focus on goal lines</p>
+
+        <div class="card">
+            <div class="card-header">
+                <h6 class="card-title mb-0">About GeoJSON Debug</h6>
+            </div>
+            <div class="card-body">
+                <p>This tool analyzes the GeoJSON output from XCTrack's <code>generate_task_geojson</code> function:</p>
+                <ul>
+                    <li><strong>Task Information:</strong> Basic task metadata and turnpoint details</li>
+                    <li><strong>Goal Line Analysis:</strong> Special focus on goal/finish line generation</li>
+                    <li><strong>Feature Breakdown:</strong> Analysis of all GeoJSON features and their types</li>
+                    <li><strong>Coordinate Inspection:</strong> Detailed coordinate data for debugging geometry issues
+                    </li>
+                </ul>
+                <p class="text-muted small mb-0">
+                    This is particularly useful for debugging goal line generation, checking feature types,
+                    and understanding the structure of generated GeoJSON data.
+                </p>
             </div>
         </div>
+    </div>
+</div>
+<div class="row mb-3">
+    <div class="col">
+        <h2>Debug: {{ task_name }}</h2>
+        <p class="text-muted">Analysis of generate_task_geojson output with focus on goal lines</p>
+    </div>
+</div>
 
-        {% if error %}
-        <div class="alert alert-danger" role="alert">
-            <h5>Error</h5>
-            <p>{{ error }}</p>
-            {% if stacktrace %}
-            <details>
-                <summary>Stack Trace</summary>
-                <pre>{{ stacktrace }}</pre>
-            </details>
-            {% endif %}
-        </div>
-        {% else %}
+{% if error %}
+<div class="alert alert-danger" role="alert">
+    <h5>Error</h5>
+    <p>{{ error }}</p>
+    {% if stacktrace %}
+    <details>
+        <summary>Stack Trace</summary>
+        <pre>{{ stacktrace }}</pre>
+    </details>
+    {% endif %}
+</div>
+{% else %}
 
-        <!-- Map Visualization -->
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="card-title mb-0">Task Visualization</h5>
-                        <div class="btn-group" role="group">
-                            <input type="radio" class="btn-check" name="geojsonSource" id="originalBtn" autocomplete="off">
-                            <label class="btn btn-outline-primary btn-sm" for="originalBtn">Original</label>
-                            
-                            <input type="radio" class="btn-check" name="geojsonSource" id="xctrackBtn" autocomplete="off" checked>
-                            <label class="btn btn-outline-success btn-sm" for="xctrackBtn">XCTrack</label>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <div id="debug-map"></div>
-                    </div>
+<!-- Map Visualization -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">Task Visualization</h5>
+                <div class="btn-group" role="group">
+                    <input type="radio" class="btn-check" name="geojsonSource" id="originalBtn" autocomplete="off">
+                    <label class="btn btn-outline-primary btn-sm" for="originalBtn">Original</label>
+
+                    <input type="radio" class="btn-check" name="geojsonSource" id="xctrackBtn" autocomplete="off"
+                        checked>
+                    <label class="btn btn-outline-success btn-sm" for="xctrackBtn">XCTrack</label>
                 </div>
+            </div>
+            <div class="card-body">
+                <div id="debug-map"></div>
             </div>
         </div>
+    </div>
+</div>
 
-        <div class="row">
-            <!-- Task Information -->
-            <div class="col-md-6 mb-4">
-                <div class="card debug-card">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">Task Information</h5>
-                    </div>
-                    <div class="card-body">
-                        <table class="table table-sm">
-                            <tr>
-                                <td><strong>Name:</strong></td>
-                                <td>{{ task_name }}</td>
-                            </tr>
-                            <tr>
-                                <td><strong>Turnpoints:</strong></td>
-                                <td>{{ task.turnpoints|length if task.turnpoints else 0 }}</td>
-                            </tr>
-                        </table>
-                    </div>
-                </div>
+<div class="row">
+    <!-- Task Information -->
+    <div class="col-md-6 mb-4">
+        <div class="card debug-card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Task Information</h5>
             </div>
-
-            <!-- GeoJSON Comparison -->
-            <div class="col-md-6 mb-4">
-                <div class="card debug-card">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">GeoJSON Data</h5>
-                    </div>
-                    <div class="card-body">
-                        <table class="table table-sm">
-                            <tr>
-                                <td><strong>Original Features:</strong></td>
-                                <td>{{ original_geojson.features|length if original_geojson and original_geojson.features else 0 }}</td>
-                            </tr>
-                            <tr>
-                                <td><strong>XCTrack Features:</strong></td>
-                                <td>{{ xctrack_geojson.features|length if xctrack_geojson and xctrack_geojson.features else 0 }}</td>
-                            </tr>
-                        </table>
-                    </div>
-                </div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <tr>
+                        <td><strong>Name:</strong></td>
+                        <td>{{ task_name }}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Turnpoints:</strong></td>
+                        <td>{{ task.turnpoints|length if task.turnpoints else 0 }}</td>
+                    </tr>
+                </table>
             </div>
         </div>
-
-        <div class="row">
-            <!-- Original GeoJSON Features -->
-            <div class="col-md-6 mb-4">
-                <div class="card debug-card">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">Original GeoJSON Features</h5>
-                    </div>
-                    <div class="card-body">
-                        {% if original_geojson and original_geojson.features %}
-                        <div class="table-responsive">
-                            <table class="table table-sm">
-                                <thead>
-                                    <tr>
-                                        <th>#</th>
-                                        <th>Type</th>
-                                        <th>Geometry</th>
-                                        <th>Name</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for feature in original_geojson.features %}
-                                    <tr>
-                                        <td>{{ loop.index }}</td>
-                                        <td><span class="feature-type">{{ feature.properties.type if feature.properties and feature.properties.type else 'unknown' }}</span></td>
-                                        <td>{{ feature.geometry.type if feature.geometry else 'none' }}</td>
-                                        <td>{{ feature.properties.name if feature.properties and feature.properties.name else '-' }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                        {% else %}
-                        <p class="text-muted">No original GeoJSON data available</p>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-
-            <!-- XCTrack GeoJSON Features -->
-            <div class="col-md-6 mb-4">
-                <div class="card debug-card">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">XCTrack GeoJSON Features</h5>
-                    </div>
-                    <div class="card-body">
-                        {% if xctrack_geojson and xctrack_geojson.features %}
-                        <div class="table-responsive">
-                            <table class="table table-sm">
-                                <thead>
-                                    <tr>
-                                        <th>#</th>
-                                        <th>Type</th>
-                                        <th>Geometry</th>
-                                        <th>Name</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for feature in xctrack_geojson.features %}
-                                    <tr>
-                                        <td>{{ loop.index }}</td>
-                                        <td><span class="feature-type">{{ feature.properties.type if feature.properties and feature.properties.type else 'unknown' }}</span></td>
-                                        <td>{{ feature.geometry.type if feature.geometry else 'none' }}</td>
-                                        <td>{{ feature.properties.name if feature.properties and feature.properties.name else '-' }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                        {% else %}
-                        <p class="text-muted">No XCTrack GeoJSON data available</p>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Raw GeoJSON Data -->
-        <div class="row">
-            <div class="col-12 mb-4">
-                <div class="card debug-card">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">Raw GeoJSON Data</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="json-display">{{ xctrack_geojson | tojson(indent=2) }}</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        {% endif %}
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    
-    {% if not error and (original_geojson or xctrack_geojson) %}
-    
-    <!-- Data injection for JavaScript -->
-    <script type="application/json" id="original-geojson-data">
+    <!-- GeoJSON Comparison -->
+    <div class="col-md-6 mb-4">
+        <div class="card debug-card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">GeoJSON Data</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <tr>
+                        <td><strong>Original Features:</strong></td>
+                        <td>{{ original_geojson.features|length if original_geojson and original_geojson.features else 0
+                            }}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>XCTrack Features:</strong></td>
+                        <td>{{ xctrack_geojson.features|length if xctrack_geojson and xctrack_geojson.features else 0 }}
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Original GeoJSON Features -->
+    <div class="col-md-6 mb-4">
+        <div class="card debug-card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Original GeoJSON Features</h5>
+            </div>
+            <div class="card-body">
+                {% if original_geojson and original_geojson.features %}
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Type</th>
+                                <th>Geometry</th>
+                                <th>Name</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for feature in original_geojson.features %}
+                            <tr>
+                                <td>{{ loop.index }}</td>
+                                <td><span class="feature-type">{{ feature.properties.type if feature.properties and
+                                        feature.properties.type else 'unknown' }}</span></td>
+                                <td>{{ feature.geometry.type if feature.geometry else 'none' }}</td>
+                                <td>{{ feature.properties.name if feature.properties and feature.properties.name else
+                                    '-' }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted">No original GeoJSON data available</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- XCTrack GeoJSON Features -->
+    <div class="col-md-6 mb-4">
+        <div class="card debug-card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">XCTrack GeoJSON Features</h5>
+            </div>
+            <div class="card-body">
+                {% if xctrack_geojson and xctrack_geojson.features %}
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Type</th>
+                                <th>Geometry</th>
+                                <th>Name</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for feature in xctrack_geojson.features %}
+                            <tr>
+                                <td>{{ loop.index }}</td>
+                                <td><span class="feature-type">{{ feature.properties.type if feature.properties and
+                                        feature.properties.type else 'unknown' }}</span></td>
+                                <td>{{ feature.geometry.type if feature.geometry else 'none' }}</td>
+                                <td>{{ feature.properties.name if feature.properties and feature.properties.name else
+                                    '-' }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted">No XCTrack GeoJSON data available</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Raw GeoJSON Data -->
+<div class="row">
+    <div class="col-12 mb-4">
+        <div class="card debug-card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Raw GeoJSON Data</h5>
+            </div>
+            <div class="card-body">
+                <div class="json-display">{{ xctrack_geojson | tojson(indent=2) }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+{% if not error and (original_geojson or xctrack_geojson) %}
+<!-- Data injection for JavaScript -->
+<script type="application/json" id="original-geojson-data">
         {% if original_geojson %}{{ original_geojson | tojson }}{% else %}null{% endif %}
     </script>
-    <script type="application/json" id="xctrack-geojson-data">
+<script type="application/json" id="xctrack-geojson-data">
         {% if xctrack_geojson %}{{ xctrack_geojson | tojson }}{% else %}null{% endif %}
     </script>
-    
-    <script>
-        // Initialize the map
-        var map = L.map('debug-map').setView([0, 0], 2);
-        
-        // Add OpenStreetMap tiles
-        L.tileLayer('https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}{r}.png', {
-             attribution: '&copy; <a href="https://stadiamaps.com/" target="_blank">Stadia Maps</a>, &copy; <a href="https://openmaptiles.org/" target="_blank">OpenMapTiles</a> &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>'
-        }).addTo(map);
-
-        // Load GeoJSON data from script tags
-        var originalData = JSON.parse(document.getElementById('original-geojson-data').textContent);
-        var xctrackData = JSON.parse(document.getElementById('xctrack-geojson-data').textContent);
-        
-        var currentLayer = null;
-        
-        // Style function for different feature types
-        function getFeatureStyle(feature) {
-            var type = feature.properties.type || 'unknown';
-            var color = '#3388ff'; // default blue
-            var weight = 2;
-            var opacity = 0.8;
-            
-            if (type.toLowerCase().includes('goal') || type.toLowerCase().includes('finish')) {
-                color = '#ff6b35'; // orange for goal
-                weight = 4;
-            } else if (type.toLowerCase().includes('start')) {
-                color = '#4CAF50'; // green for start
-                weight = 3;
-            } else if (type.toLowerCase().includes('turnpoint')) {
-                color = '#9C27B0'; // purple for turnpoints
-            } else if (type.toLowerCase().includes('track') || type.toLowerCase().includes('route')) {
-                color = '#2196F3'; // blue for tracks
-                weight = 3;
-            }
-            
-            return {
-                color: color,
-                weight: weight,
-                opacity: opacity,
-                fillOpacity: 0.3
-            };
+<script>
+    // Initialize the map
+    var map = L.map('debug-map').setView([0, 0], 2);
+    // Add OpenStreetMap tiles
+    L.tileLayer('https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; <a href="https://stadiamaps.com/" target="_blank">Stadia Maps</a>, &copy; <a href="https://openmaptiles.org/" target="_blank">OpenMapTiles</a> &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>'
+    }).addTo(map);
+    // Load GeoJSON data from script tags
+    var originalData = JSON.parse(document.getElementById('original-geojson-data').textContent);
+    var xctrackData = JSON.parse(document.getElementById('xctrack-geojson-data').textContent);
+    var currentLayer = null;
+    // Style function for different feature types
+    function getFeatureStyle(feature) {
+        var type = feature.properties.type || 'unknown';
+        var color = '#3388ff'; // default blue
+        var weight = 2;
+        var opacity = 0.8;
+        if (type.toLowerCase().includes('goal') || type.toLowerCase().includes('finish')) {
+            color = '#ff6b35'; // orange for goal
+            weight = 4;
+        } else if (type.toLowerCase().includes('start')) {
+            color = '#4CAF50'; // green for start
+            weight = 3;
+        } else if (type.toLowerCase().includes('turnpoint')) {
+            color = '#9C27B0'; // purple for turnpoints
+        } else if (type.toLowerCase().includes('track') || type.toLowerCase().includes('route')) {
+            color = '#2196F3'; // blue for tracks
+            weight = 3;
         }
-        
-        function loadGeoJSONLayer(geojsonData, sourceType) {
-            if (!geojsonData || !geojsonData.features) return null;
-            
-            return L.geoJSON(geojsonData, {
-                style: getFeatureStyle,
-                pointToLayer: function(feature, latlng) {
-                    // Create circles for turnpoint cylinders
-                    if (feature.properties && feature.properties.type === 'cylinder' && feature.properties.radius) {
-                        return L.circle(latlng, {
-                            radius: feature.properties.radius,
-                            color: getFeatureStyle(feature).color,
-                            weight: getFeatureStyle(feature).weight,
-                            opacity: getFeatureStyle(feature).opacity,
-                            fillOpacity: getFeatureStyle(feature).fillOpacity || 0.3
-                        });
-                    }
-                    // Default to marker for other point features
-                    return L.marker(latlng);
-                },
-                onEachFeature: function(feature, layer) {
-                    if (feature.properties) {
-                        var popupContent = '<h6>' + (feature.properties.name || feature.properties.type || 'Feature') + '</h6>';
-                        popupContent += '<p><strong>Source:</strong> ' + sourceType + '</p>';
-                        popupContent += '<p><strong>Type:</strong> ' + (feature.properties.type || 'unknown') + '</p>';
-                        
-                        if (feature.properties.radius) {
-                            popupContent += '<p><strong>Radius:</strong> ' + feature.properties.radius + ' m</p>';
-                        }
-                        
-                        // Add coordinate info for debugging
-                        var coords = feature.geometry.coordinates;
-                        if (feature.geometry.type === 'Point') {
-                            popupContent += '<p><strong>Coordinates:</strong> ' + coords[0].toFixed(6) + ', ' + coords[1].toFixed(6) + '</p>';
-                        } else if (feature.geometry.type === 'LineString') {
-                            popupContent += '<p><strong>Points:</strong> ' + coords.length + '</p>';
-                        } else if (feature.geometry.type === 'Polygon') {
-                            popupContent += '<p><strong>Vertices:</strong> ' + coords[0].length + '</p>';
-                        }
-                        
-                        layer.bindPopup(popupContent);
-                    }
-                }
-            });
-        }
-        
-        function switchToGeoJSON(sourceType) {
-            // Remove current layer
-            if (currentLayer) {
-                map.removeLayer(currentLayer);
-            }
-            
-            // Add new layer based on selection
-            if (sourceType === 'original' && originalData) {
-                currentLayer = loadGeoJSONLayer(originalData, 'Original');
-            } else if (sourceType === 'xctrack' && xctrackData) {
-                currentLayer = loadGeoJSONLayer(xctrackData, 'XCTrack');
-            }
-            
-            if (currentLayer) {
-                currentLayer.addTo(map);
-                // Fit the map to show all features
-                if (currentLayer.getLayers().length > 0) {
-                    map.fitBounds(currentLayer.getBounds());
-                }
-            }
-        }
-        
-        // Set up toggle button event listeners
-        document.getElementById('originalBtn').addEventListener('change', function() {
-            if (this.checked) {
-                switchToGeoJSON('original');
-            }
-        });
-        
-        document.getElementById('xctrackBtn').addEventListener('change', function() {
-            if (this.checked) {
-                switchToGeoJSON('xctrack');
-            }
-        });
-        
-        // Load XCTrack data by default
-        switchToGeoJSON('xctrack');
-        
-        // Add a legend
-        var legend = L.control({position: 'bottomright'});
-        legend.onAdd = function (map) {
-            var div = L.DomUtil.create('div', 'info legend');
-            div.style.backgroundColor = 'white';
-            div.style.padding = '6px 8px';
-            div.style.borderRadius = '4px';
-            div.style.boxShadow = '0 0 15px rgba(0,0,0,0.2)';
-            
-            div.innerHTML = '<h6>Feature Types</h6>' +
-                '<i style="background:#ff6b35; width:18px; height:3px; display:inline-block; margin-right:8px;"></i> Goal/Finish<br>' +
-                '<i style="background:#4CAF50; width:18px; height:3px; display:inline-block; margin-right:8px;"></i> Start<br>' +
-                '<i style="background:#9C27B0; width:18px; height:3px; display:inline-block; margin-right:8px;"></i> Turnpoint<br>' +
-                '<i style="background:#2196F3; width:18px; height:3px; display:inline-block; margin-right:8px;"></i> Track/Route<br>' +
-                '<i style="background:#3388ff; width:18px; height:3px; display:inline-block; margin-right:8px;"></i> Other';
-                
-            return div;
+        return {
+            color: color,
+            weight: weight,
+            opacity: opacity,
+            fillOpacity: 0.3
         };
-        legend.addTo(map);
-    </script>
-    {% endif %}
-</body>
-</html>
+    }
+    function loadGeoJSONLayer(geojsonData, sourceType) {
+        if (!geojsonData || !geojsonData.features) return null;
+        return L.geoJSON(geojsonData, {
+            style: getFeatureStyle,
+            pointToLayer: function (feature, latlng) {
+                // Create circles for turnpoint cylinders
+                if (feature.properties && feature.properties.type === 'cylinder' && feature.properties.radius) {
+                    return L.circle(latlng, {
+                        radius: feature.properties.radius,
+                        color: getFeatureStyle(feature).color,
+                        weight: getFeatureStyle(feature).weight,
+                        opacity: getFeatureStyle(feature).opacity,
+                        fillOpacity: getFeatureStyle(feature).fillOpacity || 0.3
+                    });
+                }
+                // Default to marker for other point features
+                return L.marker(latlng);
+            },
+            onEachFeature: function (feature, layer) {
+                if (feature.properties) {
+                    var popupContent = '<h6>' + (feature.properties.name || feature.properties.type || 'Feature') + '</h6>';
+                    popupContent += '<p><strong>Source:</strong> ' + sourceType + '</p>';
+                    popupContent += '<p><strong>Type:</strong> ' + (feature.properties.type || 'unknown') + '</p>';
+                    if (feature.properties.radius) {
+                        popupContent += '<p><strong>Radius:</strong> ' + feature.properties.radius + ' m</p>';
+                    }
+                    // Add coordinate info for debugging
+                    var coords = feature.geometry.coordinates;
+                    if (feature.geometry.type === 'Point') {
+                        popupContent += '<p><strong>Coordinates:</strong> ' + coords[0].toFixed(6) + ', ' + coords[1].toFixed(6) + '</p>';
+                    } else if (feature.geometry.type === 'LineString') {
+                        popupContent += '<p><strong>Points:</strong> ' + coords.length + '</p>';
+                    } else if (feature.geometry.type === 'Polygon') {
+                        popupContent += '<p><strong>Vertices:</strong> ' + coords[0].length + '</p>';
+                    }
+                    layer.bindPopup(popupContent);
+                }
+            }
+        });
+    }
+    function switchToGeoJSON(sourceType) {
+        // Remove current layer
+        if (currentLayer) {
+            map.removeLayer(currentLayer);
+        }
+        // Add new layer based on selection
+        if (sourceType === 'original' && originalData) {
+            currentLayer = loadGeoJSONLayer(originalData, 'Original');
+        } else if (sourceType === 'xctrack' && xctrackData) {
+            currentLayer = loadGeoJSONLayer(xctrackData, 'XCTrack');
+        }
+        if (currentLayer) {
+            currentLayer.addTo(map);
+            // Fit the map to show all features
+            if (currentLayer.getLayers().length > 0) {
+                map.fitBounds(currentLayer.getBounds());
+            }
+        }
+    }
+    // Set up toggle button event listeners
+    document.getElementById('originalBtn').addEventListener('change', function () {
+        if (this.checked) {
+            switchToGeoJSON('original');
+        }
+    });
+    document.getElementById('xctrackBtn').addEventListener('change', function () {
+        if (this.checked) {
+            switchToGeoJSON('xctrack');
+        }
+    });
+    // Load XCTrack data by default
+    switchToGeoJSON('xctrack');
+    // Add a legend
+    var legend = L.control({ position: 'bottomright' });
+    legend.onAdd = function (map) {
+        var div = L.DomUtil.create('div', 'info legend');
+        div.style.backgroundColor = 'white';
+        div.style.padding = '6px 8px';
+        div.style.borderRadius = '4px';
+        div.style.boxShadow = '0 0 15px rgba(0,0,0,0.2)';
+        div.innerHTML = '<h6>Feature Types</h6>' +
+            '<i style="background:#ff6b35; width:18px; height:3px; display:inline-block; margin-right:8px;"></i> Goal/Finish<br>' +
+            '<i style="background:#4CAF50; width:18px; height:3px; display:inline-block; margin-right:8px;"></i> Start<br>' +
+            '<i style="background:#9C27B0; width:18px; height:3px; display:inline-block; margin-right:8px;"></i> Turnpoint<br>' +
+            '<i style="background:#2196F3; width:18px; height:3px; display:inline-block; margin-right:8px;"></i> Track/Route<br>' +
+            '<i style="background:#3388ff; width:18px; height:3px; display:inline-block; margin-right:8px;"></i> Other';
+        return div;
+    };
+    legend.addTo(map);
+</script>
+{% endif %}
+{% endblock %}
