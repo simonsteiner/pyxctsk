@@ -44,18 +44,33 @@ class TestTaskToKML:
 
         kml_result = task_to_kml(task)
 
-        # Verify KML structure
+        # Verify KML structure - updated for simplekml output
         assert kml_result.startswith('<?xml version="1.0" encoding="UTF-8"?>')
-        assert '<kml xmlns="http://www.opengis.net/kml/2.2">' in kml_result
-        assert "<Document>" in kml_result
-        assert "<Folder>" in kml_result
-        assert "<Placemark>" in kml_result
-        assert "<LineString>" in kml_result
+        assert '<kml xmlns="http://www.opengis.net/kml/2.2"' in kml_result
+        assert "<Document" in kml_result  # simplekml adds id attributes
+        assert (
+            "<Placemark" in kml_result
+        )  # Multiple placemarks for turnpoints and course line
+        assert "<Polygon" in kml_result  # Turnpoints are polygons (circles)
+        assert "<LineString" in kml_result  # Course line
         assert "<coordinates>" in kml_result
+        assert "extrude>1</extrude>" in kml_result
+        assert "altitudeMode>relativeToGround</altitudeMode>" in kml_result
 
-        # Verify coordinate data
+        # Verify coordinate data (coordinates appear in both polygon circles and course line)
         assert "8.0,46.5,1000" in kml_result  # First turnpoint
         assert "8.1,46.6,1200" in kml_result  # Second turnpoint
+
+        # Verify turnpoint names and descriptions
+        assert "Start" in kml_result
+        assert "TP1" in kml_result
+        assert "Type: TurnpointType.TAKEOFF" in kml_result
+        assert "Radius: 1000m" in kml_result
+        assert "Radius: 400m" in kml_result
+
+        # Verify course line
+        assert "Course Line" in kml_result
+        assert "XCTrack task course with 2 turnpoints" in kml_result
 
     def test_task_to_kml_single_turnpoint(self):
         """Test KML conversion with single turnpoint."""
@@ -75,6 +90,9 @@ class TestTaskToKML:
 
         kml_result = task_to_kml(task)
         assert "9.0,47.0,800" in kml_result
+        assert "XCTrack task course with 1 turnpoints" in kml_result
+        assert "Single" in kml_result
+        assert "Radius: 1000m" in kml_result
 
     def test_task_to_kml_multiple_turnpoints(self):
         """Test KML conversion with multiple turnpoints."""
@@ -105,6 +123,9 @@ class TestTaskToKML:
         for i in range(5):
             expected_coord = f"{8.0 + i * 0.1},{46.0 + i * 0.1},{1000 + i * 100}"
             assert expected_coord in kml_result
+
+        # Verify course line description
+        assert "XCTrack task course with 5 turnpoints" in kml_result
 
     def test_task_to_kml_negative_coordinates(self):
         """Test KML conversion with negative coordinates."""
@@ -162,10 +183,15 @@ class TestTaskToKML:
 
         kml_result = task_to_kml(task)
 
-        # Check that XML tags are properly closed
+        # Check that XML tags are properly closed - updated for simplekml structure
         assert kml_result.count("<kml") == kml_result.count("</kml>")
-        assert kml_result.count("<Document>") == kml_result.count("</Document>")
-        assert kml_result.count("<Folder>") == kml_result.count("</Folder>")
-        assert kml_result.count("<Placemark>") == kml_result.count("</Placemark>")
-        assert kml_result.count("<LineString>") == kml_result.count("</LineString>")
+        assert kml_result.count("<Document") == kml_result.count("</Document>")
+        assert kml_result.count("<Placemark") == kml_result.count("</Placemark>")
+        assert kml_result.count("<Polygon") == kml_result.count("</Polygon>")
+        assert kml_result.count("<LineString") == kml_result.count("</LineString>")
         assert kml_result.count("<coordinates>") == kml_result.count("</coordinates>")
+
+        # Check for proper structure elements
+        assert "<Style" in kml_result  # simplekml generates styles
+        assert "<outerBoundaryIs>" in kml_result  # polygon boundary
+        assert "<LinearRing" in kml_result  # polygon ring
