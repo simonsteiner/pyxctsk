@@ -1,5 +1,4 @@
-"""
-QR code task format encoding utilities for XCTrack.
+"""QR code task format encoding utilities for XCTrack.
 
 This module provides polyline-based encoding and decoding utilities for the XCTrack QR code task format. It enables compact representation of turnpoint coordinates (longitude, latitude, altitude, radius) as polyline-encoded strings for use in QR codes.
 

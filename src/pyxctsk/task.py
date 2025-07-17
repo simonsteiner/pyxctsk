@@ -1,5 +1,4 @@
-"""
-XCTrack Task Data Structures and Domain Models.
+"""XCTrack Task Data Structures and Domain Models.
 
 This module defines immutable dataclasses, enums, and validation logic for representing,
 parsing, and serializing XCTrack competition tasks. It covers the core domain models:
@@ -124,8 +123,7 @@ class TimeOfDay:
             raise ValueError("Second must be between 0 and 59")
 
     def to_json_string(self) -> str:
-        """
-        Convert to JSON string format.
+        """Convert to JSON string format.
 
         Returns:
             str: JSON string representation of the time.
@@ -134,8 +132,7 @@ class TimeOfDay:
 
     @classmethod
     def from_json_string(cls, time_str: str) -> "TimeOfDay":
-        """
-        Parse from JSON string format.
+        """Parse from JSON string format.
 
         Args:
             time_str (str): JSON string to parse.
@@ -185,8 +182,7 @@ class Waypoint:
     description: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
-        """
-        Convert to dictionary for JSON serialization.
+        """Convert to dictionary for JSON serialization.
 
         Returns:
             Dict[str, Any]: Dictionary representation for JSON.
@@ -203,8 +199,7 @@ class Waypoint:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Waypoint":
-        """
-        Create from dictionary.
+        """Create from dictionary.
 
         Args:
             data (Dict[str, Any]): Dictionary to parse.
@@ -236,8 +231,7 @@ class Turnpoint:
     type: Optional[TurnpointType] = None
 
     def to_dict(self) -> Dict[str, Any]:
-        """
-        Convert to dictionary for JSON serialization.
+        """Convert to dictionary for JSON serialization.
 
         Returns:
             Dict[str, Any]: Dictionary representation for JSON.
@@ -252,8 +246,7 @@ class Turnpoint:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Turnpoint":
-        """
-        Create from dictionary.
+        """Create from dictionary.
 
         Args:
             data (Dict[str, Any]): Dictionary to parse.
@@ -285,8 +278,7 @@ class Takeoff:
     time_close: Optional[TimeOfDay] = None
 
     def to_dict(self) -> Dict[str, Any]:
-        """
-        Convert to dictionary for JSON serialization.
+        """Convert to dictionary for JSON serialization.
 
         Returns:
             Dict[str, Any]: Dictionary representation for JSON.
@@ -300,8 +292,7 @@ class Takeoff:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Takeoff":
-        """
-        Create from dictionary.
+        """Create from dictionary.
 
         Args:
             data (Dict[str, Any]): Dictionary to parse.
@@ -337,8 +328,7 @@ class SSS:
     time_close: Optional[TimeOfDay] = None
 
     def to_dict(self) -> Dict[str, Any]:
-        """
-        Convert to dictionary for JSON serialization.
+        """Convert to dictionary for JSON serialization.
 
         Returns:
             Dict[str, Any]: Dictionary representation for JSON.
@@ -354,8 +344,7 @@ class SSS:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "SSS":
-        """
-        Create from dictionary.
+        """Create from dictionary.
 
         Args:
             data (Dict[str, Any]): Dictionary to parse.
@@ -398,8 +387,7 @@ class Goal:
     line_length: Optional[float] = None
 
     def to_dict(self) -> Dict[str, Any]:
-        """
-        Convert to dictionary for JSON serialization.
+        """Convert to dictionary for JSON serialization.
 
         Returns:
             Dict[str, Any]: Dictionary representation for JSON.
@@ -418,8 +406,7 @@ class Goal:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Goal":
-        """
-        Create from dictionary.
+        """Create from dictionary.
 
         Args:
             data (Dict[str, Any]): Dictionary to parse.
@@ -500,8 +487,7 @@ class Task:
             pass
 
     def to_dict(self) -> Dict[str, Any]:
-        """
-        Convert to dictionary for JSON serialization.
+        """Convert to dictionary for JSON serialization.
 
         Returns:
             Dict[str, Any]: Dictionary representation for JSON.
@@ -536,8 +522,7 @@ class Task:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Task":
-        """
-        Create from dictionary.
+        """Create from dictionary.
 
         Args:
             data (Dict[str, Any]): Dictionary to parse.
@@ -589,8 +574,7 @@ class Task:
         )
 
     def to_json(self) -> str:
-        """
-        Convert to JSON string.
+        """Convert to JSON string.
 
         Returns:
             str: JSON string representation of the task.
@@ -599,8 +583,7 @@ class Task:
 
     @classmethod
     def from_json(cls, json_str: str) -> "Task":
-        """
-        Create from JSON string.
+        """Create from JSON string.
 
         Args:
             json_str (str): JSON string to parse.
@@ -612,8 +595,7 @@ class Task:
         return cls.from_dict(data)
 
     def to_qr_code_task(self) -> "QRCodeTask":
-        """
-        Convert to QR code task format.
+        """Convert to QR code task format.
 
         Returns:
             QRCodeTask: QRCodeTask object created from this task.
@@ -623,8 +605,7 @@ class Task:
         return QRCodeTask.from_task(self)
 
     def find_ess_turnpoint(self) -> Optional[Turnpoint]:
-        """
-        Find and return the ESS turnpoint, if any.
+        """Find and return the ESS turnpoint, if any.
 
         Returns:
             Optional[Turnpoint]: The turnpoint marked as ESS or None if no ESS turnpoint exists.
@@ -635,8 +616,7 @@ class Task:
         return None
 
     def is_ess_goal(self) -> bool:
-        """
-        Check if the ESS turnpoint is the same as the goal (last turnpoint).
+        """Check if the ESS turnpoint is the same as the goal (last turnpoint).
 
         Returns:
             bool: True if ESS is the same as goal, False otherwise.

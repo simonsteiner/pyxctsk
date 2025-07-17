@@ -1,5 +1,4 @@
-"""
-XCTrack Task Parser.
+"""Parser for XCTrack Task.
 
 Parse, load, and convert XCTrack task data from various formats.
 Handles optional QR code dependencies.
@@ -35,13 +34,14 @@ except ImportError:
 
 
 def parse_task(data: Union[bytes, str]) -> Task:
-    """
-    Parse a XCTrack Task from a variety of input formats.
+    """Parse a XCTrack Task from a variety of input formats.
 
     Args:
         data: Input data as bytes, string, or file path.
+
     Returns:
         Task: Parsed Task object.
+
     Raises:
         EmptyInputError: If input is empty.
         InvalidFormatError: If input format is invalid or cannot be parsed.

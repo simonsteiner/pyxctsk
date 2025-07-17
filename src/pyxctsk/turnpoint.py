@@ -1,5 +1,4 @@
-"""
-Turnpoint geometry and optimization utilities for XCTrack task calculations.
+"""Turnpoint geometry and optimization utilities for XCTrack task calculations.
 
 This module provides:
 - The `TaskTurnpoint` class: immutable turnpoint model for paragliding/hang gliding tasks
@@ -126,8 +125,7 @@ class TaskTurnpoint:
         goal_type: Optional[str] = None,
         goal_line_length: Optional[float] = None,
     ):
-        """
-        Initialize a task turnpoint.
+        """Initialize a task turnpoint.
 
         Args:
             lat (float): Latitude in degrees.
@@ -144,8 +142,7 @@ class TaskTurnpoint:
     def perimeter_points(
         self, angle_step: int = DEFAULT_ANGLE_STEP
     ) -> List[Tuple[float, float]]:
-        """
-        Generate perimeter points around the turnpoint at given angle steps.
+        """Generate perimeter points around the turnpoint at given angle steps.
 
         Args:
             angle_step (int): Angle step in degrees.
@@ -170,8 +167,7 @@ class TaskTurnpoint:
     def goal_line_points(
         self, prev_point: Tuple[float, float], angle_step: int = DEFAULT_ANGLE_STEP
     ) -> List[Tuple[float, float]]:
-        """
-        Generate points along a goal line.
+        """Generate points along a goal line.
 
         The goal line is perpendicular to the line from the previous point to the center,
         with the goal line center being in the middle of the line.
@@ -243,8 +239,7 @@ class TaskTurnpoint:
         prev_point: Tuple[float, float],
         next_point: Tuple[float, float],
     ) -> Tuple[float, float]:
-        """
-        Find the optimal point on this turnpoint's cylinder or goal line.
+        """Find the optimal point on this turnpoint's cylinder or goal line.
 
         Uses scipy's optimization for precise results.
 
@@ -268,8 +263,7 @@ class TaskTurnpoint:
     def _find_optimal_goal_line_point(
         self, prev_point: Tuple[float, float], next_point: Tuple[float, float]
     ) -> Tuple[float, float]:
-        """
-        Find the optimal point on the goal line.
+        """Find the optimal point on the goal line.
 
         For a goal line, the optimal crossing point depends on:
           1. Direction of approach (from prev_point)
@@ -365,8 +359,7 @@ class TaskTurnpoint:
         next_point: Tuple[float, float],
         angle_step: int = DEFAULT_ANGLE_STEP,
     ) -> List[Tuple[float, float]]:
-        """
-        Get optimized perimeter points for this turnpoint.
+        """Get optimized perimeter points for this turnpoint.
 
         Args:
             prev_point (Tuple[float, float]): Previous point in route.
@@ -392,8 +385,7 @@ class TaskTurnpoint:
 
 
 def distance_through_centers(turnpoints: List[TaskTurnpoint]) -> float:
-    """
-    Calculate distance through turnpoint centers.
+    """Calculate distance through turnpoint centers.
 
     Args:
         turnpoints (List[TaskTurnpoint]): List of TaskTurnpoint objects.

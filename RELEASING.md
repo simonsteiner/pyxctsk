@@ -10,6 +10,7 @@ Follow these steps to publish a new release to PyPI:
      - `mypy src/`
      - `isort src/ tests/ scripts/`
      - `black src/ tests/ scripts/`
+     - `pydocstyle src/ tests/ --convention=google`
 
 2. **Update Version and Changelog**
    - Update the version in `pyproject.toml`.

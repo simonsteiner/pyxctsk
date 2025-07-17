@@ -1,5 +1,4 @@
-"""
-Utility functions for XCTrack tasks.
+"""Utility functions for XCTrack tasks.
 
 This module provides helper functions for working with XCTrack task data, including:
 - QR code generation (if dependencies are available)
@@ -23,8 +22,7 @@ except ImportError:
 
 
 def generate_qr_code(data: str, size: int = 1024):
-    """
-    Generate a QR code image from string data.
+    """Generate a QR code image from string data.
 
     Args:
         data (str): String data to encode.
@@ -61,8 +59,7 @@ def generate_qr_code(data: str, size: int = 1024):
 
 
 def task_to_kml(task: Task) -> str:
-    """
-    Convert a Task object to KML format string.
+    """Convert a Task object to KML format string.
 
     Args:
         task (Task): Task object.

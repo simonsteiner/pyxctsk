@@ -1,5 +1,4 @@
-"""
-pyxctsk Command Line Interface (CLI).
+"""pyxctsk Command Line Interface (CLI).
 
 Tools for parsing, converting, and visualizing XCTrack task files (paragliding/hang gliding competitions).
 
@@ -23,7 +22,7 @@ from .utils import generate_qr_code, task_to_kml
 
 @click.group()
 def main():
-    """pyxctsk XCTrack task analysis tools."""
+    """Run the pyxctsk XCTrack task analysis tools CLI."""
     pass
 
 

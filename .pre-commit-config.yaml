@@ -26,3 +26,10 @@ repos:
         name: black
         language_version: python3
         args: ["src/", "tests/"]
+  - repo: https://github.com/PyCQA/pydocstyle
+    rev: 6.3.0
+    hooks:
+      - id: pydocstyle
+        name: pydocstyle (Google style)
+        args: ["--convention=google", "src/", "tests/"]
+        exclude: ^scripts/

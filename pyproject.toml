@@ -37,11 +37,12 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "beautifulsoup4>=4.9.0",
-    "deepdiff>=8.5.0",
     "black>=25.1.0",
+    "deepdiff>=8.5.0",
     "flake8>=7.3.0",
     "isort>=6.0.1",
     "mypy>=1.16.1",
+    "pydocstyle>=6.3.0",
     "pytest-cov>=2.0.0",
     "pytest>=6.0.0",
     "requests>=2.25.0",
@@ -50,9 +51,9 @@ web = [
     "flask>=2.0.0",
 ]
 analysis = [
-    "numpy>=1.21.0",
     "geographiclib>=2.0",
     "matplotlib>=3.3.0",
+    "numpy>=1.21.0",
 ]
 
 [tool.setuptools.package-data]

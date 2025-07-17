@@ -1,5 +1,4 @@
-"""
-SSS (Start Speed Section) calculations for XCTrack tasks.
+"""SSS (Start Speed Section) calculations for XCTrack tasks.
 
 This module provides functions to analyze and compute optimal entry points for SSS (Start Speed Section) turnpoints in paragliding/hang gliding competition tasks. It includes logic for finding the SSS turnpoint, determining the first turnpoint after SSS, and calculating the optimal entry point on the SSS cylinder perimeter for route optimization and visualization.
 """

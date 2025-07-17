@@ -1,5 +1,4 @@
-"""
-Data models for the XCTrack QR code task format.
+"""Data models for the XCTrack QR code task format.
 
 This module defines immutable dataclasses representing the main components of an XCTrack QR code task:
 - QRCodeGoal: Goal timing and type

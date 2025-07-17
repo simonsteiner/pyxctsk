@@ -1,5 +1,4 @@
-"""
-Distance calculation and route optimization for XCTrack tasks using WGS84 ellipsoid.
+"""Distance calculation and route optimization for XCTrack tasks using WGS84 ellipsoid.
 
 This module provides a unified, minimal interface for all distance-related calculations
 in the pyxctsk package. It exposes the main public API for:

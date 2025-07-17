@@ -1,5 +1,4 @@
-"""
-Task distance calculations and turnpoint conversion utilities for XCTrack tasks.
+"""Task distance calculations and turnpoint conversion utilities for XCTrack tasks.
 
 This module provides functions to:
 - Convert task turnpoints to internal representations for distance calculations
@@ -17,8 +16,7 @@ from .turnpoint import TaskTurnpoint, distance_through_centers
 
 
 def _task_to_turnpoints(task: Task) -> List[TaskTurnpoint]:
-    """
-    Convert Task turnpoints to TaskTurnpoint objects.
+    """Convert Task turnpoints to TaskTurnpoint objects.
 
     Args:
         task (Task): Task object.
@@ -90,8 +88,7 @@ def _task_to_turnpoints(task: Task) -> List[TaskTurnpoint]:
 
 
 def _calculate_savings(center_km: float, opt_km: float) -> Tuple[float, float]:
-    """
-    Calculate distance savings in km and percentage.
+    """Calculate distance savings in km and percentage.
 
     Args:
         center_km (float): Center distance in km.
@@ -112,8 +109,7 @@ def _create_turnpoint_details(
     beam_width: Optional[int] = None,
     show_progress: bool = False,
 ) -> List[Dict[str, Any]]:
-    """
-    Create detailed turnpoint information including cumulative distances.
+    """Create detailed turnpoint information including cumulative distances.
 
     Args:
         task_turnpoints: Original task turnpoints.
@@ -182,8 +178,7 @@ def calculate_task_distances(
     beam_width: Optional[int] = None,
     num_iterations: Optional[int] = None,
 ) -> Dict[str, Any]:
-    """
-    Calculate both center and optimized distances for a task.
+    """Calculate both center and optimized distances for a task.
 
     Args:
         task (Task): Task object.
@@ -276,8 +271,7 @@ def calculate_cumulative_distances(
     angle_step: Optional[int] = None,
     beam_width: Optional[int] = None,
 ) -> Tuple[float, float]:
-    """
-    Calculate cumulative distances up to a specific turnpoint index.
+    """Calculate cumulative distances up to a specific turnpoint index.
 
     Args:
         turnpoints (List[TaskTurnpoint]): List of TaskTurnpoint objects.

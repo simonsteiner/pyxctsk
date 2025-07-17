@@ -1,5 +1,4 @@
-"""
-Centralized configuration and constants for optimization routines in distance calculations.
+"""Centralized configuration and constants for optimization routines in distance calculations.
 
 Provides default parameters and a utility function to retrieve optimization settings for algorithms such as beam search and perimeter point generation.
 """
@@ -19,8 +18,7 @@ def get_optimization_config(
     beam_width: Optional[int] = None,
     num_iterations: Optional[int] = None,
 ) -> Dict[str, int]:
-    """
-    Get centralized optimization configuration parameters.
+    """Get centralized optimization configuration parameters.
 
     This ensures consistent optimization parameters are used throughout the code.
 

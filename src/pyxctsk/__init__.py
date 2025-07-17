@@ -1,5 +1,4 @@
-"""
-pyxctsk - Python implementation of XCTrack's task format.
+"""pyxctsk - Python implementation of XCTrack's task format.
 
 This package implements XCTrack's task format for reading and writing .xctsk files,
 generating and parsing XCTSK: URLs, and encoding/decoding XCTSK: URLs as QR codes.

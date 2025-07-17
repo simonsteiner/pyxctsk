@@ -1,5 +1,4 @@
-"""
-GeoJSON generation utilities for XCTrack task visualization.
+"""GeoJSON generation utilities for XCTrack task visualization.
 
 This module provides functions to convert pyxctsk task objects into GeoJSON FeatureCollections for mapping and visualization.
 

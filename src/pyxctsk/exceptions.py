@@ -1,5 +1,4 @@
-"""
-Custom exceptions for the pyxctsk package.
+"""Custom exceptions for the pyxctsk package.
 
 This module defines the exception hierarchy for pyxctsk, including errors for empty input, invalid formats, and time parsing issues.
 """

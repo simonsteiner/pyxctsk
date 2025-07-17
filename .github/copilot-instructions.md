@@ -66,7 +66,7 @@
 - Visual outputs (e.g., generated QR code images) are saved to `tests/data/visual_output/` during testing.
 
 ## Code Quality
-- Pre-commit hooks run: flake8, mypy, isort, black
+- Pre-commit hooks run: flake8, mypy, isort, black, pydocstyle
 - Run manually: `.venv/bin/pre-commit run --all-files`
 - Strict mypy type checking enforced
 

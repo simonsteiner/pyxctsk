@@ -1,5 +1,4 @@
-"""
-Route optimization algorithms for XCTrack tasks using dynamic programming (DP).
+"""Route optimization algorithms for XCTrack tasks using dynamic programming (DP).
 
 This module provides core algorithms to compute the shortest possible route through a sequence of paragliding/hang gliding task turnpoints, accounting for cylinder radii, goal lines, and look-ahead bias. It implements:
 
@@ -21,8 +20,7 @@ from .turnpoint import TaskTurnpoint
 
 
 def _init_dp_structure(turnpoints: List[TaskTurnpoint]) -> List[defaultdict]:
-    """
-    Initialize the dynamic programming data structure.
+    """Initialize the dynamic programming data structure.
 
     Args:
         turnpoints (List[TaskTurnpoint]): List of TaskTurnpoint objects.
@@ -47,8 +45,7 @@ def _process_dp_stage(
     beam_width: int,
     show_progress: bool,
 ) -> defaultdict:
-    """
-    Process one stage of the dynamic programming calculation.
+    """Process one stage of the dynamic programming calculation.
 
     Args:
         dp (List[defaultdict]): The DP structure.
@@ -109,8 +106,7 @@ def _process_dp_stage_with_refined_target(
     beam_width: int,
     show_progress: bool,
 ) -> defaultdict:
-    """
-    Process one stage of the DP calculation using refined target for look-ahead.
+    """Process one stage of the DP calculation using refined target for look-ahead.
 
     This modified version of _process_dp_stage uses the pre-calculated next target
     point instead of always using the center of the next turnpoint.
@@ -174,8 +170,7 @@ def _backtrack_path(
     best_point: Tuple[float, float],
     turnpoints: List[TaskTurnpoint],
 ) -> List[Tuple[float, float]]:
-    """
-    Backtrack through the DP structure to reconstruct the optimal path.
+    """Backtrack through the DP structure to reconstruct the optimal path.
 
     Args:
         dp (List[defaultdict]): The DP structure.
@@ -203,8 +198,7 @@ def _compute_optimal_route_with_beam_search(
     return_path: bool = False,
     beam_width: int = DEFAULT_BEAM_WIDTH,
 ) -> Tuple[float, List[Tuple[float, float]]]:
-    """
-    Compute optimal route using dynamic programming with beam search.
+    """Compute optimal route using dynamic programming with beam search.
 
     This method uses DP to consider multiple candidate paths and avoid
     the greedy local optimization trap that can occur with large cylinders.
@@ -259,8 +253,7 @@ def _compute_optimal_route_dp(
     return_path: bool = False,
     beam_width: int = DEFAULT_BEAM_WIDTH,
 ) -> Tuple[float, List[Tuple[float, float]]]:
-    """
-    Core dynamic programming algorithm for computing optimal routes through turnpoints.
+    """Core dynamic programming algorithm for computing optimal routes through turnpoints.
 
     Args:
         turnpoints (List[TaskTurnpoint]): List of TaskTurnpoint objects.
@@ -298,8 +291,7 @@ def _compute_optimal_route_dp(
 def _create_refined_turnpoints(
     turnpoints: List[TaskTurnpoint], previous_route: List[Tuple[float, float]]
 ) -> List[TaskTurnpoint]:
-    """
-    Create turnpoints with refined target points based on previous optimization.
+    """Create turnpoints with refined target points based on previous optimization.
 
     Args:
         turnpoints (List[TaskTurnpoint]): Original turnpoints.
@@ -325,8 +317,7 @@ def _compute_optimal_route_with_refined_targets(
     show_progress: bool = False,
     beam_width: Optional[int] = None,
 ) -> Tuple[float, List[Tuple[float, float]]]:
-    """
-    Compute optimal route using previous route points as look-ahead targets.
+    """Compute optimal route using previous route points as look-ahead targets.
 
     This function modifies the standard dynamic programming approach to use
     previously calculated optimal points as look-ahead targets, rather than
@@ -394,8 +385,7 @@ def calculate_iteratively_refined_route(
     show_progress: bool = False,
     beam_width: Optional[int] = None,
 ) -> Tuple[float, List[Tuple[float, float]]]:
-    """
-    Calculate optimized route with iterative refinement to reduce look-ahead bias.
+    """Calculate optimized route with iterative refinement to reduce look-ahead bias.
 
     This function implements a multi-pass optimization approach:
       1. First pass: Use cylinder centers as targets for look-ahead (standard approach)

@@ -1,5 +1,4 @@
-"""
-XCTrack QR Code Task Format (Version 2).
+"""XCTrack QR Code Task Format (Version 2).
 
 Implements the XCTrack QR code task format for compact, efficient encoding of paragliding/hang gliding competition tasks.
 This format is designed for QR code transfer, minimizing data size for reliable scanning in challenging conditions (e.g., direct sunlight).
