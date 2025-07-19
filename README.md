@@ -147,17 +147,42 @@ qr_image.save('task_qr.png')
 
 ## Command Line Interface
 
+The `pyxctsk` CLI enables conversion and inspection of XCTrack task files in multiple formats, with strict error handling and clear messaging.
+
+**Parameter Options:**
+
+- `--format [json|kml|png|qrcode-json]`  
+  Output format.  
+  - `json`: Standard JSON representation  
+  - `kml`: KML for mapping tools  
+  - `png`: QR code image (PNG)  
+  - `qrcode-json`: Compact QR string (XCTSK: URL)  
+  Default: `json`
+- `--output, -o <file>`  
+  Output file (default: stdout). For `png`, writes a PNG image; for others, writes text.
+- `<input_file>`  
+  Input file (optional). If omitted, reads from stdin. Accepts `.xctsk` files or QR code images.
+
+**Examples:**
+
 ```bash
 # Convert task to different formats
-pyxctsk convert task.xctsk --format json        # JSON output
-pyxctsk convert task.xctsk --format kml         # KML output
-pyxctsk convert task.xctsk --format qrcode-json # XCTSK: URL
-pyxctsk convert task.xctsk --format png -o qr.png # QR code image
+pyxctsk convert task.xctsk --format json                  # JSON output
+pyxctsk convert task.xctsk --format kml -o task.kml       # KML output
+pyxctsk convert task.xctsk --format png -o qr.png         # QR code image
+pyxctsk convert task.xctsk --format qrcode-json           # XCTSK: URL string
 
 # Parse from different inputs
-pyxctsk convert qr_code.png --format json       # From QR image
-cat task.xctsk | pyxctsk convert --format kml   # From stdin
+pyxctsk convert qr_code.png --format json                 # From QR image
+cat task.xctsk | pyxctsk convert --format kml             # From stdin
 ```
+
+**Supported formats:**
+
+- Input: `.xctsk` (XCTrack task files), QR code image (PNG)
+- Output: JSON, KML, QR code (PNG or XCTSK: URL string)
+
+See the CLI startup message (`pyxctsk --help` or running the CLI with no arguments) for a quick summary of options and supported formats.
 
 ## Requirements
 

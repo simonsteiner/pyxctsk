@@ -22,8 +22,28 @@ from .utils import generate_qr_code, task_to_kml
 
 @click.group()
 def main():
-    """Run the pyxctsk XCTrack task analysis tools CLI."""
-    pass
+    r"""pyxctsk: Convert task files between formats with strict error handling.
+
+    \b
+    Parameter Options:
+      --format [json|kml|png|qrcode-json]  Output format (default: json)
+      --output, -o FILE                    Output file (default: stdout)
+      INPUT_FILE                           Input file (optional, uses stdin)
+
+    \b
+    Examples:
+      pyxctsk convert task.xctsk --format json
+      pyxctsk convert task.xctsk --format kml -o task.kml
+      pyxctsk convert --format png < task.xctsk > task.png
+      pyxctsk convert task.xctsk --format qrcode-json
+
+    \b
+    Formats:
+      Input:  .xctsk files, QR code images (PNG)
+      Output: JSON, KML, QR codes (PNG or XCTSK: URL)
+
+    See README for more examples and details.
+    """
 
 
 @main.command()
@@ -43,7 +63,23 @@ def main():
     help="Output file (default: stdout)",
 )
 def convert(input_file, output_format: str, output_file: str) -> None:
-    """Convert XCTrack task formats."""
+    """Convert XCTrack task files between supported formats.
+
+    Reads an XCTrack task from a file or stdin, parses it, and outputs the
+    converted result in the specified format (JSON, KML, PNG QR code, or compact
+    QR string) to a file or stdout.
+
+    Args:
+        input_file (file or None): Input file object opened in binary mode, or None to read from stdin.
+        output_format (str): Output format ('json', 'kml', 'png', or 'qrcode-json').
+        output_file (str): Output file path, or None to write to stdout.
+
+    Returns:
+        None
+
+    Raises:
+        SystemExit: If input is missing or an error occurs during parsing or conversion.
+    """
     try:
         # Read input data
         if input_file:
