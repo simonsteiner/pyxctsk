@@ -16,8 +16,9 @@ from io import BytesIO
 
 import click
 
+from .kml import task_to_kml
 from .parser import parse_task
-from .utils import generate_qr_code, task_to_kml
+from .qrcode_image import generate_qrcode_image
 
 
 @click.group()
@@ -116,7 +117,7 @@ def convert(input_file, output_format: str, output_file: str) -> None:
         elif output_format == "png":
             qr_task = task.to_qr_code_task()
             qr_string = qr_task.to_string()
-            qr_image = generate_qr_code(qr_string, size=1024)
+            qr_image = generate_qrcode_image(qr_string, size=1024)
 
             if output_file:
                 qr_image.save(output_file, format="PNG")

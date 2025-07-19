@@ -19,7 +19,7 @@ src_dir = script_dir.parent / "src"
 sys.path.insert(0, str(src_dir))
 
 from pyxctsk import parse_task  # noqa: E402
-from pyxctsk.utils import generate_qr_code  # noqa: E402
+from pyxctsk.qrcode_image import generate_qrcode_image  # noqa: E402
 
 try:
     from PIL import Image
@@ -165,7 +165,7 @@ def test_qr_code_generation(
         # Generate QR code PNG if QR code support is available
         if QR_CODE_SUPPORT and Image is not None and pyzbar is not None:
             output_png = output_dir / f"{task_name}_generated.png"
-            qr_image = generate_qr_code(generated_qr_string, size=512)
+            qr_image = generate_qrcode_image(generated_qr_string, size=512)
             qr_image.save(output_png, format="PNG")
             result.qr_png_generated = True
             result.generated_png_path = str(output_png)

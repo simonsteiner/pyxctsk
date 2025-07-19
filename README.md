@@ -138,10 +138,10 @@ with open('task.xctsk', 'w') as f:
     f.write(task.to_json())
 
 # Generate QR code
-from pyxctsk.utils import generate_qr_code
+from pyxctsk.qrcode_image import generate_qrcode_image
 
 qr_task = task.to_qr_code_task()
-qr_image = generate_qr_code(qr_task.to_string())
+qr_image = generate_qrcode_image(qr_task.to_string())
 qr_image.save('task_qr.png')
 ```
 

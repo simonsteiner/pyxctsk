@@ -18,7 +18,9 @@ from .exceptions import (
     InvalidTimeOfDayError,
 )
 from .geojson import generate_task_geojson
+from .kml import task_to_kml
 from .parser import parse_task
+from .qrcode_image import generate_qrcode_image
 from .qrcode_task import QRCodeTask
 from .task import (
     SSS,
@@ -36,9 +38,6 @@ from .task import (
     Waypoint,
 )
 
-# Utility functions
-from .utils import generate_qr_code, task_to_kml
-
 # Constants
 EXTENSION = ".xctsk"
 MIME_TYPE = "application/xctsk"
@@ -52,7 +51,7 @@ __all__ = [
     "EarthModel",
     "EmptyInputError",
     "EXTENSION",
-    "generate_qr_code",
+    "generate_qrcode_image",
     "generate_task_geojson",
     "Goal",
     "GoalType",

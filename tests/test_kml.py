@@ -15,7 +15,7 @@ from pyxctsk import (
     TurnpointType,
     Waypoint,
 )
-from pyxctsk.utils import task_to_kml
+from pyxctsk.kml import task_to_kml
 
 
 class TestTaskToKML:

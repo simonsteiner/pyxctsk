@@ -26,13 +26,13 @@ from pyxctsk import (
     Waypoint,
     parse_task,
 )
+from pyxctsk.qrcode_image import generate_qrcode_image
 from pyxctsk.qrcode_task import (
     QRCodeTask,
     QRCodeTaskType,
     QRCodeTurnpoint,
     QRCodeTurnpointType,
 )
-from pyxctsk.utils import generate_qr_code
 
 from tests.conftest import find_xctsk_files
 
@@ -140,7 +140,7 @@ def test_qr_code_image_generation(qrcode_test_data):
 
             # Generate and save QR code image
             output_png = output_dir / f"{task_name}_qr.png"
-            qr_image = generate_qr_code(qr_string, size=512)
+            qr_image = generate_qrcode_image(qr_string, size=512)
             qr_image.save(output_png, format="PNG")
 
             # Test if the generated QR code can be parsed back
@@ -285,7 +285,7 @@ def test_roundtrip_basic():
 
     # If QR code image support is available, test image generation
     if QR_CODE_SUPPORT:
-        qr_image = generate_qr_code(qr_string, size=256)
+        qr_image = generate_qrcode_image(qr_string, size=256)
 
         # Test parsing the image
         with tempfile.NamedTemporaryFile(suffix=".png") as tmp:
@@ -333,7 +333,7 @@ def test_qr_code_roundtrip_comprehensive():
     qr_string = qr_task.to_string()
 
     # Generate QR code image
-    qr_image = generate_qr_code(qr_string, size=512)
+    qr_image = generate_qrcode_image(qr_string, size=512)
 
     # Save to temporary file
     with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp_file:
@@ -404,7 +404,7 @@ def test_qr_code_image_bytes():
     # Convert to QR code and generate image
     qr_task = task.to_qr_code_task()
     qr_string = qr_task.to_string()
-    qr_image = generate_qr_code(qr_string, size=256)
+    qr_image = generate_qrcode_image(qr_string, size=256)
 
     # Convert to bytes
     image_buffer = BytesIO()
