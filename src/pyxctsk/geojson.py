@@ -14,24 +14,31 @@ Intended for use in web-based or desktop mapping tools to visualize XCTrack comp
 
 from typing import Dict, List, Optional, Tuple
 
-from .distance import optimized_route_coordinates
-from .goal_line import get_goal_line_data, should_skip_last_turnpoint
-from .task_distances import _task_to_turnpoints
+from .goal_line import get_goal_line_data
+from .visualization_common import (
+    get_optimized_route_coordinates,
+    get_turnpoint_color_hex,
+    get_turnpoints_to_render,
+    is_goal_turnpoint,
+)
 
 
-def _create_turnpoint_feature(turnpoint, index: int) -> Dict:
-    """Create a GeoJSON feature for a turnpoint."""
-    # Determine color based on turnpoint type
-    tp_type = getattr(turnpoint, "type", None)
+def _create_turnpoint_feature(
+    turnpoint, index: int, all_turnpoints: List, task=None
+) -> Dict:
+    """Create a GeoJSON feature for a turnpoint.
 
-    if tp_type == "takeoff":
-        color = "#204d74"  # takeoff
-    elif tp_type in ["SSS", "ESS"]:
-        color = "#ac2925"  # SSS and ESS
-    elif tp_type == "goal":
-        color = "#398439"  # goal
-    else:
-        color = "#269abc"  # default turnpoint
+    Args:
+        turnpoint: The turnpoint object to create a feature for.
+        index: The index of the turnpoint in the task.
+        all_turnpoints: List of all turnpoints in the task.
+        task: Optional Task object to check if it has a goal defined.
+
+    Returns:
+        GeoJSON feature dictionary for the turnpoint.
+    """
+    is_goal = is_goal_turnpoint(turnpoint, all_turnpoints, task)
+    color = get_turnpoint_color_hex(turnpoint.type, is_goal)
 
     return {
         "type": "Feature",
@@ -45,7 +52,7 @@ def _create_turnpoint_feature(turnpoint, index: int) -> Dict:
             "radius": turnpoint.radius,
             "description": f"Radius: {turnpoint.radius}m",
             "turnpoint_index": index,
-            "tp_type": tp_type,
+            "tp_type": getattr(turnpoint, "type", None),
             "color": color,
             "fillColor": color,
             "fillOpacity": 0.1,
@@ -55,11 +62,17 @@ def _create_turnpoint_feature(turnpoint, index: int) -> Dict:
     }
 
 
-def _create_optimized_route_feature(
-    opt_coords: List[Tuple[float, float]],
-) -> Optional[Dict]:
+def _create_optimized_route_feature(task_or_coords) -> Optional[Dict]:
     """Create a GeoJSON feature for the optimized route."""
-    if len(opt_coords) < 2:
+    # Handle both old API (list of coordinates) and new API (Task object)
+    if isinstance(task_or_coords, list):
+        # Old API for testing - coords is a list of (lat, lon) tuples
+        opt_coords: Optional[List[Tuple[float, float]]] = task_or_coords
+    else:
+        # New API - task_or_coords is a Task object
+        opt_coords = get_optimized_route_coordinates(task_or_coords)
+
+    if not opt_coords or len(opt_coords) < 2:
         return None
 
     # Convert from (lat, lon) to [lon, lat] format for GeoJSON
@@ -150,19 +163,14 @@ def generate_task_geojson(task) -> Dict:
 
     # Add turnpoints as point features with cylinders
     # Skip the last turnpoint if it's a LINE type goal (goal line replaces it)
-    turnpoints_to_render = task.turnpoints
-    if should_skip_last_turnpoint(task):
-        turnpoints_to_render = task.turnpoints[:-1]
+    turnpoints_to_render = get_turnpoints_to_render(task)
 
     # Create turnpoint features
     for i, tp in enumerate(turnpoints_to_render):
-        features.append(_create_turnpoint_feature(tp, i))
+        features.append(_create_turnpoint_feature(tp, i, task.turnpoints, task))
 
     # Add optimized route if available
-    task_turnpoints = _task_to_turnpoints(task)
-    opt_coords = optimized_route_coordinates(task_turnpoints, task.turnpoints)
-
-    opt_route_feature = _create_optimized_route_feature(opt_coords)
+    opt_route_feature = _create_optimized_route_feature(task)
     if opt_route_feature:
         features.append(opt_route_feature)
 
