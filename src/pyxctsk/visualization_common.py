@@ -139,22 +139,6 @@ def is_goal_turnpoint(
         return False
 
 
-def calculate_unified_altitude(task: Task) -> int:
-    """Calculate unified altitude for the entire task.
-
-    Args:
-        task: The Task object containing turnpoints.
-
-    Returns:
-        Average altitude of all turnpoints in meters, or 0 if no turnpoints.
-    """
-    if not task.turnpoints:
-        return 0
-    return sum(tp.waypoint.alt_smoothed for tp in task.turnpoints) // len(
-        task.turnpoints
-    )
-
-
 def get_route_coordinates_with_fallback(
     task: Task, fallback_coordinates: List[Tuple[float, float]]
 ) -> List[Tuple[float, float]]:

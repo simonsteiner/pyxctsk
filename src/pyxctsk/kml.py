@@ -7,7 +7,6 @@ import simplekml  # type: ignore
 from .goal_line import get_goal_line_data
 from .task import Task, Turnpoint, TurnpointType
 from .visualization_common import (
-    calculate_unified_altitude,
     generate_circle_coordinates_3d,
     get_optimized_route_coordinates,
     get_turnpoint_color_hex,
@@ -17,6 +16,7 @@ from .visualization_common import (
 
 # Constants
 ALPHA_TRANSPARENCY = 100
+DEFAULT_ALTITUDE = 5000  # Default altitude for KML elements
 
 
 def _create_turnpoint_style(
@@ -119,7 +119,6 @@ def _create_course_line(
     kml: simplekml.Kml,
     task: Task,
     coordinates: List[Tuple[float, float, int]],
-    altitude: int,
 ) -> None:
     """Create the course line connecting all turnpoints.
 
@@ -134,23 +133,23 @@ def _create_course_line(
 
     # Use optimized route if available, otherwise fallback to direct coordinates
     if opt_route_coords and len(opt_route_coords) >= 2:
-        # Convert from (lat, lon) to (lon, lat, alt) format
-        route_coordinates = [(lon, lat, altitude) for lat, lon in opt_route_coords]
+        # Convert from (lat, lon) to (lon, lat) format (no altitude)
+        route_coordinates = [(lon, lat) for lat, lon in opt_route_coords]
     else:
-        route_coordinates = coordinates
+        route_coordinates = [(lon, lat) for (lon, lat, _alt) in coordinates]
 
     # Create the course line
     course_line = kml.newlinestring(
         name="Course Line",
         description=f"XCTrack task course with {len(task.turnpoints)} turnpoints",
         coords=route_coordinates,
-        altitudemode=simplekml.AltitudeMode.relativetoground,
+        altitudemode=simplekml.AltitudeMode.clamptoground,
     )
 
     # Style the course line
     # Set color to red with 90% transparency (alpha=26 in KML AABBGGRR format)
     course_line.style.linestyle.color = "E64136ff"  # Red, 90% transparent
-    course_line.style.linestyle.width = 5
+    course_line.style.linestyle.width = 4
 
 
 def _create_goal_line_elements(kml: simplekml.Kml, task: Task, altitude: int) -> None:
@@ -214,7 +213,7 @@ def task_to_kml(task: Task) -> str:
         A string containing the KML representation of the task.
     """
     kml = simplekml.Kml()
-    altitude = calculate_unified_altitude(task)
+    altitude = DEFAULT_ALTITUDE  # Default altitude for KML elements
 
     # Determine which turnpoints to render
     # Skip the last turnpoint if it's a LINE type goal (goal line replaces it)
@@ -226,11 +225,11 @@ def task_to_kml(task: Task) -> str:
     )
 
     # Create course line
-    # line is created 250m below the task altitude
-    _create_course_line(kml, task, coordinates, altitude - 250)
+    # line is created with clampToGround mode
+    _create_course_line(kml, task, coordinates)
 
     # Create goal line elements if applicable
-    # elements are created 250m below the task altitude
-    _create_goal_line_elements(kml, task, altitude - 250)
+    # goal line elements are created 500m above the ground
+    _create_goal_line_elements(kml, task, 500)
 
     return str(kml.kml())
