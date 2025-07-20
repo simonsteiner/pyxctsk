@@ -41,8 +41,8 @@
                 href="{{ url_for(url_prefix ~ 'compare_task', task_name=task_name) }}">Compare Task Calculations</a>
             <a class="btn {% if request.endpoint == url_prefix ~ 'airscore_task' %}btn-primary{% else %}btn-outline-primary{% endif %}"
                 href="{{ url_for(url_prefix ~ 'airscore_task', task_name=task_name) }}">AirScore</a>
-            <a class="btn {% if request.endpoint == url_prefix ~ 'debug_task' %}btn-primary{% else %}btn-outline-primary{% endif %}"
-                href="{{ url_for(url_prefix ~ 'debug_task', task_name=task_name) }}">Debug View</a>
+            <a class="btn {% if request.endpoint == url_prefix ~ 'geojson_debug_task' %}btn-primary{% else %}btn-outline-primary{% endif %}"
+                href="{{ url_for(url_prefix ~ 'geojson_debug_task', task_name=task_name) }}">GeoJSON Debug View</a>
             {% endif %}
         </div>
         {% block content %}{% endblock %}

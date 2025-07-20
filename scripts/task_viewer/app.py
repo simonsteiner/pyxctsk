@@ -98,38 +98,6 @@ def index():
     )
 
 
-@task_viewer_bp.route("/compare")
-def compare_index():
-    """Render the comparison page with unified task selection.
-
-    Returns:
-        Response: Rendered HTML page for the comparison index.
-    """
-    tasks = get_available_tasks()
-    return render_template(
-        "compare.html",
-        tasks=tasks,
-        xctrack_available=XCTRACK_AVAILABLE,
-        url_prefix="task_viewer.",
-    )
-
-
-@task_viewer_bp.route("/debug")
-def debug_index():
-    """Render the debug page with unified task selection.
-
-    Returns:
-        Response: Rendered HTML page for the debug index.
-    """
-    tasks = get_available_tasks()
-    return render_template(
-        "debug.html",
-        tasks=tasks,
-        xctrack_available=XCTRACK_AVAILABLE,
-        url_prefix="task_viewer.",
-    )
-
-
 @task_viewer_bp.route("/task/<task_name>")
 def show_task(task_name: str):
     """Display visualization and details for a specific task.
@@ -225,9 +193,9 @@ def compare_task(task_name: str):
         )
 
 
-@task_viewer_bp.route("/debug/<task_name>")
-def debug_task(task_name: str):
-    """Display debug information for generate_task_geojson with focus on goal lines.
+@task_viewer_bp.route("/geojson_debug/<task_name>")
+def geojson_debug_task(task_name: str):
+    """Display geojson debug information for generate_task_geojson with focus on goal lines.
 
     Args:
         task_name (str): The name of the task to debug.
@@ -260,7 +228,7 @@ def debug_task(task_name: str):
         xctrack_geojson = generate_task_geojson(task)  # type: ignore
 
         return render_template(
-            "debug_view.html",
+            "geojson_debug_view.html",
             task_name=task_name,
             task=task,
             original_geojson=geojson_data,
@@ -273,7 +241,7 @@ def debug_task(task_name: str):
 
         stacktrace = traceback.format_exc()
         return render_template(
-            "debug_view.html",
+            "geojson_debug_view.html",
             task_name=task_name,
             error=f"Error generating debug data: {str(e)}",
             stacktrace=stacktrace,
