@@ -2,6 +2,42 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v0.3.0] - 2025-07-21
+
+### Added
+
+- Switched codebase to require Python 3.10 or newer, enabling use of modern type hint syntax and language features
+- Enhanced KML export: added `simplekml` dependency and improved KML export functionality
+- Type stubs for `geopy`, `polyline`, and `pyzbar` for strict mypy compliance
+- Essential smoke tests for distance calculations and comprehensive reference tests for validation
+- QR code test utilities and comprehensive tests for QR code functionality
+- SSS, turnpoint, and utility function tests; migrated and consolidated test files for efficiency
+
+### Enhanced
+
+- Refactored KML and GeoJSON generation: unified altitude handling, improved turnpoint feature creation, and introduced shared visualization utilities
+- Refactored goal line calculations: consolidated logic into `goal_line` module and updated GeoJSON/KML generation
+- Improved documentation and code quality: added pydocstyle to pre-commit hooks, improved module docstrings, and updated release instructions
+- Improved error handling in QR code and distance modules
+- Updated test data and documentation for clarity and improved coverage
+- Update dependencies to latest versions for improved stability and performance
+
+### Fixed
+
+- Handled edge case for identical start and end points in cylinder optimization
+- Corrected latitude/longitude values in route comparison outputs
+- Updated route comparison coordinates for improved accuracy in visual output
+- Resolved all mypy type errors for strict type compliance
+- Fixed type hints and import statements for consistency and compatibility
+
+### Refactored
+
+- Split and reorganized modules for maintainability: QR code, KML, goal line, and utility functions
+- Unified altitude parameter naming and removed unused calculations in KML generation
+- Reorganized imports and updated `__all__` in `__init__.py`
+- Cleaned up and improved formatting across test and source files
+- Removed obsolete and outdated test files and data
+
 ## [v0.2.0] - 2025-07-09
 
 ### Added
