@@ -37,7 +37,7 @@ Follow these steps to publish a new release to PyPI:
    - Optionally, test installation:
 
      ```bash
-     python3 -m venv venv-test
+     python3.13 -m venv venv-test
      source venv-test/bin/activate
      pip install pyxctsk
      ```

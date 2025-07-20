@@ -76,10 +76,13 @@ cd pyxctsk
 
 # Create and activate virtual environment
 python3 -m venv .venv
+# (Optional) If Python 3.13 is installed, create virtual environment with:
+python3.13 -m venv .venv
 source .venv/bin/activate
 
-# Install core library in development mode with dev dependencies
-pip install -e ".[dev]"
+# Install core library in development mode with dev, web and analysis dependencies
+# The -e flag ("editable") lets pip link your source directory, so code changes take effect immediately without reinstalling.
+pip install -e ".[dev,web,analysis]"
 
 # Run tests
 python -m pytest
