@@ -571,13 +571,13 @@ class TaskDataExtractor:
                     break
 
                 file_path = os.path.join(directory_path, filename)
-                logger.info(f"\n--- Processing {filename} ---")
+                logger.info(f"\n\n--- Processing {filename} ---")
 
                 self.process_html_file(file_path)
                 files_processed += 1
 
     def preprocess_directory(self, directory_path: str) -> None:
-        """Preprocesses all HTML files in a directory by cleaning and saving them.
+        """Preprocesses all HTML files in a directory by cleaning and saving them, skipping files already cleaned.
 
         Args:
             directory_path (str): Path to directory containing HTML files.
@@ -587,11 +587,13 @@ class TaskDataExtractor:
         """
         for filename in sorted(os.listdir(directory_path)):
             if filename.endswith(".html"):
+                cleaned_path = os.path.join(self.output_dirs["html_cleaned"], filename)
+                if os.path.exists(cleaned_path):
+                    logger.info(f"Skipping {filename}: cleaned file already exists.")
+                    continue
                 file_path = os.path.join(directory_path, filename)
-
                 with open(file_path, "r", encoding="utf-8") as f:
                     html_content = f.read()
-
                 # Preprocess HTML to remove base64 images
                 cleaned_soup = self.preprocess_html(html_content)
                 # Save cleaned HTML
@@ -604,12 +606,13 @@ if __name__ == "__main__":
     extractor = TaskDataExtractor()
 
     # Preprocess HTML files to remove base64 images
-    # extractor.preprocess_directory("downloaded_tasks/html")
-    # print("\n==== PREPROCESSING HTML FILES ====")
-    # print("Preprocessed HTML files saved to:", extractor.output_dirs["html_cleaned"])
+    print("\n==== PREPROCESSING HTML FILES ====")
+    print("Cleaned HTML files saved to:", extractor.output_dirs["html_cleaned"])
+    print("Preprocessing HTML files...")
+    extractor.preprocess_directory("downloaded_tasks/html")
 
     print("\n==== PROCESSING HTML FILES ====")
-    print("Processing HTML files and saving JSON and GeoJSON...")
+    print("Processing HTML files and saving JSON and GeoJSON...\n")
 
     # Process a couple of files first (for testing)
     extractor.process_directory(
