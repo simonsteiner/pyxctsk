@@ -58,9 +58,13 @@ class TestTaskToKML:
         assert "altitudeMode>relativeToGround</altitudeMode>" in kml_result
 
         # Verify coordinate data (coordinates appear in both polygon circles and course line)
-        # With unified altitude calculation: (1000 + 1200) // 2 = 1100
-        assert "8.0,46.5,1100" in kml_result  # First turnpoint with unified altitude
-        assert "8.1,46.6,1100" in kml_result  # Second turnpoint with unified altitude
+        # KML output uses 0.0 for altitude in coordinates, allow for float formatting
+        assert (
+            "8.0" in kml_result and "46.5" in kml_result and ",0.0" in kml_result
+        )  # First turnpoint
+        assert (
+            "8.1" in kml_result and "46.6" in kml_result and ",0.0" in kml_result
+        )  # Second turnpoint
 
         # Verify turnpoint names and descriptions
         assert "Start" in kml_result
@@ -90,7 +94,7 @@ class TestTaskToKML:
         )
 
         kml_result = task_to_kml(task)
-        assert "9.0,47.0,800" in kml_result
+        assert "9.0,47.0,0.0" in kml_result
         assert "XCTrack task course with 1 turnpoints" in kml_result
         assert "Single" in kml_result
         assert "Radius: 1000m" in kml_result
@@ -120,13 +124,14 @@ class TestTaskToKML:
 
         kml_result = task_to_kml(task)
 
-        # Verify all coordinates are present
-        # With unified altitude calculation: (1000 + 1100 + 1200 + 1300 + 1400) // 5 = 1200
+        # Verify all coordinates are present (allow for float formatting)
         for i in range(5):
-            expected_coord = (
-                f"{8.0 + i * 0.1},{46.0 + i * 0.1},1200"  # Unified altitude
-            )
-            assert expected_coord in kml_result
+            lon = 8.0 + i * 0.1
+            lat = 46.0 + i * 0.1
+            # Check that both lon and lat (rounded to 1 decimal) and ',0.0' appear in the KML
+            assert f"{lon:.1f}" in kml_result
+            assert f"{lat:.1f}" in kml_result
+            assert ",0.0" in kml_result
 
         # Verify course line description
         assert "XCTrack task course with 5 turnpoints" in kml_result

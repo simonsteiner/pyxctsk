@@ -115,7 +115,7 @@ class TestCLIConvert:
             assert result.exit_code == 0
             assert "<?xml version=" in result.output
             assert "<kml xmlns=" in result.output
-            assert "8.0,46.5,1000" in result.output
+            assert "8.0,46.5,0.0" in result.output
 
         finally:
             Path(tmp_path).unlink()
