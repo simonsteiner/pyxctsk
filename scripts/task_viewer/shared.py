@@ -3,7 +3,7 @@
 import json
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from flask import current_app
 
@@ -14,7 +14,7 @@ GEOJSON_DIR = BASE_DIR / "geojson"
 XCTSK_DIR = BASE_DIR / "xctsk"
 
 
-def get_available_tasks() -> list[str]:
+def get_available_tasks() -> List[str]:
     """Get list of available task names present in all required formats.
 
     Returns:
