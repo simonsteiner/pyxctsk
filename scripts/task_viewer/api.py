@@ -47,9 +47,12 @@ def qrcode_image(task_name: str) -> Response:
     # Always generate QR code string from .xctsk file
     xctsk_path = XCTSK_DIR / f"{task_name}.xctsk"
     if not xctsk_path.exists():
-        return (
-            jsonify({"error": ".xctsk file not found for this task"}),
-            404,
+        return Response(
+            jsonify({"error": ".xctsk file not found for this task"}).get_data(
+                as_text=False
+            ),
+            status=404,
+            mimetype="application/json",
         )
     try:
         from pyxctsk import parse_task
@@ -59,22 +62,26 @@ def qrcode_image(task_name: str) -> Response:
             qr_task = task.to_qr_code_task()
             qr_string = qr_task.to_string()
         else:
-            return (
-                jsonify({"error": "Task object does not support QR code generation"}),
-                500,
+            return Response(
+                jsonify(
+                    {"error": "Task object does not support QR code generation"}
+                ).get_data(as_text=False),
+                status=500,
+                mimetype="application/json",
             )
     except Exception as e:
         import traceback
 
         stacktrace = traceback.format_exc()
-        return (
+        return Response(
             jsonify(
                 {
                     "error": f"Error generating QR code string from task: {str(e)}",
                     "stacktrace": stacktrace,
                 }
-            ),
-            500,
+            ).get_data(as_text=False),
+            status=500,
+            mimetype="application/json",
         )
 
     try:
@@ -93,14 +100,15 @@ def qrcode_image(task_name: str) -> Response:
         import traceback
 
         stacktrace = traceback.format_exc()
-        return (
+        return Response(
             jsonify(
                 {
                     "error": f"Error generating QR code image: {str(e)}",
                     "stacktrace": stacktrace,
                 }
-            ),
-            500,
+            ).get_data(as_text=False),
+            status=500,
+            mimetype="application/json",
         )
 
 
