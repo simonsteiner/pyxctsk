@@ -5,12 +5,10 @@ This module provides polyline-based encoding and decoding utilities for the XCTr
 Functions:
 - encode_num(num: int) -> str: Polyline-encodes a single integer value.
 - encode_competition_turnpoint(lon: float, lat: float, alt: int, radius: int) -> str: Encodes a turnpoint's coordinates and parameters into a polyline string.
-- decode_nums(encoded_str: str) -> List[int]: Decodes a polyline-encoded string into a list of integers.
+- decode_nums(encoded_str: str) -> list[int]: Decodes a polyline-encoded string into a list of integers.
 
 Intended for internal use in QR code generation and parsing for paragliding/hang gliding competition tasks.
 """
-
-from typing import List
 
 
 def encode_num(num: int) -> str:
@@ -70,7 +68,7 @@ def encode_competition_turnpoint(lon: float, lat: float, alt: int, radius: int) 
     return encoded_lon + encoded_lat + encoded_alt + encoded_radius
 
 
-def decode_nums(encoded_str: str) -> List[int]:
+def decode_nums(encoded_str: str) -> list[int]:
     """Decode a string of encoded numbers using the polyline algorithm.
 
     Args:

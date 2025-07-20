@@ -1,7 +1,5 @@
 """Task to KML conversion."""
 
-from typing import List, Optional, Tuple
-
 import simplekml  # type: ignore
 
 from .goal_line import get_goal_line_data
@@ -57,11 +55,11 @@ def _create_turnpoint_style(
 
 def _create_turnpoint_elements(
     kml: simplekml.Kml,
-    turnpoints: List[Turnpoint],
+    turnpoints: list[Turnpoint],
     task_altitude: int,
-    original_turnpoints: List[Turnpoint],
-    task: Optional[Task] = None,
-) -> List[Tuple[float, float, int]]:
+    original_turnpoints: list[Turnpoint],
+    task: Task | None = None,
+) -> list[tuple[float, float, int]]:
     """Create turnpoint circles and center points in the KML.
 
     Args:
@@ -118,7 +116,7 @@ def _create_turnpoint_elements(
 def _create_course_line(
     kml: simplekml.Kml,
     task: Task,
-    coordinates: List[Tuple[float, float, int]],
+    coordinates: list[tuple[float, float, int]],
 ) -> None:
     """Create the course line connecting all turnpoints.
 

@@ -1,6 +1,6 @@
 """Type stubs for geopy.distance package."""
 
-from typing import Any, Dict, List, Optional, Tuple, Union, overload
+from typing import Any, overload
 
 class Distance:
     def __init__(self, *args: Any, **kwargs: Any) -> None: ...
@@ -17,13 +17,13 @@ class Distance:
 
 @overload
 def great_circle(
-    point1: Tuple[float, float], point2: Tuple[float, float], **kwargs: Any
+    point1: tuple[float, float], point2: tuple[float, float], **kwargs: Any
 ) -> Distance: ...
 @overload
 def great_circle(point1: Any, point2: Any, **kwargs: Any) -> Distance: ...
 @overload
 def geodesic(
-    point1: Tuple[float, float], point2: Tuple[float, float], **kwargs: Any
+    point1: tuple[float, float], point2: tuple[float, float], **kwargs: Any
 ) -> Distance: ...
 @overload
 def geodesic(point1: Any, point2: Any, **kwargs: Any) -> Distance: ...

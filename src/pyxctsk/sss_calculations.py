@@ -3,7 +3,7 @@
 This module provides functions to analyze and compute optimal entry points for SSS (Start Speed Section) turnpoints in paragliding/hang gliding competition tasks. It includes logic for finding the SSS turnpoint, determining the first turnpoint after SSS, and calculating the optimal entry point on the SSS cylinder perimeter for route optimization and visualization.
 """
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from geopy.distance import geodesic
 
@@ -13,10 +13,10 @@ from .turnpoint import TaskTurnpoint
 
 def calculate_optimal_sss_entry_point(
     sss_turnpoint: TaskTurnpoint,
-    takeoff_center: Tuple[float, float],
-    first_tp_after_sss_point: Tuple[float, float],
-    angle_step: Optional[int] = None,
-) -> Tuple[float, float]:
+    takeoff_center: tuple[float, float],
+    first_tp_after_sss_point: tuple[float, float],
+    angle_step: int | None = None,
+) -> tuple[float, float]:
     """Calculate the optimal entry point for an SSS (Start Speed Section) turnpoint.
 
     This function finds the point on the SSS cylinder perimeter that minimizes the
@@ -46,7 +46,7 @@ def calculate_optimal_sss_entry_point(
     return best_sss_point
 
 
-def _find_sss_turnpoint(task_turnpoints) -> Optional[Tuple[int, Any]]:
+def _find_sss_turnpoint(task_turnpoints) -> tuple[int, Any] | None:
     """Find the SSS turnpoint in a task.
 
     Args:
@@ -62,8 +62,8 @@ def _find_sss_turnpoint(task_turnpoints) -> Optional[Tuple[int, Any]]:
 
 
 def _get_first_tp_after_sss_point(
-    task_turnpoints, sss_index: int, route_coordinates: List[Tuple[float, float]]
-) -> Optional[Tuple[Dict[str, float], Tuple[float, float]]]:
+    task_turnpoints, sss_index: int, route_coordinates: list[tuple[float, float]]
+) -> tuple[dict[str, float], tuple[float, float]] | None:
     """Get the first turnpoint after SSS and its route point.
 
     Args:
@@ -97,9 +97,9 @@ def _get_first_tp_after_sss_point(
 
 def calculate_sss_info(
     task_turnpoints,
-    route_coordinates: List[Tuple[float, float]],
-    angle_step: Optional[int] = None,
-) -> Optional[Dict[str, Any]]:
+    route_coordinates: list[tuple[float, float]],
+    angle_step: int | None = None,
+) -> dict[str, Any] | None:
     """Calculate SSS (Start Speed Section) information for a task.
 
     This function analyzes a task to find SSS turnpoints and calculates the optimal

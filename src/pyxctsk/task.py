@@ -12,15 +12,12 @@ support for QR code encoding/decoding and distance calculations (see related mod
 """
 
 import json
-import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import Any
 
-from .exceptions import InvalidTimeOfDayError
-
-if TYPE_CHECKING:
-    from .qrcode_task import QRCodeTask
+from .qrcode_task import QRCodeTask
+from .shared_enums import TimeOfDay
 
 
 class Direction(str, Enum):
@@ -100,70 +97,6 @@ class TurnpointType(str, Enum):
 
 
 @dataclass
-class TimeOfDay:
-    """Represents a time of day (HH:MM:SS).
-
-    Attributes:
-        hour (int): Hour (0-23).
-        minute (int): Minute (0-59).
-        second (int): Second (0-59).
-    """
-
-    hour: int
-    minute: int
-    second: int
-
-    def __post_init__(self) -> None:
-        """Validate time values."""
-        if not (0 <= self.hour <= 23):
-            raise ValueError("Hour must be between 0 and 23")
-        if not (0 <= self.minute <= 59):
-            raise ValueError("Minute must be between 0 and 59")
-        if not (0 <= self.second <= 59):
-            raise ValueError("Second must be between 0 and 59")
-
-    def to_json_string(self) -> str:
-        """Convert to JSON string format.
-
-        Returns:
-            str: JSON string representation of the time.
-        """
-        return f'"{self.hour:02d}:{self.minute:02d}:{self.second:02d}Z"'
-
-    @classmethod
-    def from_json_string(cls, time_str: str) -> "TimeOfDay":
-        """Parse from JSON string format.
-
-        Args:
-            time_str (str): JSON string to parse.
-
-        Returns:
-            TimeOfDay: Parsed TimeOfDay object.
-
-        Raises:
-            InvalidTimeOfDayError: If the string is not a valid time.
-        """
-        # Handle both quoted and unquoted formats
-        if time_str.startswith('"') and time_str.endswith('"'):
-            time_str = time_str[1:-1]  # Remove quotes
-
-        pattern = r"^(\d{2}):(\d{2}):(\d{2})Z$"
-        match = re.match(pattern, time_str)
-        if not match:
-            raise InvalidTimeOfDayError(time_str)
-
-        hour = int(match.group(1))
-        minute = int(match.group(2))
-        second = int(match.group(3))
-
-        return cls(hour=hour, minute=minute, second=second)
-
-    def __str__(self) -> str:
-        """Return string representation in HH:MM:SSZ format."""
-        return f"{self.hour:02d}:{self.minute:02d}:{self.second:02d}Z"
-
-
-@dataclass
 class Waypoint:
     """Represents a waypoint with coordinates and optional description.
 
@@ -179,9 +112,9 @@ class Waypoint:
     lat: float
     lon: float
     alt_smoothed: int
-    description: Optional[str] = None
+    description: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
 
         Returns:
@@ -198,7 +131,7 @@ class Waypoint:
         return result
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Waypoint":
+    def from_dict(cls, data: dict[str, Any]) -> "Waypoint":
         """Create from dictionary.
 
         Args:
@@ -228,9 +161,9 @@ class Turnpoint:
 
     radius: int
     waypoint: Waypoint
-    type: Optional[TurnpointType] = None
+    type: TurnpointType | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
 
         Returns:
@@ -245,7 +178,7 @@ class Turnpoint:
         return result
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Turnpoint":
+    def from_dict(cls, data: dict[str, Any]) -> "Turnpoint":
         """Create from dictionary.
 
         Args:
@@ -274,10 +207,10 @@ class Takeoff:
         time_close (Optional[TimeOfDay]): Closing time.
     """
 
-    time_open: Optional[TimeOfDay] = None
-    time_close: Optional[TimeOfDay] = None
+    time_open: TimeOfDay | None = None
+    time_close: TimeOfDay | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
 
         Returns:
@@ -291,7 +224,7 @@ class Takeoff:
         return result
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Takeoff":
+    def from_dict(cls, data: dict[str, Any]) -> "Takeoff":
         """Create from dictionary.
 
         Args:
@@ -324,10 +257,10 @@ class SSS:
 
     type: SSSType
     direction: Direction
-    time_gates: List[TimeOfDay] = field(default_factory=list)
-    time_close: Optional[TimeOfDay] = None
+    time_gates: list[TimeOfDay] = field(default_factory=list)
+    time_close: TimeOfDay | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
 
         Returns:
@@ -343,7 +276,7 @@ class SSS:
         return result
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "SSS":
+    def from_dict(cls, data: dict[str, Any]) -> "SSS":
         """Create from dictionary.
 
         Args:
@@ -382,11 +315,11 @@ class Goal:
         line_length (Optional[float]): Length of the goal line (for LINE type).
     """
 
-    type: Optional[GoalType] = None
-    deadline: Optional[TimeOfDay] = None
-    line_length: Optional[float] = None
+    type: GoalType | None = None
+    deadline: TimeOfDay | None = None
+    line_length: float | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
 
         Returns:
@@ -405,7 +338,7 @@ class Goal:
         return result
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Goal":
+    def from_dict(cls, data: dict[str, Any]) -> "Goal":
         """Create from dictionary.
 
         Args:
@@ -444,11 +377,11 @@ class Task:
 
     task_type: TaskType
     version: int
-    turnpoints: List[Turnpoint]
-    earth_model: Optional[EarthModel] = None
-    takeoff: Optional[Takeoff] = None
-    sss: Optional[SSS] = None
-    goal: Optional[Goal] = None
+    turnpoints: list[Turnpoint]
+    earth_model: EarthModel | None = None
+    takeoff: Takeoff | None = None
+    sss: SSS | None = None
+    goal: Goal | None = None
 
     def __post_init__(self) -> None:
         """Post-initialization validation and processing."""
@@ -486,7 +419,7 @@ class Task:
             # ESS is not the last turnpoint, so it's always a cylinder
             pass
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
 
         Returns:
@@ -503,7 +436,7 @@ class Task:
             # as the radius represents half of the total goal line length
             self.goal.line_length = float(self.turnpoints[-1].radius) * 2.0
 
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "taskType": self.task_type.value,
             "version": self.version,
             "turnpoints": [tp.to_dict() for tp in self.turnpoints],
@@ -521,7 +454,7 @@ class Task:
         return result
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Task":
+    def from_dict(cls, data: dict[str, Any]) -> "Task":
         """Create from dictionary.
 
         Args:
@@ -594,17 +527,15 @@ class Task:
         data = json.loads(json_str)
         return cls.from_dict(data)
 
-    def to_qr_code_task(self) -> "QRCodeTask":
+    def to_qr_code_task(self) -> QRCodeTask:
         """Convert to QR code task format.
 
         Returns:
             QRCodeTask: QRCodeTask object created from this task.
         """
-        from .qrcode_task import QRCodeTask
-
         return QRCodeTask.from_task(self)
 
-    def find_ess_turnpoint(self) -> Optional[Turnpoint]:
+    def find_ess_turnpoint(self) -> Turnpoint | None:
         """Find and return the ESS turnpoint, if any.
 
         Returns:

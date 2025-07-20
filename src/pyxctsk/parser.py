@@ -10,12 +10,11 @@ Supports:
 - File path (str) to any of the above (auto-detected)
 
 Functions:
-    parse_task(data: Union[bytes, str]) -> Task: Auto-detect and parse task from supported formats.
+    parse_task(data: bytes | str) -> Task: Auto-detect and parse task from supported formats.
 """
 
 import json
 from io import BytesIO
-from typing import Union
 
 from .exceptions import EmptyInputError, InvalidFormatError
 from .qrcode_task import QR_CODE_SCHEME, QRCodeTask
@@ -33,7 +32,7 @@ except ImportError:
     QR_CODE_SUPPORT = False
 
 
-def parse_task(data: Union[bytes, str]) -> Task:
+def parse_task(data: bytes | str) -> Task:
     """Parse a XCTrack Task from a variety of input formats.
 
     Args:

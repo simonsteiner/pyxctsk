@@ -28,7 +28,7 @@ This module provides:
 import json
 from collections import OrderedDict
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any
 
 import polyline
 
@@ -76,15 +76,15 @@ class QRCodeTask:
     """
 
     version: int = QR_CODE_TASK_VERSION
-    task_type: Optional[QRCodeTaskType] = None
-    earth_model: Optional[QRCodeEarthModel] = None
-    turnpoints_polyline: Optional[str] = None
-    turnpoints: List[QRCodeTurnpoint] = field(default_factory=list)
-    takeoff: Optional[QRCodeTakeoff] = None
-    sss: Optional[QRCodeSSS] = None
-    goal: Optional[QRCodeGoal] = None
+    task_type: QRCodeTaskType | None = None
+    earth_model: QRCodeEarthModel | None = None
+    turnpoints_polyline: str | None = None
+    turnpoints: list[QRCodeTurnpoint] = field(default_factory=list)
+    takeoff: QRCodeTakeoff | None = None
+    sss: QRCodeSSS | None = None
+    goal: QRCodeGoal | None = None
 
-    def to_dict(self, simplified: bool = False) -> Dict[str, Any]:
+    def to_dict(self, simplified: bool = False) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
 
         Builds the QR code task dictionary in the precise field order required
@@ -111,7 +111,7 @@ class QRCodeTask:
             return simplified_result
 
         # Full format - Create an empty dict to start with
-        result: Dict[str, Any] = {}
+        result: dict[str, Any] = {}
 
         # To match the expected output exactly, we need to build the dictionary
         # in the precise order seen in the expected output
@@ -154,7 +154,7 @@ class QRCodeTask:
         return result
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "QRCodeTask":
+    def from_dict(cls, data: dict[str, Any]) -> "QRCodeTask":
         """Create from dictionary.
 
         Handles both full format and simplified XC/Waypoints format.
@@ -185,23 +185,28 @@ class QRCodeTask:
             )
 
         # Full format
-        version = data.get("version", QR_CODE_TASK_VERSION)
+        version_raw = data.get("version", QR_CODE_TASK_VERSION)
+        version = version_raw if isinstance(version_raw, int) else int(str(version_raw))
 
-        task_type: Optional[QRCodeTaskType] = None
+        task_type: QRCodeTaskType | None = None
         if "taskType" in data:
             if data["taskType"] == "CLASSIC":
                 task_type = QRCodeTaskType.CLASSIC
             elif data["taskType"] == "WAYPOINTS" or data["taskType"] == "W":
                 task_type = QRCodeTaskType.WAYPOINTS
 
-        earth_model: Optional[QRCodeEarthModel] = None
+        earth_model: QRCodeEarthModel | None = None
         if "e" in data:
-            earth_model = QRCodeEarthModel(data["e"])
+            e_val = data["e"]
+            e_int = e_val if isinstance(e_val, int) else int(str(e_val))
+            earth_model = QRCodeEarthModel(e_int)
 
         turnpoints_polyline = data.get("p")
+        if turnpoints_polyline is not None:
+            turnpoints_polyline = str(turnpoints_polyline)
 
         turnpoints = []
-        if "t" in data:
+        if "t" in data and isinstance(data["t"], list):
             turnpoints = [QRCodeTurnpoint.from_dict(tp) for tp in data["t"]]
 
         takeoff = None
@@ -216,11 +221,11 @@ class QRCodeTask:
             takeoff = QRCodeTakeoff.from_dict(takeoff_data)
 
         sss = None
-        if "s" in data:
+        if "s" in data and isinstance(data["s"], dict):
             sss = QRCodeSSS.from_dict(data["s"])
 
         goal = None
-        if "g" in data:
+        if "g" in data and isinstance(data["g"], dict):
             goal = QRCodeGoal.from_dict(data["g"])
 
         return cls(

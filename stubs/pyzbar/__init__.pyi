@@ -1,11 +1,11 @@
 """Type stubs for pyzbar package."""
 
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 class Decoded:
     data: bytes
     type: str
-    rect: Tuple[int, int, int, int]
-    polygon: List[Tuple[int, int]]
+    rect: tuple[int, int, int, int]
+    polygon: list[tuple[int, int]]
 
-def decode(image: Any) -> List[Decoded]: ...
+def decode(image: Any) -> list[Decoded]: ...

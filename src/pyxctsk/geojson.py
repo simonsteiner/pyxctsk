@@ -12,8 +12,6 @@ All features include geometry and properties suitable for web map display, inclu
 Intended for use in web-based or desktop mapping tools to visualize XCTrack competition tasks.
 """
 
-from typing import Dict, List, Optional, Tuple
-
 from .goal_line import get_goal_line_data
 from .visualization_common import (
     get_optimized_route_coordinates,
@@ -24,8 +22,8 @@ from .visualization_common import (
 
 
 def _create_turnpoint_feature(
-    turnpoint, index: int, all_turnpoints: List, task=None
-) -> Dict:
+    turnpoint, index: int, all_turnpoints: list, task=None
+) -> dict:
     """Create a GeoJSON feature for a turnpoint.
 
     Args:
@@ -62,12 +60,12 @@ def _create_turnpoint_feature(
     }
 
 
-def _create_optimized_route_feature(task_or_coords) -> Optional[Dict]:
+def _create_optimized_route_feature(task_or_coords) -> dict | None:
     """Create a GeoJSON feature for the optimized route."""
     # Handle both old API (list of coordinates) and new API (Task object)
     if isinstance(task_or_coords, list):
         # Old API for testing - coords is a list of (lat, lon) tuples
-        opt_coords: Optional[List[Tuple[float, float]]] = task_or_coords
+        opt_coords = task_or_coords  # type: list[tuple[float, float]] | None
     else:
         # New API - task_or_coords is a Task object
         opt_coords = get_optimized_route_coordinates(task_or_coords)
@@ -98,7 +96,7 @@ def _create_optimized_route_feature(task_or_coords) -> Optional[Dict]:
     }
 
 
-def _create_goal_line_features(task) -> List[Dict]:
+def _create_goal_line_features(task) -> list[dict]:
     """Create goal line and control zone features for LINE type goals."""
     goal_data = get_goal_line_data(task)
     if goal_data is None:
@@ -157,7 +155,7 @@ def _create_goal_line_features(task) -> List[Dict]:
     return features
 
 
-def generate_task_geojson(task) -> Dict:
+def generate_task_geojson(task) -> dict:
     """Generate GeoJSON data from pyxctsk task object."""
     features = []
 

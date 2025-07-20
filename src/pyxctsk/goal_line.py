@@ -4,8 +4,6 @@ This module provides common functionality for calculating goal line positions
 and control zones that can be used by both GeoJSON and KML generation modules.
 """
 
-from typing import List, Optional, Tuple
-
 from pyproj import Geod
 
 from .task import GoalType, Task
@@ -41,7 +39,7 @@ def _find_previous_turnpoint(turnpoints, last_tp):
 
 def calculate_goal_line_endpoints(
     last_tp, prev_tp, goal_line_length: float
-) -> Tuple[Tuple[float, float], Tuple[float, float], float]:
+) -> tuple[tuple[float, float], tuple[float, float], float]:
     """Calculate the endpoints of the goal line and return the forward azimuth.
 
     Args:
@@ -89,7 +87,7 @@ def generate_semicircle_arc(
     end_azimuth: float,
     through_azimuth: float,
     radius: float,
-) -> List[Tuple[float, float]]:
+) -> list[tuple[float, float]]:
     """Generate arc points for a semi-circle.
 
     Args:
@@ -127,9 +125,10 @@ def generate_semicircle_arc(
 
 def get_goal_line_data(
     task: Task,
-) -> Optional[
-    Tuple[Tuple[float, float], Tuple[float, float], float, List[Tuple[float, float]]]
-]:
+) -> (
+    tuple[tuple[float, float], tuple[float, float], float, list[tuple[float, float]]]
+    | None
+):
     """Get goal line data for LINE type goals.
 
     Args:

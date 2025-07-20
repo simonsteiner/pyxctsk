@@ -13,7 +13,7 @@ generating, and manipulating XCTrack-compatible QR code tasks.
 
 from collections import OrderedDict
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import Any
 
 import polyline
 
@@ -24,9 +24,7 @@ from .qrcode_enums import (
     QRCodeSSSType,
     QRCodeTurnpointType,
 )
-
-if TYPE_CHECKING:
-    from .task import TimeOfDay
+from .shared_enums import TimeOfDay
 
 
 @dataclass
@@ -40,12 +38,12 @@ class QRCodeGoal:
     - type: Goal type - LINE (1) or CYLINDER (2, default)
     """
 
-    deadline: Optional["TimeOfDay"] = None
-    type: Optional[QRCodeGoalType] = None
+    deadline: TimeOfDay | None = None
+    type: QRCodeGoalType | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
-        result: Dict[str, Any] = {}
+        result: dict[str, Any] = {}
         if self.deadline:
             result["d"] = self.deadline.to_json_string().strip('"')
         if self.type is not None:
@@ -53,9 +51,9 @@ class QRCodeGoal:
         return result
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "QRCodeGoal":
+    def from_dict(cls, data: dict[str, Any]) -> "QRCodeGoal":
         """Create from dictionary."""
-        from .task import TimeOfDay
+        # TimeOfDay imported from shared_enums
 
         deadline = None
         if "d" in data:
@@ -82,7 +80,7 @@ class QRCodeSSS:
 
     direction: QRCodeDirection
     type: QRCodeSSSType
-    time_gates: List["TimeOfDay"] = field(default_factory=list)
+    time_gates: list["TimeOfDay"] = field(default_factory=list)
 
     def to_dict(self) -> OrderedDict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -98,9 +96,9 @@ class QRCodeSSS:
         return result
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "QRCodeSSS":
+    def from_dict(cls, data: dict[str, Any]) -> "QRCodeSSS":
         """Create from dictionary."""
-        from .task import TimeOfDay
+        # TimeOfDay imported from shared_enums
 
         time_gates = []
         if "g" in data:
@@ -131,12 +129,12 @@ class QRCodeTakeoff:
     - time_close: Takeoff close time (optional)
     """
 
-    time_open: Optional["TimeOfDay"] = None
-    time_close: Optional["TimeOfDay"] = None
+    time_open: TimeOfDay | None = None
+    time_close: TimeOfDay | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
-        result = {}
+        result: dict[str, Any] = {}
         if self.time_open:
             result["o"] = self.time_open.to_json_string()
         if self.time_close:
@@ -144,9 +142,9 @@ class QRCodeTakeoff:
         return result
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "QRCodeTakeoff":
+    def from_dict(cls, data: dict[str, Any]) -> "QRCodeTakeoff":
         """Create from dictionary."""
-        from .task import TimeOfDay
+        # TimeOfDay imported from shared_enums
 
         time_open = None
         time_close = None
@@ -184,7 +182,7 @@ class QRCodeTurnpoint:
     name: str
     alt_smoothed: int
     type: QRCodeTurnpointType = QRCodeTurnpointType.NONE
-    description: Optional[str] = None
+    description: str | None = None
 
     def to_dict(self, simplified: bool = False) -> OrderedDict[str, Any]:
         """Convert to dictionary for JSON serialization.
@@ -229,7 +227,7 @@ class QRCodeTurnpoint:
         return result
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "QRCodeTurnpoint":
+    def from_dict(cls, data: dict[str, Any]) -> "QRCodeTurnpoint":
         """Create from dictionary.
 
         Decodes turnpoint data from QR code JSON format. Handles both individual

@@ -19,7 +19,6 @@ from pyxctsk import (
     Goal,
     GoalType,
     InvalidFormatError,
-    InvalidTimeOfDayError,
     QRCodeTask,
     SSSType,
     Takeoff,
@@ -31,6 +30,7 @@ from pyxctsk import (
     Waypoint,
     parse_task,
 )
+from pyxctsk.shared_enums import InvalidTimeOfDayError
 
 
 class TestTimeOfDay:

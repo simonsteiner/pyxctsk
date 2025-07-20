@@ -12,8 +12,6 @@ All core logic is implemented in focused submodules; this module re-exports
 main entry points for use by other code and CLI tools.
 """
 
-from typing import List, Optional, Tuple
-
 # Import all the public API from the refactored modules
 from .optimization_config import (
     DEFAULT_ANGLE_STEP,
@@ -31,11 +29,11 @@ from .turnpoint import TaskTurnpoint, distance_through_centers
 
 
 def optimized_distance(
-    turnpoints: List[TaskTurnpoint],
-    angle_step: Optional[int] = None,
+    turnpoints: list[TaskTurnpoint],
+    angle_step: int | None = None,
     show_progress: bool = False,
-    beam_width: Optional[int] = None,
-    num_iterations: Optional[int] = None,
+    beam_width: int | None = None,
+    num_iterations: int | None = None,
 ) -> float:
     """Compute the fully optimized distance through turnpoints using iterative refinement.
 
@@ -70,12 +68,12 @@ def optimized_distance(
 
 
 def optimized_route_coordinates(
-    turnpoints: List[TaskTurnpoint],
+    turnpoints: list[TaskTurnpoint],
     task_turnpoints=None,  # Kept for backward compatibility
-    angle_step: Optional[int] = None,
-    beam_width: Optional[int] = None,
-    num_iterations: Optional[int] = None,
-) -> List[Tuple[float, float]]:
+    angle_step: int | None = None,
+    beam_width: int | None = None,
+    num_iterations: int | None = None,
+) -> list[tuple[float, float]]:
     """Compute the fully optimized route coordinates through turnpoints using iterative refinement.
 
     This algorithm finds the shortest possible route through all turnpoint cylinders
@@ -87,7 +85,7 @@ def optimized_route_coordinates(
     of the next turnpoint.
 
     Args:
-        turnpoints: List[TaskTurnpoint] objects
+        turnpoints: list[TaskTurnpoint] objects
         task_turnpoints: Optional list of original task turnpoints with type information
                          (kept for backward compatibility)
         angle_step: Angle step in degrees for perimeter point generation (fallback only)

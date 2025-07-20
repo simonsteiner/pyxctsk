@@ -5,7 +5,6 @@ including turnpoint filtering, route coordinate generation, and styling helpers.
 """
 
 import math
-from typing import List, Optional, Tuple
 
 from .distance import optimized_route_coordinates
 from .goal_line import should_skip_last_turnpoint
@@ -17,7 +16,7 @@ CIRCLE_POINTS = 64  # Number of points to approximate circle
 METERS_PER_DEGREE = 111320.0  # 1 degree ≈ 111.32 km at equator
 
 
-def get_turnpoints_to_render(task: Task) -> List[Turnpoint]:
+def get_turnpoints_to_render(task: Task) -> list[Turnpoint]:
     """Get the list of turnpoints that should be rendered for visualization.
 
     Skips the last turnpoint if it's a LINE type goal (goal line replaces it).
@@ -33,7 +32,7 @@ def get_turnpoints_to_render(task: Task) -> List[Turnpoint]:
     return task.turnpoints
 
 
-def get_optimized_route_coordinates(task: Task) -> Optional[List[Tuple[float, float]]]:
+def get_optimized_route_coordinates(task: Task) -> list[tuple[float, float]] | None:
     """Get optimized route coordinates for the task.
 
     Args:
@@ -72,7 +71,7 @@ def get_turnpoint_color_hex(
 
 def generate_circle_coordinates_2d(
     center_lat: float, center_lon: float, radius_meters: float
-) -> List[Tuple[float, float]]:
+) -> list[tuple[float, float]]:
     """Generate 2D coordinates for a circular turnpoint zone.
 
     Args:
@@ -99,7 +98,7 @@ def generate_circle_coordinates_2d(
 
 def generate_circle_coordinates_3d(
     center_lat: float, center_lon: float, radius_meters: float, altitude: int
-) -> List[Tuple[float, float, int]]:
+) -> list[tuple[float, float, int]]:
     """Generate 3D coordinates for a circular turnpoint zone.
 
     Args:
@@ -116,7 +115,9 @@ def generate_circle_coordinates_3d(
 
 
 def is_goal_turnpoint(
-    turnpoint: Turnpoint, all_turnpoints: List[Turnpoint], task: Optional[Task] = None
+    turnpoint: Turnpoint,
+    all_turnpoints: list[Turnpoint],
+    task: Task | None = None,
 ) -> bool:
     """Check if a turnpoint is the goal (last) turnpoint.
 
@@ -140,8 +141,8 @@ def is_goal_turnpoint(
 
 
 def get_route_coordinates_with_fallback(
-    task: Task, fallback_coordinates: List[Tuple[float, float]]
-) -> List[Tuple[float, float]]:
+    task: Task, fallback_coordinates: list[tuple[float, float]]
+) -> list[tuple[float, float]]:
     """Get route coordinates with fallback to direct coordinates.
 
     Args:

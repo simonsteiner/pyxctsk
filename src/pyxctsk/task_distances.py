@@ -8,14 +8,14 @@ This module provides functions to:
 - Return detailed distance breakdowns for use in analysis and visualization
 """
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from .optimization_config import get_optimization_config
 from .task import Task
 from .turnpoint import TaskTurnpoint, distance_through_centers
 
 
-def _task_to_turnpoints(task: Task) -> List[TaskTurnpoint]:
+def _task_to_turnpoints(task: Task) -> list[TaskTurnpoint]:
     """Convert Task turnpoints to TaskTurnpoint objects.
 
     Args:
@@ -87,7 +87,7 @@ def _task_to_turnpoints(task: Task) -> List[TaskTurnpoint]:
     return result
 
 
-def _calculate_savings(center_km: float, opt_km: float) -> Tuple[float, float]:
+def _calculate_savings(center_km: float, opt_km: float) -> tuple[float, float]:
     """Calculate distance savings in km and percentage.
 
     Args:
@@ -104,11 +104,11 @@ def _calculate_savings(center_km: float, opt_km: float) -> Tuple[float, float]:
 
 def _create_turnpoint_details(
     task_turnpoints,
-    task_distance_turnpoints: List[TaskTurnpoint],
-    angle_step: Optional[int] = None,
-    beam_width: Optional[int] = None,
+    task_distance_turnpoints: list[TaskTurnpoint],
+    angle_step: int | None = None,
+    beam_width: int | None = None,
     show_progress: bool = False,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Create detailed turnpoint information including cumulative distances.
 
     Args:
@@ -173,11 +173,11 @@ def _create_turnpoint_details(
 
 def calculate_task_distances(
     task: Task,
-    angle_step: Optional[int] = None,
+    angle_step: int | None = None,
     show_progress: bool = False,
-    beam_width: Optional[int] = None,
-    num_iterations: Optional[int] = None,
-) -> Dict[str, Any]:
+    beam_width: int | None = None,
+    num_iterations: int | None = None,
+) -> dict[str, Any]:
     """Calculate both center and optimized distances for a task.
 
     Args:
@@ -266,11 +266,11 @@ def calculate_task_distances(
 
 
 def calculate_cumulative_distances(
-    turnpoints: List[TaskTurnpoint],
+    turnpoints: list[TaskTurnpoint],
     index: int,
-    angle_step: Optional[int] = None,
-    beam_width: Optional[int] = None,
-) -> Tuple[float, float]:
+    angle_step: int | None = None,
+    beam_width: int | None = None,
+) -> tuple[float, float]:
     """Calculate cumulative distances up to a specific turnpoint index.
 
     Args:

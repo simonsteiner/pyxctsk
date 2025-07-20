@@ -10,8 +10,6 @@ This module provides:
 Intended for use in parsing, generating, and optimizing XCTrack tasks.
 """
 
-from typing import List, Optional, Tuple
-
 from geopy.distance import geodesic
 from pyproj import Geod
 from scipy.optimize import fminbound
@@ -23,20 +21,20 @@ geod = Geod(ellps="WGS84")
 
 
 def _calculate_distance_through_point(
-    start_point: Tuple[float, float],
-    point: Tuple[float, float],
-    end_point: Tuple[float, float],
+    start_point: tuple[float, float],
+    point: tuple[float, float],
+    end_point: tuple[float, float],
 ) -> float:
     """Calculate total distance from start through point to end."""
     return geodesic(start_point, point).meters + geodesic(point, end_point).meters
 
 
 def _find_optimal_cylinder_point(
-    cylinder_center: Tuple[float, float],
+    cylinder_center: tuple[float, float],
     cylinder_radius: float,
-    start_point: Tuple[float, float],
-    end_point: Tuple[float, float],
-) -> Tuple[float, float]:
+    start_point: tuple[float, float],
+    end_point: tuple[float, float],
+) -> tuple[float, float]:
     """Find optimal point on cylinder using continuous optimization.
 
     Uses scipy.optimize for precise optimization.
@@ -71,10 +69,10 @@ def _find_optimal_cylinder_point(
 
 def _get_optimized_perimeter_points(
     turnpoint: "TaskTurnpoint",
-    prev_point: Tuple[float, float],
-    next_point: Tuple[float, float],
+    prev_point: tuple[float, float],
+    next_point: tuple[float, float],
     angle_step: int = DEFAULT_ANGLE_STEP,
-) -> List[Tuple[float, float]]:
+) -> list[tuple[float, float]]:
     """Get optimized perimeter points for a turnpoint.
 
     Finds the optimal entry/exit points using scipy optimization.
@@ -122,8 +120,8 @@ class TaskTurnpoint:
         lat: float,
         lon: float,
         radius: float = 0,
-        goal_type: Optional[str] = None,
-        goal_line_length: Optional[float] = None,
+        goal_type: str | None = None,
+        goal_line_length: float | None = None,
     ):
         """Initialize a task turnpoint.
 
@@ -141,7 +139,7 @@ class TaskTurnpoint:
 
     def perimeter_points(
         self, angle_step: int = DEFAULT_ANGLE_STEP
-    ) -> List[Tuple[float, float]]:
+    ) -> list[tuple[float, float]]:
         """Generate perimeter points around the turnpoint at given angle steps.
 
         Args:
@@ -165,8 +163,8 @@ class TaskTurnpoint:
         return points
 
     def goal_line_points(
-        self, prev_point: Tuple[float, float], angle_step: int = DEFAULT_ANGLE_STEP
-    ) -> List[Tuple[float, float]]:
+        self, prev_point: tuple[float, float], angle_step: int = DEFAULT_ANGLE_STEP
+    ) -> list[tuple[float, float]]:
         """Generate points along a goal line.
 
         The goal line is perpendicular to the line from the previous point to the center,
@@ -236,9 +234,9 @@ class TaskTurnpoint:
 
     def optimal_point(
         self,
-        prev_point: Tuple[float, float],
-        next_point: Tuple[float, float],
-    ) -> Tuple[float, float]:
+        prev_point: tuple[float, float],
+        next_point: tuple[float, float],
+    ) -> tuple[float, float]:
         """Find the optimal point on this turnpoint's cylinder or goal line.
 
         Uses scipy's optimization for precise results.
@@ -261,8 +259,8 @@ class TaskTurnpoint:
         )
 
     def _find_optimal_goal_line_point(
-        self, prev_point: Tuple[float, float], next_point: Tuple[float, float]
-    ) -> Tuple[float, float]:
+        self, prev_point: tuple[float, float], next_point: tuple[float, float]
+    ) -> tuple[float, float]:
         """Find the optimal point on the goal line.
 
         For a goal line, the optimal crossing point depends on:
@@ -355,10 +353,10 @@ class TaskTurnpoint:
 
     def optimized_perimeter_points(
         self,
-        prev_point: Tuple[float, float],
-        next_point: Tuple[float, float],
+        prev_point: tuple[float, float],
+        next_point: tuple[float, float],
         angle_step: int = DEFAULT_ANGLE_STEP,
-    ) -> List[Tuple[float, float]]:
+    ) -> list[tuple[float, float]]:
         """Get optimized perimeter points for this turnpoint.
 
         Args:
@@ -384,7 +382,7 @@ class TaskTurnpoint:
         return _get_optimized_perimeter_points(self, prev_point, next_point, angle_step)
 
 
-def distance_through_centers(turnpoints: List[TaskTurnpoint]) -> float:
+def distance_through_centers(turnpoints: list[TaskTurnpoint]) -> float:
     """Calculate distance through turnpoint centers.
 
     Args:

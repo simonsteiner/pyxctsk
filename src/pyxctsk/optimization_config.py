@@ -3,8 +3,6 @@
 Provides default parameters and a utility function to retrieve optimization settings for algorithms such as beam search and perimeter point generation.
 """
 
-from typing import Dict, Optional
-
 # Configuration constants
 DEFAULT_ANGLE_STEP = 10  # Angle step in degrees for perimeter point generation (5-15° for good accuracy/performance balance)
 DEFAULT_BEAM_WIDTH = (
@@ -14,10 +12,10 @@ DEFAULT_NUM_ITERATIONS = 5  # Default number of iterations for iterative refinem
 
 
 def get_optimization_config(
-    angle_step: Optional[int] = None,
-    beam_width: Optional[int] = None,
-    num_iterations: Optional[int] = None,
-) -> Dict[str, int]:
+    angle_step: int | None = None,
+    beam_width: int | None = None,
+    num_iterations: int | None = None,
+) -> dict[str, int]:
     """Get centralized optimization configuration parameters.
 
     This ensures consistent optimization parameters are used throughout the code.

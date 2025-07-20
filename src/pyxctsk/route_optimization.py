@@ -11,7 +11,6 @@ All algorithms operate on immutable TaskTurnpoint dataclasses and use geodesic d
 """
 
 from collections import defaultdict
-from typing import List, Optional, Tuple
 
 from geopy.distance import geodesic
 
@@ -19,7 +18,7 @@ from .optimization_config import DEFAULT_BEAM_WIDTH
 from .turnpoint import TaskTurnpoint
 
 
-def _init_dp_structure(turnpoints: List[TaskTurnpoint]) -> List[defaultdict]:
+def _init_dp_structure(turnpoints: list[TaskTurnpoint]) -> list[defaultdict]:
     """Initialize the dynamic programming data structure.
 
     Args:
@@ -29,7 +28,7 @@ def _init_dp_structure(turnpoints: List[TaskTurnpoint]) -> List[defaultdict]:
         List[defaultdict]: List of defaultdicts for DP computation.
     """
     # dp[i] maps candidate points on turnpoint i -> (best_distance, parent_point)
-    dp: List[defaultdict] = [
+    dp: list[defaultdict] = [
         defaultdict(lambda: (float("inf"), None)) for _ in turnpoints
     ]
 
@@ -39,9 +38,9 @@ def _init_dp_structure(turnpoints: List[TaskTurnpoint]) -> List[defaultdict]:
 
 
 def _process_dp_stage(
-    dp: List[defaultdict],
+    dp: list[defaultdict],
     i: int,
-    turnpoints: List[TaskTurnpoint],
+    turnpoints: list[TaskTurnpoint],
     beam_width: int,
     show_progress: bool,
 ) -> defaultdict:
@@ -99,10 +98,10 @@ def _process_dp_stage(
 
 
 def _process_dp_stage_with_refined_target(
-    dp: List[defaultdict],
+    dp: list[defaultdict],
     i: int,
-    turnpoints: List[TaskTurnpoint],
-    next_target: Optional[Tuple[float, float]],
+    turnpoints: list[TaskTurnpoint],
+    next_target: tuple[float, float] | None,
     beam_width: int,
     show_progress: bool,
 ) -> defaultdict:
@@ -166,10 +165,10 @@ def _process_dp_stage_with_refined_target(
 
 
 def _backtrack_path(
-    dp: List[defaultdict],
-    best_point: Tuple[float, float],
-    turnpoints: List[TaskTurnpoint],
-) -> List[Tuple[float, float]]:
+    dp: list[defaultdict],
+    best_point: tuple[float, float],
+    turnpoints: list[TaskTurnpoint],
+) -> list[tuple[float, float]]:
     """Backtrack through the DP structure to reconstruct the optimal path.
 
     Args:
@@ -193,11 +192,11 @@ def _backtrack_path(
 
 
 def _compute_optimal_route_with_beam_search(
-    turnpoints: List[TaskTurnpoint],
+    turnpoints: list[TaskTurnpoint],
     show_progress: bool = False,
     return_path: bool = False,
     beam_width: int = DEFAULT_BEAM_WIDTH,
-) -> Tuple[float, List[Tuple[float, float]]]:
+) -> tuple[float, list[tuple[float, float]]]:
     """Compute optimal route using dynamic programming with beam search.
 
     This method uses DP to consider multiple candidate paths and avoid
@@ -246,13 +245,13 @@ def _compute_optimal_route_with_beam_search(
 
 
 def _compute_optimal_route_dp(
-    turnpoints: List[TaskTurnpoint],
+    turnpoints: list[TaskTurnpoint],
     task_turnpoints=None,
     angle_step: int = 10,
     show_progress: bool = False,
     return_path: bool = False,
     beam_width: int = DEFAULT_BEAM_WIDTH,
-) -> Tuple[float, List[Tuple[float, float]]]:
+) -> tuple[float, list[tuple[float, float]]]:
     """Core dynamic programming algorithm for computing optimal routes through turnpoints.
 
     Args:
@@ -289,8 +288,8 @@ def _compute_optimal_route_dp(
 
 
 def _create_refined_turnpoints(
-    turnpoints: List[TaskTurnpoint], previous_route: List[Tuple[float, float]]
-) -> List[TaskTurnpoint]:
+    turnpoints: list[TaskTurnpoint], previous_route: list[tuple[float, float]]
+) -> list[TaskTurnpoint]:
     """Create turnpoints with refined target points based on previous optimization.
 
     Args:
@@ -311,12 +310,12 @@ def _create_refined_turnpoints(
 
 
 def _compute_optimal_route_with_refined_targets(
-    turnpoints: List[TaskTurnpoint],
-    previous_route: List[Tuple[float, float]],
-    angle_step: Optional[int] = None,
+    turnpoints: list[TaskTurnpoint],
+    previous_route: list[tuple[float, float]],
+    angle_step: int | None = None,
     show_progress: bool = False,
-    beam_width: Optional[int] = None,
-) -> Tuple[float, List[Tuple[float, float]]]:
+    beam_width: int | None = None,
+) -> tuple[float, list[tuple[float, float]]]:
     """Compute optimal route using previous route points as look-ahead targets.
 
     This function modifies the standard dynamic programming approach to use
@@ -379,12 +378,12 @@ def _compute_optimal_route_with_refined_targets(
 
 
 def calculate_iteratively_refined_route(
-    turnpoints: List[TaskTurnpoint],
-    num_iterations: Optional[int] = None,
-    angle_step: Optional[int] = None,
+    turnpoints: list[TaskTurnpoint],
+    num_iterations: int | None = None,
+    angle_step: int | None = None,
     show_progress: bool = False,
-    beam_width: Optional[int] = None,
-) -> Tuple[float, List[Tuple[float, float]]]:
+    beam_width: int | None = None,
+) -> tuple[float, list[tuple[float, float]]]:
     """Calculate optimized route with iterative refinement to reduce look-ahead bias.
 
     This function implements a multi-pass optimization approach:
