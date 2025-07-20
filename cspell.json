@@ -12,6 +12,7 @@
         "python"
     ],
     "words": [
+        "AABBGGRR",
         "addopts",
         "airscore",
         "altitudemode",
@@ -30,6 +31,7 @@
         "forcelist",
         "frombuffer",
         "fuvu",
+        "geospatial",
         "htmlcov",
         "iconstyle",
         "imdecode",

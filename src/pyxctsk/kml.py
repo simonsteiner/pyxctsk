@@ -119,7 +119,7 @@ def _create_course_line(
     kml: simplekml.Kml,
     task: Task,
     coordinates: List[Tuple[float, float, int]],
-    task_altitude: int,
+    altitude: int,
 ) -> None:
     """Create the course line connecting all turnpoints.
 
@@ -127,7 +127,7 @@ def _create_course_line(
         kml: The KML document to add elements to.
         task: The Task object.
         coordinates: Fallback coordinates if optimized route is not available.
-        task_altitude: Unified altitude for the task.
+        altitude: altitude for the line.
     """
     # Get optimized route coordinates
     opt_route_coords = get_optimized_route_coordinates(task)
@@ -135,7 +135,7 @@ def _create_course_line(
     # Use optimized route if available, otherwise fallback to direct coordinates
     if opt_route_coords and len(opt_route_coords) >= 2:
         # Convert from (lat, lon) to (lon, lat, alt) format
-        route_coordinates = [(lon, lat, task_altitude) for lat, lon in opt_route_coords]
+        route_coordinates = [(lon, lat, altitude) for lat, lon in opt_route_coords]
     else:
         route_coordinates = coordinates
 
@@ -144,24 +144,22 @@ def _create_course_line(
         name="Course Line",
         description=f"XCTrack task course with {len(task.turnpoints)} turnpoints",
         coords=route_coordinates,
-        extrude=1,
         altitudemode=simplekml.AltitudeMode.relativetoground,
     )
 
     # Style the course line
-    course_line.style.linestyle.color = "ff4136"  # Red color
-    course_line.style.linestyle.width = 3
+    # Set color to red with 90% transparency (alpha=26 in KML AABBGGRR format)
+    course_line.style.linestyle.color = "E64136ff"  # Red, 90% transparent
+    course_line.style.linestyle.width = 5
 
 
-def _create_goal_line_elements(
-    kml: simplekml.Kml, task: Task, task_altitude: int
-) -> None:
+def _create_goal_line_elements(kml: simplekml.Kml, task: Task, altitude: int) -> None:
     """Create goal line and control zone for LINE type goals.
 
     Args:
         kml: The KML document to add elements to.
         task: The Task object.
-        task_altitude: Unified altitude for the task.
+        altitude: altitude for the line.
     """
     goal_data = get_goal_line_data(task)
     if goal_data is None:
@@ -173,7 +171,7 @@ def _create_goal_line_elements(
     goal_line = kml.newlinestring(
         name="Goal Line",
         description=f"Goal line length: {goal_line_length:.0f}m",
-        coords=[(lon1, lat1, task_altitude), (lon2, lat2, task_altitude)],
+        coords=[(lon1, lat1, altitude), (lon2, lat2, altitude)],
         extrude=1,
         altitudemode=simplekml.AltitudeMode.relativetoground,
     )
@@ -182,7 +180,7 @@ def _create_goal_line_elements(
 
     # Create control zone polygon
     control_zone_coords_3d = [
-        (coord[0], coord[1], task_altitude) for coord in control_zone_coords
+        (coord[0], coord[1], altitude) for coord in control_zone_coords
     ]
 
     control_zone = kml.newpolygon(
@@ -216,7 +214,7 @@ def task_to_kml(task: Task) -> str:
         A string containing the KML representation of the task.
     """
     kml = simplekml.Kml()
-    task_altitude = calculate_unified_altitude(task)
+    altitude = calculate_unified_altitude(task)
 
     # Determine which turnpoints to render
     # Skip the last turnpoint if it's a LINE type goal (goal line replaces it)
@@ -224,13 +222,15 @@ def task_to_kml(task: Task) -> str:
 
     # Create turnpoint elements and get coordinates
     coordinates = _create_turnpoint_elements(
-        kml, turnpoints_to_render, task_altitude, task.turnpoints, task
+        kml, turnpoints_to_render, altitude, task.turnpoints, task
     )
 
     # Create course line
-    _create_course_line(kml, task, coordinates, task_altitude)
+    # line is created 250m below the task altitude
+    _create_course_line(kml, task, coordinates, altitude - 250)
 
     # Create goal line elements if applicable
-    _create_goal_line_elements(kml, task, task_altitude)
+    # elements are created 250m below the task altitude
+    _create_goal_line_elements(kml, task, altitude - 250)
 
     return str(kml.kml())
