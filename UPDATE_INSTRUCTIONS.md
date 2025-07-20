@@ -75,4 +75,5 @@ from PIL import Image; from pyzbar import pyzbar; print('✓ QR code reading')
 
 | Date | Updated Packages | Notes |
 |------|------------------|-------|
+| 2025-07-21 | click, geopy, polyline, pyproj, qrcode, beautifulsoup4, mypy, pytest, pytest-cov, requests, matplotlib, numpy | Dependency update: main and optional packages bumped to latest stable versions |
 | 2025-07-08 | scipy, click, geopy, Pillow, pyproj, qrcode | Initial dependency audit and updates |
