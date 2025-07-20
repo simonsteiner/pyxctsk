@@ -1,7 +1,9 @@
-"""API routes for task_viewer Flask app.
+"""API routes for the Task Viewer Flask app.
 
-Contains all API endpoints (JSON, KML, comparison, airscore).
+Provides endpoints for task data retrieval, KML export, comparison, and task listing.
 """
+
+from typing import List, Tuple, Union
 
 from flask import Blueprint, Response, abort, jsonify
 
@@ -24,18 +26,18 @@ from shared import (
     prepare_comparison_data,
 )
 
-api_bp = Blueprint("api", __name__)
+api_bp: Blueprint = Blueprint("api", __name__)
 
 
 @api_bp.route("/api/task/<task_name>")
-def task_api(task_name: str):
-    """Return task data in JSON format via API endpoint.
+def task_api(task_name: str) -> Response:
+    """Return task data in JSON format for a given task.
 
     Args:
-        task_name (str): The name of the task to retrieve.
+        task_name (str): Name of the task to retrieve.
 
     Returns:
-        Response: Flask JSON response containing task and geojson data, or 404 if not found.
+        Response: Flask JSON response with task and geojson data, or 404 if not found.
 
     Raises:
         werkzeug.exceptions.NotFound: If the task data is missing.
@@ -51,7 +53,7 @@ def task_api(task_name: str):
 
 
 @api_bp.route("/api/kml/<task_name>.kml")
-def kml_task_api(task_name: str):
+def kml_task_api(task_name: str) -> Union[Response, Tuple[Response, int]]:
     """Return KML for a given task as a downloadable file via API endpoint.
 
     Args:
@@ -92,7 +94,7 @@ def kml_task_api(task_name: str):
 
 
 @api_bp.route("/api/compare/<task_name>")
-def compare_task_api(task_name: str):
+def compare_task_api(task_name: str) -> Union[Response, Tuple[Response, int]]:
     """Return comparison data in JSON format via API endpoint.
 
     Args:
@@ -143,3 +145,20 @@ def compare_task_api(task_name: str):
             ),
             500,
         )
+
+
+@api_bp.route("/api/list_tasks")
+def list_tasks_api() -> Union[Response, Tuple[Response, int]]:
+    """Return a list of available task base names (without extension).
+
+    Returns:
+        Response: Flask JSON response with task names or error with status code.
+    """
+    try:
+        # List all .xctsk files in XCTSK_DIR
+        task_files: List[str] = [
+            f.stem for f in XCTSK_DIR.glob("*.xctsk") if f.is_file()
+        ]
+        return jsonify({"tasks": sorted(task_files)})
+    except Exception as e:
+        return jsonify({"error": f"Error listing tasks: {str(e)}"}), 500
