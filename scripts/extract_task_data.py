@@ -100,8 +100,11 @@ class TaskDataExtractor:
 
         # Extract all metadata from definition list
         for i, dt in enumerate(dt_elements):
+            dt_text = dt.get_text(strip=True)
+            if not dt_text:
+                continue  # Skip if dt is empty
             if i < len(dd_elements):
-                key = dt.get_text(strip=True).rstrip(":")
+                key = dt_text.rstrip(":")
                 value = dd_elements[i].get_text(strip=True)
 
                 # Special handling for task distance

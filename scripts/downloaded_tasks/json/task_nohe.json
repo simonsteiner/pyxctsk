@@ -10,7 +10,6 @@
     "earth_model": "WGS84 ellipsoid",
     "task_distance_through_centers": "82.6km (through centers)",
     "task_distance_optimized": "96.3km (optimized)",
-    "": "96.3km (optimized)",
     "distance_through_centers_km": 82.6,
     "distance_optimized_km": 96.3
   },
