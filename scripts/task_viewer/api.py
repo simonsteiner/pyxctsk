@@ -10,6 +10,7 @@ from flask import Blueprint, Response, abort, jsonify
 try:
     from pyxctsk import (
         calculate_task_distances,
+        generate_qrcode_image,
         generate_task_geojson,
         parse_task,
         task_to_kml,
@@ -27,6 +28,80 @@ from shared import (
 )
 
 api_bp: Blueprint = Blueprint("api", __name__)
+
+
+@api_bp.route("/api/qrcode_image/<task_name>.png")
+def qrcode_image(task_name: str) -> Response:
+    """Return a PNG QR code image for the given task.
+
+    Args:
+        task_name (str): Name of the task whose QR code to generate.
+
+    Returns:
+        Response: Flask response with PNG image of the QR code, or error message and status code.
+
+    Raises:
+        werkzeug.exceptions.NotFound: If the task or QR code string is missing.
+    """
+
+    # Always generate QR code string from .xctsk file
+    xctsk_path = XCTSK_DIR / f"{task_name}.xctsk"
+    if not xctsk_path.exists():
+        return (
+            jsonify({"error": ".xctsk file not found for this task"}),
+            404,
+        )
+    try:
+        from pyxctsk import parse_task
+
+        task = parse_task(str(xctsk_path))
+        if hasattr(task, "to_qr_code_task"):
+            qr_task = task.to_qr_code_task()
+            qr_string = qr_task.to_string()
+        else:
+            return (
+                jsonify({"error": "Task object does not support QR code generation"}),
+                500,
+            )
+    except Exception as e:
+        import traceback
+
+        stacktrace = traceback.format_exc()
+        return (
+            jsonify(
+                {
+                    "error": f"Error generating QR code string from task: {str(e)}",
+                    "stacktrace": stacktrace,
+                }
+            ),
+            500,
+        )
+
+    try:
+        img = generate_qrcode_image(qr_string, size=512)
+        from io import BytesIO
+
+        buf = BytesIO()
+        img.save(buf, format="PNG")
+        buf.seek(0)
+        return Response(
+            buf.getvalue(),
+            mimetype="image/png",
+            headers={"Content-Disposition": f"inline; filename={task_name}.png"},
+        )
+    except Exception as e:
+        import traceback
+
+        stacktrace = traceback.format_exc()
+        return (
+            jsonify(
+                {
+                    "error": f"Error generating QR code image: {str(e)}",
+                    "stacktrace": stacktrace,
+                }
+            ),
+            500,
+        )
 
 
 @api_bp.route("/api/task/<task_name>")

@@ -13,12 +13,8 @@
     }
 
     .table-responsive {
-        max-height: 500px;
+        max-height: 600px;
         overflow-y: auto;
-    }
-
-    .metadata-value {
-        font-weight: bold;
     }
 
     .turnpoint-highlight:hover {
@@ -61,18 +57,25 @@
 </div>
 {% else %}
 
-<div class="row mb-3">
-    <div class="col">
+
+
+<div class="row mb-3 align-items-top">
+    <div class="col-md-8 col-12">
         <h1>Task: {{ task_name }}</h1>
         {% if metadata.created %}
-        <p class="text-muted">Created: {{ metadata.created }}</p>
+        <p class="text-muted">Created: {{ metadata.created }} / {{ metadata.author }}</p>
         {% endif %}
-        <p>
-            <a href="/api/kml/{{ task_name }}.kml" class="btn btn-outline-primary btn-sm" target="_blank"
-                rel="noopener">
+        <div class="d-flex flex-wrap align-items-center gap-3 mt-2">
+            <a href="/api/kml/{{ task_name }}.kml" class="btn btn-outline-secondary btn-sm" target="_blank" rel="noopener">
                 Download KML
             </a>
-        </p>
+            <a href="/api/qrcode_image/{{ task_name }}.png" class="btn btn-outline-secondary btn-sm" download="{{ task_name }}.png">
+                Download QR Code
+            </a>
+        </div>
+    </div>
+    <div class="col-md-4 col-12 text-center mt-3 mt-md-0">
+        <img src="/api/qrcode_image/{{ task_name }}.png" alt="QR Code for {{ task_name }}" style="height:300px;width:300px;border-radius:6px;border:1px solid #ccc;background:#fff;padding:2px;vertical-align:middle;" loading="lazy">
     </div>
 </div>
 
@@ -109,7 +112,7 @@
             <div class="card-body">
                 <h4 class="card-title">Task Metadata</h4>
                 <div class="table-responsive">
-                    <table class="table table-striped">
+                    <table class="table table-striped table-hover">
                         <tbody>
                             {% for key, value in metadata.items() %}
                             <tr>
@@ -130,7 +133,7 @@
             <div class="card-body">
                 <h4 class="card-title">Task Turnpoints</h4>
                 <div class="table-responsive">
-                    <table class="table table-striped">
+                    <table class="table table-striped table-hover">
                         <thead>
                             <tr>
                                 <th scope="col">#</th>
