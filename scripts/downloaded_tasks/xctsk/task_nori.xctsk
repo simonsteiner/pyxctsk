@@ -1,0 +1,105 @@
+{
+    "earthModel": "WGS84",
+    "goal": {
+        "deadline": "15:30:00Z",
+        "type": "CYLINDER"
+    },
+    "sss": {
+        "direction": "EXIT",
+        "timeGates": [
+            "10:45:00Z"
+        ],
+        "type": "RACE"
+    },
+    "takeoff": {
+        "timeClose": "12:00:00Z",
+        "timeOpen": "09:30:00Z"
+    },
+    "taskType": "CLASSIC",
+    "turnpoints": [
+        {
+            "radius": 400,
+            "type": "TAKEOFF",
+            "waypoint": {
+                "altSmoothed": 2180,
+                "description": "S01 GENDUSAS",
+                "lat": 46.70716666666667,
+                "lon": 8.796833333333334,
+                "name": "S01"
+            }
+        },
+        {
+            "radius": 32500,
+            "type": "SSS",
+            "waypoint": {
+                "altSmoothed": 3027,
+                "description": "B12 VORAB",
+                "lat": 46.874233333333336,
+                "lon": 9.156600000000001,
+                "name": "B12"
+            }
+        },
+        {
+            "radius": 1500,
+            "waypoint": {
+                "altSmoothed": 3027,
+                "description": "B12 VORAB",
+                "lat": 46.874233333333336,
+                "lon": 9.156600000000001,
+                "name": "B12"
+            }
+        },
+        {
+            "radius": 4000,
+            "waypoint": {
+                "altSmoothed": 1310,
+                "description": "B881 SAFIEN",
+                "lat": 46.67966666666666,
+                "lon": 9.316,
+                "name": "B88"
+            }
+        },
+        {
+            "radius": 8000,
+            "waypoint": {
+                "altSmoothed": 1440,
+                "description": "L00 Andermatt",
+                "lat": 46.6312,
+                "lon": 8.590433333333333,
+                "name": "L00"
+            }
+        },
+        {
+            "radius": 800,
+            "waypoint": {
+                "altSmoothed": 2430,
+                "description": "B72 P AULT",
+                "lat": 46.648666666666664,
+                "lon": 8.874500000000001,
+                "name": "B72"
+            }
+        },
+        {
+            "radius": 3000,
+            "type": "ESS",
+            "waypoint": {
+                "altSmoothed": 1231,
+                "description": "L01 DISENTIS",
+                "lat": 46.69738333333333,
+                "lon": 8.8414,
+                "name": "L01"
+            }
+        },
+        {
+            "radius": 100,
+            "waypoint": {
+                "altSmoothed": 1231,
+                "description": "L01 DISENTIS",
+                "lat": 46.69738333333333,
+                "lon": 8.8414,
+                "name": "L01"
+            }
+        }
+    ],
+    "version": 1
+}

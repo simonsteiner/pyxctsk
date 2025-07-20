@@ -1,0 +1,80 @@
+{
+  "metadata": {
+    "file_name": "nori",
+    "created": "2025-06-22 05:59:20 UTC",
+    "author": "Martin S (TaskCreator)",
+    "start_type": "Race",
+    "take-off_open_at": "09:30",
+    "take-off_closed_at": "12:00",
+    "sss_open": "10:45 (UTC)",
+    "goal_type": "CYLINDER",
+    "task_deadline": "15:30 (UTC)",
+    "earth_model": "WGS84 ellipsoid",
+    "task_distance_through_centers": "141.6km (through centers)",
+    "task_distance_optimized": "115.3km (optimized)",
+    "distance_through_centers_km": 141.6,
+    "distance_optimized_km": 115.3
+  },
+  "turnpoints": [
+    {
+      "#": 1,
+      "Name": "S01",
+      "Radius (m)": 400,
+      "Distance (km)": 0.0,
+      "Optimized (km)": 0.0,
+      "Type": "Takeoff"
+    },
+    {
+      "#": 2,
+      "Name": "B12",
+      "Radius (m)": 32500,
+      "Distance (km)": 33.2,
+      "Optimized (km)": 0.5,
+      "Type": "SSS"
+    },
+    {
+      "#": 3,
+      "Name": "B12",
+      "Radius (m)": 1500,
+      "Distance (km)": 33.2,
+      "Optimized (km)": 32.0
+    },
+    {
+      "#": 4,
+      "Name": "B88",
+      "Radius (m)": 4000,
+      "Distance (km)": 58.0,
+      "Optimized (km)": 52.5
+    },
+    {
+      "#": 5,
+      "Name": "L00",
+      "Radius (m)": 8000,
+      "Distance (km)": 113.8,
+      "Optimized (km)": 96.9
+    },
+    {
+      "#": 6,
+      "Name": "B72",
+      "Radius (m)": 800,
+      "Distance (km)": 135.6,
+      "Optimized (km)": 110.1
+    },
+    {
+      "#": 7,
+      "Name": "L01",
+      "Radius (m)": 3000,
+      "Distance (km)": 141.6,
+      "Optimized (km)": 112.4,
+      "Type": "ESS"
+    },
+    {
+      "#": 8,
+      "Name": "L01",
+      "Radius (m)": 100,
+      "Distance (km)": 141.6,
+      "Optimized (km)": 115.3,
+      "Type": "Goal"
+    }
+  ]
+}
