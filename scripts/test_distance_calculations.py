@@ -339,9 +339,13 @@ def analyze_and_display_results(all_results: List[Dict[str, Any]]):
             print(
                 f"  ⏱️  Time (avg/med): {statistics.mean(times):.4f}s / {statistics.median(times):.4f}s"
             )
-            print(
-                f"  📐 Dist (km, avg/stdev): {statistics.mean(dists)/1000:.2f}km / {statistics.stdev(dists)/1000:.3f}km"
-            )
+            mean_km = statistics.mean(dists) / 1000
+            if len(dists) > 1:
+                stdev_km = statistics.stdev(dists) / 1000
+                stdev_str = f"{stdev_km:.3f}km"
+            else:
+                stdev_str = "N/A"
+            print(f"  📐 Dist (km, avg/stdev): {mean_km:.2f}km / {stdev_str}")
 
     # --- Detailed Task-by-Task Table ---
     print("\n📋 DETAILED TASK RESULTS")
