@@ -29,7 +29,18 @@ class FakeTurnpoint:
 
     center: tuple[float, float]
 
-    def optimal_point(self, prev_point, next_point):
+    def optimal_point(
+        self, prev_point: tuple[float, float], next_point: tuple[float, float]
+    ) -> tuple[float, float]:
+        """Return the fixed optimal point for this fake turnpoint.
+
+        Args:
+            prev_point: Previous point in the route (ignored).
+            next_point: Next point in the route (ignored).
+
+        Returns:
+            The turnpoint center.
+        """
         return self.center
 
 
