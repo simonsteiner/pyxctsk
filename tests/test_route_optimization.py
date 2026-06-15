@@ -13,7 +13,6 @@ from pyxctsk.route_optimization import (
     _backtrack_path,
     _compute_optimal_route_with_beam_search,
     _init_dp_structure,
-    calculate_iteratively_refined_route,
 )
 from pyxctsk.turnpoint import TaskTurnpoint, TurnpointGeometry
 
