@@ -180,10 +180,13 @@ class GoalLine:
 
     @classmethod
     def from_task(cls, task: Task) -> "GoalLine | None":
-        """Build the goal line for a task, or None if it has no LINE goal.
+        """Build the goal line for a task.
 
-        Returns None when the task is not a LINE goal, has fewer than two
-        turnpoints, or has no previous turnpoint distinct from the goal center.
+        Args:
+            task: Task to derive the goal line from.
+
+        Returns:
+            A GoalLine if the task has a LINE goal with sufficient geometry, otherwise None.
         """
         if not (
             task.goal
