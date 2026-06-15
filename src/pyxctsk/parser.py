@@ -76,7 +76,7 @@ def _parse_xctsk_url(text: str | None, raw: bytes) -> Task | None:
     if text is not None and text.startswith(scheme):
         payload = text[len(scheme):]
     elif raw.startswith(scheme.encode("utf-8")):
-        payload = raw[len(scheme):].decode("utf-8", errors="replace")
+        payload = raw[len(scheme):].decode("utf-8")
     else:
         return None
 
