@@ -70,6 +70,7 @@ def test_beam_search_runs_against_fake_geometry():
 
 
 def test_backtrack_reconstructs_full_path():
+    """Backtracking should reconstruct the full path from the DP parent pointers."""
     turnpoints = [
         FakeTurnpoint((0.0, 0.0)),
         FakeTurnpoint((0.0, 1.0)),
