@@ -10,6 +10,8 @@ This module provides:
 Intended for use in parsing, generating, and optimizing XCTrack tasks.
 """
 
+from typing import Protocol, runtime_checkable
+
 from geopy.distance import geodesic
 from pyproj import Geod
 from scipy.optimize import fminbound
@@ -18,6 +20,43 @@ from .optimization_config import DEFAULT_ANGLE_STEP
 
 # Initialize WGS84 ellipsoid
 geod = Geod(ellps="WGS84")
+
+
+@runtime_checkable
+class TurnpointGeometry(Protocol):
+    """The geometry seam the route optimizer depends on.
+
+    Route optimization needs only two things from a turnpoint: where its
+    center is, and—given the previous and next points in the route—where the
+    optimal point to pass through it lies. Everything else (cylinder radius,
+    goal-line length, geodesic math) is an implementation detail behind this
+    interface.
+
+    Depending on this protocol instead of the concrete ``TaskTurnpoint`` lets
+    the dynamic-programming core be exercised with lightweight fakes and lets
+    new turnpoint kinds be added without editing the optimizer.
+
+    Attributes:
+        center: (lat, lon) of the turnpoint center.
+    """
+
+    center: tuple[float, float]
+
+    def optimal_point(
+        self,
+        prev_point: tuple[float, float],
+        next_point: tuple[float, float],
+    ) -> tuple[float, float]:
+        """Return the optimal (lat, lon) to pass through this turnpoint.
+
+        Args:
+            prev_point: (lat, lon) of the previous point in the route.
+            next_point: (lat, lon) of the next point in the route.
+
+        Returns:
+            (lat, lon) of the optimal point to pass through this turnpoint.
+        """
+        ...
 
 
 def _calculate_distance_through_point(

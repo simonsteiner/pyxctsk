@@ -15,10 +15,10 @@ from collections import defaultdict
 from geopy.distance import geodesic
 
 from .optimization_config import DEFAULT_BEAM_WIDTH
-from .turnpoint import TaskTurnpoint
+from .turnpoint import TaskTurnpoint, TurnpointGeometry
 
 
-def _init_dp_structure(turnpoints: list[TaskTurnpoint]) -> list[defaultdict]:
+def _init_dp_structure(turnpoints: list[TurnpointGeometry]) -> list[defaultdict]:
     """Initialize the dynamic programming data structure.
 
     Args:
@@ -40,7 +40,7 @@ def _init_dp_structure(turnpoints: list[TaskTurnpoint]) -> list[defaultdict]:
 def _process_dp_stage(
     dp: list[defaultdict],
     i: int,
-    turnpoints: list[TaskTurnpoint],
+    turnpoints: list[TurnpointGeometry],
     beam_width: int,
     show_progress: bool,
 ) -> defaultdict:
@@ -64,18 +64,9 @@ def _process_dp_stage(
 
     # For each candidate point from previous turnpoint
     for prev_point, (prev_dist, _) in dp[i - 1].items():
-        optimal_point = None
-
-        # Check if this is a goal line
-        if current_tp.goal_type == "LINE":
-            # For goal lines, we need the previous point to determine the optimal point
-            optimal_point = current_tp._find_optimal_goal_line_point(
-                prev_point, next_center
-            )
-        elif current_tp.radius == 0:
-            optimal_point = current_tp.center
-        else:
-            optimal_point = current_tp.optimal_point(prev_point, next_center)
+        # The turnpoint resolves its own geometry (cylinder, goal line, or
+        # zero-radius center) behind the TurnpointGeometry seam.
+        optimal_point = current_tp.optimal_point(prev_point, next_center)
 
         # Calculate leg distance and total distance
         leg_distance = geodesic(prev_point, optimal_point).meters
@@ -100,7 +91,7 @@ def _process_dp_stage(
 def _process_dp_stage_with_refined_target(
     dp: list[defaultdict],
     i: int,
-    turnpoints: list[TaskTurnpoint],
+    turnpoints: list[TurnpointGeometry],
     next_target: tuple[float, float] | None,
     beam_width: int,
     show_progress: bool,
@@ -135,11 +126,8 @@ def _process_dp_stage_with_refined_target(
 
     # For each candidate point from previous turnpoint
     for prev_point, (prev_dist, _) in dp[i - 1].items():
-        # Find optimal entry point on current turnpoint
-        if current_tp.radius == 0:
-            optimal_point = current_tp.center
-        else:
-            optimal_point = current_tp.optimal_point(prev_point, next_center)
+        # Find optimal entry point on current turnpoint via the geometry seam.
+        optimal_point = current_tp.optimal_point(prev_point, next_center)
 
         # Calculate leg distance and total distance
         leg_distance = geodesic(prev_point, optimal_point).meters
@@ -167,7 +155,7 @@ def _process_dp_stage_with_refined_target(
 def _backtrack_path(
     dp: list[defaultdict],
     best_point: tuple[float, float],
-    turnpoints: list[TaskTurnpoint],
+    turnpoints: list[TurnpointGeometry],
 ) -> list[tuple[float, float]]:
     """Backtrack through the DP structure to reconstruct the optimal path.
 
@@ -192,7 +180,7 @@ def _backtrack_path(
 
 
 def _compute_optimal_route_with_beam_search(
-    turnpoints: list[TaskTurnpoint],
+    turnpoints: list[TurnpointGeometry],
     show_progress: bool = False,
     return_path: bool = False,
     beam_width: int = DEFAULT_BEAM_WIDTH,
