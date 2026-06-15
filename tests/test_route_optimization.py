@@ -84,10 +84,10 @@ def test_backtrack_reconstructs_full_path():
     assert path == [(0.0, 0.0), (0.0, 1.0)]
 
 
-def test_iterative_refinement_handles_short_input():
-    # Fewer than two turnpoints: distance is zero and the path is the centers.
-    distance, route = calculate_iteratively_refined_route(
-        [FakeTurnpoint((1.0, 2.0))]
+def test_beam_search_handles_short_input():
+    """A single turnpoint should yield zero distance and a 1-point path."""
+    distance, route = _compute_optimal_route_with_beam_search(
+        [FakeTurnpoint((1.0, 2.0))], return_path=True
     )
     assert distance == 0.0
     assert route == [(1.0, 2.0)]
