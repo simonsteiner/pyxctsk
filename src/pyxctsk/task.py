@@ -384,40 +384,48 @@ class Task:
     goal: Goal | None = None
 
     def __post_init__(self) -> None:
-        """Post-initialization validation and processing."""
-        if not self.turnpoints or len(self.turnpoints) == 0:
-            return
+        """Post-initialization processing.
 
-        # Find ESS turnpoint (if any)
-        ess_tp = None
-        for tp in self.turnpoints:
-            if tp.type == TurnpointType.ESS:
-                ess_tp = tp
-                break
+        Enriches the task's goal so the constructed object always satisfies
+        the documented contract below. This is the single place that derives
+        goal defaults; ``from_dict`` and ``to_dict`` rely on it rather than
+        re-deriving the same rules.
+        """
+        self.goal = self._derive_goal(self.turnpoints, self.goal)
 
-        # The last turnpoint is always the goal
-        last_tp = self.turnpoints[-1]
+    @staticmethod
+    def _derive_goal(turnpoints: "list[Turnpoint]", goal: "Goal | None") -> "Goal | None":
+        """Return the effective goal for a task, applying defaults explicitly.
 
-        # Create goal object if it doesn't exist yet
-        if not self.goal and len(self.turnpoints) > 0:
-            self.goal = Goal()
+        Contract — a task with at least one turnpoint always has a goal:
+          - if no goal was supplied, an empty one is created;
+          - an unspecified goal type defaults to ``CYLINDER``;
+          - a ``LINE`` goal's ``line_length`` is twice the last turnpoint's
+            radius, since the radius represents half of the goal line.
 
-        # Only process goal settings if a goal object exists
-        if self.goal:
-            # If goal type is not specified, default to CYLINDER
-            if not self.goal.type:
-                self.goal.type = GoalType.CYLINDER
+        With no turnpoints the goal is returned unchanged (typically ``None``).
 
-            # If goal type is LINE, set goal line length from last turnpoint radius
-            if self.goal.type == GoalType.LINE:
-                # The last turnpoint's radius represents half of the goal line length
-                self.goal.line_length = float(last_tp.radius * 2)
+        Args:
+            turnpoints: The task's turnpoints.
+            goal: The goal supplied at construction, if any.
 
-        # If the last turnpoint is marked as ESS, it shares goal settings
-        # Otherwise, ESS is always a cylinder (if present)
-        if ess_tp and ess_tp != self.turnpoints[-1]:
-            # ESS is not the last turnpoint, so it's always a cylinder
-            pass
+        Returns:
+            The enriched goal, or the original value when there are no turnpoints.
+        """
+        if not turnpoints:
+            return goal
+
+        if goal is None:
+            goal = Goal()
+
+        if not goal.type:
+            goal.type = GoalType.CYLINDER
+
+        if goal.type == GoalType.LINE:
+            # The last turnpoint's radius represents half of the goal line length.
+            goal.line_length = float(turnpoints[-1].radius * 2)
+
+        return goal
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
@@ -425,17 +433,6 @@ class Task:
         Returns:
             Dict[str, Any]: Dictionary representation for JSON.
         """
-        # Apply goal line length logic before serializing
-        if (
-            self.goal
-            and self.goal.type == GoalType.LINE
-            and self.turnpoints
-            and len(self.turnpoints) > 0
-        ):
-            # For goal LINE type, make sure the line length is set to twice the last turnpoint radius
-            # as the radius represents half of the total goal line length
-            self.goal.line_length = float(self.turnpoints[-1].radius) * 2.0
-
         result: dict[str, Any] = {
             "taskType": self.task_type.value,
             "version": self.version,
@@ -480,22 +477,9 @@ class Task:
         goal = None
         if "goal" in data:
             goal = Goal.from_dict(data["goal"])
-        elif turnpoints:  # Create goal object even if not explicitly in data
-            goal = Goal()
 
-        # Process goal settings if it exists
-        if goal and turnpoints:
-            # If goal type is not specified, default to CYLINDER
-            if not goal.type:
-                goal.type = GoalType.CYLINDER
-
-            # If goal type is LINE, make sure line length is correctly set
-            if goal.type == GoalType.LINE:
-                if goal.line_length is None and turnpoints:
-                    # For goal LINE type, the line length is twice the last turnpoint radius
-                    # as the radius represents half of the total goal line length
-                    goal.line_length = float(turnpoints[-1].radius * 2)
-
+        # Goal defaults are derived once in Task.__post_init__; no need to
+        # repeat the rules here.
         return cls(
             task_type=TaskType(data["taskType"]),
             version=data["version"],
