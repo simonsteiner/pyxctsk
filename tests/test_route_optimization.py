@@ -51,6 +51,7 @@ def test_fake_turnpoint_satisfies_protocol():
     assert isinstance(TaskTurnpoint(0.0, 0.0), TurnpointGeometry)
 
 def test_beam_search_runs_against_fake_geometry():
+    """Beam search should run end-to-end against a lightweight geometry adapter."""
     # Three points; with optimal_point == center every route is forced through
     # the centers, so the distance is the sum of the two legs.
     turnpoints = [
