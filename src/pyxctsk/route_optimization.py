@@ -493,7 +493,7 @@ def optimized_distance(
 
 def optimized_route_coordinates(
     turnpoints: list[TaskTurnpoint],
-    task_turnpoints=None,  # Kept for backward compatibility
+    task_turnpoints: object | None = None,  # Kept for backward compatibility
     angle_step: int | None = None,
     beam_width: int | None = None,
     num_iterations: int | None = None,
