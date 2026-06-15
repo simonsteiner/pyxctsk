@@ -15,11 +15,72 @@ from unittest.mock import Mock
 from pyxctsk import Goal, GoalType, Task, TaskType, Turnpoint, TurnpointType, Waypoint
 from pyxctsk.geojson import _create_goal_line_features
 from pyxctsk.goal_line import (
+    GoalLine,
     _find_previous_turnpoint,
     calculate_goal_line_endpoints,
     generate_semicircle_arc,
+    goal_line_length_from_turnpoints,
     should_skip_last_turnpoint,
 )
+
+
+def _line_goal_task(prev_radius=400, goal_radius=400, line_length=None):
+    """Build a two-turnpoint LINE-goal task for goal-line tests."""
+    tp1 = Turnpoint(
+        radius=prev_radius,
+        waypoint=Waypoint(name="TP1", lat=46.0, lon=8.0, alt_smoothed=1000),
+        type=TurnpointType.TAKEOFF,
+    )
+    tp2 = Turnpoint(
+        radius=goal_radius,
+        waypoint=Waypoint(name="Goal", lat=47.0, lon=8.0, alt_smoothed=500),
+        type=TurnpointType.NONE,
+    )
+    goal = Goal(type=GoalType.LINE, line_length=line_length)
+    return Task(task_type=TaskType.CLASSIC, version=1, turnpoints=[tp1, tp2], goal=goal)
+
+
+class TestGoalLineLengthFromTurnpoints:
+    """Test the single-source goal-line length rule."""
+
+    def test_length_is_twice_last_radius(self):
+        task = _line_goal_task(goal_radius=250)
+        assert goal_line_length_from_turnpoints(task.turnpoints) == 500.0
+
+    def test_empty_turnpoints_returns_none(self):
+        assert goal_line_length_from_turnpoints([]) is None
+
+
+class TestGoalLineClass:
+    """Test the GoalLine deep module in isolation."""
+
+    def test_from_task_builds_line_goal(self):
+        gl = GoalLine.from_task(_line_goal_task(goal_radius=300))
+        assert gl is not None
+        # Task.__post_init__ sets line_length to 2 * radius.
+        assert gl.length == 600.0
+        assert gl.center == (47.0, 8.0)
+        assert gl.approach_from == (46.0, 8.0)
+
+    def test_from_task_returns_none_for_cylinder(self):
+        task = _line_goal_task()
+        task.goal.type = GoalType.CYLINDER
+        assert GoalLine.from_task(task) is None
+
+    def test_endpoints_are_perpendicular_to_due_north_approach(self):
+        # Approaching from due south, the line runs east-west and is centred
+        # on the goal, so the forward azimuth is ~0/360.
+        gl = GoalLine.from_task(_line_goal_task())
+        (lon1, lat1), (lon2, lat2), forward_azimuth = gl.endpoints()
+        assert abs(forward_azimuth) < 1.0 or abs(forward_azimuth - 360) < 1.0
+        # Endpoints straddle the goal longitude symmetrically.
+        assert abs((lon1 + lon2) / 2 - 8.0) < 1e-6
+
+    def test_control_zone_is_a_closed_polygon(self):
+        gl = GoalLine.from_task(_line_goal_task())
+        zone = gl.control_zone()
+        assert zone[0] == zone[-1]  # closed ring
+        assert len(zone) > 3
 
 
 class TestFindPreviousTurnpoint:
