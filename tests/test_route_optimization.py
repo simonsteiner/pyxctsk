@@ -45,10 +45,10 @@ class FakeTurnpoint:
 
 
 def test_fake_turnpoint_satisfies_protocol():
+    """FakeTurnpoint and TaskTurnpoint should satisfy the TurnpointGeometry seam."""
     assert isinstance(FakeTurnpoint((0.0, 0.0)), TurnpointGeometry)
     # The real adapter satisfies the same seam.
     assert isinstance(TaskTurnpoint(0.0, 0.0), TurnpointGeometry)
-
 
 def test_beam_search_runs_against_fake_geometry():
     # Three points; with optimal_point == center every route is forced through
