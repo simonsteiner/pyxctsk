@@ -10,6 +10,7 @@ This module provides functions to:
 
 from typing import Any
 
+from .goal_line import goal_line_length_from_turnpoints
 from .optimization_config import get_optimization_config
 from .task import Task
 from .turnpoint import TaskTurnpoint, distance_through_centers
@@ -38,12 +39,11 @@ def _task_to_turnpoints(task: Task) -> list[TaskTurnpoint]:
 
             # For goal LINE type, get line length from goal or last turnpoint
             if goal_type == "LINE":
-                # Use goal line length if specified, otherwise calculate from turnpoint radius
+                # Use goal line length if specified, otherwise derive from turnpoint radius
                 if task.goal.line_length is not None:
                     goal_line_length = task.goal.line_length
-                elif len(task.turnpoints) > 0:
-                    last_tp = task.turnpoints[-1]
-                    goal_line_length = float(last_tp.radius * 2)
+                else:
+                    goal_line_length = goal_line_length_from_turnpoints(task.turnpoints)
 
     result = []
 
@@ -54,8 +54,8 @@ def _task_to_turnpoints(task: Task) -> list[TaskTurnpoint]:
             if goal_type == "LINE":
                 # This is a goal line turnpoint
                 if goal_line_length is None and tp.radius > 0:
-                    # Use last turnpoint radius to determine goal line length if not specified
-                    goal_line_length = float(tp.radius * 2)
+                    # Derive goal line length from the last turnpoint radius
+                    goal_line_length = goal_line_length_from_turnpoints(task.turnpoints)
 
                 result.append(
                     TaskTurnpoint(
