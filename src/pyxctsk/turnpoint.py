@@ -47,7 +47,15 @@ class TurnpointGeometry(Protocol):
         prev_point: tuple[float, float],
         next_point: tuple[float, float],
     ) -> tuple[float, float]:
-        """Return the optimal (lat, lon) to pass through this turnpoint."""
+        """Return the optimal (lat, lon) to pass through this turnpoint.
+
+        Args:
+            prev_point: (lat, lon) of the previous point in the route.
+            next_point: (lat, lon) of the next point in the route.
+
+        Returns:
+            (lat, lon) of the optimal point to pass through this turnpoint.
+        """
         ...
 
 
