@@ -61,7 +61,7 @@ def _read_file(path: str) -> bytes | None:
     try:
         with open(path, "rb") as f:
             return f.read()
-    except (FileNotFoundError, IsADirectoryError, PermissionError):
+    except (FileNotFoundError, IsADirectoryError, PermissionError, OSError):
         return None
 
 
