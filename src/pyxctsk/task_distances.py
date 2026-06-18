@@ -12,6 +12,7 @@ from typing import Any
 
 from .goal_line import goal_line_length_from_turnpoints
 from .optimization_config import get_optimization_config
+from .route_optimization import optimized_distance
 from .task import Task
 from .turnpoint import TaskTurnpoint, distance_through_centers
 
@@ -121,8 +122,6 @@ def _create_turnpoint_details(
     Returns:
         List[Dict[str, Any]]: List of dictionaries with turnpoint details.
     """
-    from .distance import optimized_distance  # Import here to avoid circular imports
-
     config = get_optimization_config(angle_step, beam_width)
     turnpoint_details = []
     cumulative_center = 0.0
@@ -190,8 +189,6 @@ def calculate_task_distances(
     Returns:
         Dict[str, Any]: Dictionary containing distance calculations and turnpoint details.
     """
-    from .distance import optimized_distance  # Import here to avoid circular imports
-
     config = get_optimization_config(angle_step, beam_width, num_iterations)
     # Convert to TaskTurnpoint objects
     turnpoints = _task_to_turnpoints(task)
@@ -282,8 +279,6 @@ def calculate_cumulative_distances(
     Returns:
         Tuple[float, float]: Tuple of (center_distance_km, optimized_distance_km).
     """
-    from .distance import optimized_distance  # Import here to avoid circular imports
-
     if index == 0 or len(turnpoints) <= 1:
         return 0.0, 0.0
 
