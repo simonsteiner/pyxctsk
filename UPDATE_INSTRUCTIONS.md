@@ -27,9 +27,9 @@ uv sync --all-extras
         "Pillow>=11.0.0",
         "polyline>=2.0.0",
         "pyproj>=3.7.0",
-        "pyzbar>=0.1.9",
         "qrcode[pil]>=8.0.0",
         "scipy>=1.16.0",
+        "zxing-cpp>=2.3.0",
     ]
     ```
 
@@ -63,7 +63,7 @@ uv sync --all-extras
 ```bash
 uv run python -c "
 from scipy.optimize import fminbound; print('✓ scipy.optimize')
-from PIL import Image; from pyzbar import pyzbar; print('✓ QR code reading')
+from PIL import Image; import zxingcpp; print('✓ QR code reading')
 "
 ```
 

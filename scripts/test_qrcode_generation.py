@@ -22,15 +22,15 @@ from pyxctsk import parse_task  # noqa: E402
 from pyxctsk.qrcode_image import generate_qrcode_image  # noqa: E402
 
 try:
+    import zxingcpp
     from PIL import Image
-    from pyzbar import pyzbar
 
     QR_CODE_SUPPORT = True
 except ImportError:
     Image = None
-    pyzbar = None
+    zxingcpp = None
     QR_CODE_SUPPORT = False
-    print("Warning: QR code dependencies (PIL, pyzbar) not available")
+    print("Warning: QR code dependencies (PIL, zxing-cpp) not available")
 
 
 class QRCodeTestResult:
@@ -163,7 +163,7 @@ def test_qr_code_generation(
             result.qr_string_matches = generated_qr_string == expected_qr_string
 
         # Generate QR code PNG if QR code support is available
-        if QR_CODE_SUPPORT and Image is not None and pyzbar is not None:
+        if QR_CODE_SUPPORT and Image is not None and zxingcpp is not None:
             output_png = output_dir / f"{task_name}_generated.png"
             qr_image = generate_qrcode_image(generated_qr_string, size=512)
             qr_image.save(output_png, format="PNG")
@@ -174,9 +174,11 @@ def test_qr_code_generation(
             try:
                 # Read the QR code from the generated image
                 image = Image.open(output_png)
-                decoded_objects = pyzbar.decode(image)
+                decoded_objects = zxingcpp.read_barcodes(
+                    image, formats=zxingcpp.BarcodeFormat.QRCode
+                )
                 if decoded_objects:
-                    decoded_string = decoded_objects[0].data.decode("utf-8")
+                    decoded_string = decoded_objects[0].text
                     result.qr_png_parsable = True
 
                     # Test roundtrip: parse the decoded string back to a task
@@ -362,7 +364,7 @@ def main() -> int:
 
     if not QR_CODE_SUPPORT:
         print("\nWarning: QR code image generation will be skipped")
-        print("To enable full testing, install: pip install Pillow pyzbar")
+        print("To enable full testing, run: uv sync")
 
     # Test each file
     results = []

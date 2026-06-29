@@ -74,3 +74,5 @@ xctrack
 xctsk
 xtol
 zbar
+zxing
+zxingcpp

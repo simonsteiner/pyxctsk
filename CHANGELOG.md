@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+
+- Migrated project and dependency management to [uv](https://docs.astral.sh/uv/): added `uv.lock` and `.python-version`, moved dev dependencies to a `[dependency-groups]` table, and switched the publish workflow to `uv build`/`uv publish`.
+- Raised the minimum Python version to 3.11 (`scipy>=1.16` already required it).
+- Replaced the QR image decoder `pyzbar` with [`zxing-cpp`](https://github.com/zxing-cpp/zxing-cpp), which ships self-contained binary wheels — QR image tests no longer need the system `zbar` library and now run by default.
+- `pyxctsk.__version__` is now read from package metadata so `pyproject.toml` is the single source of truth.
+
 ## [v0.3.0] - 2025-07-21
 
 ### Added

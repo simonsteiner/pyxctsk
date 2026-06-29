@@ -28,13 +28,13 @@ from .task import Task
 
 # Optional QR code dependencies
 try:
-    import pyzbar.pyzbar as pyzbar
+    import zxingcpp
     from PIL import Image
 
     QR_CODE_SUPPORT = True
 except ImportError:
     Image = None  # type: ignore
-    pyzbar = None  # type: ignore
+    zxingcpp = None  # type: ignore
     QR_CODE_SUPPORT = False
 
 
@@ -74,9 +74,9 @@ def _parse_xctsk_url(text: str | None, raw: bytes) -> Task | None:
     """
     scheme = QR_CODE_SCHEME
     if text is not None and text.startswith(scheme):
-        payload = text[len(scheme):]
+        payload = text[len(scheme) :]
     elif raw.startswith(scheme.encode("utf-8")):
-        payload = raw[len(scheme):].decode("utf-8")
+        payload = raw[len(scheme) :].decode("utf-8")
     else:
         return None
 
@@ -114,15 +114,17 @@ def _parse_qrcode_image(text: str | None, raw: bytes) -> Task | None:
         return None
     try:
         image = Image.open(BytesIO(raw))  # type: ignore
-        qr_codes = pyzbar.decode(image)  # type: ignore
+        qr_codes = zxingcpp.read_barcodes(  # type: ignore
+            image, formats=zxingcpp.BarcodeFormat.QRCode  # type: ignore
+        )
     except Exception:
         return None
 
     for qr_code in qr_codes:
-        payload = qr_code.data
-        if payload.startswith(QR_CODE_SCHEME.encode("utf-8")):
+        payload = qr_code.text
+        if payload.startswith(QR_CODE_SCHEME):
             try:
-                qr_task_json = payload[len(QR_CODE_SCHEME):].decode("utf-8")
+                qr_task_json = payload[len(QR_CODE_SCHEME) :]
                 return QRCodeTask.from_json(qr_task_json).to_task()
             except _PARSE_ERRORS:
                 continue

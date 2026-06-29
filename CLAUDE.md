@@ -55,7 +55,7 @@ Distances use the WGS84 ellipsoid via `geopy`/`pyproj`; optimization uses `scipy
 
 ## Conventions
 
-- Optional/heavy dependencies (QR image handling: Pillow, qrcode, pyzbar) are imported with `try/except` so the core stays importable without them. Follow this pattern when adding optional features.
+- Optional/heavy dependencies (QR image handling: Pillow, qrcode, zxing-cpp) are imported with `try/except` so the core stays importable without them. Follow this pattern when adding optional features.
 - Type hints are required on all function params and returns; mypy runs in strict mode (`disallow_untyped_defs`, `strict_optional`). Third-party stubs live in `stubs/`.
 - All public functions/classes need Google-style docstrings (summary, `Args:`, `Returns:`, `Raises:`); private `_`-prefixed members need one only if non-trivial. `pydocstyle --convention=google` enforces this.
 - Do not add features, fallbacks, or config unless requested. When adding a dependency, update `pyproject.toml` (runtime deps under `[project]`, dev tools under `[dependency-groups]`, optional features under `[project.optional-dependencies]`) and run `uv lock` to refresh `uv.lock`.

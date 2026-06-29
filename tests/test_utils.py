@@ -252,12 +252,12 @@ class TestQRTestUtils:
 
     def test_qr_code_support_detection(self):
         """Test QR code support detection logic."""
-        from tests.qr_test_utils import QR_CODE_SUPPORT, Image, pyzbar
+        from tests.qr_test_utils import QR_CODE_SUPPORT, Image, zxingcpp
 
         # The support detection should be consistent
         if QR_CODE_SUPPORT:
             assert Image is not None
-            assert pyzbar is not None
+            assert zxingcpp is not None
         else:
             # When not supported, variables might be None
             # This is fine as the tests skip appropriately

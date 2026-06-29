@@ -73,7 +73,7 @@
 ## Key Integration Points
 - CLI entry point in `cli.py` with Click command structure
 - QR code generation requires Pillow and qrcode libraries
-- QR code parsing requires pyzbar library
+- QR code parsing requires the zxing-cpp library
 - Distance calculations use geopy, pyproj and scipy
         
 # Docstring Requirements

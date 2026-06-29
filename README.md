@@ -28,7 +28,7 @@ The library implements the full XCTrack Competition Interfaces specification, en
 
 - **Pillow**: Image processing for QR code generation and parsing
 - **qrcode**: QR code generation
-- **pyzbar**: QR code parsing from images
+- **zxing-cpp**: QR code parsing from images (ships binary wheels; no system library needed)
 
 ### Development
 
