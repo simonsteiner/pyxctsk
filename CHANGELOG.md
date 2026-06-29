@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- The release workflows now create a GitHub Release automatically, taking the notes from the matching `CHANGELOG.md` section (via `scripts/changelog_extract.py`) and attaching the built wheel and sdist.
+
 ## [v0.4.0] - 2026-06-30
 
 ### Changed
