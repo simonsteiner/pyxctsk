@@ -15,8 +15,8 @@ try:
     import zxingcpp
     from PIL import Image
 except ImportError:
-    Image = None
-    zxingcpp = None
+    Image = None  # type: ignore[assignment]
+    zxingcpp = None  # type: ignore[assignment]
 
 
 # A trivial roundtrip exercised in a subprocess to confirm the decoder actually

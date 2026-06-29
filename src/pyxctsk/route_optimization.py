@@ -11,6 +11,7 @@ All algorithms operate on immutable TaskTurnpoint dataclasses and use geodesic d
 """
 
 from collections import defaultdict
+from collections.abc import Sequence
 
 from geopy.distance import geodesic
 
@@ -18,7 +19,7 @@ from .optimization_config import DEFAULT_BEAM_WIDTH, get_optimization_config
 from .turnpoint import TaskTurnpoint, TurnpointGeometry
 
 
-def _init_dp_structure(turnpoints: list[TurnpointGeometry]) -> list[defaultdict]:
+def _init_dp_structure(turnpoints: Sequence[TurnpointGeometry]) -> list[defaultdict]:
     """Initialize the dynamic programming data structure.
 
     Args:
@@ -40,7 +41,7 @@ def _init_dp_structure(turnpoints: list[TurnpointGeometry]) -> list[defaultdict]
 def _process_dp_stage(
     dp: list[defaultdict],
     i: int,
-    turnpoints: list[TurnpointGeometry],
+    turnpoints: Sequence[TurnpointGeometry],
     beam_width: int,
     show_progress: bool,
 ) -> defaultdict:
@@ -91,7 +92,7 @@ def _process_dp_stage(
 def _process_dp_stage_with_refined_target(
     dp: list[defaultdict],
     i: int,
-    turnpoints: list[TurnpointGeometry],
+    turnpoints: Sequence[TurnpointGeometry],
     next_target: tuple[float, float] | None,
     beam_width: int,
     show_progress: bool,
@@ -155,7 +156,7 @@ def _process_dp_stage_with_refined_target(
 def _backtrack_path(
     dp: list[defaultdict],
     best_point: tuple[float, float],
-    turnpoints: list[TurnpointGeometry],
+    turnpoints: Sequence[TurnpointGeometry],
 ) -> list[tuple[float, float]]:
     """Backtrack through the DP structure to reconstruct the optimal path.
 
@@ -180,7 +181,7 @@ def _backtrack_path(
 
 
 def _compute_optimal_route_with_beam_search(
-    turnpoints: list[TurnpointGeometry],
+    turnpoints: Sequence[TurnpointGeometry],
     show_progress: bool = False,
     return_path: bool = False,
     beam_width: int = DEFAULT_BEAM_WIDTH,
