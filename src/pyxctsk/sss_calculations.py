@@ -39,8 +39,10 @@ def calculate_optimal_sss_entry_point(
     # Find the point that minimizes total distance: takeoff -> SSS entry -> first TP after SSS
     best_sss_point = min(
         sss_perimeter,
-        key=lambda p: geodesic(takeoff_center, p).meters
-        + geodesic(p, first_tp_after_sss_point).meters,
+        key=lambda p: (
+            geodesic(takeoff_center, p).meters
+            + geodesic(p, first_tp_after_sss_point).meters
+        ),
     )
 
     return best_sss_point

@@ -1,5 +1,4 @@
-"""
-Comprehensive tests for utility functions, CLI helpers, and shared test infrastructure.
+"""Comprehensive tests for utility functions, CLI helpers, and shared test infrastructure.
 
 Covers:
 - CLI conversion commands and output formats
@@ -19,9 +18,9 @@ from unittest.mock import Mock, patch
 
 import pytest
 from click.testing import CliRunner
+
 from pyxctsk import Task, TaskType, Turnpoint, TurnpointType, Waypoint
 from pyxctsk.cli import convert, main
-
 from tests.qr_test_utils import QR_CODE_SUPPORT
 
 # ============================================================================
@@ -357,7 +356,6 @@ class TestErrorHandling:
 
     def test_exception_handling_patterns(self):
         """Test common exception handling patterns."""
-
         # Test that we can catch and handle various exceptions
         with pytest.raises(ValueError):
             raise ValueError("Test error")

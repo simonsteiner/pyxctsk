@@ -30,7 +30,7 @@ class TimeOfDay:
             raise ValueError("Second must be between 0 and 59")
 
     def to_json_string(self) -> str:
-        """Convert to the ``HH:MM:SSZ`` string used as a JSON value.
+        r"""Convert to the ``HH:MM:SSZ`` string used as a JSON value.
 
         Returns the bare time string (no surrounding quotes); callers embed it
         as a value in a dict that is then ``json.dumps``-ed, which adds the

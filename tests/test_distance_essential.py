@@ -12,6 +12,7 @@ which provides full coverage using real-world tasks and thorough algorithm valid
 """
 
 import pytest
+
 from pyxctsk import Task
 from pyxctsk.distance import calculate_task_distances
 
@@ -32,30 +33,30 @@ class TestEssentialDistance:
 
         # Basic sanity checks - all distances should be positive
         assert results["center_distance_km"] > 0, "Center distance should be positive"
-        assert (
-            results["optimized_distance_km"] > 0
-        ), "Optimized distance should be positive"
+        assert results["optimized_distance_km"] > 0, (
+            "Optimized distance should be positive"
+        )
 
         # Optimization should reduce distance
-        assert (
-            results["center_distance_km"] > results["optimized_distance_km"]
-        ), "Optimization should reduce distance"
+        assert results["center_distance_km"] > results["optimized_distance_km"], (
+            "Optimization should reduce distance"
+        )
 
         # Should have same number of turnpoints as input task
-        assert len(results["turnpoints"]) == len(
-            task.turnpoints
-        ), "Should have same number of turnpoints"
+        assert len(results["turnpoints"]) == len(task.turnpoints), (
+            "Should have same number of turnpoints"
+        )
 
         # Reasonable range checks for this specific task
         center_km = results["center_distance_km"]
         opt_km = results["optimized_distance_km"]
 
-        assert (
-            100 <= center_km <= 200
-        ), f"Center distance {center_km:.1f}km outside expected range [100-200km]"
-        assert (
-            50 <= opt_km <= 150
-        ), f"Optimized distance {opt_km:.1f}km outside expected range [50-150km]"
+        assert 100 <= center_km <= 200, (
+            f"Center distance {center_km:.1f}km outside expected range [100-200km]"
+        )
+        assert 50 <= opt_km <= 150, (
+            f"Optimized distance {opt_km:.1f}km outside expected range [50-150km]"
+        )
 
         print(f"✅ Smoke test passed: {center_km:.1f}km → {opt_km:.1f}km")
 

@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Dict, List, Tuple
 
 import pytest
+
 from pyxctsk import Task, parse_task
 
 

@@ -394,7 +394,9 @@ class Task:
         self.goal = self._derive_goal(self.turnpoints, self.goal)
 
     @staticmethod
-    def _derive_goal(turnpoints: "list[Turnpoint]", goal: "Goal | None") -> "Goal | None":
+    def _derive_goal(
+        turnpoints: "list[Turnpoint]", goal: "Goal | None"
+    ) -> "Goal | None":
         """Return the effective goal for a task, applying defaults explicitly.
 
         Contract — a task with at least one turnpoint always has a goal:

@@ -20,9 +20,14 @@ uv run pytest                                # full suite
 uv run pytest tests/test_qrcode.py -vv -s    # single file, verbose, no capture
 uv run pytest -m "not slow"                  # skip slow-marked tests
 
-# Lint / format / typecheck (runs flake8, mypy, isort, black, pydocstyle, cspell)
-uv run pre-commit run --all-files
-uv run pre-commit install                    # enable on commit
+# Lint / format / typecheck
+uv run ruff check --fix src/ tests/ scripts/   # lint (E/W/F/I/D) + autofix
+uv run ruff format src/ tests/ scripts/        # format (black-compatible)
+uv run mypy --config-file mypy.ini src/        # type check
+
+# Git hooks are managed by lefthook (config in lefthook.yml)
+uv run lefthook install                        # enable hooks on commit
+uv run lefthook run pre-commit                 # run hooks against staged files
 
 # Check optional QR dependencies are importable
 uv run python scripts/check_qr_deps.py
@@ -57,9 +62,9 @@ Distances use the WGS84 ellipsoid via `geopy`/`pyproj`; optimization uses `scipy
 
 - Optional/heavy dependencies (QR image handling: Pillow, qrcode, zxing-cpp) are imported with `try/except` so the core stays importable without them. Follow this pattern when adding optional features.
 - Type hints are required on all function params and returns; mypy runs in strict mode (`disallow_untyped_defs`, `strict_optional`). Third-party stubs live in `stubs/`.
-- All public functions/classes need Google-style docstrings (summary, `Args:`, `Returns:`, `Raises:`); private `_`-prefixed members need one only if non-trivial. `pydocstyle --convention=google` enforces this.
+- All public functions/classes need Google-style docstrings (summary, `Args:`, `Returns:`, `Raises:`); private `_`-prefixed members need one only if non-trivial. Ruff's `D` rules (Google convention) enforce this.
 - Do not add features, fallbacks, or config unless requested. When adding a dependency, update `pyproject.toml` (runtime deps under `[project]`, dev tools under `[dependency-groups]`, optional features under `[project.optional-dependencies]`) and run `uv lock` to refresh `uv.lock`.
-- `scripts/` is excluded from flake8/mypy/pydocstyle — it holds utilities, not library code.
+- `scripts/` holds utilities, not library code: docstring (`D`) rules and mypy are not enforced there, and the vendored `scripts/task_viewer/airscore_clone` is fully excluded from ruff.
 
 ## Tests & reference data
 

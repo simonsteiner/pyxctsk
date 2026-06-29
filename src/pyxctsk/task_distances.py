@@ -32,7 +32,6 @@ def _task_to_turnpoints(task: Task) -> list[TaskTurnpoint]:
 
     # Process goal if there are turnpoints
     if task.turnpoints:
-
         # Goal can be explicitly defined or implicitly defined by the last turnpoint
         if task.goal:
             # Explicit goal definition
@@ -132,7 +131,7 @@ def _create_turnpoint_details(
         # Calculate cumulative distances for all turnpoints
         if i > 0:
             if show_progress and i > 1:
-                print(f"    🔄 Turnpoint {i+1}/{len(task_distance_turnpoints)}")
+                print(f"    🔄 Turnpoint {i + 1}/{len(task_distance_turnpoints)}")
 
             # Calculate center distance incrementally
             prev_tp = task_distance_turnpoints[i - 1]
@@ -213,7 +212,7 @@ def calculate_task_distances(
     center_dist = distance_through_centers(distance_turnpoints)
 
     if show_progress:
-        print(f"  ✅ Center distance: {center_dist/1000.0:.1f}km")
+        print(f"  ✅ Center distance: {center_dist / 1000.0:.1f}km")
         print("  🎯 Starting optimized calculation...")
 
     opt_dist = optimized_distance(
@@ -225,7 +224,7 @@ def calculate_task_distances(
     )
 
     if show_progress:
-        print(f"  ✅ Optimized distance: {opt_dist/1000.0:.1f}km")
+        print(f"  ✅ Optimized distance: {opt_dist / 1000.0:.1f}km")
 
     # Convert to kilometers
     center_km = center_dist / 1000.0

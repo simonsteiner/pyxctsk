@@ -208,7 +208,7 @@ def _compute_optimal_route_with_beam_search(
     # DP forward pass
     for i in range(1, len(turnpoints)):
         if show_progress:
-            print(f"    ⚡ DP stage {i}/{len(turnpoints)-1}")
+            print(f"    ⚡ DP stage {i}/{len(turnpoints) - 1}")
 
         dp[i] = _process_dp_stage(dp, i, turnpoints, beam_width, show_progress)
 
@@ -222,7 +222,7 @@ def _compute_optimal_route_with_beam_search(
     )
 
     if show_progress:
-        print(f"    ✅ DP route: {best_distance/1000.0:.3f}km")
+        print(f"    ✅ DP route: {best_distance / 1000.0:.3f}km")
 
     # Reconstruct path if needed
     route_points = []
@@ -330,7 +330,7 @@ def _compute_optimal_route_with_refined_targets(
     # DP forward pass with refined targets
     for i in range(1, len(turnpoints)):
         if show_progress:
-            print(f"    ⚡ DP stage {i}/{len(turnpoints)-1}")
+            print(f"    ⚡ DP stage {i}/{len(turnpoints) - 1}")
 
         # Get the look-ahead point from the previous route
         next_target = None
@@ -355,7 +355,7 @@ def _compute_optimal_route_with_refined_targets(
     )
 
     if show_progress:
-        print(f"    ✅ Refined DP route: {best_distance/1000.0:.3f}km")
+        print(f"    ✅ Refined DP route: {best_distance / 1000.0:.3f}km")
 
     # Reconstruct path
     route_points = _backtrack_path(dp, best_point, turnpoints)
@@ -421,7 +421,7 @@ def calculate_iteratively_refined_route(
     for iteration in range(1, config["num_iterations"]):
         if show_progress:
             print(
-                f"    🔄 Refinement iteration {iteration}/{config['num_iterations']-1}..."
+                f"    🔄 Refinement iteration {iteration}/{config['num_iterations'] - 1}..."
             )
 
         # Create modified turnpoints that use previous optimal points as targets
@@ -443,7 +443,7 @@ def calculate_iteratively_refined_route(
             current_route = new_route
 
             if show_progress:
-                print(f"    ✅ Improved distance: {best_distance/1000.0:.3f}km")
+                print(f"    ✅ Improved distance: {best_distance / 1000.0:.3f}km")
         else:
             if show_progress:
                 print(f"    ⚠️ No improvement in iteration {iteration}, stopping")

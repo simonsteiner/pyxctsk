@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Dict, List
 
 import pytest
+
 from pyxctsk.distance import (
     TaskTurnpoint,
     calculate_cumulative_distances,
@@ -148,9 +149,9 @@ class TestDistanceComprehensive:
             print(f"  Tolerance: {tolerance_percent:.1%}")
 
             # Ensure average difference is well within tolerance
-            assert (
-                avg_diff < tolerance_percent / 2
-            ), f"Average difference {avg_diff:.2%} exceeds half tolerance {tolerance_percent/2:.2%}"
+            assert avg_diff < tolerance_percent / 2, (
+                f"Average difference {avg_diff:.2%} exceeds half tolerance {tolerance_percent / 2:.2%}"
+            )
 
     def test_algorithm_core_functionality(self, test_turnpoints: List[TaskTurnpoint]):
         """Test core algorithm functionality with synthetic data.
@@ -168,9 +169,9 @@ class TestDistanceComprehensive:
 
         # Validate reasonable optimization savings (larger radii should give better optimization)
         savings_pct = (center_dist - opt_dist) / center_dist
-        assert (
-            0.02 < savings_pct < 0.8
-        ), f"Savings {savings_pct:.1%} outside reasonable range [2%-80%]"
+        assert 0.02 < savings_pct < 0.8, (
+            f"Savings {savings_pct:.1%} outside reasonable range [2%-80%]"
+        )
 
     def test_cumulative_distance_calculations(
         self, test_turnpoints: List[TaskTurnpoint]
@@ -182,15 +183,15 @@ class TestDistanceComprehensive:
                 test_turnpoints, target_idx
             )
 
-            assert (
-                center_cum > 0
-            ), f"Cumulative center distance to {target_idx} should be positive"
-            assert (
-                opt_cum > 0
-            ), f"Cumulative optimized distance to {target_idx} should be positive"
-            assert (
-                opt_cum <= center_cum
-            ), "Cumulative optimization should not exceed center distance"
+            assert center_cum > 0, (
+                f"Cumulative center distance to {target_idx} should be positive"
+            )
+            assert opt_cum > 0, (
+                f"Cumulative optimized distance to {target_idx} should be positive"
+            )
+            assert opt_cum <= center_cum, (
+                "Cumulative optimization should not exceed center distance"
+            )
 
             # Cumulative distances should increase with more turnpoints
             if target_idx > 1:
@@ -216,9 +217,9 @@ class TestDistanceComprehensive:
         center_dist = distance_through_centers(identical_tps)
         opt_dist = optimized_distance(identical_tps)
         assert center_dist == 0.0, "Distance between identical points should be zero"
-        assert (
-            opt_dist <= center_dist
-        ), "Optimization shouldn't increase distance from zero"
+        assert opt_dist <= center_dist, (
+            "Optimization shouldn't increase distance from zero"
+        )
 
         # Zero radius turnpoints (exact points)
         zero_radius_tps = [
@@ -229,9 +230,9 @@ class TestDistanceComprehensive:
         center_dist = distance_through_centers(zero_radius_tps)
         opt_dist = optimized_distance(zero_radius_tps)
         # With zero radius, optimization should have minimal effect
-        assert (
-            abs(center_dist - opt_dist) < 1.0
-        ), "Zero radius should have minimal optimization difference"
+        assert abs(center_dist - opt_dist) < 1.0, (
+            "Zero radius should have minimal optimization difference"
+        )
 
     @pytest.mark.parametrize("angle_step", [5, 10, 15, 30])
     def test_angle_step_consistency(
@@ -242,15 +243,15 @@ class TestDistanceComprehensive:
         opt_dist = optimized_distance(test_turnpoints, angle_step=angle_step)
 
         # All angle steps should optimize
-        assert (
-            opt_dist < center_dist
-        ), f"Angle step {angle_step}° should optimize distance"
+        assert opt_dist < center_dist, (
+            f"Angle step {angle_step}° should optimize distance"
+        )
 
         # Results should be reasonable regardless of angle step
         savings_pct = (center_dist - opt_dist) / center_dist
-        assert (
-            0.01 < savings_pct < 0.9
-        ), f"Angle step {angle_step}°: savings {savings_pct:.1%} unreasonable"
+        assert 0.01 < savings_pct < 0.9, (
+            f"Angle step {angle_step}°: savings {savings_pct:.1%} unreasonable"
+        )
 
     def test_task_distances_integration(self, reference_data: Dict[str, Dict]):
         """Test the full task distance calculation pipeline.
@@ -283,9 +284,9 @@ class TestDistanceComprehensive:
 
                 assert center_km > 0, f"{task_name}: Center distance should be positive"
                 assert opt_km > 0, f"{task_name}: Optimized distance should be positive"
-                assert (
-                    opt_km < center_km
-                ), f"{task_name}: Optimization should reduce distance"
+                assert opt_km < center_km, (
+                    f"{task_name}: Optimization should reduce distance"
+                )
 
                 # Validate turnpoint data
                 for i, tp_result in enumerate(results["turnpoints"]):

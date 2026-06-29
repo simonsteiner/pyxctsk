@@ -161,7 +161,7 @@ def process_html_file(html_file: Path, output_dir: Optional[Path] = None) -> Lis
     all_qr_codes = []
 
     for i, base64_svg in enumerate(base64_svgs):
-        print(f"Processing SVG {i+1}/{len(base64_svgs)}")
+        print(f"Processing SVG {i + 1}/{len(base64_svgs)}")
 
         # Decode base64 SVG
         svg_data = decode_base64_svg(base64_svg)
@@ -176,7 +176,7 @@ def process_html_file(html_file: Path, output_dir: Optional[Path] = None) -> Lis
         # Save intermediate PNG if output directory is specified
         if output_dir:
             output_dir.mkdir(parents=True, exist_ok=True)
-            png_file = output_dir / f"{html_file.stem}_svg_{i+1}.png"
+            png_file = output_dir / f"{html_file.stem}_svg_{i + 1}.png"
             cv2.imwrite(str(png_file), image)
             print(f"Saved PNG: {png_file}")
 

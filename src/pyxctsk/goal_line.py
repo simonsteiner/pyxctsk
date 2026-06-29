@@ -85,8 +85,12 @@ def _endpoints_from_coords(
 
     half_length = goal_line_length / 2
 
-    lon1, lat1, _ = geod.fwd(center_lon, center_lat, perpendicular_azimuth_1, half_length)
-    lon2, lat2, _ = geod.fwd(center_lon, center_lat, perpendicular_azimuth_2, half_length)
+    lon1, lat1, _ = geod.fwd(
+        center_lon, center_lat, perpendicular_azimuth_1, half_length
+    )
+    lon2, lat2, _ = geod.fwd(
+        center_lon, center_lat, perpendicular_azimuth_2, half_length
+    )
 
     return (lon1, lat1), (lon2, lat2), forward_azimuth
 

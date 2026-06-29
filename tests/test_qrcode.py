@@ -17,6 +17,7 @@ import tempfile
 from io import BytesIO
 
 import pytest
+
 from pyxctsk import (
     EarthModel,
     Task,
@@ -33,7 +34,6 @@ from pyxctsk.qrcode_task import (
     QRCodeTurnpoint,
     QRCodeTurnpointType,
 )
-
 from tests.conftest import find_xctsk_files
 
 # Use shared QR code test utilities
@@ -93,18 +93,18 @@ def test_qr_code_string_generation(qrcode_test_data):
                 qr_string = qr_task.to_string()
 
             assert qr_string, f"Failed to generate QR string for {task_name}"
-            assert qr_string.startswith(
-                "XCTSK:"
-            ), f"Invalid QR string format for {task_name}"
+            assert qr_string.startswith("XCTSK:"), (
+                f"Invalid QR string format for {task_name}"
+            )
 
             # Compare with expected QR string if available
             expected_txt = expected_dir / f"{task_name}.txt"
             if expected_txt.exists():
                 with open(expected_txt, "r") as f:
                     expected_qr_string = f.read().strip()
-                assert (
-                    qr_string == expected_qr_string
-                ), f"QR string mismatch for {task_name}"
+                assert qr_string == expected_qr_string, (
+                    f"QR string mismatch for {task_name}"
+                )
 
         except Exception as e:
             pytest.fail(f"Error processing {task_name}: {e}")
@@ -193,16 +193,16 @@ def test_qr_code_image_generation(qrcode_test_data):
                             print("\n--- DeepDiff ---\n", diff)
                         except ImportError:
                             pass
-                        assert (
-                            False
-                        ), f"QR code roundtrip failed for {task_name} (JSON mismatch)"
+                        assert False, (
+                            f"QR code roundtrip failed for {task_name} (JSON mismatch)"
+                        )
                 else:
                     if decoded_string != qr_string:
                         print("\n--- Decoded String ---\n", decoded_string)
                         print("\n--- Generated String ---\n", qr_string)
-                        assert (
-                            False
-                        ), f"QR code roundtrip failed for {task_name} (raw string)"
+                        assert False, (
+                            f"QR code roundtrip failed for {task_name} (raw string)"
+                        )
             except Exception as e:
                 # If decoding fails unexpectedly, skip rather than fail so a
                 # broken local decoder doesn't block the rest of the suite.
@@ -483,9 +483,9 @@ def test_qr_turnpoint_field_order():
     keys = list(ess_tp_dict.keys())
 
     # Check order for ESS turnpoint
-    assert keys.index("t") < keys.index(
-        "z"
-    ), "Type should come before coordinates in ESS"
+    assert keys.index("t") < keys.index("z"), (
+        "Type should come before coordinates in ESS"
+    )
 
     # Create a QRCode task with turnpoints that have types
     qr_task = QRCodeTask(turnpoints=[sss_tp, ess_tp])
@@ -501,16 +501,16 @@ def test_qr_turnpoint_field_order():
     # Check SSS turnpoint
     sss_tp_json = task_dict["t"][0]
     sss_keys = list(sss_tp_json.keys())
-    assert sss_keys.index("t") < sss_keys.index(
-        "z"
-    ), "Type should come before z in SSS turnpoint"
+    assert sss_keys.index("t") < sss_keys.index("z"), (
+        "Type should come before z in SSS turnpoint"
+    )
 
     # Check ESS turnpoint
     ess_tp_json = task_dict["t"][1]
     ess_keys = list(ess_tp_json.keys())
-    assert ess_keys.index("t") < ess_keys.index(
-        "z"
-    ), "Type should come before z in ESS turnpoint"
+    assert ess_keys.index("t") < ess_keys.index("z"), (
+        "Type should come before z in ESS turnpoint"
+    )
 
 
 def test_qr_spec_example_compliance():
@@ -533,9 +533,9 @@ def test_qr_spec_example_compliance():
             gen_tp = generated_dict["t"][i]
             gen_keys = list(gen_tp.keys())
             if "t" in gen_tp:
-                assert gen_keys.index("t") < gen_keys.index(
-                    "z"
-                ), f"Type should come before z in turnpoint {i}"
+                assert gen_keys.index("t") < gen_keys.index("z"), (
+                    f"Type should come before z in turnpoint {i}"
+                )
 
 
 def test_waypoints_format():
@@ -580,9 +580,9 @@ def test_waypoints_format():
     # Verify expected structure
     assert "T" in data and data["T"] == "W", f"Expected T=W, got {data.get('T')}"
     assert "V" in data and data["V"] == 2, f"Expected V=2, got {data.get('V')}"
-    assert (
-        "t" in data and len(data["t"]) == 3
-    ), f"Expected 3 turnpoints, got {len(data.get('t', []))}"
+    assert "t" in data and len(data["t"]) == 3, (
+        f"Expected 3 turnpoints, got {len(data.get('t', []))}"
+    )
 
     # Verify turnpoint structure
     for i, tp in enumerate(data["t"]):

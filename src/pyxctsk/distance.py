@@ -31,7 +31,6 @@ from .task_distances import (
 )
 from .turnpoint import TaskTurnpoint, distance_through_centers
 
-
 # Export all the main public functions and classes
 __all__ = [
     # Core classes

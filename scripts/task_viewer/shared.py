@@ -132,7 +132,7 @@ def prepare_comparison_data(
     for i, orig_tp in enumerate(original_tps):
         tp_comparison = {
             "index": i + 1,
-            "name": orig_tp.get("Name", f"TP{i+1}"),
+            "name": orig_tp.get("Name", f"TP{i + 1}"),
             "type": orig_tp.get("Type", ""),
             "radius_m": orig_tp.get("Radius (m)", 0),
             "original": {

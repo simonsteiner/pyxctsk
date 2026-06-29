@@ -255,13 +255,12 @@ def test_airscore_calculations(
         }
 
     except Exception as e:
-
         print(f"    ⚠️  Error in AirScore calculation: {e}")
         if verbose:
             import traceback
 
             print("    📜 Stack trace:")
-            print(f"    {traceback.format_exc().replace(chr(10), chr(10)+'    ')}")
+            print(f"    {traceback.format_exc().replace(chr(10), chr(10) + '    ')}")
 
         total_time = time.time() - start_time
 
@@ -317,7 +316,7 @@ def compare_with_reference(
 
     if verbose:
         print(
-            f"  📏 {len(turnpoints)} turnpoints, center distance: {center_distance/1000:.2f}km"
+            f"  📏 {len(turnpoints)} turnpoints, center distance: {center_distance / 1000:.2f}km"
         )
 
     # Test pyxctsk optimization
@@ -333,7 +332,7 @@ def compare_with_reference(
         savings = (center_distance - pyxctsk_result["total_distance"]) / 1000
         print(f"    ⏱️  Time: {pyxctsk_result['total_time']:.4f}s")
         print(
-            f"    📐 Distance: {pyxctsk_result['total_distance']/1000:.2f}km (saves {savings:.2f}km)"
+            f"    📐 Distance: {pyxctsk_result['total_distance'] / 1000:.2f}km (saves {savings:.2f}km)"
         )
 
     # Test AirScore optimization if available and requested
@@ -351,7 +350,7 @@ def compare_with_reference(
             savings = (center_distance - airscore_result["total_distance"]) / 1000
             print(f"    ⏱️  Time: {airscore_result['total_time']:.4f}s")
             print(
-                f"    📐 Distance: {airscore_result['total_distance']/1000:.2f}km (saves {savings:.2f}km)"
+                f"    📐 Distance: {airscore_result['total_distance'] / 1000:.2f}km (saves {savings:.2f}km)"
             )
 
     # Add task metadata including JSON reference data if available
@@ -453,8 +452,8 @@ def analyze_results(all_results: List[Dict[str, Any]]) -> None:
     print(f"  ⏱️  Average time per task: {statistics.mean(pyxctsk_times):.4f}s")
     print(f"  ⏱️  Median time per task: {statistics.median(pyxctsk_times):.4f}s")
     print(f"  ⏱️  Min/Max time: {min(pyxctsk_times):.4f}s / {max(pyxctsk_times):.4f}s")
-    print(f"  📐 Average distance: {statistics.mean(pyxctsk_distances)/1000:.2f}km")
-    print(f"  📐 Distance std dev: {statistics.stdev(pyxctsk_distances)/1000:.3f}km")
+    print(f"  📐 Average distance: {statistics.mean(pyxctsk_distances) / 1000:.2f}km")
+    print(f"  📐 Distance std dev: {statistics.stdev(pyxctsk_distances) / 1000:.3f}km")
 
     # AirScore statistics if available
     if has_airscore:
@@ -479,10 +478,10 @@ def analyze_results(all_results: List[Dict[str, Any]]) -> None:
                 f"  ⏱️  Min/Max time: {min(airscore_times):.4f}s / {max(airscore_times):.4f}s"
             )
             print(
-                f"  📐 Average distance: {statistics.mean(airscore_distances)/1000:.2f}km"
+                f"  📐 Average distance: {statistics.mean(airscore_distances) / 1000:.2f}km"
             )
             print(
-                f"  📐 Distance std dev: {statistics.stdev(airscore_distances)/1000:.3f}km"
+                f"  📐 Distance std dev: {statistics.stdev(airscore_distances) / 1000:.3f}km"
             )
 
             # Compare pyxctsk vs AirScore
@@ -647,7 +646,9 @@ def analyze_results(all_results: List[Dict[str, Any]]) -> None:
                     airscore_sign = (
                         "+"
                         if airscore_diff_km > 0
-                        else "-" if airscore_diff_km < 0 else " "
+                        else "-"
+                        if airscore_diff_km < 0
+                        else " "
                     )
                     row_values.extend(
                         [

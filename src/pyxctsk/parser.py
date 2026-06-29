@@ -115,7 +115,8 @@ def _parse_qrcode_image(text: str | None, raw: bytes) -> Task | None:
     try:
         image = Image.open(BytesIO(raw))  # type: ignore
         qr_codes = zxingcpp.read_barcodes(  # type: ignore
-            image, formats=zxingcpp.BarcodeFormat.QRCode  # type: ignore
+            image,
+            formats=zxingcpp.BarcodeFormat.QRCode,  # type: ignore
         )
     except Exception:
         return None

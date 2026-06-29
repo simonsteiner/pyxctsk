@@ -1,5 +1,4 @@
-"""
-Comprehensive core functionality tests for pyxctsk.
+"""Comprehensive core functionality tests for pyxctsk.
 
 This test suite covers:
 - TimeOfDay: validation, serialization, and error handling
@@ -11,6 +10,7 @@ This test suite covers:
 """
 
 import pytest
+
 from pyxctsk import (
     SSS,
     Direction,

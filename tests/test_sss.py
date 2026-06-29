@@ -1,5 +1,4 @@
-"""
-Comprehensive SSS (Start Speed Section) tests for pyxctsk.
+"""Comprehensive SSS (Start Speed Section) tests for pyxctsk.
 
 This module consolidates all SSS-related test coverage, including:
 - Core SSS calculation algorithms and entry point logic
@@ -11,6 +10,7 @@ All essential SSS test functionality is maintained in this single module.
 """
 
 from geopy.distance import geodesic
+
 from pyxctsk.distance import optimized_route_coordinates
 from pyxctsk.sss_calculations import (
     calculate_optimal_sss_entry_point,
@@ -73,13 +73,13 @@ class TestSSSRouting:
         assert len(turnpoints) >= 3, "Task should have at least 3 turnpoints"
 
         # Check turnpoint types
-        assert (
-            turnpoints[0].type.value == "TAKEOFF"
-        ), "First turnpoint should be TAKEOFF"
+        assert turnpoints[0].type.value == "TAKEOFF", (
+            "First turnpoint should be TAKEOFF"
+        )
         assert turnpoints[1].type.value == "SSS", "Second turnpoint should be SSS"
-        assert (
-            turnpoints[2].type is None or turnpoints[2].type.value == ""
-        ), "Third turnpoint should be regular TP"
+        assert turnpoints[2].type is None or turnpoints[2].type.value == "", (
+            "Third turnpoint should be regular TP"
+        )
 
         print("✅ SSS task structure verified:")
         print(
@@ -108,9 +108,9 @@ class TestSSSRouting:
         optimized_route = optimized_route_coordinates(turnpoints)
 
         # Verify routes have same number of points
-        assert len(center_route) == len(
-            optimized_route
-        ), "Routes should have same length"
+        assert len(center_route) == len(optimized_route), (
+            "Routes should have same length"
+        )
 
         # For SSS tasks, the first leg should be different
         # (takeoff to SSS entry point vs takeoff to SSS center)
@@ -129,6 +129,6 @@ class TestSSSRouting:
             print(f"   Difference: {leg_difference:.1f}m")
 
             # There should be some meaningful difference (at least 10m)
-            assert (
-                leg_difference > 10.0
-            ), "Optimized route should differ meaningfully from center route"
+            assert leg_difference > 10.0, (
+                "Optimized route should differ meaningfully from center route"
+            )

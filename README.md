@@ -33,7 +33,9 @@ The library implements the full XCTrack Competition Interfaces specification, en
 ### Development
 
 - **pytest**: Testing framework
-- **black**, **flake8**, **isort**, **mypy**: Code quality and formatting tools
+- **ruff**: Linting and formatting
+- **mypy**: Static type checking
+- **lefthook**: Git hook manager
 
 ## Project Structure
 
@@ -94,14 +96,20 @@ uv run python scripts/check_qr_deps.py
 
 ### Code Quality & Formatting
 
-The project uses pre-commit hooks to maintain code quality:
+The project uses [lefthook](https://github.com/evilmartians/lefthook) to run
+[ruff](https://docs.astral.sh/ruff/) (lint + format), mypy, and cspell on commit:
 
 ```bash
-# Install pre-commit hooks
-uv run pre-commit install
+# Install the git hooks (one-time)
+uv run lefthook install
 
-# Run hooks manually
-uv run pre-commit run --all-files
+# Run the pre-commit hooks against staged files
+uv run lefthook run pre-commit
+
+# Or run the tools directly
+uv run ruff check --fix src/ tests/ scripts/
+uv run ruff format src/ tests/ scripts/
+uv run mypy --config-file mypy.ini src/
 ```
 
 ## Usage Examples

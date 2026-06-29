@@ -45,7 +45,7 @@ def _create_turnpoint_feature(
             "coordinates": [turnpoint.waypoint.lon, turnpoint.waypoint.lat],
         },
         "properties": {
-            "name": turnpoint.waypoint.name or f"TP{index+1}",
+            "name": turnpoint.waypoint.name or f"TP{index + 1}",
             "type": "cylinder",
             "radius": turnpoint.radius,
             "description": f"Radius: {turnpoint.radius}m",

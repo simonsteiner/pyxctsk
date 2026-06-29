@@ -46,16 +46,13 @@ analysis = [
 [dependency-groups]
 dev = [
     "beautifulsoup4>=4.13.4",
-    "black>=25.1.0,<26",  # keep in sync with the pinned pre-commit black hook
     "deepdiff>=8.5.0",
-    "flake8>=7.3.0",
-    "isort>=6.0.1",
+    "lefthook>=1.7.0",
     "mypy>=1.17.0",
-    "pre_commit>=4.2.0",
-    "pydocstyle>=6.3.0",
     "pytest-cov>=6.2.1",
     "pytest>=8.4.1",
     "requests>=2.32.4",
+    "ruff>=0.10.0",
 ]
 
 [tool.setuptools.package-data]
@@ -70,17 +67,30 @@ pyxctsk = "pyxctsk.cli:main"
 [project.urls]
 Repository = "https://github.com/simonsteiner/pyxctsk"
 
-[tool.black]
+[tool.ruff]
 line-length = 88
-target-version = ['py311']
+target-version = "py311"
+src = ["src"]
+# Vendored third-party code: never format or lint it.
+extend-exclude = ["scripts/task_viewer/airscore_clone"]
 
-[tool.isort]
-profile = "black"
-multi_line_output = 3
+[tool.ruff.lint]
+# E/W pycodestyle, F pyflakes, I import sorting, D docstrings.
+# E501 (line length) and E203 are left to the formatter.
+select = ["E", "W", "F", "I", "D"]
+ignore = ["E501", "E203"]
 
-[tool.flake8]
-max-line-length = 88
-extend-ignore = "E501,E203"
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.isort]
+known-first-party = ["pyxctsk"]
+
+[tool.ruff.lint.per-file-ignores]
+# scripts/ holds utilities, not library code — don't require docstrings there.
+"scripts/**" = ["D"]
+# __init__.py re-exports; allow unsorted/star-style re-export conveniences.
+"src/pyxctsk/__init__.py" = ["F401"]
 
 [tool.mypy]
 python_version = "3.11"

@@ -44,10 +44,12 @@ class TestGoalLineLengthFromTurnpoints:
     """Test the single-source goal-line length rule."""
 
     def test_length_is_twice_last_radius(self):
+        """Goal-line length is twice the final turnpoint radius."""
         task = _line_goal_task(goal_radius=250)
         assert goal_line_length_from_turnpoints(task.turnpoints) == 500.0
 
     def test_empty_turnpoints_returns_none(self):
+        """No turnpoints yields no goal-line length."""
         assert goal_line_length_from_turnpoints([]) is None
 
 
@@ -55,6 +57,7 @@ class TestGoalLineClass:
     """Test the GoalLine deep module in isolation."""
 
     def test_from_task_builds_line_goal(self):
+        """A line goal builds a GoalLine with the expected geometry."""
         gl = GoalLine.from_task(_line_goal_task(goal_radius=300))
         assert gl is not None
         # Task.__post_init__ sets line_length to 2 * radius.
@@ -63,11 +66,13 @@ class TestGoalLineClass:
         assert gl.approach_from == (46.0, 8.0)
 
     def test_from_task_returns_none_for_cylinder(self):
+        """A cylinder goal produces no GoalLine."""
         task = _line_goal_task()
         task.goal.type = GoalType.CYLINDER
         assert GoalLine.from_task(task) is None
 
     def test_endpoints_are_perpendicular_to_due_north_approach(self):
+        """Endpoints lie perpendicular to a due-north approach, centred on goal."""
         # Approaching from due south, the line runs east-west and is centred
         # on the goal, so the forward azimuth is ~0/360.
         gl = GoalLine.from_task(_line_goal_task())
@@ -77,6 +82,7 @@ class TestGoalLineClass:
         assert abs((lon1 + lon2) / 2 - 8.0) < 1e-6
 
     def test_control_zone_is_a_closed_polygon(self):
+        """The control zone is a closed ring of more than three points."""
         gl = GoalLine.from_task(_line_goal_task())
         zone = gl.control_zone()
         assert zone[0] == zone[-1]  # closed ring

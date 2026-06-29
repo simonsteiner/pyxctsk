@@ -2,6 +2,7 @@ AABBGGRR
 addopts
 airscore
 altitudemode
+barcodes
 bevo
 brentq
 changealphaint
@@ -28,6 +29,7 @@ imwrite
 jsonify
 LANCZOS
 latlng
+lefthook
 levelname
 libzbar
 linecontrol

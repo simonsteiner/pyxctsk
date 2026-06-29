@@ -7,11 +7,9 @@ Follow these steps to publish a new release to PyPI:
    - Sync the environment: `uv sync --all-extras`
    - All tests must pass: `uv run pytest`
    - Code must be formatted and linted:
-     - `uv run flake8 src/ tests/ scripts/ --extend-ignore=E501,E203 --exclude=scripts/task_viewer/airscore_clone`
-     - `uv run mypy src/`
-     - `uv run isort src/ tests/ scripts/`
-     - `uv run black src/ tests/ scripts/`
-     - `uv run pydocstyle src/ tests/ --convention=google`
+     - `uv run ruff check src/ tests/ scripts/`
+     - `uv run ruff format --check src/ tests/ scripts/`
+     - `uv run mypy --config-file mypy.ini src/`
 
 2. **Update Version and Changelog**
    - Update the version in `pyproject.toml` — this is the single source of truth.

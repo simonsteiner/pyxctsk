@@ -215,9 +215,9 @@ def print_summary(results: List[QRCodeTestResult]) -> None:
     roundtrip_success = sum(1 for r in results if r.roundtrip_success)
     errors = sum(1 for r in results if r.error_message)
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("QR CODE GENERATION TEST SUMMARY")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"Total tasks:              {total}")
     print(f"XCTSK files found:        {xctsk_found}")
     print(f"Expected TXT files:       {expected_txt_found}")

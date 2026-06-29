@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 - Raised the minimum Python version to 3.11 (`scipy>=1.16` already required it).
 - Replaced the QR image decoder `pyzbar` with [`zxing-cpp`](https://github.com/zxing-cpp/zxing-cpp), which ships self-contained binary wheels — QR image tests no longer need the system `zbar` library and now run by default.
 - `pyxctsk.__version__` is now read from package metadata so `pyproject.toml` is the single source of truth.
+- Replaced the black + isort + flake8 + pydocstyle toolchain with [ruff](https://docs.astral.sh/ruff/), and switched git hook management from pre-commit to [lefthook](https://github.com/evilmartians/lefthook).
 
 ## [v0.3.0] - 2025-07-21
 
