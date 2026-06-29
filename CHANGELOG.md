@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [v0.4.0] - 2026-06-30
+
 ### Changed
 
 - Migrated project and dependency management to [uv](https://docs.astral.sh/uv/): added `uv.lock` and `.python-version`, moved dev dependencies to a `[dependency-groups]` table, and switched the publish workflow to `uv build`/`uv publish`.
