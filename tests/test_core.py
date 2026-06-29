@@ -43,11 +43,11 @@ class TestTimeOfDay:
         # Test string representation
         assert str(time) == "10:30:45Z"
 
-        # Test JSON serialization
+        # Test JSON serialization — the bare value, quoted later by json.dumps.
         json_str = time.to_json_string()
-        assert json_str == '"10:30:45Z"'
+        assert json_str == "10:30:45Z"
 
-        # Test JSON deserialization
+        # Test JSON deserialization (accepts the bare value and a quoted one)
         parsed_time = TimeOfDay.from_json_string(json_str)
         assert parsed_time.hour == 10
         assert parsed_time.minute == 30

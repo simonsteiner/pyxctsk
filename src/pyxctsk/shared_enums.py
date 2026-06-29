@@ -30,12 +30,17 @@ class TimeOfDay:
             raise ValueError("Second must be between 0 and 59")
 
     def to_json_string(self) -> str:
-        """Convert to JSON string format.
+        """Convert to the ``HH:MM:SSZ`` string used as a JSON value.
+
+        Returns the bare time string (no surrounding quotes); callers embed it
+        as a value in a dict that is then ``json.dumps``-ed, which adds the
+        quotes. Returning a pre-quoted string here caused values to be
+        double-quoted (``"\\"13:00:00Z\\""``) in serialized tasks.
 
         Returns:
-            str: JSON string representation of the time.
+            str: The time as ``HH:MM:SSZ``.
         """
-        return f'"{self.hour:02d}:{self.minute:02d}:{self.second:02d}Z"'
+        return f"{self.hour:02d}:{self.minute:02d}:{self.second:02d}Z"
 
     @classmethod
     def from_json_string(cls, time_str: str) -> "TimeOfDay":
