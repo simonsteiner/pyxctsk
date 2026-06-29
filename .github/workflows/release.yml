@@ -1,0 +1,84 @@
+name: Release 🚀
+
+# Manually triggered from the GitHub UI (Actions → Release → Run workflow).
+# Runs the test gate, bumps the version, updates the CHANGELOG, commits, tags,
+# pushes, and publishes to PyPI — all in one job, so it builds from the bumped
+# working tree.
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Semantic version bump"
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+        default: patch
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: '3.11'
+
+      - name: Verify (lint, types, tests)
+        run: |
+          uv sync --all-extras
+          uv run ruff check src/ tests/ scripts/
+          uv run ruff format --check src/ tests/ scripts/
+          uv run mypy --config-file mypy.ini src/
+          uv run pytest
+
+      - name: Bump version
+        id: bump
+        run: |
+          uv version --bump ${{ inputs.bump }}
+          uv lock
+          echo "version=$(uv version --short)" >> "$GITHUB_OUTPUT"
+
+      - name: Roll CHANGELOG [Unreleased] into a dated release
+        run: |
+          python3 - "${{ steps.bump.outputs.version }}" <<'PY'
+          import datetime
+          import pathlib
+          import sys
+
+          version = sys.argv[1]
+          path = pathlib.Path("CHANGELOG.md")
+          text = path.read_text()
+          marker = "## [Unreleased]"
+          if marker not in text:
+              sys.exit("CHANGELOG.md has no '## [Unreleased]' section.")
+          dated = f"## [v{version}] - {datetime.date.today().isoformat()}"
+          path.write_text(text.replace(marker, f"{marker}\n\n{dated}", 1))
+          PY
+
+      - name: Commit, tag, and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add pyproject.toml uv.lock CHANGELOG.md
+          git commit -m "release v${{ steps.bump.outputs.version }}"
+          git tag -a "v${{ steps.bump.outputs.version }}" -m "Version ${{ steps.bump.outputs.version }}"
+          git push --follow-tags origin HEAD:main
+
+      - name: Build package
+        run: uv build
+
+      - name: Publish to PyPI
+        env:
+          UV_PUBLISH_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+        run: uv publish

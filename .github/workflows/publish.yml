@@ -1,12 +1,36 @@
 name: Publish 🐍 pyxctsk to PyPI
 
+# Triggered when a version tag is pushed (e.g. by scripts/release.sh). The
+# Release workflow publishes on its own, so this path covers tags pushed
+# locally or by hand.
+
 on:
   push:
     tags:
       - 'v*.*.*'
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: '3.11'
+
+      - name: Verify (lint, types, tests)
+        run: |
+          uv sync --all-extras
+          uv run ruff check src/ tests/ scripts/
+          uv run ruff format --check src/ tests/ scripts/
+          uv run mypy --config-file mypy.ini src/
+          uv run pytest
+
   build-and-publish:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
