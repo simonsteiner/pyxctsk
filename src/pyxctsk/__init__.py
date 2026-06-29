@@ -6,6 +6,8 @@ generating and parsing XCTSK: URLs, and encoding/decoding XCTSK: URLs as QR code
 See http://xctrack.org/ and http://xctrack.org/Competition_Interfaces.html
 """
 
+from importlib.metadata import version
+
 from .distance import (
     TaskTurnpoint,
     calculate_task_distances,
@@ -43,7 +45,9 @@ EXTENSION = ".xctsk"
 MIME_TYPE = "application/xctsk"
 VERSION = 1
 
-__version__ = "1.0.0"
+# Single source of truth: the version declared in pyproject.toml, read from the
+# installed package metadata.
+__version__ = version("pyxctsk")
 __all__ = [
     "calculate_task_distances",
     "Direction",

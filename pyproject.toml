@@ -16,12 +16,11 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "click>=8.2.1",
     "geopy>=2.4.1",
@@ -35,6 +34,16 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+web = [
+    "flask>=3.1.1",
+]
+analysis = [
+    "geographiclib>=2.0",
+    "matplotlib>=3.10.3",
+    "numpy>=2.3.1",
+]
+
+[dependency-groups]
 dev = [
     "beautifulsoup4>=4.13.4",
     "black>=25.1.0",
@@ -47,14 +56,6 @@ dev = [
     "pytest-cov>=6.2.1",
     "pytest>=8.4.1",
     "requests>=2.32.4",
-]
-web = [
-    "flask>=3.1.1",
-]
-analysis = [
-    "geographiclib>=2.0",
-    "matplotlib>=3.10.3",
-    "numpy>=2.3.1",
 ]
 
 [tool.setuptools.package-data]
@@ -71,7 +72,7 @@ Repository = "https://github.com/simonsteiner/pyxctsk"
 
 [tool.black]
 line-length = 88
-target-version = ['py38']
+target-version = ['py311']
 
 [tool.isort]
 profile = "black"
@@ -82,7 +83,7 @@ max-line-length = 88
 extend-ignore = "E501,E203"
 
 [tool.mypy]
-python_version = "3.8"
+python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
