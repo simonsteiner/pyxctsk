@@ -1,18 +1,20 @@
 """Unit tests for the route-optimization dynamic program via its seam.
 
-These tests exercise the DP core (_compute_optimal_route_with_beam_search and
-backtracking) through the TurnpointGeometry protocol using a lightweight fake
-turnpoint. Because the algorithm depends only on `center` and
-`optimal_point()`, it can be tested without geodesic math, scipy, or real
-coordinates — the point of the geometry seam.
+These tests exercise the DP core (_run_dp and backtracking) through the
+TurnpointGeometry protocol using a lightweight fake turnpoint. Because the
+algorithm depends only on `center` and `optimal_point()`, it can be tested
+without geodesic math, scipy, or real coordinates — the point of the
+geometry seam.
 """
 
 from dataclasses import dataclass
 
 from pyxctsk.route_optimization import (
     _backtrack_path,
-    _compute_optimal_route_with_beam_search,
+    _center_lookahead,
     _init_dp_structure,
+    _route_lookahead,
+    _run_dp,
 )
 from pyxctsk.turnpoint import TaskTurnpoint, TurnpointGeometry
 
@@ -51,8 +53,8 @@ def test_fake_turnpoint_satisfies_protocol():
     assert isinstance(TaskTurnpoint(0.0, 0.0), TurnpointGeometry)
 
 
-def test_beam_search_runs_against_fake_geometry():
-    """Beam search should run end-to-end against a lightweight geometry adapter."""
+def test_dp_runs_against_fake_geometry():
+    """The DP core should run end-to-end against a lightweight geometry adapter."""
     # Three points; with optimal_point == center every route is forced through
     # the centers, so the distance is the sum of the two legs.
     turnpoints = [
@@ -61,9 +63,7 @@ def test_beam_search_runs_against_fake_geometry():
         FakeTurnpoint((0.0, 2.0)),
     ]
 
-    distance, route = _compute_optimal_route_with_beam_search(
-        turnpoints, return_path=True
-    )
+    distance, route = _run_dp(turnpoints, _center_lookahead(turnpoints), beam_width=5)
 
     assert distance > 0
     assert route[0] == (0.0, 0.0)
@@ -86,10 +86,48 @@ def test_backtrack_reconstructs_full_path():
     assert path == [(0.0, 0.0), (0.0, 1.0)]
 
 
-def test_beam_search_handles_short_input():
+def test_dp_handles_short_input():
     """A single turnpoint should yield zero distance and a 1-point path."""
-    distance, route = _compute_optimal_route_with_beam_search(
-        [FakeTurnpoint((1.0, 2.0))], return_path=True
-    )
+    turnpoints = [FakeTurnpoint((1.0, 2.0))]
+    distance, route = _run_dp(turnpoints, _center_lookahead(turnpoints), beam_width=5)
     assert distance == 0.0
     assert route == [(1.0, 2.0)]
+
+
+def test_center_lookahead_targets_next_center():
+    """The center strategy should target the next turnpoint's center, then its own."""
+    turnpoints = [
+        FakeTurnpoint((0.0, 0.0)),
+        FakeTurnpoint((0.0, 1.0)),
+        FakeTurnpoint((0.0, 2.0)),
+    ]
+    lookahead = _center_lookahead(turnpoints)
+    assert lookahead(1) == (0.0, 2.0)
+    # Final stage falls back to the current turnpoint's center.
+    assert lookahead(2) == (0.0, 2.0)
+
+
+def test_route_lookahead_targets_previous_route():
+    """The refined strategy should target the previous route's points."""
+    turnpoints = [
+        FakeTurnpoint((0.0, 0.0)),
+        FakeTurnpoint((0.0, 1.0)),
+        FakeTurnpoint((0.0, 2.0)),
+    ]
+    previous_route = [(0.0, 0.0), (0.1, 1.0), (0.2, 2.0)]
+    lookahead = _route_lookahead(turnpoints, previous_route)
+    # Intermediate stage aims at the previous route's next point.
+    assert lookahead(1) == (0.2, 2.0)
+    # Final stage falls back to the current turnpoint's center.
+    assert lookahead(2) == (0.0, 2.0)
+
+
+def test_route_lookahead_falls_back_on_incomplete_route():
+    """An incomplete previous route should fall back to the current center."""
+    turnpoints = [
+        FakeTurnpoint((0.0, 0.0)),
+        FakeTurnpoint((0.0, 1.0)),
+        FakeTurnpoint((0.0, 2.0)),
+    ]
+    lookahead = _route_lookahead(turnpoints, [(0.0, 0.0)])
+    assert lookahead(1) == (0.0, 1.0)
