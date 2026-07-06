@@ -136,11 +136,18 @@ class TaskTurnpoint:
     ) -> list[tuple[float, float]]:
         """Generate perimeter points around the turnpoint at given angle steps.
 
+        Only cylinder turnpoints have a sampled perimeter. For a goal line
+        (``goal_type == "LINE"``) the orientation depends on the previous point
+        in the route, which is not available here, so a single-element list with
+        the center is returned; use ``optimal_point`` for the goal-line case. A
+        zero-radius cylinder likewise collapses to its center.
+
         Args:
             angle_step (int): Angle step in degrees.
 
         Returns:
-            List[Tuple[float, float]]: List of (lat, lon) tuples representing points on the cylinder perimeter.
+            List[Tuple[float, float]]: List of (lat, lon) tuples on the cylinder
+            perimeter, or ``[center]`` for goal lines and zero-radius cylinders.
         """
         if self.goal_type == "LINE":
             # For goal lines, orientation depends on the previous point in the
