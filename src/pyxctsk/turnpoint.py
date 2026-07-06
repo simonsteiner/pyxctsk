@@ -106,51 +106,6 @@ def _find_optimal_cylinder_point(
     return (lat, lon)
 
 
-def _get_optimized_perimeter_points(
-    turnpoint: "TaskTurnpoint",
-    prev_point: tuple[float, float],
-    next_point: tuple[float, float],
-    angle_step: int = DEFAULT_ANGLE_STEP,
-) -> list[tuple[float, float]]:
-    """Get optimized perimeter points for a turnpoint.
-
-    Finds the optimal entry/exit points using scipy optimization.
-
-    Args:
-        turnpoint: TaskTurnpoint object
-        prev_point: Previous point in route (for optimization)
-        next_point: Next point in route (for optimization)
-        angle_step: Angle step for uniform sampling fallback (if needed)
-
-    Returns:
-        List of (lat, lon) points on perimeter
-    """
-    # Handle goal lines
-    if turnpoint.goal_type == "LINE":
-        if prev_point:
-            # For goal lines, we need the previous point to determine orientation
-            optimal_point = turnpoint._find_optimal_goal_line_point(
-                prev_point, next_point
-            )
-            return [optimal_point]
-        else:
-            # If no previous point available, return center
-            return [turnpoint.center]
-
-    if turnpoint.radius == 0:
-        return [turnpoint.center]
-
-    if prev_point and next_point:
-        # Use optimized single point
-        optimal_point = _find_optimal_cylinder_point(
-            turnpoint.center, turnpoint.radius, prev_point, next_point
-        )
-        return [optimal_point]
-    else:
-        # Fall back to uniform sampling
-        return turnpoint.perimeter_points(angle_step)
-
-
 class TaskTurnpoint:
     """Turnpoint class for distance calculations."""
 
@@ -188,8 +143,8 @@ class TaskTurnpoint:
             List[Tuple[float, float]]: List of (lat, lon) tuples representing points on the cylinder perimeter.
         """
         if self.goal_type == "LINE":
-            # For goal lines, we need a previous point to determine orientation
-            # This case is handled in goal_line_points() with a previous point
+            # For goal lines, orientation depends on the previous point in the
+            # route, which is not available here; optimal_point handles that case.
             return [self.center]
 
         if self.radius == 0:
@@ -199,76 +154,6 @@ class TaskTurnpoint:
         for azimuth in range(0, 360, angle_step):
             lon, lat, _ = geod.fwd(self.center[1], self.center[0], azimuth, self.radius)
             points.append((lat, lon))
-        return points
-
-    def goal_line_points(
-        self, prev_point: tuple[float, float], angle_step: int = DEFAULT_ANGLE_STEP
-    ) -> list[tuple[float, float]]:
-        """Generate points along a goal line.
-
-        The goal line is perpendicular to the line from the previous point to the center,
-        with the goal line center being in the middle of the line.
-
-        Args:
-            prev_point (Tuple[float, float]): Previous point in route (needed for goal line orientation).
-            angle_step (int): Angle step in degrees for sampling points.
-
-        Returns:
-            List[Tuple[float, float]]: List of (lat, lon) tuples representing points on the goal line.
-        """
-        if self.goal_type != "LINE":
-            return self.perimeter_points(angle_step)
-
-        # If goal line length is not specified, use a reasonable default
-        # Note: this should normally not happen as we should calculate from radius
-        # in _task_to_turnpoints, but this is a fallback
-        goal_line_length = self.goal_line_length
-        if goal_line_length is None:
-            # Default to a standard FAI-style goal line of 400m if no better information
-            goal_line_length = 400.0
-
-        # Calculate bearing from previous point to goal center
-        forward_azimuth, _, _ = geod.inv(
-            prev_point[1], prev_point[0], self.center[1], self.center[0]
-        )
-
-        # Goal line is perpendicular to the approach direction
-        perpendicular_azimuth_1 = (forward_azimuth + 90) % 360
-        perpendicular_azimuth_2 = (forward_azimuth - 90) % 360
-
-        # Calculate the endpoints of the goal line
-        half_length = goal_line_length / 2
-        lon1, lat1, _ = geod.fwd(
-            self.center[1], self.center[0], perpendicular_azimuth_1, half_length
-        )
-        lon2, lat2, _ = geod.fwd(
-            self.center[1], self.center[0], perpendicular_azimuth_2, half_length
-        )
-
-        # Sample points along the goal line
-        points = []
-        total_steps = int(360 / angle_step)
-
-        # Add the endpoints and center point
-        points.append((lat1, lon1))
-        points.append(self.center)
-        points.append((lat2, lon2))
-
-        # Add semi-circle points behind the goal line
-        # The semi-circle has radius = half_length and is on the opposite side from the approach
-        back_azimuth = (forward_azimuth + 180) % 360
-        for i in range(total_steps):
-            angle = angle_step * i
-            if angle > 180:
-                continue  # Only create semi-circle, not full circle
-
-            # Calculate point on semi-circle behind goal line
-            semi_azimuth = (back_azimuth - 90 + angle) % 360
-            lon, lat, _ = geod.fwd(
-                self.center[1], self.center[0], semi_azimuth, half_length
-            )
-            points.append((lat, lon))
-
         return points
 
     def optimal_point(
@@ -389,36 +274,6 @@ class TaskTurnpoint:
         optimal_point = (lat, lon)
 
         return optimal_point
-
-    def optimized_perimeter_points(
-        self,
-        prev_point: tuple[float, float],
-        next_point: tuple[float, float],
-        angle_step: int = DEFAULT_ANGLE_STEP,
-    ) -> list[tuple[float, float]]:
-        """Get optimized perimeter points for this turnpoint.
-
-        Args:
-            prev_point (Tuple[float, float]): Previous point in route.
-            next_point (Tuple[float, float]): Next point in route.
-            angle_step (int): Angle step for fallback uniform sampling.
-
-        Returns:
-            List[Tuple[float, float]]: List of (lat, lon) points on perimeter.
-        """
-        if self.goal_type == "LINE":
-            # For goal lines, we need both a previous point and a special handling
-            if prev_point:
-                # Find optimal point on goal line
-                optimal_point = self._find_optimal_goal_line_point(
-                    prev_point, next_point
-                )
-                return [optimal_point]
-            else:
-                # Cannot optimize without previous point, return center
-                return [self.center]
-
-        return _get_optimized_perimeter_points(self, prev_point, next_point, angle_step)
 
 
 def distance_through_centers(turnpoints: list[TaskTurnpoint]) -> float:
