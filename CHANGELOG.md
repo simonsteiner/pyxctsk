@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Removed
+
+- **Breaking (library API):** removed three dead, duplicated methods/helpers from `turnpoint.py`: `TaskTurnpoint.optimized_perimeter_points`, `TaskTurnpoint.goal_line_points`, and the module-level `_get_optimized_perimeter_points`. They duplicated the cylinder/goal-line/center dispatch already owned by `TaskTurnpoint.optimal_point` and were unused within the package. Callers should use `TaskTurnpoint.optimal_point` (optimal crossing point) or `TaskTurnpoint.perimeter_points` (cylinder sampling), both of which are retained.
+
 ## [v0.4.1] - 2026-06-29
 
 ### Added
