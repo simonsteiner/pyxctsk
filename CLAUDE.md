@@ -46,13 +46,13 @@ The CLI entry point is `pyxctsk` (`pyxctsk.cli:main`), e.g. `pyxctsk convert tas
 
 **Distance subsystem is a facade.** `distance.py` only re-exports; the real work lives in focused submodules that must avoid importing back into each other (a circular import between `distance` and `task_distances` was deliberately broken — keep `distance.py` as a thin re-export layer):
 
-- `turnpoint.py` — `TaskTurnpoint`, `distance_through_centers` (geometry primitives)
-- `route_optimization.py` — shortest-path through turnpoint cylinders via beam search + iterative refinement (`optimized_distance`, `calculate_iteratively_refined_route`). Refinement is iterative specifically to avoid look-ahead bias.
+- `turnpoint.py` — `TaskTurnpoint`, `distance_through_centers`, earth-model helpers (WGS84 vs FAI sphere), local Transverse Mercator projection, and the planar `plane_optimal_point` (GetOptPi: crossing vs reflection cases per Ding, Xie & Jiang)
+- `route_optimization.py` — shortest-path through turnpoint cylinders per FAI S7F §7 via the Ding–Xie–Jiang alternating point-circle-point method (`optimized_distance`, `calculate_iteratively_refined_route`): optimize in a local TM plane, converge at ε = 0.1 m, snap points onto true cylinder boundaries, sum geodesic legs. Touching semantics: every cylinder boundary must be touched in order (concentric turnpoints force out-and-back legs, matching XCTrack).
 - `task_distances.py` — per-leg and cumulative task distances
 - `sss_calculations.py` — Start-of-Speed-Section entry point / info
-- `optimization_config.py` — tunable params (`DEFAULT_BEAM_WIDTH`, `DEFAULT_ANGLE_STEP`, `DEFAULT_NUM_ITERATIONS`)
+- `optimization_config.py` — tunable params (`CONVERGENCE_EPSILON_M`, `DEFAULT_NUM_ITERATIONS` max sweeps)
 
-Distances use the WGS84 ellipsoid via `geopy`/`pyproj`; optimization uses `scipy`.
+Distances honor the task's `earthModel` field (WGS84 ellipsoid default, FAI sphere R = 6371 km) via `pyproj`; optimization uses `scipy`.
 
 **QR code subsystem.** `qrcode_task.py` implements XCTrack's compact QR format (v2) with polyline-compressed coordinates for small, sunlight-readable codes. Supporting modules: `qrcode_models.py`, `qrcode_encoding.py`, `qrcode_enums.py`, `qrcode_image.py`. `shared_enums.py` holds enums shared between the full and QR models.
 

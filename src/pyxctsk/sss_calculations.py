@@ -5,9 +5,6 @@ This module provides functions to analyze and compute optimal entry points for S
 
 from typing import Any
 
-from geopy.distance import geodesic
-
-from .optimization_config import get_optimization_config
 from .turnpoint import TaskTurnpoint
 
 
@@ -15,37 +12,24 @@ def calculate_optimal_sss_entry_point(
     sss_turnpoint: TaskTurnpoint,
     takeoff_center: tuple[float, float],
     first_tp_after_sss_point: tuple[float, float],
-    angle_step: int | None = None,
 ) -> tuple[float, float]:
     """Calculate the optimal entry point for an SSS (Start Speed Section) turnpoint.
 
-    This function finds the point on the SSS cylinder perimeter that minimizes the
-    total distance from takeoff to the first turnpoint after SSS, passing through
-    the SSS entry point.
+    This function finds the point on the SSS cylinder boundary that minimizes
+    the total distance from takeoff to the first turnpoint after SSS, passing
+    through the SSS entry point. The point is the exact GetOptPi solution
+    (crossing vs. reflection case per Ding, Xie & Jiang), which also covers a
+    takeoff lying inside the SSS cylinder.
 
     Args:
         sss_turnpoint: TaskTurnpoint object representing the SSS cylinder
         takeoff_center: (lat, lon) tuple of takeoff center coordinates
         first_tp_after_sss_point: (lat, lon) tuple of the target point on first TP after SSS
-        angle_step: Angle step in degrees for perimeter point generation
 
     Returns:
         Tuple of (lat, lon) representing the optimal SSS entry point
     """
-    config = get_optimization_config(angle_step)
-    # Generate perimeter points for the SSS turnpoint
-    sss_perimeter = sss_turnpoint.perimeter_points(config["angle_step"])
-
-    # Find the point that minimizes total distance: takeoff -> SSS entry -> first TP after SSS
-    best_sss_point = min(
-        sss_perimeter,
-        key=lambda p: (
-            geodesic(takeoff_center, p).meters
-            + geodesic(p, first_tp_after_sss_point).meters
-        ),
-    )
-
-    return best_sss_point
+    return sss_turnpoint.optimal_point(takeoff_center, first_tp_after_sss_point)
 
 
 def _find_sss_turnpoint(task_turnpoints) -> tuple[int, Any] | None:
@@ -100,7 +84,6 @@ def _get_first_tp_after_sss_point(
 def calculate_sss_info(
     task_turnpoints,
     route_coordinates: list[tuple[float, float]],
-    angle_step: int | None = None,
 ) -> dict[str, Any] | None:
     """Calculate SSS (Start Speed Section) information for a task.
 
@@ -110,7 +93,6 @@ def calculate_sss_info(
     Args:
         task_turnpoints: List of task turnpoints with type information
         route_coordinates: List of (lat, lon) tuples representing the optimized route
-        angle_step: Angle step in degrees for perimeter point generation
 
     Returns:
         Dictionary containing SSS information or None if no SSS found:
@@ -121,7 +103,6 @@ def calculate_sss_info(
             'takeoff_center': {'lat': float, 'lon': float}
         }
     """
-    config = get_optimization_config(angle_step)
     if not task_turnpoints or len(task_turnpoints) < 2:
         return None
 
@@ -157,7 +138,6 @@ def calculate_sss_info(
         sss_task_tp,
         takeoff_center,
         first_tp_after_sss_route_point,
-        config["angle_step"],
     )
 
     optimal_sss_point = {"lat": best_sss_point[0], "lon": best_sss_point[1]}

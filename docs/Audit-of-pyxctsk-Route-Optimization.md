@@ -59,6 +59,17 @@ Reference cross-checks: igc-xc-score (mmomtchev) confirms the FAI approach — i
 - The exact body of `turnpoint.py` (`optimal_point`, `TaskTurnpoint`, `TurnpointGeometry`), `optimization_config.py` (numeric defaults for `DEFAULT_ANGLE_STEP`, `DEFAULT_BEAM_WIDTH`, `DEFAULT_NUM_ITERATIONS`), [github](https://github.com/simonsteiner/pyxctsk/blob/main/src/pyxctsk/distance.py) `task_distances.py`, and `sss_calculations.py` could not be retrieved from the public web during this audit (GitHub raw/tree endpoints were robots-blocked; the PyPI source tarball `pyxctsk-0.4.1.tar.gz` is the reliable way to obtain them). Findings 2, 3, 6, and 7 are therefore reasoned inferences from the confirmed call sites and docstrings and must be verified against the actual source before fixing.
 - pyxctsk is derived from Tom Payne's go-xctrack [github](https://github.com/simonsteiner/pyxctsk) and targets XCTrack compatibility, so some behavior is intended to match XCTrack rather than FS/FAI exactly.
 
+## Sources
+
+- FAI Sporting Code Section 7F – XC Scoring, 2026 Edition V1.0 (§4 earth model/distances, §6.2.3.1 goal line, §7 route optimization): <https://www.fai.org/sites/default/files/2026-05/Sporting%20Code%20S7%20F%20-%20XC%20Scoring%202026_V1.0.pdf>
+- FAI Sporting Code Section 7F – XC Scoring, 2024 Edition (predecessor text referenced in the 2024-vs-2026 comparison): <https://www.fai.org/sites/default/files/civl/documents/sporting_code_s7_f_-_xc_scoring_2024.pdf>
+- Yuepeng Ding, Xiong Xie & Bo Jiang, "An Efficient Algorithm for Touring n Circles," MATEC Web of Conferences 232, 03027 (EITCE 2018), DOI 10.1051/matecconf/201823203027: <https://www.matec-conferences.org/articles/matecconf/pdf/2018/91/matecconf_eitce2018_03027.pdf>
+- XCTrack Competition Interfaces (`.xctsk` format incl. `earthModel`): <https://xctrack.org/Competition_Interfaces.html>
+
+## Resolution (2026-07-07)
+
+The prompt below was executed in PR [#8](https://github.com/simonsteiner/pyxctsk/pull/8). Outcomes, including the verification of finding 2 (the old `optimal_point` used geodesic azimuth math, not planar degrees — its actual defects were an azimuth-wraparound stall, a center fallback for near-coincident neighbours, and the missing crossing case) and the discovery that XCTrack's own displayed distances deviate up to ~1% from the true WGS84 optimum on giant-cylinder tasks, are documented in [XCTrack-Optimized-Distance-Findings.md](XCTrack-Optimized-Distance-Findings.md). Design decisions are recorded in [adr/](adr/README.md).
+
 ---
 
 ## Ready-to-paste Claude Code prompt
