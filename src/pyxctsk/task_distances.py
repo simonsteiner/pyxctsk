@@ -14,7 +14,7 @@ from .goal_line import goal_line_length_from_turnpoints
 from .optimization_config import get_optimization_config
 from .route_optimization import optimized_distance
 from .task import Task
-from .turnpoint import TaskTurnpoint, distance_through_centers
+from .turnpoint import TaskTurnpoint, distance_through_centers, geodesic_distance
 
 
 def _task_to_turnpoints(task: Task) -> list[TaskTurnpoint]:
@@ -46,6 +46,7 @@ def _task_to_turnpoints(task: Task) -> list[TaskTurnpoint]:
                     goal_line_length = goal_line_length_from_turnpoints(task.turnpoints)
 
     result = []
+    earth_model = task.earth_model
 
     for i, tp in enumerate(task.turnpoints):
         # Check if this is the goal turnpoint (last one)
@@ -64,6 +65,7 @@ def _task_to_turnpoints(task: Task) -> list[TaskTurnpoint]:
                         radius=0,  # Goal lines have 0 radius (no cylinder)
                         goal_type=goal_type,
                         goal_line_length=goal_line_length,
+                        earth_model=earth_model,
                     )
                 )
             else:
@@ -74,13 +76,17 @@ def _task_to_turnpoints(task: Task) -> list[TaskTurnpoint]:
                         lon=tp.waypoint.lon,
                         radius=tp.radius,
                         goal_type=goal_type,
+                        earth_model=earth_model,
                     )
                 )
         else:
             # Regular turnpoint
             result.append(
                 TaskTurnpoint(
-                    lat=tp.waypoint.lat, lon=tp.waypoint.lon, radius=tp.radius
+                    lat=tp.waypoint.lat,
+                    lon=tp.waypoint.lon,
+                    radius=tp.radius,
+                    earth_model=earth_model,
                 )
             )
 
@@ -135,9 +141,10 @@ def _create_turnpoint_details(
 
             # Calculate center distance incrementally
             prev_tp = task_distance_turnpoints[i - 1]
-            from geopy.distance import geodesic
-
-            leg_distance = geodesic(prev_tp.center, task_tp.center).meters / 1000.0
+            leg_distance = (
+                geodesic_distance(prev_tp.center, task_tp.center, task_tp.earth_model)
+                / 1000.0
+            )
             cumulative_center += leg_distance
 
             # For optimized distance, calculate using all turnpoints up to current

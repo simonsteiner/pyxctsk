@@ -1,372 +1,305 @@
-"""Route optimization algorithms for XCTrack tasks using dynamic programming (DP).
+"""Route optimization for XCTrack tasks via the Ding–Xie–Jiang touring-n-circles algorithm.
 
-This module provides core algorithms to compute the shortest possible route through a sequence of paragliding/hang gliding task turnpoints, accounting for cylinder radii, goal lines, and look-ahead bias. It implements:
+This module computes the shortest route through a sequence of task turnpoint
+cylinders per FAI Sporting Code S7F 2026 §7 (task distance = shortest path from
+launch to goal touching each cylinder or goal line in order), following the
+algorithm the spec cites: Ding, Xie & Jiang, "An Efficient Algorithm for
+Touring n Circles" (MATEC Web of Conferences 232, 03027, EITCE 2018).
 
-- True dynamic programming with beam search to avoid greedy local minima
-- Iterative refinement to reduce systematic bias from always targeting cylinder centers
-- A single DP core (`_run_dp`) whose look-ahead target is a pluggable strategy
-- Utilities for reconstructing optimal paths and handling goal lines
+The implementation:
 
-All algorithms operate on immutable TaskTurnpoint dataclasses and use geodesic distance calculations. The main entry point is `calculate_iteratively_refined_route`, which performs multi-pass optimization for best accuracy.
+- projects all turnpoint centers into a local Transverse Mercator plane centred
+  on the task area (§7.1.2),
+- initializes one route point per turnpoint and then alternately fixes the
+  odd- and even-indexed points, updating each free point with the exact planar
+  GetOptPi solution (crossing vs. reflection case) between its two neighbours,
+- iterates until a full sweep changes the total path length by less than
+  ε = 0.1 m (§7.1.3) or the sweep limit is reached,
+- converts the points back to geographic coordinates and snaps each onto the
+  true cylinder boundary at radius r on the selected earth model
+  ("ProjectionCorrection", §7.1.7),
+- sums the leg distances geodesically (WGS84 ellipsoid by default, great
+  circles on the FAI sphere R = 6 371 000 m when the task specifies it).
+
+The route starts at the takeoff *center* and each subsequent turnpoint circle
+must be touched on its boundary, matching XCTrack's displayed optimized
+distance (including mandatory "out and back" legs between concentric
+cylinders of different radii).
+
+The main entry point is `calculate_iteratively_refined_route`; `optimized_distance`
+and `optimized_route_coordinates` are thin wrappers over it.
 """
 
-from collections import defaultdict
-from collections.abc import Callable, Sequence
+import math
+from collections.abc import Sequence
 
-from geopy.distance import geodesic
+from .optimization_config import CONVERGENCE_EPSILON_M, get_optimization_config
+from .turnpoint import (
+    TurnpointGeometry,
+    geod_for_earth_model,
+    local_tm_transformers,
+    plane_optimal_point,
+)
 
-from .optimization_config import get_optimization_config
-from .turnpoint import TaskTurnpoint, TurnpointGeometry
-
-#: A look-ahead strategy maps a DP stage index to the target point used when
-#: choosing the optimal entry point on that stage's turnpoint.
-LookaheadStrategy = Callable[[int], tuple[float, float]]
-
-
-def _center_lookahead(turnpoints: Sequence[TurnpointGeometry]) -> LookaheadStrategy:
-    """Build the standard look-ahead strategy targeting cylinder centers.
-
-    Args:
-        turnpoints (Sequence[TurnpointGeometry]): The task turnpoints.
-
-    Returns:
-        LookaheadStrategy: Strategy returning the next turnpoint's center, or
-        the current turnpoint's center for the final stage.
-    """
-
-    def target(i: int) -> tuple[float, float]:
-        if i + 1 < len(turnpoints):
-            return turnpoints[i + 1].center
-        return turnpoints[i].center
-
-    return target
+#: A planar circle: (x, y, radius) in the local Transverse Mercator plane.
+PlaneCircle = tuple[float, float, float]
 
 
-def _route_lookahead(
-    turnpoints: Sequence[TurnpointGeometry],
-    previous_route: Sequence[tuple[float, float]],
-) -> LookaheadStrategy:
-    """Build a refined look-ahead strategy targeting a previous route's points.
+def _plane_circles(
+    turnpoints: Sequence[TurnpointGeometry], earth_model: object
+) -> tuple[list[PlaneCircle], object]:
+    """Project turnpoint cylinders into a local Transverse Mercator plane.
 
-    Using the previously optimized route as the look-ahead target (instead of
-    cylinder centers) reduces the systematic bias of always aiming at the
-    center of the next cylinder.
+    The plane is centred on the mean of the turnpoint centers (the task area,
+    §7.1.2). A LINE goal contributes a zero-radius circle: the goal line is
+    perpendicular to the final approach and centred on the goal, so its
+    optimal crossing point is the goal center itself.
 
     Args:
         turnpoints (Sequence[TurnpointGeometry]): The task turnpoints.
-        previous_route (Sequence[Tuple[float, float]]): Previously calculated
-            optimal route coordinates.
+        earth_model: Earth model selector (None means WGS84).
 
     Returns:
-        LookaheadStrategy: Strategy returning the previous route's point for
-        the next stage, falling back to the current turnpoint's center for the
-        final stage or an incomplete route.
+        Tuple of (planar circles, inverse transformer back to geographic
+        coordinates).
     """
+    lat0 = sum(tp.center[0] for tp in turnpoints) / len(turnpoints)
+    lon0 = sum(tp.center[1] for tp in turnpoints) / len(turnpoints)
+    to_plane, to_geo = local_tm_transformers(lat0, lon0, earth_model)
 
-    def target(i: int) -> tuple[float, float]:
-        if i < len(turnpoints) - 1 and i < len(previous_route) - 1:
-            return previous_route[i + 1]
-        return turnpoints[i].center
+    circles: list[PlaneCircle] = []
+    for tp in turnpoints:
+        x, y = to_plane.transform(tp.center[1], tp.center[0])
+        radius = 0.0 if tp.goal_type == "LINE" else float(tp.radius)
+        circles.append((x, y, radius))
+    return circles, to_geo
 
-    return target
 
+def _closest_circle_point(
+    point: tuple[float, float], circle: PlaneCircle
+) -> tuple[float, float]:
+    """Return the planar circle-boundary point nearest to ``point``.
 
-def _init_dp_structure(turnpoints: Sequence[TurnpointGeometry]) -> list[defaultdict]:
-    """Initialize the dynamic programming data structure.
+    Used for the final turnpoint, which has no successor: the shortest way to
+    touch its circle from the previous route point is the radially nearest
+    boundary point (regardless of whether the previous point lies inside or
+    outside the circle).
 
     Args:
-        turnpoints (Sequence[TurnpointGeometry]): List of turnpoints.
+        point: (x, y) of the previous route point.
+        circle: (x, y, radius) of the final circle.
 
     Returns:
-        List[defaultdict]: List of defaultdicts for DP computation.
+        (x, y) of the nearest boundary point, or the center for radius 0.
     """
-    # dp[i] maps candidate points on turnpoint i -> (best_distance, parent_point)
-    dp: list[defaultdict] = [
-        defaultdict(lambda: (float("inf"), None)) for _ in turnpoints
-    ]
-
-    # Initialize: start at takeoff center with distance 0
-    dp[0][turnpoints[0].center] = (0.0, None)
-    return dp
-
-
-def _process_dp_stage(
-    dp: list[defaultdict],
-    i: int,
-    turnpoints: Sequence[TurnpointGeometry],
-    next_target: tuple[float, float],
-    beam_width: int,
-) -> defaultdict:
-    """Process one stage of the dynamic programming calculation.
-
-    Args:
-        dp (List[defaultdict]): The DP structure.
-        i (int): Current stage index.
-        turnpoints (Sequence[TurnpointGeometry]): List of turnpoints.
-        next_target (Tuple[float, float]): Look-ahead target point for this stage.
-        beam_width (int): Number of best candidates to keep.
-
-    Returns:
-        defaultdict: Updated DP structure for stage i.
-    """
-    current_tp = turnpoints[i]
-    new_candidates: defaultdict = defaultdict(lambda: (float("inf"), None))
-
-    # For each candidate point from previous turnpoint
-    for prev_point, (prev_dist, _) in dp[i - 1].items():
-        # The turnpoint resolves its own geometry (cylinder, goal line, or
-        # zero-radius center) behind the TurnpointGeometry seam.
-        optimal_point = current_tp.optimal_point(prev_point, next_target)
-
-        # Calculate leg distance and total distance
-        leg_distance = geodesic(prev_point, optimal_point).meters
-        total_distance = prev_dist + leg_distance
-
-        # Keep the best distance for this optimal point
-        if total_distance < new_candidates[optimal_point][0]:
-            new_candidates[optimal_point] = (total_distance, prev_point)
-
-    # Beam search: keep only the best beam_width candidates
-    if len(new_candidates) > beam_width:
-        best_items = sorted(new_candidates.items(), key=lambda kv: kv[1][0])[
-            :beam_width
-        ]
-        result: defaultdict = defaultdict(lambda: (float("inf"), None))
-        result.update(dict(best_items))
-        return result
-    return new_candidates
+    cx, cy, radius = circle
+    if radius <= 0.0:
+        return (cx, cy)
+    dx, dy = point[0] - cx, point[1] - cy
+    dist = math.hypot(dx, dy)
+    if dist == 0.0:
+        return (cx + radius, cy)
+    return (cx + radius * dx / dist, cy + radius * dy / dist)
 
 
-def _backtrack_path(
-    dp: list[defaultdict],
-    best_point: tuple[float, float],
-    turnpoints: Sequence[TurnpointGeometry],
-) -> list[tuple[float, float]]:
-    """Backtrack through the DP structure to reconstruct the optimal path.
-
-    Args:
-        dp (List[defaultdict]): The DP structure.
-        best_point (Tuple[float, float]): The best final point.
-        turnpoints (Sequence[TurnpointGeometry]): List of turnpoints.
-
-    Returns:
-        List[Tuple[float, float]]: List of coordinates forming the optimal path.
-    """
-    path_points = []
-    current_point = best_point
-
-    for i in range(len(turnpoints) - 1, -1, -1):
-        path_points.append(current_point)
-        if i > 0:
-            _, parent_point = dp[i][current_point]
-            current_point = parent_point
-
-    return list(reversed(path_points))
-
-
-def _run_dp(
-    turnpoints: Sequence[TurnpointGeometry],
-    lookahead: LookaheadStrategy,
-    beam_width: int,
-    show_progress: bool = False,
-) -> tuple[float, list[tuple[float, float]]]:
-    """Run the DP route search with a pluggable look-ahead strategy.
-
-    This is the single DP core: it initializes the DP structure, runs the
-    forward pass (using ``lookahead`` to pick each stage's target point),
-    selects the best final candidate, and backtracks the optimal path.
-
-    Args:
-        turnpoints (Sequence[TurnpointGeometry]): List of turnpoints.
-        lookahead (LookaheadStrategy): Maps a stage index to its look-ahead
-            target point (e.g. cylinder centers on the first pass, a previous
-            route's points on refinement passes).
-        beam_width (int): Number of best candidates to keep at each stage.
-        show_progress (bool): Whether to show progress indicators.
-
-    Returns:
-        Tuple[float, List[Tuple[float, float]]]: Tuple of
-        (optimized_distance_meters, route_coordinates).
-    """
-    dp = _init_dp_structure(turnpoints)
-
-    # DP forward pass
-    for i in range(1, len(turnpoints)):
-        if show_progress:
-            print(f"    ⚡ DP stage {i}/{len(turnpoints) - 1}")
-
-        dp[i] = _process_dp_stage(dp, i, turnpoints, lookahead(i), beam_width)
-
-    # Find the best final solution
-    final_candidates = dp[-1]
-    if not final_candidates:
-        return 0.0, []
-
-    best_point, (best_distance, _) = min(
-        final_candidates.items(), key=lambda kv: kv[1][0]
+def _polyline_length(points: Sequence[tuple[float, float]]) -> float:
+    """Total planar length of a polyline given as (x, y) points."""
+    return sum(
+        math.hypot(points[i + 1][0] - points[i][0], points[i + 1][1] - points[i][1])
+        for i in range(len(points) - 1)
     )
 
-    if show_progress:
-        print(f"    ✅ DP route: {best_distance / 1000.0:.3f}km")
 
-    return best_distance, _backtrack_path(dp, best_point, turnpoints)
+def _optimize_plane_points(
+    circles: Sequence[PlaneCircle],
+    max_sweeps: int,
+    epsilon: float = CONVERGENCE_EPSILON_M,
+    show_progress: bool = False,
+) -> list[tuple[float, float]]:
+    """Run the Ding–Xie–Jiang alternating optimization in the plane.
+
+    One route point is kept per circle, initialized at the circle centers.
+    Each sweep first updates all odd-indexed points (even ones fixed), then
+    all even-indexed points (odd ones fixed); every update places the point
+    with the exact GetOptPi solution between its two neighbours. The start
+    point (index 0, the takeoff center) stays fixed; the final point, having
+    no successor, is the boundary point nearest its predecessor. Sweeps stop
+    once the total path length changes by less than ``epsilon``.
+
+    Args:
+        circles: Planar circles (x, y, radius) in turnpoint order.
+        max_sweeps: Upper bound on alternating sweeps.
+        epsilon: Convergence threshold on total length change, in meters.
+        show_progress: Whether to print per-sweep progress.
+
+    Returns:
+        The optimized (x, y) route points, one per circle.
+    """
+    n = len(circles)
+    points: list[tuple[float, float]] = [(c[0], c[1]) for c in circles]
+    if n < 2:
+        return points
+
+    previous_length = _polyline_length(points)
+    for sweep in range(max_sweeps):
+        for parity in (1, 0):
+            for i in range(1, n):
+                if i % 2 != parity:
+                    continue
+                cx, cy, radius = circles[i]
+                if i == n - 1:
+                    points[i] = _closest_circle_point(points[i - 1], circles[i])
+                else:
+                    points[i] = plane_optimal_point(
+                        points[i - 1], points[i + 1], (cx, cy), radius
+                    )
+        current_length = _polyline_length(points)
+        if show_progress:
+            print(f"    🔄 Sweep {sweep + 1}: {current_length / 1000.0:.4f}km")
+        if abs(previous_length - current_length) < epsilon:
+            break
+        previous_length = current_length
+
+    return points
 
 
 def calculate_iteratively_refined_route(
-    turnpoints: list[TaskTurnpoint],
+    turnpoints: Sequence[TurnpointGeometry],
     num_iterations: int | None = None,
     angle_step: int | None = None,
     show_progress: bool = False,
     beam_width: int | None = None,
+    earth_model: object = None,
 ) -> tuple[float, list[tuple[float, float]]]:
-    """Calculate optimized route with iterative refinement to reduce look-ahead bias.
+    """Calculate the optimized route with the alternating point-circle-point method.
 
-    This function implements a multi-pass optimization approach:
-      1. First pass: Use cylinder centers as targets for look-ahead (standard approach)
-      2. Subsequent passes: Use previously calculated optimal points as look-ahead targets
-      3. Continue for a fixed number of iterations or until convergence
-
-    This reduces the systematic bias created by always targeting the center of the next
-    cylinder instead of its optimal entry point.
+    Optimization runs in a local Transverse Mercator plane (§7.1.2) until the
+    total length converges below ε = 0.1 m (§7.1.3); the resulting points are
+    snapped onto the true cylinder boundaries (§7.1.7) and the legs summed
+    geodesically on the task's earth model.
 
     Args:
-        turnpoints (List[TaskTurnpoint]): List of TaskTurnpoint objects.
-        num_iterations (Optional[int]): Number of refinement iterations to perform.
-        angle_step (Optional[int]): Angle step in degrees for perimeter point generation.
+        turnpoints (Sequence[TurnpointGeometry]): The task turnpoints.
+        num_iterations (Optional[int]): Maximum number of alternating sweeps.
+        angle_step (Optional[int]): Deprecated, ignored (kept for API compatibility).
         show_progress (bool): Whether to show progress indicators.
-        beam_width (Optional[int]): Number of best candidates to keep at each DP stage.
+        beam_width (Optional[int]): Deprecated, ignored (kept for API compatibility).
+        earth_model: Earth model selector (``EarthModel`` member, its string
+            value, or None). None falls back to the first turnpoint's
+            ``earth_model`` attribute, defaulting to WGS84.
 
     Returns:
         Tuple[float, List[Tuple[float, float]]]: Tuple of (optimized_distance_meters, route_coordinates).
     """
     config = get_optimization_config(angle_step, beam_width, num_iterations)
     if len(turnpoints) < 2:
-        distance = 0.0
-        path = [(tp.center[0], tp.center[1]) for tp in turnpoints]
-        return distance, path
+        return 0.0, [(tp.center[0], tp.center[1]) for tp in turnpoints]
 
-    # Check if last turnpoint is a goal line
-    if turnpoints[-1].goal_type == "LINE":
-        if show_progress:
-            print("    🏁 Task has a goal line finish")
+    if earth_model is None:
+        earth_model = getattr(turnpoints[0], "earth_model", None)
 
-    # Initialize with standard optimization (using centers as look-ahead targets)
-    if show_progress:
-        print("    🔄 Initial optimization pass (using center look-ahead)...")
+    if show_progress and turnpoints[-1].goal_type == "LINE":
+        print("    🏁 Task has a goal line finish")
 
-    best_distance, best_route = _run_dp(
-        turnpoints,
-        _center_lookahead(turnpoints),
-        config["beam_width"],
+    circles, to_geo = _plane_circles(turnpoints, earth_model)
+    plane_points = _optimize_plane_points(
+        circles,
+        max_sweeps=config["num_iterations"],
         show_progress=show_progress,
     )
-    current_route = best_route
 
-    # Perform iterative refinement
-    for iteration in range(1, config["num_iterations"]):
-        if show_progress:
-            print(
-                f"    🔄 Refinement iteration {iteration}/{config['num_iterations'] - 1}..."
-            )
+    g = geod_for_earth_model(earth_model)
+    route: list[tuple[float, float]] = []
+    for i, ((x, y), (cx, cy, radius), tp) in enumerate(
+        zip(plane_points, circles, turnpoints)
+    ):
+        if i == 0 or radius <= 0.0:
+            # Takeoff start point and zero-radius circles (including LINE
+            # goals) sit exactly on the turnpoint center.
+            route.append((tp.center[0], tp.center[1]))
+            continue
+        # ProjectionCorrection (§7.1.7): re-place the planar solution at
+        # exactly radius r on the earth model along the center→point azimuth.
+        azimuth = math.degrees(math.atan2(x - cx, y - cy))
+        lon, lat, _ = g.fwd(tp.center[1], tp.center[0], azimuth, radius)
+        route.append((lat, lon))
 
-        # Re-run the DP using the previous route's points as look-ahead targets
-        new_distance, new_route = _run_dp(
-            turnpoints,
-            _route_lookahead(turnpoints, current_route),
-            config["beam_width"],
-            show_progress=show_progress,
-        )
+    distance = 0.0
+    for i in range(len(route) - 1):
+        _, _, leg = g.inv(route[i][1], route[i][0], route[i + 1][1], route[i + 1][0])
+        distance += float(leg)
 
-        # Check for improvement
-        if new_distance < best_distance:
-            best_distance = new_distance
-            best_route = new_route
-            current_route = new_route
+    if show_progress:
+        print(f"    ✅ Optimized route: {distance / 1000.0:.3f}km")
 
-            if show_progress:
-                print(f"    ✅ Improved distance: {best_distance / 1000.0:.3f}km")
-        else:
-            if show_progress:
-                print(f"    ⚠️ No improvement in iteration {iteration}, stopping")
-            break
-
-    return best_distance, best_route
+    return distance, route
 
 
 def optimized_distance(
-    turnpoints: list[TaskTurnpoint],
+    turnpoints: Sequence[TurnpointGeometry],
     angle_step: int | None = None,
     show_progress: bool = False,
     beam_width: int | None = None,
     num_iterations: int | None = None,
+    earth_model: object = None,
 ) -> float:
-    """Compute the fully optimized distance through turnpoints using iterative refinement.
+    """Compute the fully optimized task distance through the turnpoints.
 
-    This algorithm finds the shortest possible route through all turnpoint cylinders
-    starting from the center of the take-off and computing the optimal path using
-    dynamic programming with beam search and iterative refinement to reduce look-ahead bias.
-
-    The iterative refinement approach performs multiple optimization passes to
-    avoid the systematic bias of assuming the next target is at the center
-    of the next turnpoint.
+    This finds the shortest route starting at the takeoff center and touching
+    every turnpoint cylinder (and goal line) in order, per FAI Sporting Code
+    S7F §7, using the Ding–Xie–Jiang alternating optimization.
 
     Args:
-        turnpoints: List of TaskTurnpoint objects
-        angle_step: Angle step in degrees for perimeter point generation (fallback only)
-        show_progress: Whether to show progress indicators
-        beam_width: Number of best candidates to keep at each DP stage
-        num_iterations: Number of refinement iterations
+        turnpoints: The task turnpoints.
+        angle_step: Deprecated, ignored (kept for API compatibility).
+        show_progress: Whether to show progress indicators.
+        beam_width: Deprecated, ignored (kept for API compatibility).
+        num_iterations: Maximum number of alternating sweeps.
+        earth_model: Earth model selector (None uses the turnpoints' model,
+            defaulting to WGS84).
 
     Returns:
-        Optimized distance in meters
+        Optimized distance in meters.
     """
-    config = get_optimization_config(angle_step, beam_width, num_iterations)
-
     distance, _ = calculate_iteratively_refined_route(
         turnpoints,
-        num_iterations=config["num_iterations"],
-        angle_step=config["angle_step"],
+        num_iterations=num_iterations,
+        angle_step=angle_step,
         show_progress=show_progress,
-        beam_width=config["beam_width"],
+        beam_width=beam_width,
+        earth_model=earth_model,
     )
     return distance
 
 
 def optimized_route_coordinates(
-    turnpoints: list[TaskTurnpoint],
+    turnpoints: Sequence[TurnpointGeometry],
     task_turnpoints: object | None = None,  # Kept for backward compatibility
     angle_step: int | None = None,
     beam_width: int | None = None,
     num_iterations: int | None = None,
+    earth_model: object = None,
 ) -> list[tuple[float, float]]:
-    """Compute the fully optimized route coordinates through turnpoints using iterative refinement.
-
-    This algorithm finds the shortest possible route through all turnpoint cylinders
-    and returns the actual coordinates of the optimal path using dynamic programming
-    with beam search and iterative refinement to reduce the look-ahead bias.
-
-    The iterative refinement approach performs multiple optimization passes to
-    avoid the systematic bias of assuming the next target is at the center
-    of the next turnpoint.
+    """Compute the fully optimized route coordinates through the turnpoints.
 
     Args:
-        turnpoints: list[TaskTurnpoint] objects
-        task_turnpoints: Optional list of original task turnpoints with type information
-                         (kept for backward compatibility)
-        angle_step: Angle step in degrees for perimeter point generation (fallback only)
-        beam_width: Number of best candidates to keep at each DP stage
-        num_iterations: Number of refinement iterations
+        turnpoints: The task turnpoints.
+        task_turnpoints: Unused; kept for backward compatibility.
+        angle_step: Deprecated, ignored (kept for API compatibility).
+        beam_width: Deprecated, ignored (kept for API compatibility).
+        num_iterations: Maximum number of alternating sweeps.
+        earth_model: Earth model selector (None uses the turnpoints' model,
+            defaulting to WGS84).
 
     Returns:
-        List of (lat, lon) tuples representing the optimized route coordinates
+        List of (lat, lon) tuples representing the optimized route coordinates.
     """
-    config = get_optimization_config(angle_step, beam_width, num_iterations)
-
     _, route_coordinates = calculate_iteratively_refined_route(
         turnpoints,
-        num_iterations=config["num_iterations"],
-        angle_step=config["angle_step"],
+        num_iterations=num_iterations,
+        angle_step=angle_step,
         show_progress=False,
-        beam_width=config["beam_width"],
+        beam_width=beam_width,
+        earth_model=earth_model,
     )
     return route_coordinates

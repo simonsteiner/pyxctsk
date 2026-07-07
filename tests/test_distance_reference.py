@@ -212,13 +212,16 @@ class TestDistanceComprehensive:
         assert optimized_distance(single_tp) == 0.0
         assert distance_through_centers(single_tp) == 0.0
 
-        # Identical turnpoints
+        # Identical (concentric) turnpoints: the center distance is zero, but
+        # touching semantics require reaching the second circle's boundary
+        # from the start at the shared center — 400 m. XCTrack behaves the
+        # same way for concentric turnpoints (see task_nohe reference data).
         identical_tps = [TaskTurnpoint(47.0, 8.0, 400), TaskTurnpoint(47.0, 8.0, 400)]
         center_dist = distance_through_centers(identical_tps)
         opt_dist = optimized_distance(identical_tps)
         assert center_dist == 0.0, "Distance between identical points should be zero"
-        assert opt_dist <= center_dist, (
-            "Optimization shouldn't increase distance from zero"
+        assert opt_dist == pytest.approx(400.0, abs=1.0), (
+            "Touching a concentric circle from its center costs the radius"
         )
 
         # Zero radius turnpoints (exact points)
