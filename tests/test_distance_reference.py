@@ -105,8 +105,7 @@ class TestDistanceComprehensive:
             if "distance_optimized_km" not in ref_meta:
                 continue
 
-            # Calculate distances with moderate precision for performance
-            calc_results = calculate_task_distances(task, angle_step=10)
+            calc_results = calculate_task_distances(task)
 
             ref_center_km = ref_meta.get("distance_through_centers_km", 0)
             ref_opt_km = ref_meta.get("distance_optimized_km", 0)
@@ -161,7 +160,7 @@ class TestDistanceComprehensive:
         """
         # Test basic optimization effectiveness
         center_dist = distance_through_centers(test_turnpoints)
-        opt_dist = optimized_distance(test_turnpoints, angle_step=15)
+        opt_dist = optimized_distance(test_turnpoints)
 
         assert center_dist > 0, "Center distance should be positive"
         assert opt_dist > 0, "Optimized distance should be positive"
@@ -237,24 +236,16 @@ class TestDistanceComprehensive:
             "Zero radius should have minimal optimization difference"
         )
 
-    @pytest.mark.parametrize("angle_step", [5, 10, 15, 30])
-    def test_angle_step_consistency(
-        self, test_turnpoints: List[TaskTurnpoint], angle_step: int
-    ):
-        """Test that different angle steps produce consistent optimization behavior."""
+    def test_optimization_is_deterministic(self, test_turnpoints: List[TaskTurnpoint]):
+        """Repeated runs must produce identical, converged results."""
         center_dist = distance_through_centers(test_turnpoints)
-        opt_dist = optimized_distance(test_turnpoints, angle_step=angle_step)
+        results = [optimized_distance(test_turnpoints) for _ in range(3)]
 
-        # All angle steps should optimize
-        assert opt_dist < center_dist, (
-            f"Angle step {angle_step}° should optimize distance"
-        )
+        assert all(r == results[0] for r in results), "Optimization must be stable"
+        assert results[0] < center_dist, "Optimization should reduce distance"
 
-        # Results should be reasonable regardless of angle step
-        savings_pct = (center_dist - opt_dist) / center_dist
-        assert 0.01 < savings_pct < 0.9, (
-            f"Angle step {angle_step}°: savings {savings_pct:.1%} unreasonable"
-        )
+        savings_pct = (center_dist - results[0]) / center_dist
+        assert 0.01 < savings_pct < 0.9, f"Savings {savings_pct:.1%} unreasonable"
 
     def test_task_distances_integration(self, reference_data: Dict[str, Dict]):
         """Test the full task distance calculation pipeline.
@@ -271,42 +262,40 @@ class TestDistanceComprehensive:
 
             task = reference_data[task_name]["task"]
 
-            # Test full pipeline with different precision levels
-            for angle_step, precision_name in [(15, "fast"), (5, "precise")]:
-                results = calculate_task_distances(task, angle_step=angle_step)
+            results = calculate_task_distances(task)
 
-                # Validate structure
-                assert "center_distance_km" in results
-                assert "optimized_distance_km" in results
-                assert "turnpoints" in results
-                assert len(results["turnpoints"]) == len(task.turnpoints)
+            # Validate structure
+            assert "center_distance_km" in results
+            assert "optimized_distance_km" in results
+            assert "turnpoints" in results
+            assert len(results["turnpoints"]) == len(task.turnpoints)
 
-                # Validate optimization effectiveness
-                center_km = results["center_distance_km"]
-                opt_km = results["optimized_distance_km"]
+            # Validate optimization effectiveness
+            center_km = results["center_distance_km"]
+            opt_km = results["optimized_distance_km"]
 
-                assert center_km > 0, f"{task_name}: Center distance should be positive"
-                assert opt_km > 0, f"{task_name}: Optimized distance should be positive"
-                assert opt_km < center_km, (
-                    f"{task_name}: Optimization should reduce distance"
-                )
+            assert center_km > 0, f"{task_name}: Center distance should be positive"
+            assert opt_km > 0, f"{task_name}: Optimized distance should be positive"
+            assert opt_km < center_km, (
+                f"{task_name}: Optimization should reduce distance"
+            )
 
-                # Validate turnpoint data
-                for i, tp_result in enumerate(results["turnpoints"]):
-                    assert "cumulative_center_km" in tp_result
-                    assert "cumulative_optimized_km" in tp_result
+            # Validate turnpoint data
+            for i, tp_result in enumerate(results["turnpoints"]):
+                assert "cumulative_center_km" in tp_result
+                assert "cumulative_optimized_km" in tp_result
 
-                    # Cumulative distances should be non-decreasing
-                    if i > 0:
-                        prev_tp = results["turnpoints"][i - 1]
-                        assert (
-                            tp_result["cumulative_center_km"]
-                            >= prev_tp["cumulative_center_km"]
-                        )
-                        assert (
-                            tp_result["cumulative_optimized_km"]
-                            >= prev_tp["cumulative_optimized_km"]
-                        )
+                # Cumulative distances should be non-decreasing
+                if i > 0:
+                    prev_tp = results["turnpoints"][i - 1]
+                    assert (
+                        tp_result["cumulative_center_km"]
+                        >= prev_tp["cumulative_center_km"]
+                    )
+                    assert (
+                        tp_result["cumulative_optimized_km"]
+                        >= prev_tp["cumulative_optimized_km"]
+                    )
 
             # Only test first found task to keep test time reasonable
             break
@@ -330,8 +319,7 @@ class TestDistanceComprehensive:
             if "distance_optimized_km" not in ref_meta:
                 continue
 
-            # High precision calculation
-            results = calculate_task_distances(task, angle_step=2)
+            results = calculate_task_distances(task)
 
             ref_opt_km = ref_meta["distance_optimized_km"]
             calc_opt_km = results["optimized_distance_km"]

@@ -33,12 +33,15 @@ and `optimized_route_coordinates` are thin wrappers over it.
 import math
 from collections.abc import Sequence
 
-from .optimization_config import CONVERGENCE_EPSILON_M, get_optimization_config
+from pyproj import Transformer
+
+from .optimization_config import CONVERGENCE_EPSILON_M, DEFAULT_NUM_ITERATIONS
 from .turnpoint import (
     TurnpointGeometry,
     geod_for_earth_model,
     local_tm_transformers,
     plane_optimal_point,
+    snap_to_boundary,
 )
 
 #: A planar circle: (x, y, radius) in the local Transverse Mercator plane.
@@ -47,7 +50,7 @@ PlaneCircle = tuple[float, float, float]
 
 def _plane_circles(
     turnpoints: Sequence[TurnpointGeometry], earth_model: object
-) -> tuple[list[PlaneCircle], object]:
+) -> tuple[list[PlaneCircle], Transformer]:
     """Project turnpoint cylinders into a local Transverse Mercator plane.
 
     The plane is centred on the mean of the turnpoint centers (the task area,
@@ -166,9 +169,7 @@ def _optimize_plane_points(
 def calculate_iteratively_refined_route(
     turnpoints: Sequence[TurnpointGeometry],
     num_iterations: int | None = None,
-    angle_step: int | None = None,
     show_progress: bool = False,
-    beam_width: int | None = None,
     earth_model: object = None,
 ) -> tuple[float, list[tuple[float, float]]]:
     """Calculate the optimized route with the alternating point-circle-point method.
@@ -181,9 +182,7 @@ def calculate_iteratively_refined_route(
     Args:
         turnpoints (Sequence[TurnpointGeometry]): The task turnpoints.
         num_iterations (Optional[int]): Maximum number of alternating sweeps.
-        angle_step (Optional[int]): Deprecated, ignored (kept for API compatibility).
         show_progress (bool): Whether to show progress indicators.
-        beam_width (Optional[int]): Deprecated, ignored (kept for API compatibility).
         earth_model: Earth model selector (``EarthModel`` member, its string
             value, or None). None falls back to the first turnpoint's
             ``earth_model`` attribute, defaulting to WGS84.
@@ -191,7 +190,9 @@ def calculate_iteratively_refined_route(
     Returns:
         Tuple[float, List[Tuple[float, float]]]: Tuple of (optimized_distance_meters, route_coordinates).
     """
-    config = get_optimization_config(angle_step, beam_width, num_iterations)
+    max_sweeps = (
+        num_iterations if num_iterations is not None else DEFAULT_NUM_ITERATIONS
+    )
     if len(turnpoints) < 2:
         return 0.0, [(tp.center[0], tp.center[1]) for tp in turnpoints]
 
@@ -204,13 +205,13 @@ def calculate_iteratively_refined_route(
     circles, to_geo = _plane_circles(turnpoints, earth_model)
     plane_points = _optimize_plane_points(
         circles,
-        max_sweeps=config["num_iterations"],
+        max_sweeps=max_sweeps,
         show_progress=show_progress,
     )
 
     g = geod_for_earth_model(earth_model)
     route: list[tuple[float, float]] = []
-    for i, ((x, y), (cx, cy, radius), tp) in enumerate(
+    for i, ((x, y), (_, _, radius), tp) in enumerate(
         zip(plane_points, circles, turnpoints)
     ):
         if i == 0 or radius <= 0.0:
@@ -220,9 +221,9 @@ def calculate_iteratively_refined_route(
             continue
         # ProjectionCorrection (§7.1.7): re-place the planar solution at
         # exactly radius r on the earth model along the center→point azimuth.
-        azimuth = math.degrees(math.atan2(x - cx, y - cy))
-        lon, lat, _ = g.fwd(tp.center[1], tp.center[0], azimuth, radius)
-        route.append((lat, lon))
+        route.append(
+            snap_to_boundary(to_geo.transform(x, y), tp.center, radius, earth_model)
+        )
 
     distance = 0.0
     for i in range(len(route) - 1):
@@ -237,9 +238,7 @@ def calculate_iteratively_refined_route(
 
 def optimized_distance(
     turnpoints: Sequence[TurnpointGeometry],
-    angle_step: int | None = None,
     show_progress: bool = False,
-    beam_width: int | None = None,
     num_iterations: int | None = None,
     earth_model: object = None,
 ) -> float:
@@ -251,9 +250,7 @@ def optimized_distance(
 
     Args:
         turnpoints: The task turnpoints.
-        angle_step: Deprecated, ignored (kept for API compatibility).
         show_progress: Whether to show progress indicators.
-        beam_width: Deprecated, ignored (kept for API compatibility).
         num_iterations: Maximum number of alternating sweeps.
         earth_model: Earth model selector (None uses the turnpoints' model,
             defaulting to WGS84).
@@ -264,9 +261,7 @@ def optimized_distance(
     distance, _ = calculate_iteratively_refined_route(
         turnpoints,
         num_iterations=num_iterations,
-        angle_step=angle_step,
         show_progress=show_progress,
-        beam_width=beam_width,
         earth_model=earth_model,
     )
     return distance
@@ -274,9 +269,6 @@ def optimized_distance(
 
 def optimized_route_coordinates(
     turnpoints: Sequence[TurnpointGeometry],
-    task_turnpoints: object | None = None,  # Kept for backward compatibility
-    angle_step: int | None = None,
-    beam_width: int | None = None,
     num_iterations: int | None = None,
     earth_model: object = None,
 ) -> list[tuple[float, float]]:
@@ -284,9 +276,6 @@ def optimized_route_coordinates(
 
     Args:
         turnpoints: The task turnpoints.
-        task_turnpoints: Unused; kept for backward compatibility.
-        angle_step: Deprecated, ignored (kept for API compatibility).
-        beam_width: Deprecated, ignored (kept for API compatibility).
         num_iterations: Maximum number of alternating sweeps.
         earth_model: Earth model selector (None uses the turnpoints' model,
             defaulting to WGS84).
@@ -297,9 +286,7 @@ def optimized_route_coordinates(
     _, route_coordinates = calculate_iteratively_refined_route(
         turnpoints,
         num_iterations=num_iterations,
-        angle_step=angle_step,
         show_progress=False,
-        beam_width=beam_width,
         earth_model=earth_model,
     )
     return route_coordinates

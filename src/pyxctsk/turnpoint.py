@@ -24,8 +24,6 @@ from typing import Protocol, runtime_checkable
 from pyproj import CRS, Geod, Transformer
 from scipy.optimize import fminbound
 
-from .optimization_config import DEFAULT_ANGLE_STEP
-
 #: Radius of the FAI sphere earth model in meters (FAI Sporting Code S7F).
 FAI_SPHERE_RADIUS_M = 6_371_000.0
 
@@ -265,6 +263,35 @@ def plane_optimal_point(
     return _plane_pcp_point(prev_point, next_point, center, radius)
 
 
+def snap_to_boundary(
+    point_lonlat: tuple[float, float],
+    center: tuple[float, float],
+    radius: float,
+    earth_model: object = None,
+) -> tuple[float, float]:
+    """Snap a point onto a cylinder boundary (ProjectionCorrection, §7.1.7).
+
+    A point placed in the local Transverse Mercator plane does not sit exactly
+    at radius ``r`` on the earth model; re-place it at exactly ``r`` along the
+    geodesic azimuth from the cylinder center toward it.
+
+    Args:
+        point_lonlat: (lon, lat) of the approximate point (transformer axis
+            order).
+        center: (lat, lon) of the cylinder center.
+        radius: Cylinder radius in meters.
+        earth_model: Earth model selector (see :func:`geod_for_earth_model`).
+
+    Returns:
+        (lat, lon) of the corrected point at exactly ``radius`` meters from
+        the center.
+    """
+    g = geod_for_earth_model(earth_model)
+    azimuth, _, _ = g.inv(center[1], center[0], point_lonlat[0], point_lonlat[1])
+    lon, lat, _ = g.fwd(center[1], center[0], azimuth, radius)
+    return (lat, lon)
+
+
 @runtime_checkable
 class TurnpointGeometry(Protocol):
     """The geometry seam the route optimizer depends on.
@@ -318,39 +345,6 @@ class TaskTurnpoint:
         self.goal_line_length = goal_line_length
         self.earth_model = earth_model
 
-    def perimeter_points(
-        self, angle_step: int = DEFAULT_ANGLE_STEP
-    ) -> list[tuple[float, float]]:
-        """Generate perimeter points around the turnpoint at given angle steps.
-
-        Only cylinder turnpoints have a sampled perimeter. For a goal line
-        (``goal_type == "LINE"``) the orientation depends on the previous point
-        in the route, which is not available here, so a single-element list with
-        the center is returned; use ``optimal_point`` for the goal-line case. A
-        zero-radius cylinder likewise collapses to its center.
-
-        Args:
-            angle_step (int): Angle step in degrees.
-
-        Returns:
-            List[Tuple[float, float]]: List of (lat, lon) tuples on the cylinder
-            perimeter, or ``[center]`` for goal lines and zero-radius cylinders.
-        """
-        if self.goal_type == "LINE":
-            # For goal lines, orientation depends on the previous point in the
-            # route, which is not available here; optimal_point handles that case.
-            return [self.center]
-
-        if self.radius == 0:
-            return [self.center]
-
-        g = geod_for_earth_model(self.earth_model)
-        points = []
-        for azimuth in range(0, 360, angle_step):
-            lon, lat, _ = g.fwd(self.center[1], self.center[0], azimuth, self.radius)
-            points.append((lat, lon))
-        return points
-
     def optimal_point(
         self,
         prev_point: tuple[float, float],
@@ -376,7 +370,7 @@ class TaskTurnpoint:
         if self.radius == 0:
             return self.center
 
-        to_plane, _ = local_tm_transformers(
+        to_plane, to_geo = local_tm_transformers(
             self.center[0], self.center[1], self.earth_model
         )
         cx, cy = to_plane.transform(self.center[1], self.center[0])
@@ -384,13 +378,9 @@ class TaskTurnpoint:
         p2 = to_plane.transform(next_point[1], next_point[0])
 
         x, y = plane_optimal_point(p1, p2, (cx, cy), float(self.radius))
-        # ProjectionCorrection (§7.1.7): express the planar solution as an
-        # azimuth from the center and re-place it at exactly radius r on the
-        # earth model, so the point sits on the true cylinder boundary.
-        azimuth = math.degrees(math.atan2(x - cx, y - cy))
-        g = geod_for_earth_model(self.earth_model)
-        lon, lat, _ = g.fwd(self.center[1], self.center[0], azimuth, self.radius)
-        return (lat, lon)
+        return snap_to_boundary(
+            to_geo.transform(x, y), self.center, self.radius, self.earth_model
+        )
 
     def _find_optimal_goal_line_point(
         self, prev_point: tuple[float, float], next_point: tuple[float, float]

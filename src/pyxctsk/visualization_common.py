@@ -42,7 +42,7 @@ def get_optimized_route_coordinates(task: Task) -> list[tuple[float, float]] | N
         List of (lat, lon) coordinate tuples for the optimized route, or None if not available.
     """
     task_turnpoints = _task_to_turnpoints(task)
-    return optimized_route_coordinates(task_turnpoints, task.turnpoints)
+    return optimized_route_coordinates(task_turnpoints)
 
 
 def get_turnpoint_color_hex(

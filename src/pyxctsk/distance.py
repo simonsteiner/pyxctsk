@@ -16,10 +16,7 @@ main entry points for use by other code and CLI tools.
 # Import all the public API from the refactored modules
 from .optimization_config import (
     CONVERGENCE_EPSILON_M,
-    DEFAULT_ANGLE_STEP,
-    DEFAULT_BEAM_WIDTH,
     DEFAULT_NUM_ITERATIONS,
-    get_optimization_config,
 )
 from .route_optimization import (
     calculate_iteratively_refined_route,
@@ -53,10 +50,7 @@ __all__ = [
     "calculate_sss_info",
     "calculate_optimal_sss_entry_point",
     # Configuration
-    "get_optimization_config",
     "CONVERGENCE_EPSILON_M",
-    "DEFAULT_ANGLE_STEP",
-    "DEFAULT_BEAM_WIDTH",
     "DEFAULT_NUM_ITERATIONS",
     "FAI_SPHERE_RADIUS_M",
     # Advanced functions

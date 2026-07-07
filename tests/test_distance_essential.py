@@ -28,8 +28,7 @@ class TestEssentialDistance:
         """
         task = bevo_task
 
-        # Use fast settings for smoke test
-        results = calculate_task_distances(task, angle_step=30)
+        results = calculate_task_distances(task)
 
         # Basic sanity checks - all distances should be positive
         assert results["center_distance_km"] > 0, "Center distance should be positive"

@@ -50,7 +50,7 @@ The CLI entry point is `pyxctsk` (`pyxctsk.cli:main`), e.g. `pyxctsk convert tas
 - `route_optimization.py` — shortest-path through turnpoint cylinders per FAI S7F §7 via the Ding–Xie–Jiang alternating point-circle-point method (`optimized_distance`, `calculate_iteratively_refined_route`): optimize in a local TM plane, converge at ε = 0.1 m, snap points onto true cylinder boundaries, sum geodesic legs. Touching semantics: every cylinder boundary must be touched in order (concentric turnpoints force out-and-back legs, matching XCTrack).
 - `task_distances.py` — per-leg and cumulative task distances
 - `sss_calculations.py` — Start-of-Speed-Section entry point / info
-- `optimization_config.py` — tunable params (`CONVERGENCE_EPSILON_M`, `DEFAULT_NUM_ITERATIONS` max sweeps; `DEFAULT_ANGLE_STEP` for perimeter sampling, `DEFAULT_BEAM_WIDTH` deprecated/unused)
+- `optimization_config.py` — tunable params (`CONVERGENCE_EPSILON_M`, `DEFAULT_NUM_ITERATIONS` max sweeps)
 
 Distances honor the task's `earthModel` field (WGS84 ellipsoid default, FAI sphere R = 6371 km) via `pyproj`; optimization uses `scipy`.
 
