@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [v0.5.0] - 2026-07-07
+
 ### Changed
 
 - **Route optimization is now faithful to FAI Sporting Code S7F 2026 §7** (see `docs/Audit-of-pyxctsk-Route-Optimization.md`). The dynamic-programming + beam-search heuristic in `route_optimization.py` was replaced by the algorithm the spec cites — Ding, Xie & Jiang, *"An Efficient Algorithm for Touring n Circles"* (MATEC Web of Conf. 232, 03027, 2018): one route point per turnpoint, alternately updating odd/even points with the exact planar GetOptPi solution (crossing vs. reflection case), iterated until the total path length changes by less than ε = 0.1 m (§7.1.3). Optimization runs in a localized Transverse Mercator plane centred on the task area (§7.1.2); the converged points are snapped back onto the true cylinder boundaries (ProjectionCorrection, §7.1.7) before legs are summed geodesically. The optimizer is both more accurate (true optimum instead of a heuristic) and much faster.
