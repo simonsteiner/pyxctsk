@@ -17,6 +17,7 @@ import json
 import statistics
 import sys
 import time
+from importlib.util import find_spec
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
@@ -59,23 +60,17 @@ except ImportError as e:
 # --- Imports for Gemini and ChatGPT ---
 path_opt_path = Path(__file__).parent / "path_opt"
 sys.path.insert(0, str(path_opt_path))
-try:
-    from path_opt.pg_path_opt_chatgpt import Gate, optimize_path  # type: ignore
+# Only probe for availability here; get_chatgpt_result and get_gemini_result import
+# the symbols they need locally, since the two modules export clashing names.
+CHATGPT_AVAILABLE = find_spec("path_opt.pg_path_opt_chatgpt") is not None
+print(
+    f"ChatGPT path optimization {'available' if CHATGPT_AVAILABLE else 'not available'}."
+)
 
-    CHATGPT_AVAILABLE = True
-    print("ChatGPT path optimization available.")
-except ImportError as e:
-    CHATGPT_AVAILABLE = False
-    print(f"ChatGPT path optimization not available: {e}")
-
-try:
-    from path_opt.pg_path_opt_gemini import Gate, Point, optimize_path  # type: ignore
-
-    GEMINI_AVAILABLE = True
-    print("Gemini path optimization available.")
-except ImportError as e:
-    GEMINI_AVAILABLE = False
-    print(f"Gemini path optimization not available: {e}")
+GEMINI_AVAILABLE = find_spec("path_opt.pg_path_opt_gemini") is not None
+print(
+    f"Gemini path optimization {'available' if GEMINI_AVAILABLE else 'not available'}."
+)
 
 
 # --- Data Loading ---

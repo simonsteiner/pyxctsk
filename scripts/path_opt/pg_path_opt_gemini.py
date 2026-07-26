@@ -71,11 +71,24 @@ class GeodesicTools:
         """
         Solves the "crossing situation" by finding the intersection of the geodesic
         p_prev -> p_next and the gate's circle that is closer to p_prev.
+
+        Along the geodesic, f(s) = dist(s, center) - radius falls to a single minimum
+        at the closest approach and rises again, so the bracket handed to the root
+        finder depends on which side of the boundary p_prev sits:
+
+        - p_prev inside the circle: the only crossing is the exit point, bracketed by
+          [0, s12] since f(0) <= 0 <= f(s12).
+        - p_prev outside: the entry crossing is the one nearer p_prev, bracketed by
+          [0, s_closest] where f dips below zero.
+
+        If the geodesic merely grazes the circle there is no sign change to bracket,
+        and the closest approach is already the best point on the boundary.
         """
         geodesic_line = self.geod.Inverse(
             p_prev.lat, p_prev.lon, p_next.lat, p_next.lon
         )
         azi1 = geodesic_line["azi1"]
+        s12 = float(geodesic_line["s12"])
 
         # Define a function whose root is the intersection distance
         def objective_func(dist_from_prev: float) -> float:
@@ -86,21 +99,27 @@ class GeodesicTools:
                 gate.radius
             )
 
-        # Find the point of closest approach on the geodesic to the circle center
-        # This helps establish a search bracket for the root-finding algorithm
-        def closest_approach_objective(dist_from_prev: float) -> float:
-            p_on_geodesic = self.get_point_on_azimuth(p_prev, azi1, dist_from_prev)
-            return self.get_distance(p_on_geodesic, gate.center)
-
-        res = minimize_scalar(closest_approach_objective)
+        # Find the point of closest approach on the geodesic to the circle center.
+        # Bounding the search to the segment keeps s_closest physically meaningful;
+        # an unbounded search can settle outside [0, s12] entirely.
+        res = minimize_scalar(objective_func, bounds=(0.0, s12), method="bounded")
         s_closest = float(getattr(res, "x", 0.0))
 
-        # The two intersection points are on either side of the closest point.
-        # We find the one closer to p_prev (smaller s value).
-        s_root = brentq(objective_func, a=0, b=s_closest)
-        # Defensive: ensure s_root is float (brentq always returns float)
-        if not isinstance(s_root, float):
-            raise TypeError("brentq did not return a float")
+        f_start = objective_func(0.0)
+        f_closest = objective_func(s_closest)
+        f_end = objective_func(s12)
+
+        if f_start <= 0.0 <= f_end:
+            # p_prev lies inside the gate: the single crossing is the exit point.
+            a, b = 0.0, s12
+        elif f_closest < 0.0 < f_start:
+            # p_prev lies outside: take the entry crossing, nearest to p_prev.
+            a, b = 0.0, s_closest
+        else:
+            # Tangent contact, so there is no sign change to bracket.
+            return self.get_point_on_azimuth(p_prev, azi1, s_closest)
+
+        s_root = float(brentq(objective_func, a=a, b=b))
         return self.get_point_on_azimuth(p_prev, azi1, s_root)
 
     def _get_optimal_point(self, p_prev: Point, p_next: Point, gate: Gate) -> Point:
