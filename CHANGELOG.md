@@ -2,6 +2,42 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+## [v0.5.0] - 2026-07-07
+
+### Changed
+
+- **Route optimization is now faithful to FAI Sporting Code S7F 2026 §7** (see `docs/Audit-of-pyxctsk-Route-Optimization.md`). The dynamic-programming + beam-search heuristic in `route_optimization.py` was replaced by the algorithm the spec cites — Ding, Xie & Jiang, *"An Efficient Algorithm for Touring n Circles"* (MATEC Web of Conf. 232, 03027, 2018): one route point per turnpoint, alternately updating odd/even points with the exact planar GetOptPi solution (crossing vs. reflection case), iterated until the total path length changes by less than ε = 0.1 m (§7.1.3). Optimization runs in a localized Transverse Mercator plane centred on the task area (§7.1.2); the converged points are snapped back onto the true cylinder boundaries (ProjectionCorrection, §7.1.7) before legs are summed geodesically. The optimizer is both more accurate (true optimum instead of a heuristic) and much faster.
+- **The "crossing" case is now handled** (Ding et al. Theorem 1): when the previous or next route point lies inside a cylinder, or the leg passes through it, the optimal point is the segment–circle intersection — no spurious detours for nested/overlapping cylinders or a takeoff inside the SSS. Concentric turnpoints of different radii keep their mandatory out-and-back legs (touching semantics, matching XCTrack's displayed distances, e.g. `task_nohe`).
+- **The `earthModel` task field is honored**: distances and boundary points are computed on the WGS84 ellipsoid (default) or on the FAI sphere (great circles, R = 6 371 000 m) when the task specifies `FAI_SPHERE`. New helpers `geodesic_distance`, `geod_for_earth_model` and constant `FAI_SPHERE_RADIUS_M` in `turnpoint.py`; `TaskTurnpoint` gained an `earth_model` attribute that `_task_to_turnpoints` fills from the task.
+- `TaskTurnpoint.optimal_point` places points via the planar GetOptPi in a local Transverse Mercator plane and snaps them to exactly radius *r* on the earth model (previously: scipy `fminbound` over the azimuth, which could stall in the 0°/360° wrap and returned the cylinder center when the neighbours nearly coincided). `calculate_optimal_sss_entry_point` now returns this exact point instead of the nearest of the 10°-sampled perimeter points.
+- `optimized_distance`, `optimized_route_coordinates` and `calculate_iteratively_refined_route` gained an `earth_model` parameter; `num_iterations` now bounds the alternating sweeps (default `DEFAULT_NUM_ITERATIONS = 100`; convergence normally stops after a handful). New `CONVERGENCE_EPSILON_M = 0.1` in `optimization_config.py`.
+
+### Removed
+
+- **Breaking (library API):** all parameters of the removed beam-search optimizer were dropped rather than kept as no-ops: the `angle_step` and `beam_width` parameters of `optimized_distance`, `optimized_route_coordinates`, `calculate_iteratively_refined_route`, `calculate_task_distances` and `calculate_cumulative_distances`; the `angle_step` parameter of `calculate_optimal_sss_entry_point` and `calculate_sss_info`; and the unused `task_turnpoints` back-compat parameter of `optimized_route_coordinates`. The `calculate_task_distances` result dictionary no longer contains the `optimization_angle_step` and `beam_width` keys.
+- **Breaking (library API):** `optimization_config.py` lost `get_optimization_config`, `DEFAULT_BEAM_WIDTH` and `DEFAULT_ANGLE_STEP` (it now holds only `CONVERGENCE_EPSILON_M` and `DEFAULT_NUM_ITERATIONS`, both re-exported from `pyxctsk.distance`), and `TaskTurnpoint.perimeter_points` was removed — the exact `optimal_point` replaced its last consumer (SSS entry points); cylinder outlines for visualization are drawn in `visualization_common.py`.
+- The private beam-search internals of `route_optimization.py` (`_run_dp`, `_init_dp_structure`, `_process_dp_stage`, `_backtrack_path`, `_center_lookahead`, `_route_lookahead`) were removed with the algorithm swap. The `TurnpointGeometry` protocol now names the attributes the optimizer needs (`center`, `radius`, `goal_type`) instead of an `optimal_point` method.
+- **Breaking (library API):** removed three dead, duplicated methods/helpers from `turnpoint.py`: `TaskTurnpoint.optimized_perimeter_points`, `TaskTurnpoint.goal_line_points`, and the module-level `_get_optimized_perimeter_points`. They duplicated the cylinder/goal-line/center dispatch already owned by `TaskTurnpoint.optimal_point` and were unused within the package. Callers should use `TaskTurnpoint.optimal_point` (optimal crossing point), which is retained. (`TaskTurnpoint.perimeter_points` was suggested as an alternative here at the time, but it has since been removed as well — see the entry above.)
+
+## [v0.4.1] - 2026-06-29
+
+### Added
+
+- The release workflows now create a GitHub Release automatically, taking the notes from the matching `CHANGELOG.md` section (via `scripts/changelog_extract.py`) and attaching the built wheel and sdist.
+
+## [v0.4.0] - 2026-06-30
+
+### Changed
+
+- Migrated project and dependency management to [uv](https://docs.astral.sh/uv/): added `uv.lock` and `.python-version`, moved dev dependencies to a `[dependency-groups]` table, and switched the publish workflow to `uv build`/`uv publish`.
+- Raised the minimum Python version to 3.11 (`scipy>=1.16` already required it).
+- Replaced the QR image decoder `pyzbar` with [`zxing-cpp`](https://github.com/zxing-cpp/zxing-cpp), which ships self-contained binary wheels — QR image tests no longer need the system `zbar` library and now run by default.
+- `pyxctsk.__version__` is now read from package metadata so `pyproject.toml` is the single source of truth.
+- Replaced the black + isort + flake8 + pydocstyle toolchain with [ruff](https://docs.astral.sh/ruff/), and switched git hook management from pre-commit to [lefthook](https://github.com/evilmartians/lefthook).
+- Automated releases: a `scripts/release.sh` helper and a manually-triggered `Release` GitHub Actions workflow bump the version, update the changelog, tag, and publish; the `Publish` workflow now runs the test/lint/type gate before uploading to PyPI.
+
 ## [v0.3.0] - 2025-07-21
 
 ### Added

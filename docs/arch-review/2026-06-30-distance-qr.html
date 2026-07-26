@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Architecture review — pyxctsk</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+    </script>
+    <style>
+      .seam { stroke-dasharray: 5 4; }
+      .deep { background: linear-gradient(135deg, #0f172a, #1e293b); }
+      .mod { font-size: 0.62rem; letter-spacing: 0.08em; }
+      .dead { background-image: repeating-linear-gradient(45deg, #fecaca, #fecaca 6px, #fee2e2 6px, #fee2e2 12px); }
+      pre.mermaid { background: transparent; }
+    </style>
+  </head>
+  <body class="bg-stone-50 text-slate-900 font-sans">
+    <main class="max-w-5xl mx-auto px-6 py-12 space-y-12">
+
+      <header class="space-y-4 border-b border-slate-200 pb-8">
+        <h1 class="text-4xl font-serif tracking-tight">Architecture review — <span class="text-indigo-700">pyxctsk</span></h1>
+        <p class="text-slate-500 text-sm">2026-06-30 · deepening opportunities in the distance &amp; QR subsystems</p>
+        <div class="flex flex-wrap gap-4 text-xs text-slate-600 pt-2">
+          <span class="flex items-center gap-2"><span class="inline-block w-5 h-4 border-2 border-slate-700 rounded-sm"></span> module</span>
+          <span class="flex items-center gap-2"><svg width="28" height="8"><line x1="0" y1="4" x2="28" y2="4" stroke="#475569" stroke-width="2" class="seam"/></svg> seam</span>
+          <span class="flex items-center gap-2"><svg width="28" height="8"><line x1="0" y1="4" x2="28" y2="4" stroke="#dc2626" stroke-width="2"/></svg> leakage</span>
+          <span class="flex items-center gap-2"><span class="inline-block w-5 h-4 deep rounded-sm"></span> deep module</span>
+          <span class="flex items-center gap-2"><span class="inline-block w-5 h-4 dead rounded-sm border border-red-300"></span> dead / pass-through</span>
+        </div>
+      </header>
+
+      <section id="candidates" class="space-y-14">
+
+        <!-- ============ CANDIDATE A ============ -->
+        <article id="cand-dp" class="space-y-6">
+          <div class="flex items-center gap-3 flex-wrap">
+            <h2 class="text-2xl font-serif">A. Collapse the duplicated DP machinery</h2>
+            <span class="text-xs font-semibold px-2 py-1 rounded-full bg-emerald-100 text-emerald-800">Strong</span>
+            <span class="text-xs px-2 py-1 rounded-full bg-slate-100 text-slate-600">in-process</span>
+          </div>
+          <p class="font-mono text-sm text-slate-500">src/pyxctsk/route_optimization.py</p>
+
+          <div class="grid md:grid-cols-2 gap-4">
+            <!-- BEFORE -->
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <p class="mod uppercase text-slate-400 mb-3">Before — two parallel pipelines</p>
+              <div class="space-y-2 text-xs">
+                <div class="grid grid-cols-2 gap-2">
+                  <div class="border border-slate-300 rounded p-2 text-center">_process_dp_stage</div>
+                  <div class="border border-slate-300 rounded p-2 text-center">_process_dp_stage_<br>with_refined_target</div>
+                </div>
+                <p class="text-center text-rose-600 text-[0.65rem]">↑ identical but for <code>next_center</code> selection · beam-trim copy-pasted · dead code after <code>return</code></p>
+                <div class="grid grid-cols-2 gap-2 pt-1">
+                  <div class="border border-slate-300 rounded p-2 text-center">_compute_optimal_<br>route_with_beam_search</div>
+                  <div class="border border-slate-300 rounded p-2 text-center">_compute_optimal_<br>route_with_refined_targets</div>
+                </div>
+                <p class="text-center text-rose-600 text-[0.65rem]">↑ init dp · forward loop · pick best · backtrack — twice</p>
+                <div class="dead border border-red-300 rounded p-2 text-center">_create_refined_turnpoints<br><span class="text-[0.6rem] text-red-700">rebuilds turnpoints, strips goal_type</span></div>
+              </div>
+            </div>
+            <!-- AFTER -->
+            <div class="rounded-lg border border-slate-200 deep text-slate-100 p-4">
+              <p class="mod uppercase text-slate-400 mb-3">After — one parameterized routine</p>
+              <div class="space-y-3 text-xs">
+                <div class="border-2 border-emerald-400/70 rounded p-3 text-center bg-slate-900/40">
+                  <p class="font-semibold text-emerald-300">_run_dp(turnpoints, lookahead, beam_width)</p>
+                  <p class="text-[0.65rem] text-slate-400 mt-1">init · forward pass · pick best · backtrack</p>
+                </div>
+                <p class="text-center text-slate-400 text-[0.65rem]">look-ahead target is a strategy:</p>
+                <div class="grid grid-cols-2 gap-2">
+                  <div class="border border-slate-600 rounded p-2 text-center text-slate-300">centers<br><span class="text-[0.6rem] text-slate-500">pass 1</span></div>
+                  <div class="border border-slate-600 rounded p-2 text-center text-slate-300">prev route<br><span class="text-[0.6rem] text-slate-500">refine</span></div>
+                </div>
+                <p class="text-center text-emerald-300/80 text-[0.6rem] pt-1">_create_refined_turnpoints deleted</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid md:grid-cols-2 gap-x-8 gap-y-3 text-sm">
+            <div>
+              <p class="font-semibold text-slate-700">Problem</p>
+              <p class="text-slate-600">Two copies of the DP, kept in sync by hand; the "refinement" signal travels through a pass-through that silently strips <code>goal_type</code>.</p>
+            </div>
+            <div>
+              <p class="font-semibold text-slate-700">Solution</p>
+              <p class="text-slate-600">One DP routine that takes the look-ahead target as a parameter; delete the pass-through and the unreachable code.</p>
+            </div>
+          </div>
+          <ul class="grid sm:grid-cols-2 gap-x-8 gap-y-1 text-sm text-slate-700 list-disc pl-5">
+            <li>locality: one DP, one place to test</li>
+            <li>leverage: refinement is one argument</li>
+            <li>delete ~120 lines of duplication</li>
+            <li>kills latent goal_type-stripping bug</li>
+          </ul>
+        </article>
+
+        <!-- ============ CANDIDATE B ============ -->
+        <article id="cand-dead" class="space-y-6">
+          <div class="flex items-center gap-3 flex-wrap">
+            <h2 class="text-2xl font-serif">B. Delete the dead perimeter layer in <code class="text-xl">turnpoint.py</code></h2>
+            <span class="text-xs font-semibold px-2 py-1 rounded-full bg-emerald-100 text-emerald-800">Strong</span>
+            <span class="text-xs px-2 py-1 rounded-full bg-slate-100 text-slate-600">deletion test</span>
+          </div>
+          <p class="font-mono text-sm text-slate-500">src/pyxctsk/turnpoint.py</p>
+
+          <div class="grid md:grid-cols-2 gap-4">
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <p class="mod uppercase text-slate-400 mb-3">Before — what callers actually reach</p>
+              <div class="space-y-2 text-xs">
+                <div class="border-2 border-emerald-500 rounded p-2 text-center">optimal_point() <span class="text-[0.6rem] text-emerald-700">← used by optimizer (via seam)</span></div>
+                <div class="border-2 border-emerald-500 rounded p-2 text-center">perimeter_points() <span class="text-[0.6rem] text-emerald-700">← used by SSS</span></div>
+                <div class="dead border border-red-300 rounded p-2 text-center">optimized_perimeter_points() <span class="text-[0.6rem] text-red-700">unreferenced</span></div>
+                <div class="dead border border-red-300 rounded p-2 text-center">_get_optimized_perimeter_points() <span class="text-[0.6rem] text-red-700">only the dead method calls it</span></div>
+                <div class="dead border border-red-300 rounded p-2 text-center">goal_line_points() <span class="text-[0.6rem] text-red-700">referenced only in a comment</span></div>
+              </div>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <p class="mod uppercase text-slate-400 mb-3">After — interface shrinks to what's used</p>
+              <div class="space-y-2 text-xs">
+                <div class="border-2 border-emerald-500 rounded p-2 text-center">optimal_point()</div>
+                <div class="border-2 border-emerald-500 rounded p-2 text-center">perimeter_points()</div>
+                <div class="h-8 flex items-center justify-center text-slate-400 text-[0.7rem] italic">— three modules removed —</div>
+                <p class="text-center text-emerald-700 text-[0.7rem] pt-2">smaller interface · no behaviour lost</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid md:grid-cols-2 gap-x-8 gap-y-3 text-sm">
+            <div>
+              <p class="font-semibold text-slate-700">Problem</p>
+              <p class="text-slate-600">Three functions duplicate the cylinder/goal/center dispatch that <code>optimal_point</code> already owns — and nothing calls them.</p>
+            </div>
+            <div>
+              <p class="font-semibold text-slate-700">Solution</p>
+              <p class="text-slate-600">Delete <code>optimized_perimeter_points</code>, <code>_get_optimized_perimeter_points</code>, <code>goal_line_points</code>.</p>
+            </div>
+          </div>
+          <ul class="grid sm:grid-cols-2 gap-x-8 gap-y-1 text-sm text-slate-700 list-disc pl-5">
+            <li>deletion test: complexity vanishes, nothing reappears</li>
+            <li>interface shrinks; one dispatch survives</li>
+            <li>removes a second copy of goal-line math (see C)</li>
+            <li>less surface for the next reader to map</li>
+          </ul>
+        </article>
+
+        <!-- ============ CANDIDATE C ============ -->
+        <article id="cand-goalline" class="space-y-6">
+          <div class="flex items-center gap-3 flex-wrap">
+            <h2 class="text-2xl font-serif">C. Reunite goal-line geometry behind <code class="text-xl">GoalLine</code></h2>
+            <span class="text-xs font-semibold px-2 py-1 rounded-full bg-amber-100 text-amber-800">Worth exploring</span>
+            <span class="text-xs px-2 py-1 rounded-full bg-slate-100 text-slate-600">leakage</span>
+          </div>
+          <p class="font-mono text-sm text-slate-500">src/pyxctsk/turnpoint.py · src/pyxctsk/goal_line.py</p>
+
+          <div class="rounded-lg border border-slate-200 bg-white p-4">
+            <p class="mod uppercase text-slate-400 mb-2">Before — goal-line rules live in two places</p>
+            <pre class="mermaid">
+flowchart LR
+  subgraph gl[goal_line.py]
+    GL["GoalLine&nbsp;(deep)\nendpoints · control_zone\n'single source' per docstring"]
+  end
+  subgraph tp[turnpoint.py]
+    F["_find_optimal_goal_line_point\nre-derives azimuth + endpoints"]
+  end
+  KML[kml.py] --> GL
+  GEO[geojson.py] --> GL
+  TD[task_distances.py] --> GL
+  OPT["route optimizer"] --> F
+  F -.duplicate math.-> GL
+  classDef leak stroke:#dc2626,stroke-width:2px,fill:#fef2f2;
+  class F leak
+            </pre>
+          </div>
+          <div class="rounded-lg border border-slate-200 bg-white p-4">
+            <p class="mod uppercase text-slate-400 mb-2">After — one module owns the endpoint math</p>
+            <pre class="mermaid">
+flowchart LR
+  subgraph gl[goal_line.py]
+    GL["GoalLine&nbsp;(deep)\nendpoints · control_zone · optimal crossing"]
+  end
+  KML[kml.py] --> GL
+  GEO[geojson.py] --> GL
+  TD[task_distances.py] --> GL
+  OPT["route optimizer"] --> GL
+  classDef deep fill:#0f172a,color:#fff,stroke:#10b981,stroke-width:2px;
+  class GL deep
+            </pre>
+          </div>
+
+          <div class="grid md:grid-cols-2 gap-x-8 gap-y-3 text-sm">
+            <div>
+              <p class="font-semibold text-slate-700">Problem</p>
+              <p class="text-slate-600"><code>turnpoint.py</code> re-derives perpendicular azimuth and endpoints that <code>GoalLine</code> already owns — the docstring's "single source" claim is false.</p>
+            </div>
+            <div>
+              <p class="font-semibold text-slate-700">Solution</p>
+              <p class="text-slate-600">Move the optimal-crossing computation onto <code>GoalLine</code> (it already has <code>endpoints()</code>); have the turnpoint call through it.</p>
+            </div>
+          </div>
+          <ul class="grid sm:grid-cols-2 gap-x-8 gap-y-1 text-sm text-slate-700 list-disc pl-5">
+            <li>locality: goal-line rules in one module</li>
+            <li>docstring's claim becomes true</li>
+            <li>one endpoint primitive, one test surface</li>
+            <li>pairs naturally with B</li>
+          </ul>
+          <div class="bg-amber-50 border border-amber-200 rounded p-3 text-sm text-amber-900">
+            Note: the turnpoint needs a goal line oriented to an arbitrary <em>prev_point</em>, not the task's previous turnpoint. <code>GoalLine</code> currently binds approach to a fixed turnpoint — the deepening must let the approach vary. Worth grilling the interface.
+          </div>
+        </article>
+
+        <!-- ============ CANDIDATE D ============ -->
+        <article id="cand-enums" class="space-y-6">
+          <div class="flex items-center gap-3 flex-wrap">
+            <h2 class="text-2xl font-serif">D. Table-drive the QR ↔ domain enum translation</h2>
+            <span class="text-xs font-semibold px-2 py-1 rounded-full bg-amber-100 text-amber-800">Worth exploring</span>
+            <span class="text-xs px-2 py-1 rounded-full bg-slate-100 text-slate-600">in-process</span>
+          </div>
+          <p class="font-mono text-sm text-slate-500">src/pyxctsk/qrcode_task.py (from_task / to_task)</p>
+
+          <div class="grid md:grid-cols-2 gap-4">
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <p class="mod uppercase text-slate-400 mb-3">Before — if/elif chains, both directions</p>
+              <div class="space-y-1.5">
+                <!-- mass diagram: interface tiny, impl huge for the shallow mapping -->
+                <div class="flex gap-1 items-end h-40">
+                  <div class="flex flex-col items-center justify-end">
+                    <div class="w-16 bg-slate-300 rounded-t" style="height:18px"></div>
+                    <span class="mod text-slate-400 mt-1">interface</span>
+                  </div>
+                  <div class="flex flex-col items-center justify-end">
+                    <div class="w-16 bg-rose-300 rounded-t" style="height:150px"></div>
+                    <span class="mod text-slate-400 mt-1">impl</span>
+                  </div>
+                  <div class="pl-3 text-[0.7rem] text-slate-500 self-end pb-6 space-y-0.5">
+                    <p>TaskType · EarthModel</p>
+                    <p>GoalType · SSSType</p>
+                    <p>TurnpointType · Direction</p>
+                    <p class="text-rose-600">6 pairs × 2 directions</p>
+                  </div>
+                </div>
+                <p class="text-[0.7rem] text-slate-500">A new enum value touches up to four if/elif blocks.</p>
+              </div>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <p class="mod uppercase text-slate-400 mb-3">After — one bidirectional map per pair</p>
+              <div class="space-y-1.5">
+                <div class="flex gap-1 items-end h-40">
+                  <div class="flex flex-col items-center justify-end">
+                    <div class="w-16 bg-slate-300 rounded-t" style="height:18px"></div>
+                    <span class="mod text-slate-400 mt-1">interface</span>
+                  </div>
+                  <div class="flex flex-col items-center justify-end">
+                    <div class="w-16 bg-emerald-300 rounded-t" style="height:46px"></div>
+                    <span class="mod text-slate-400 mt-1">impl</span>
+                  </div>
+                  <div class="pl-3 text-[0.7rem] text-slate-500 self-end pb-2">
+                    <code class="block">to_qr / from_qr</code>
+                    <p class="mt-1">one mapping table,<br>read both ways</p>
+                    <p class="text-emerald-700 mt-1">add a value = one row</p>
+                  </div>
+                </div>
+                <p class="text-[0.7rem] text-slate-500">Field ordering / null handling stays — only the enum mapping moves.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid md:grid-cols-2 gap-x-8 gap-y-3 text-sm">
+            <div>
+              <p class="font-semibold text-slate-700">Problem</p>
+              <p class="text-slate-600">Six enum pairs are hand-mapped with if/elif in both directions across <code>from_task</code> and <code>to_task</code> — a shallow mapping spread thin.</p>
+            </div>
+            <div>
+              <p class="font-semibold text-slate-700">Solution</p>
+              <p class="text-slate-600">One small bidirectional table per enum pair; a tiny <code>convert</code> reads it both ways. Leave the ordering logic alone.</p>
+            </div>
+          </div>
+          <ul class="grid sm:grid-cols-2 gap-x-8 gap-y-1 text-sm text-slate-700 list-disc pl-5">
+            <li>locality: each pair defined once</li>
+            <li>add an enum value in one row</li>
+            <li>round-trip becomes table-symmetric</li>
+            <li>scope tight: mapping only, not ordering</li>
+          </ul>
+        </article>
+
+      </section>
+
+      <!-- ============ TOP RECOMMENDATION ============ -->
+      <section id="top-recommendation" class="border-t border-slate-200 pt-10">
+        <div class="rounded-xl deep text-slate-100 p-8 space-y-3">
+          <p class="mod uppercase text-emerald-300">Top recommendation</p>
+          <h2 class="text-2xl font-serif">Start with <a href="#cand-dp" class="underline decoration-emerald-400 underline-offset-4">A — collapse the DP machinery</a>.</h2>
+          <p class="text-slate-300 text-sm max-w-2xl">It is the deepest friction and the most leverage: two hand-synced copies become one parameterized routine, the pass-through that strips <code>goal_type</code> disappears, and the optimizer gains one clear test surface. Do <a href="#cand-dead" class="underline decoration-emerald-400 underline-offset-4">B</a> first as a free warm-up — it is pure deletion — then <a href="#cand-goalline" class="underline decoration-emerald-400 underline-offset-4">C</a> follows naturally since B removes one of the two goal-line copies.</p>
+        </div>
+      </section>
+
+    </main>
+  </body>
+</html>

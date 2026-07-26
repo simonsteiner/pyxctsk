@@ -23,7 +23,7 @@ Usage examples:
     python extract_qr_from_html.py downloaded_tasks/html/*.html -v
 
 Prerequisites:
-    pip install opencv-python pyzbar cairosvg
+    pip install opencv-python zxing-cpp cairosvg
 """
 
 import argparse
@@ -35,11 +35,11 @@ from typing import List, Optional
 try:
     import cv2
     import numpy as np
+    import zxingcpp
     from cairosvg import svg2png
-    from pyzbar import pyzbar
 except ImportError as e:
     print(f"Required package not installed: {e}")
-    print("Please install with: pip install opencv-python pyzbar cairosvg")
+    print("Please install with: pip install opencv-python zxing-cpp cairosvg")
     exit(1)
 
 
@@ -119,11 +119,12 @@ def decode_qr_code(image: np.ndarray) -> List[str]:
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
     # Detect and decode QR codes
-    decoded_objects = pyzbar.decode(gray)
+    decoded_objects = zxingcpp.read_barcodes(
+        gray, formats=zxingcpp.BarcodeFormat.QRCode
+    )
 
     for obj in decoded_objects:
-        qr_data = obj.data.decode("utf-8")
-        qr_codes.append(qr_data)
+        qr_codes.append(obj.text)
 
     return qr_codes
 
@@ -160,7 +161,7 @@ def process_html_file(html_file: Path, output_dir: Optional[Path] = None) -> Lis
     all_qr_codes = []
 
     for i, base64_svg in enumerate(base64_svgs):
-        print(f"Processing SVG {i+1}/{len(base64_svgs)}")
+        print(f"Processing SVG {i + 1}/{len(base64_svgs)}")
 
         # Decode base64 SVG
         svg_data = decode_base64_svg(base64_svg)
@@ -175,7 +176,7 @@ def process_html_file(html_file: Path, output_dir: Optional[Path] = None) -> Lis
         # Save intermediate PNG if output directory is specified
         if output_dir:
             output_dir.mkdir(parents=True, exist_ok=True)
-            png_file = output_dir / f"{html_file.stem}_svg_{i+1}.png"
+            png_file = output_dir / f"{html_file.stem}_svg_{i + 1}.png"
             cv2.imwrite(str(png_file), image)
             print(f"Saved PNG: {png_file}")
 

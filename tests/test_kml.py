@@ -1,5 +1,4 @@
-"""
-Unit tests for KML export functionality in pyxctsk.
+"""Unit tests for KML export functionality in pyxctsk.
 
 This module verifies:
 - Correct KML structure and XML validity for exported tasks

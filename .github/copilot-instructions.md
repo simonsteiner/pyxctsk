@@ -66,14 +66,14 @@
 - Visual outputs (e.g., generated QR code images) are saved to `tests/data/visual_output/` during testing.
 
 ## Code Quality
-- Pre-commit hooks run: flake8, mypy, isort, black, pydocstyle
-- Run manually: `.venv/bin/pre-commit run --all-files`
+- Git hooks (via lefthook) run: ruff check, ruff format, mypy, cspell
+- Run manually: `uv run lefthook run pre-commit`
 - Strict mypy type checking enforced
 
 ## Key Integration Points
 - CLI entry point in `cli.py` with Click command structure
 - QR code generation requires Pillow and qrcode libraries
-- QR code parsing requires pyzbar library
+- QR code parsing requires the zxing-cpp library
 - Distance calculations use geopy, pyproj and scipy
         
 # Docstring Requirements

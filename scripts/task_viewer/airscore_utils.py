@@ -312,7 +312,7 @@ def convert_xctrack_to_airscore_turnpoints(task) -> List[Turnpoint]:
             shape=shape,
             how=how,
             altitude=tp.waypoint.altitude if hasattr(tp.waypoint, "altitude") else None,
-            name=tp.waypoint.name if hasattr(tp.waypoint, "name") else f"TP{i+1}",
+            name=tp.waypoint.name if hasattr(tp.waypoint, "name") else f"TP{i + 1}",
         )
         airscore_tps.append(airscore_tp)
 
@@ -378,7 +378,7 @@ def calculate_airscore_distances(task) -> Dict[str, Any]:
         turnpoint_results.append(
             {
                 "index": i,
-                "name": tp.name if hasattr(tp, "name") else f"TP{i+1}",
+                "name": tp.name if hasattr(tp, "name") else f"TP{i + 1}",
                 "type": tp.type,
                 "radius": tp.radius,
                 "how": tp.how,
@@ -432,7 +432,7 @@ def generate_airscore_geojson(task, airscore_results: Dict) -> Dict:
             },
             "properties": {
                 "name": (
-                    tp.waypoint.name if hasattr(tp.waypoint, "name") else f"TP{i+1}"
+                    tp.waypoint.name if hasattr(tp.waypoint, "name") else f"TP{i + 1}"
                 ),
                 "type": "cylinder",
                 "radius": tp.radius,

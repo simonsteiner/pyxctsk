@@ -28,12 +28,14 @@ The library implements the full XCTrack Competition Interfaces specification, en
 
 - **Pillow**: Image processing for QR code generation and parsing
 - **qrcode**: QR code generation
-- **pyzbar**: QR code parsing from images
+- **zxing-cpp**: QR code parsing from images (ships binary wheels; no system library needed)
 
 ### Development
 
 - **pytest**: Testing framework
-- **black**, **flake8**, **isort**, **mypy**: Code quality and formatting tools
+- **ruff**: Linting and formatting
+- **mypy**: Static type checking
+- **lefthook**: Git hook manager
 
 ## Project Structure
 
@@ -70,42 +72,44 @@ pip install pyxctsk
 
 ### Development Installation
 
+This project uses [uv](https://docs.astral.sh/uv/) for dependency management.
+
 ```bash
 git clone https://github.com/simonsteiner/pyxctsk.git
 cd pyxctsk
 
-# Create and activate virtual environment
-python3 -m venv .venv
-# (Optional) If Python 3.13 is installed, create virtual environment with:
-python3.13 -m venv .venv
-source .venv/bin/activate
-
-# Install core library in development mode with dev, web and analysis dependencies
-# The -e flag ("editable") lets pip link your source directory, so code changes take effect immediately without reinstalling.
-pip install -e ".[dev,web,analysis]"
+# Create the virtual environment and install the project (editable) with the
+# dev dependency group plus the web and analysis extras.
+uv sync --all-extras
 
 # Run tests
-python -m pytest
+uv run pytest
 
 # Run single test with parameter
 # -s: disables output capturing, allowing print statements and other outputs to be shown in the terminal.
 # -vv: increases verbosity, providing more detailed test results.
-python pytest -s tests/test_qrcode.py -vv
+uv run pytest -s tests/test_qrcode.py -vv
 
 # (Optional) To check QR code dependencies, run:
-python scripts/check_qr_deps.py
+uv run python scripts/check_qr_deps.py
 ```
 
 ### Code Quality & Formatting
 
-The project uses pre-commit hooks to maintain code quality:
+The project uses [lefthook](https://github.com/evilmartians/lefthook) to run
+[ruff](https://docs.astral.sh/ruff/) (lint + format), mypy, and cspell on commit:
 
 ```bash
-# Install pre-commit hooks
-.venv/bin/pre-commit install
+# Install the git hooks (one-time)
+uv run lefthook install
 
-# Run hooks manually
-.venv/bin/pre-commit run --all-files
+# Run the pre-commit hooks against staged files
+uv run lefthook run pre-commit
+
+# Or run the tools directly
+uv run ruff check --fix src/ tests/ scripts/
+uv run ruff format src/ tests/ scripts/
+uv run mypy --config-file mypy.ini src/
 ```
 
 ## Usage Examples
@@ -189,11 +193,12 @@ See the CLI startup message (`pyxctsk --help` or running the CLI with no argumen
 
 ## Requirements
 
-- Python 3.8+
+- Python 3.11+
 - Optional dependencies can be installed with extras:
-  - `pip install pyxctsk[dev]` for development tools
   - `pip install pyxctsk[web]` for web interface components
   - `pip install pyxctsk[analysis]` for analysis tools
+- Development tooling lives in the `dev` dependency group and is installed
+  automatically by `uv sync` (or `uv sync --all-extras` to include the extras).
 
 ## License
 

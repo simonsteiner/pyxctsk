@@ -4,21 +4,21 @@ Quick guide for updating dependencies and maintaining the pyxctsk project.
 
 ## Prerequisites
 
-Activate the virtual environment:
+Sync the environment (creates `.venv` and installs everything):
 
 ```bash
 cd /Users/simon/DEV/git/pyxctsk
-source .venv/bin/activate
+uv sync --all-extras
 ```
 
 ## Updating Dependencies
 
 ### Update Process
 
-1. **Check outdated packages**: `pip list --outdated`
-2. **Check specific versions**: `pip show click geopy Pillow polyline pyproj pyzbar qrcode scipy`
-3. **Update dependencies**: `pip install --upgrade click geopy Pillow polyline pyproj pyzbar qrcode scipy`
-4. **Update pyproject.toml** with new minimum versions:
+1. **Check outdated packages**: `uv pip list --outdated`
+2. **Bump everything within the declared ranges**: `uv lock --upgrade`
+3. **Bump a single package**: `uv lock --upgrade-package scipy`
+4. **Update pyproject.toml** if you want to raise the minimum versions, e.g.:
 
     ```toml
     dependencies = [
@@ -27,41 +27,43 @@ source .venv/bin/activate
         "Pillow>=11.0.0",
         "polyline>=2.0.0",
         "pyproj>=3.7.0",
-        "pyzbar>=0.1.9",
         "qrcode[pil]>=8.0.0",
         "scipy>=1.16.0",
+        "zxing-cpp>=2.3.0",
     ]
     ```
 
-5. **Test**: `pip install -e ".[dev]"` and run tests
+   After editing `pyproject.toml`, run `uv lock` to refresh `uv.lock`.
+
+5. **Test**: `uv sync --all-extras && uv run pytest`
 
 ### Check Latest Versions
 
 ```bash
-pip index versions [package_name]
+uv pip index versions [package_name]
 ```
 
 ## Development Dependencies
 
 ```bash
-# Install with optional dependencies
-pip install -e ".[dev,web,analysis]"
+# Install the dev group plus the web and analysis extras
+uv sync --all-extras
 ```
 
 ## Troubleshooting
 
 **Common Issues:**
 
-- **Import errors**: Reinstall with `pip install -e .`
-- **Version conflicts**: Use `pip install --upgrade --force-reinstall [package]`
+- **Import errors / stale environment**: Re-sync with `uv sync --all-extras`
+- **Rebuild from scratch**: `rm -rf .venv && uv sync --all-extras`
 - **Missing dependencies**: Ensure scipy is installed
 
 **Quick verification test:**
 
 ```bash
-python -c "
+uv run python -c "
 from scipy.optimize import fminbound; print('✓ scipy.optimize')
-from PIL import Image; from pyzbar import pyzbar; print('✓ QR code reading')
+from PIL import Image; import zxingcpp; print('✓ QR code reading')
 "
 ```
 

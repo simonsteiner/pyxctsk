@@ -255,7 +255,7 @@ def compare_task_distances(
     center_distance = distance_through_centers(turnpoints)
     if verbose:
         print(
-            f"  📏 {len(turnpoints)} turnpoints, center-to-center distance: {center_distance/1000:.2f}km"
+            f"  📏 {len(turnpoints)} turnpoints, center-to-center distance: {center_distance / 1000:.2f}km"
         )
 
     # --- Run all calculations ---

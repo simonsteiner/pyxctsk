@@ -98,7 +98,7 @@ python extract_task_data.py
 
 ### `extract_qr_from_html.py`
 
-Locates base64-encoded SVG QR codes in HTML files, decodes and converts them to images, and extracts QR data using OpenCV and pyzbar. Supports batch processing, intermediate PNG output, and error handling for malformed images.
+Locates base64-encoded SVG QR codes in HTML files, decodes and converts them to images, and extracts QR data using OpenCV and zxing-cpp. Supports batch processing, intermediate PNG output, and error handling for malformed images.
 
 #### Usage Examples
 
@@ -128,7 +128,7 @@ Test script for QR code generation functionality. Generates QR codes for XCTSK f
 
 ### `check_qr_deps.py`
 
-Dependency checker for QR code functionality. Verifies that Pillow, pyzbar, and the zbar system library are installed, providing OS-specific installation instructions if dependencies are missing.
+Dependency checker for QR code functionality. Verifies that Pillow and zxing-cpp are installed and that a QR encode/decode roundtrip works. No system library is required.
 
 ## Project Structure
 

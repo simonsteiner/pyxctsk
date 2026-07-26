@@ -45,7 +45,7 @@ class QRCodeGoal:
         """Convert to dictionary for JSON serialization."""
         result: dict[str, Any] = {}
         if self.deadline:
-            result["d"] = self.deadline.to_json_string().strip('"')
+            result["d"] = self.deadline.to_json_string()
         if self.type is not None:
             result["t"] = self.type.value
         return result
@@ -90,7 +90,7 @@ class QRCodeSSS:
         result["d"] = self.direction.value
         # Add time_gates in the middle if they exist
         if self.time_gates:
-            result["g"] = [gate.to_json_string().strip('"') for gate in self.time_gates]
+            result["g"] = [gate.to_json_string() for gate in self.time_gates]
         # Add type last
         result["t"] = self.type.value
         return result

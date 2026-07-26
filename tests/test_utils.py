@@ -1,5 +1,4 @@
-"""
-Comprehensive tests for utility functions, CLI helpers, and shared test infrastructure.
+"""Comprehensive tests for utility functions, CLI helpers, and shared test infrastructure.
 
 Covers:
 - CLI conversion commands and output formats
@@ -19,9 +18,9 @@ from unittest.mock import Mock, patch
 
 import pytest
 from click.testing import CliRunner
+
 from pyxctsk import Task, TaskType, Turnpoint, TurnpointType, Waypoint
 from pyxctsk.cli import convert, main
-
 from tests.qr_test_utils import QR_CODE_SUPPORT
 
 # ============================================================================
@@ -252,12 +251,12 @@ class TestQRTestUtils:
 
     def test_qr_code_support_detection(self):
         """Test QR code support detection logic."""
-        from tests.qr_test_utils import QR_CODE_SUPPORT, Image, pyzbar
+        from tests.qr_test_utils import QR_CODE_SUPPORT, Image, zxingcpp
 
         # The support detection should be consistent
         if QR_CODE_SUPPORT:
             assert Image is not None
-            assert pyzbar is not None
+            assert zxingcpp is not None
         else:
             # When not supported, variables might be None
             # This is fine as the tests skip appropriately
@@ -357,7 +356,6 @@ class TestErrorHandling:
 
     def test_exception_handling_patterns(self):
         """Test common exception handling patterns."""
-
         # Test that we can catch and handle various exceptions
         with pytest.raises(ValueError):
             raise ValueError("Test error")

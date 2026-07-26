@@ -2,8 +2,9 @@
 
 This module provides a unified, minimal interface for all distance-related calculations
 in the pyxctsk package. It exposes the main public API for:
-- Optimized route and distance calculations through turnpoint cylinders
-- Iterative refinement and beam search algorithms for shortest path
+- Optimized route and distance calculations through turnpoint cylinders per
+  FAI S7F §7 (Ding-Xie-Jiang alternating point-circle-point method)
+- Earth-model aware distances (WGS84 ellipsoid default, FAI sphere R = 6371 km)
 - SSS (Start of Speed Section) entry point and info calculations
 - Cumulative and per-leg task distance calculations
 - Configuration of optimization parameters
@@ -14,98 +15,25 @@ main entry points for use by other code and CLI tools.
 
 # Import all the public API from the refactored modules
 from .optimization_config import (
-    DEFAULT_ANGLE_STEP,
-    DEFAULT_BEAM_WIDTH,
+    CONVERGENCE_EPSILON_M,
     DEFAULT_NUM_ITERATIONS,
-    get_optimization_config,
 )
-from .route_optimization import calculate_iteratively_refined_route
+from .route_optimization import (
+    calculate_iteratively_refined_route,
+    optimized_distance,
+    optimized_route_coordinates,
+)
 from .sss_calculations import calculate_optimal_sss_entry_point, calculate_sss_info
 from .task_distances import (
     calculate_cumulative_distances,
     calculate_task_distances,
 )
-from .turnpoint import TaskTurnpoint, distance_through_centers
-
-
-def optimized_distance(
-    turnpoints: list[TaskTurnpoint],
-    angle_step: int | None = None,
-    show_progress: bool = False,
-    beam_width: int | None = None,
-    num_iterations: int | None = None,
-) -> float:
-    """Compute the fully optimized distance through turnpoints using iterative refinement.
-
-    This algorithm finds the shortest possible route through all turnpoint cylinders
-    starting from the center of the take-off and computing the optimal path using
-    dynamic programming with beam search and iterative refinement to reduce look-ahead bias.
-
-    The iterative refinement approach performs multiple optimization passes to
-    avoid the systematic bias of assuming the next target is at the center
-    of the next turnpoint.
-
-    Args:
-        turnpoints: List of TaskTurnpoint objects
-        angle_step: Angle step in degrees for perimeter point generation (fallback only)
-        show_progress: Whether to show progress indicators
-        beam_width: Number of best candidates to keep at each DP stage
-        num_iterations: Number of refinement iterations
-
-    Returns:
-        Optimized distance in meters
-    """
-    config = get_optimization_config(angle_step, beam_width, num_iterations)
-
-    distance, _ = calculate_iteratively_refined_route(
-        turnpoints,
-        num_iterations=config["num_iterations"],
-        angle_step=config["angle_step"],
-        show_progress=show_progress,
-        beam_width=config["beam_width"],
-    )
-    return distance
-
-
-def optimized_route_coordinates(
-    turnpoints: list[TaskTurnpoint],
-    task_turnpoints=None,  # Kept for backward compatibility
-    angle_step: int | None = None,
-    beam_width: int | None = None,
-    num_iterations: int | None = None,
-) -> list[tuple[float, float]]:
-    """Compute the fully optimized route coordinates through turnpoints using iterative refinement.
-
-    This algorithm finds the shortest possible route through all turnpoint cylinders
-    and returns the actual coordinates of the optimal path using dynamic programming
-    with beam search and iterative refinement to reduce the look-ahead bias.
-
-    The iterative refinement approach performs multiple optimization passes to
-    avoid the systematic bias of assuming the next target is at the center
-    of the next turnpoint.
-
-    Args:
-        turnpoints: list[TaskTurnpoint] objects
-        task_turnpoints: Optional list of original task turnpoints with type information
-                         (kept for backward compatibility)
-        angle_step: Angle step in degrees for perimeter point generation (fallback only)
-        beam_width: Number of best candidates to keep at each DP stage
-        num_iterations: Number of refinement iterations
-
-    Returns:
-        List of (lat, lon) tuples representing the optimized route coordinates
-    """
-    config = get_optimization_config(angle_step, beam_width, num_iterations)
-
-    _, route_coordinates = calculate_iteratively_refined_route(
-        turnpoints,
-        num_iterations=config["num_iterations"],
-        angle_step=config["angle_step"],
-        show_progress=False,
-        beam_width=config["beam_width"],
-    )
-    return route_coordinates
-
+from .turnpoint import (
+    FAI_SPHERE_RADIUS_M,
+    TaskTurnpoint,
+    distance_through_centers,
+    geodesic_distance,
+)
 
 # Export all the main public functions and classes
 __all__ = [
@@ -115,16 +43,16 @@ __all__ = [
     "optimized_distance",
     "optimized_route_coordinates",
     "distance_through_centers",
+    "geodesic_distance",
     "calculate_task_distances",
     "calculate_cumulative_distances",
     # SSS specific functions
     "calculate_sss_info",
     "calculate_optimal_sss_entry_point",
     # Configuration
-    "get_optimization_config",
-    "DEFAULT_ANGLE_STEP",
-    "DEFAULT_BEAM_WIDTH",
+    "CONVERGENCE_EPSILON_M",
     "DEFAULT_NUM_ITERATIONS",
+    "FAI_SPHERE_RADIUS_M",
     # Advanced functions
     "calculate_iteratively_refined_route",
 ]

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyxctsk"
-version = "0.3.0"
+version = "0.5.0"
 description = "Python implementation of XCTrack's task format"
 readme = "README.md"
 license = {text = "MIT"}
@@ -16,38 +16,24 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "click>=8.2.1",
     "geopy>=2.4.1",
     "Pillow>=11.3.0",
     "polyline>=2.0.2",
     "pyproj>=3.7.1",
-    "pyzbar>=0.1.9",
     "qrcode[pil]>=8.2",
     "scipy>=1.16.0",
     "simplekml>=1.3.6",
+    "zxing-cpp>=2.3.0",
 ]
 
 [project.optional-dependencies]
-dev = [
-    "beautifulsoup4>=4.13.4",
-    "black>=25.1.0",
-    "deepdiff>=8.5.0",
-    "flake8>=7.3.0",
-    "isort>=6.0.1",
-    "mypy>=1.17.0",
-    "pre_commit>=4.2.0",
-    "pydocstyle>=6.3.0",
-    "pytest-cov>=6.2.1",
-    "pytest>=8.4.1",
-    "requests>=2.32.4",
-]
 web = [
     "flask>=3.1.1",
 ]
@@ -55,6 +41,18 @@ analysis = [
     "geographiclib>=2.0",
     "matplotlib>=3.10.3",
     "numpy>=2.3.1",
+]
+
+[dependency-groups]
+dev = [
+    "beautifulsoup4>=4.13.4",
+    "deepdiff>=8.5.0",
+    "lefthook>=1.7.0",
+    "mypy>=1.17.0",
+    "pytest-cov>=6.2.1",
+    "pytest>=8.4.1",
+    "requests>=2.32.4",
+    "ruff>=0.10.0",
 ]
 
 [tool.setuptools.package-data]
@@ -69,20 +67,33 @@ pyxctsk = "pyxctsk.cli:main"
 [project.urls]
 Repository = "https://github.com/simonsteiner/pyxctsk"
 
-[tool.black]
+[tool.ruff]
 line-length = 88
-target-version = ['py38']
+target-version = "py311"
+src = ["src"]
+# Vendored third-party code: never format or lint it.
+extend-exclude = ["scripts/task_viewer/airscore_clone"]
 
-[tool.isort]
-profile = "black"
-multi_line_output = 3
+[tool.ruff.lint]
+# E/W pycodestyle, F pyflakes, I import sorting, D docstrings.
+# E501 (line length) and E203 are left to the formatter.
+select = ["E", "W", "F", "I", "D"]
+ignore = ["E501", "E203"]
 
-[tool.flake8]
-max-line-length = 88
-extend-ignore = "E501,E203"
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.isort]
+known-first-party = ["pyxctsk"]
+
+[tool.ruff.lint.per-file-ignores]
+# scripts/ holds utilities, not library code — don't require docstrings there.
+"scripts/**" = ["D"]
+# __init__.py re-exports; allow unsorted/star-style re-export conveniences.
+"src/pyxctsk/__init__.py" = ["F401"]
 
 [tool.mypy]
-python_version = "3.8"
+python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
@@ -94,7 +105,7 @@ strict_optional = true
 mypy_path = "stubs"
 
 [[tool.mypy.overrides]]
-module = ["geopy.*", "polyline.*", "pyzbar.*", "scipy.*", "qrcode.*", "optype.*"]
+module = ["geopy.*", "polyline.*", "zxingcpp.*", "scipy.*", "qrcode.*", "optype.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
