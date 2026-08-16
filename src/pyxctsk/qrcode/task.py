@@ -33,16 +33,16 @@ from collections import OrderedDict
 from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Any
 
-from .model.passthrough import QR_EXTENSIONS_KEY, read_passthrough, write_passthrough
-from .qrcode_enums import (
+from ..model.passthrough import QR_EXTENSIONS_KEY, read_passthrough, write_passthrough
+from .enums import (
     QRCodeEarthModel,
     QRCodeTaskType,
     QRCodeTurnpointType,
 )
-from .qrcode_models import QRCodeGoal, QRCodeSSS, QRCodeTakeoff, QRCodeTurnpoint
+from .models import QRCodeGoal, QRCodeSSS, QRCodeTakeoff, QRCodeTurnpoint
 
 if TYPE_CHECKING:
-    from .model.task import Task
+    from ..model.task import Task
 
 # Constants
 QR_CODE_SCHEME = "XCTSK:"
@@ -423,7 +423,7 @@ class QRCodeTask:
         Returns:
             QRCodeTask instance optimized for QR code embedding
         """
-        from .qrcode_conversion import task_to_qr_code_task
+        from .conversion import task_to_qr_code_task
 
         return task_to_qr_code_task(task)
 
@@ -437,7 +437,7 @@ class QRCodeTask:
         Returns:
             QRCodeTask instance optimized for XC/Waypoints format
         """
-        from .qrcode_conversion import task_to_qr_code_waypoints
+        from .conversion import task_to_qr_code_waypoints
 
         return task_to_qr_code_waypoints(task)
 
@@ -447,6 +447,6 @@ class QRCodeTask:
         Returns:
             Task object with full format specification
         """
-        from .qrcode_conversion import qr_code_task_to_task
+        from .conversion import qr_code_task_to_task
 
         return qr_code_task_to_task(self)

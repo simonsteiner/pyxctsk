@@ -110,8 +110,8 @@ class TestObsoleteSSSDirection:
     def test_both_readers_agree_on_the_fallback(self):
         """The QR reader and the full-JSON reader must not diverge here."""
         from pyxctsk.model.task import OBSOLETE_DIRECTION_DEFAULT
-        from pyxctsk.qrcode_enums import QRCodeDirection
-        from pyxctsk.qrcode_models import QRCodeSSS
+        from pyxctsk.qrcode.enums import QRCodeDirection
+        from pyxctsk.qrcode.models import QRCodeSSS
 
         qr_fallback = QRCodeSSS.from_dict({"t": 1, "g": ["12:00:00Z"]}).direction
 
@@ -423,7 +423,7 @@ class TestCompressedQRScheme:
 
     def test_unknown_scheme_is_rejected(self):
         """A lookalike prefix is not silently treated as plain JSON."""
-        from pyxctsk.qrcode_task import QRCodeTask
+        from pyxctsk.qrcode.task import QRCodeTask
 
         with pytest.raises(ValueError, match="Invalid QR code scheme"):
             QRCodeTask.from_string("NOT-A-SCHEME:{}")
@@ -504,8 +504,8 @@ class TestTaskTypeValue:
         came out unset and ``T`` was swallowed as an unknown key, which then
         re-serialized in the wrong shape.
         """
-        from pyxctsk.qrcode_enums import QRCodeTaskType
-        from pyxctsk.qrcode_task import QRCodeTask
+        from pyxctsk.qrcode.enums import QRCodeTaskType
+        from pyxctsk.qrcode.task import QRCodeTask
 
         qr = QRCodeTask.from_dict({"T": "W", "t": [{"n": "A", "z": "|dz~FligrB?"}]})
 
@@ -545,7 +545,7 @@ class TestTaskTypeValue:
 
     def test_both_waypoints_entry_points_agree(self):
         """from_task_waypoints() and to_waypoints_string() are one definition."""
-        from pyxctsk.qrcode_task import QRCodeTask
+        from pyxctsk.qrcode.task import QRCodeTask
 
         task = parse_task(str(REFERENCE_QR / "task_bevo.txt"))
 
@@ -637,7 +637,7 @@ class TestManufacturerExtensions:
         field that ``to_dict`` never wrote — the exact round-trip loss the
         unknown-key passthrough exists to prevent, hidden by the allow-list.
         """
-        from pyxctsk.qrcode_task import QRCodeTask
+        from pyxctsk.qrcode.task import QRCodeTask
 
         source = json.loads(Task.from_json(task_json()).to_qr_code_task().to_json())
         source["p"] = "_p~iF~ps|U"
@@ -649,8 +649,8 @@ class TestManufacturerExtensions:
 
     def test_turnpoint_x_is_not_read_as_a_coordinate(self):
         """The ``x`` key means extensions, not longitude as it once did."""
-        from pyxctsk.qrcode_encoding import encode_competition_turnpoint
-        from pyxctsk.qrcode_models import QRCodeTurnpoint
+        from pyxctsk.qrcode.encoding import encode_competition_turnpoint
+        from pyxctsk.qrcode.models import QRCodeTurnpoint
 
         z = encode_competition_turnpoint(8.1, 46.5, 1234, 400)
         turnpoint = QRCodeTurnpoint.from_dict({"n": "X", "z": z, "x": [{"k": "v"}]})
@@ -669,7 +669,7 @@ class TestTurnpointCoordinatesAreNeverInvented:
     """
 
     def _from_dict(self, data):
-        from pyxctsk.qrcode_models import QRCodeTurnpoint
+        from pyxctsk.qrcode.models import QRCodeTurnpoint
 
         return QRCodeTurnpoint.from_dict(data)
 
@@ -681,7 +681,7 @@ class TestTurnpointCoordinatesAreNeverInvented:
     @pytest.mark.parametrize("count", [0, 1, 2, 5])
     def test_wrong_number_count_raises(self, count):
         """Only the 3- and 4-number forms are defined."""
-        from pyxctsk.qrcode_encoding import encode_num
+        from pyxctsk.qrcode.encoding import encode_num
 
         z = "".join(encode_num(n) for n in range(count))
         with pytest.raises(ValueError, match="3 or 4 numbers"):
@@ -721,7 +721,7 @@ class TestWaypointsFormatPreservesExtras:
     }
 
     def _parsed(self):
-        from pyxctsk.qrcode_task import QRCodeTask
+        from pyxctsk.qrcode.task import QRCodeTask
 
         return QRCodeTask.from_dict(json.loads(json.dumps(self.SOURCE)))
 
@@ -750,7 +750,7 @@ class TestWaypointsFormatPreservesExtras:
 
     def test_a_plain_waypoints_task_gains_nothing(self):
         """Absent extras must stay absent — no empty "x" appearing."""
-        from pyxctsk.qrcode_task import QRCodeTask
+        from pyxctsk.qrcode.task import QRCodeTask
 
         plain = {"T": "W", "V": 2, "t": [{"n": "WPT1", "z": "|dz~FligrB?"}]}
         emitted = json.loads(QRCodeTask.from_dict(plain).to_waypoints_json())
@@ -803,11 +803,11 @@ class TestWaypointsTaskEncoding:
 
     def test_z_length_selects_the_format(self):
         """Three numbers means waypoints, four means competition."""
-        from pyxctsk.qrcode_encoding import (
+        from pyxctsk.qrcode.encoding import (
             encode_competition_turnpoint,
             encode_waypoint_turnpoint,
         )
-        from pyxctsk.qrcode_models import QRCodeTurnpoint
+        from pyxctsk.qrcode.models import QRCodeTurnpoint
 
         waypoint_z = encode_waypoint_turnpoint(8.1, 46.5, 1234)
         competition_z = encode_competition_turnpoint(8.1, 46.5, 1234, 400)

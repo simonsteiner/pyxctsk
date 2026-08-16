@@ -13,7 +13,7 @@ not symmetric and stay at the call sites: an unrecognized turnpoint type is
 ``NONE`` going out and ``None`` coming back, for instance.
 """
 
-from .model.task import (
+from ..model.task import (
     SSS,
     Direction,
     EarthModel,
@@ -27,7 +27,7 @@ from .model.task import (
     TurnpointType,
     Waypoint,
 )
-from .qrcode_enums import (
+from .enums import (
     QRCodeDirection,
     QRCodeEarthModel,
     QRCodeGoalType,
@@ -35,8 +35,8 @@ from .qrcode_enums import (
     QRCodeTaskType,
     QRCodeTurnpointType,
 )
-from .qrcode_models import QRCodeGoal, QRCodeSSS, QRCodeTakeoff, QRCodeTurnpoint
-from .qrcode_task import QR_CODE_TASK_VERSION, QRCodeTask
+from .models import QRCodeGoal, QRCodeSSS, QRCodeTakeoff, QRCodeTurnpoint
+from .task import QR_CODE_TASK_VERSION, QRCodeTask
 
 #: The task version the full JSON format carries.
 TASK_VERSION = 1
@@ -73,7 +73,7 @@ _TO_QR_GOAL_TYPE: dict[GoalType | None, QRCodeGoalType] = {
 # Written out rather than derived by inverting the tables above: the key types
 # differ (each admits None exactly where its own source field is optional), and
 # a comprehension that had to paper over that would be less clear than this.
-# ``test_qrcode_conversion.py`` asserts the two directions stay mutual inverses.
+# ``tests/qrcode/test_conversion.py`` asserts the two directions stay mutual inverses.
 _FROM_QR_TASK_TYPE: dict[QRCodeTaskType | None, TaskType] = {
     QRCodeTaskType.CLASSIC: TaskType.CLASSIC,
     QRCodeTaskType.WAYPOINTS: TaskType.WAYPOINTS,

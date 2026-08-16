@@ -19,7 +19,7 @@ src_dir = script_dir.parent / "src"
 sys.path.insert(0, str(src_dir))
 
 from pyxctsk import parse_task  # noqa: E402
-from pyxctsk.qrcode_image import generate_qrcode_image  # noqa: E402
+from pyxctsk.qrcode.image import generate_qrcode_image  # noqa: E402
 
 try:
     import zxingcpp

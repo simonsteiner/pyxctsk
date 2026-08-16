@@ -15,14 +15,14 @@ from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Any
 
-from .model.passthrough import QR_EXTENSIONS_KEY, read_passthrough, write_passthrough
-from .model.time_of_day import TimeOfDay
-from .qrcode_encoding import (
+from ..model.passthrough import QR_EXTENSIONS_KEY, read_passthrough, write_passthrough
+from ..model.time_of_day import TimeOfDay
+from .encoding import (
     decode_nums,
     encode_competition_turnpoint,
     encode_waypoint_turnpoint,
 )
-from .qrcode_enums import (
+from .enums import (
     QR_OBSOLETE_DIRECTION_DEFAULT,
     QRCodeDirection,
     QRCodeGoalType,

@@ -12,7 +12,7 @@ Neighbouring modules hold what this one deliberately does not:
   - ``enums`` — the constrained values (``TaskType``, ``TurnpointType``, …),
     re-exported here for callers
   - ``validation`` — the spec's structural rules, reached via ``Task.validate()``
-  - ``qrcode_conversion`` — the mapping to and from the compact QR format
+  - ``qrcode.conversion`` — the mapping to and from the compact QR format
   - ``time_of_day`` — ``TimeOfDay``, shared with the QR models
 """
 
@@ -20,7 +20,7 @@ import json
 from dataclasses import dataclass, field, replace
 from typing import Any
 
-from ..qrcode_task import QRCodeTask
+from ..qrcode.task import QRCodeTask
 
 # The enums are re-exported: they are part of task.py's public surface and
 # callers import them from here. They live in their own module so validation.py

@@ -39,8 +39,8 @@ from .model.task import (
 )
 from .model.validation import ValidationIssue, ValidationRule
 from .parser import parse_task
-from .qrcode_image import generate_qrcode_image
-from .qrcode_task import QRCodeTask
+from .qrcode.image import generate_qrcode_image
+from .qrcode.task import QRCodeTask
 
 # Constants
 EXTENSION = ".xctsk"

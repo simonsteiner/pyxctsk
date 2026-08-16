@@ -16,7 +16,7 @@ from pyxctsk.model.task import (
     SSSType,
     TaskType,
 )
-from pyxctsk.qrcode_conversion import (
+from pyxctsk.qrcode.conversion import (
     _FROM_QR_DIRECTION,
     _FROM_QR_EARTH_MODEL,
     _FROM_QR_GOAL_TYPE,
@@ -30,7 +30,7 @@ from pyxctsk.qrcode_conversion import (
     _TO_QR_TASK_TYPE,
     _TO_QR_TURNPOINT_TYPE,
 )
-from pyxctsk.qrcode_enums import (
+from pyxctsk.qrcode.enums import (
     QR_OBSOLETE_DIRECTION_DEFAULT,
     QRCodeDirection,
     QRCodeEarthModel,

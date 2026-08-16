@@ -27,10 +27,10 @@ from pyxctsk import (
     Waypoint,
     parse_task,
 )
-from pyxctsk.qrcode_enums import QRCodeTaskType, QRCodeTurnpointType
-from pyxctsk.qrcode_image import generate_qrcode_image
-from pyxctsk.qrcode_models import QRCodeTurnpoint
-from pyxctsk.qrcode_task import QRCodeTask
+from pyxctsk.qrcode.enums import QRCodeTaskType, QRCodeTurnpointType
+from pyxctsk.qrcode.image import generate_qrcode_image
+from pyxctsk.qrcode.models import QRCodeTurnpoint
+from pyxctsk.qrcode.task import QRCodeTask
 from tests.conftest import find_xctsk_files
 
 # Use shared QR code test utilities
