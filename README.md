@@ -8,9 +8,9 @@ The library implements the XCTrack Competition Interfaces specification: both ta
 
 ## Technical Highlights
 
-- **Typed Data Model**: Core domain objects are dataclasses with constrained values modelled as enums, so unknown task/turnpoint/goal types are rejected at parse time. `Task.validate()` additionally reports violations of the spec's structural rules — TAKEOFF only first, SSS and ESS exactly once, SSS before ESS — and `parse_task(data, strict=True)` turns them into an error ([task.py](./src/pyxctsk/task.py))
-- **Advanced Distance Calculation**: Implements sophisticated route optimization algorithms to accurately calculate task distances with iterative refinement to avoid look-ahead bias ([distance.py](./src/pyxctsk/distance.py), [route_optimization.py](./src/pyxctsk/route_optimization.py))
-- **Efficient QR Code Representation**: Implements XCTrack's compact QR code format with polyline compression for efficient task sharing via small QR codes that work well in direct sunlight ([qrcode_task.py](./src/pyxctsk/qrcode_task.py))
+- **Typed Data Model**: Core domain objects are dataclasses with constrained values modelled as enums, so unknown task/turnpoint/goal types are rejected at parse time. `Task.validate()` additionally reports violations of the spec's structural rules — TAKEOFF only first, SSS and ESS exactly once, SSS before ESS — and `parse_task(data, strict=True)` turns them into an error ([model/task.py](./src/pyxctsk/model/task.py))
+- **Advanced Distance Calculation**: Implements sophisticated route optimization algorithms to accurately calculate task distances with iterative refinement to avoid look-ahead bias ([distance/](./src/pyxctsk/distance/__init__.py), [route_optimization.py](./src/pyxctsk/distance/route_optimization.py))
+- **Efficient QR Code Representation**: Implements XCTrack's compact QR code format with polyline compression for efficient task sharing via small QR codes that work well in direct sunlight ([qrcode/task.py](./src/pyxctsk/qrcode/task.py))
 - **Flexible Parsing Pipeline**: Single entry point that intelligently detects and parses multiple input formats (JSON, URL, QR code image) ([parser.py](./src/pyxctsk/parser.py))
 - **Type Safety**: Comprehensive type hints throughout the codebase with strict mypy enforcement
 
@@ -43,23 +43,32 @@ The library implements the XCTrack Competition Interfaces specification: both ta
 .
 ├── src/
 │   └── pyxctsk/           # Core package implementation
-│       ├── __init__.py    # Package exports
-│       ├── task.py        # Core data models
-│       ├── parser.py      # Input format parser
-│       ├── distance.py    # Distance calculation interface
-│       ├── qrcode_task.py # QR code format implementation
-│       └── ...
-├── tests/                 # Test suite
-│   ├── test_basic.py
-│   ├── test_distance.py
-│   └── ...
+│       ├── __init__.py    # Public API — everything most callers need
+│       ├── parser.py      # Single entry point for every input format
+│       ├── cli.py         # `pyxctsk convert`
+│       ├── exceptions.py
+│       ├── model/         # The task itself: dataclasses, enums, validation
+│       ├── qrcode/        # The compact QR format, and conversion to the model
+│       ├── distance/      # Route optimization, task distances, goal-line geometry
+│       └── export/        # KML and GeoJSON writers
+├── tests/                 # Test suite, mirroring the package layout
+│   ├── conftest.py        # Shared fixtures
+│   ├── paths.py           # Where the reference data lives
+│   ├── model/  qrcode/  distance/  export/
+│   ├── conformance/       # Spec-audit regressions, cutting across packages
+│   └── data/              # Reference tasks and generated output
 ├── scripts/               # Utility scripts
 ├── pyproject.toml         # Project configuration
 └── README.md
 ```
 
+Dependencies between the packages run one way — `model → qrcode` and
+`model → distance → export` — so a change to an export format cannot reach the
+domain model, and the model does not know how distances are computed. Each
+package's `__init__.py` is its interface and describes what it holds.
+
 - `src/pyxctsk/`: Core library implementation with immutable data models and parsing logic
-- `tests/`: Comprehensive test suite with basic tests and specialized distance calculation tests
+- `tests/`: Test suite; each subpackage covers the source package of the same name
 - `scripts/`: Utility scripts for automation and testing
 
 ## Installation
@@ -88,7 +97,7 @@ uv run pytest
 # Run single test with parameter
 # -s: disables output capturing, allowing print statements and other outputs to be shown in the terminal.
 # -vv: increases verbosity, providing more detailed test results.
-uv run pytest -s tests/test_qrcode.py -vv
+uv run pytest -s tests/qrcode/test_codec.py -vv
 
 # (Optional) To check QR code dependencies, run:
 uv run python scripts/check_qr_deps.py

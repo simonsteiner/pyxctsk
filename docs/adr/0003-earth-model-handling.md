@@ -29,7 +29,7 @@ measurement, boundary-point placement, and the optimization projection.
 
 - Distances honor the task's declared model end to end; a meridian degree measures
   111 194.93 m on the FAI sphere vs ~110 574 m on WGS84 at the equator (asserted in
-  `tests/test_distance.py::TestEarthModel`).
+  `tests/distance/test_distance.py::TestEarthModel`).
 - geopy was dropped from the distance subsystem in favour of pyproj (both use Karney's
   algorithm; pyproj parameterizes the sphere cleanly and provides fwd/inv in one object).
 - All 22 reference tasks declare WGS84, so reference accuracy is unchanged by this

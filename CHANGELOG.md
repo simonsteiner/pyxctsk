@@ -15,6 +15,19 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- **Breaking (API): the package is split into `model`, `qrcode`, `distance` and `export`.** `src/pyxctsk/` had grown to 27 modules in one flat directory, with prefixes (`qrcode_*`, `task_*`) doing the job a directory should. The public API is unchanged — everything re-exported from `pyxctsk` itself is where it was — but every deep import path moves:
+
+  | was | now |
+  | --- | --- |
+  | `pyxctsk.task`, `.task_enums`, `.time_of_day`, `.passthrough`, `.validation`, `.rounding` | `pyxctsk.model.{task,enums,time_of_day,passthrough,validation,rounding}` |
+  | `pyxctsk.qrcode_{task,models,encoding,enums,image,conversion}` | `pyxctsk.qrcode.{task,models,encoding,enums,image,conversion}` |
+  | `pyxctsk.turnpoint`, `.route_optimization`, `.task_distances`, `.sss_calculations`, `.optimization_config` | `pyxctsk.distance.{turnpoint,route_optimization,task_distances,sss,config}` |
+  | `pyxctsk.kml`, `.geojson`, `.visualization_common` | `pyxctsk.export.{kml,geojson,common}` |
+  | `pyxctsk.goal_line` | `pyxctsk.distance.goal_line` |
+  | `pyxctsk.distance` | unchanged — the facade module became the package `__init__` |
+
+  Dependencies now run one way, `model → qrcode` and `model → distance → export`. Goal-line geometry landed in `distance/` rather than beside the KML and GeoJSON writers that draw it, because `task_distances` sizes a LINE goal's cylinder from the goal-line length — with it in `export/` that edge closes a real import cycle. Each package's `__init__.py` re-exports its own interface and documents what it holds.
+- **Breaking (API): `_task_to_turnpoints` is now `task_to_turnpoints`**, re-exported as `pyxctsk.distance.task_to_turnpoints`. It was private by name only — the export package, five test modules and a script all imported it, and it now crosses a package seam.
 - **`Task` ↔ `QRCodeTask` conversion moved to the new `qrcode_conversion` module**, which imports both models at the top level. It was ~280 lines inside `qrcode_task.py` (686 lines → 428), reached through function-local `from .task import ...` blocks that existed only to dodge a circular import — the wire model knowing about the domain model, in the wrong direction. The six enum pairs are now translation tables rather than if/elif chains, with `tests/test_qrcode_conversion.py` asserting both directions stay mutual inverses and cover every enum member. `QRCodeTask.from_task()`, `.from_task_waypoints()`, `.to_task()` and `Task.to_qr_code_task()` are unchanged as API.
 - **The spec's structural rules moved out of the domain model** into the new `validation` module, which imports `task_enums` but never `task`, so it checks the model without depending on it. `Task.validate()` is the entry point onto it and `task.py` drops from 690 to 566 lines, holding exactly the domain dataclasses. The enums it used to carry are now in `task_enums` and re-exported, so `from pyxctsk.task import TaskType` still works.
 - **Breaking (API):** `Task.validate()` returns `list[ValidationIssue]` rather than `list[str]`, and `TaskValidationError.issues` holds the same. Each issue names the `ValidationRule` it broke, so a caller can react to a specific violation instead of matching English prose that is free to change. `str(issue)` gives the previous string and `str(error)` is unchanged. Both new types are exported from `pyxctsk`.

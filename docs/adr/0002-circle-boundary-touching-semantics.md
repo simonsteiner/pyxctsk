@@ -57,4 +57,4 @@ The optimized route uses boundary semantics with these endpoint rules:
   required, per the rules above.
 - A takeoff inside the SSS cylinder, nested start cylinders, and overlapping cylinders
   all route through segment–circle intersections without spurious detours (covered in
-  `tests/test_distance.py::TestCrossingCase`).
+  `tests/distance/test_distance.py::TestCrossingCase`).
