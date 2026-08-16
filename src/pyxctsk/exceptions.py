@@ -3,6 +3,8 @@
 This module defines the exception hierarchy for pyxctsk, including errors for empty input, invalid formats, and time parsing issues.
 """
 
+from collections.abc import Sequence
+
 
 class pyXCTSKError(Exception):
     """Base exception for all pyxctsk errors."""
@@ -29,13 +31,15 @@ class TaskValidationError(pyXCTSKError):
     turnpoints it describes are not a well-formed task.
 
     Attributes:
-        issues (list[str]): One message per violated rule.
+        issues (list): One :class:`~pyxctsk.validation.ValidationIssue` per
+            violated rule, each naming the rule it broke. Typed loosely here
+            because ``validation`` imports the exceptions, not the reverse.
     """
 
-    def __init__(self, issues: list[str]):
+    def __init__(self, issues: Sequence[object]):
         """Initialize with the list of structural violations."""
-        self.issues = issues
-        super().__init__("; ".join(issues))
+        self.issues = list(issues)
+        super().__init__("; ".join(str(issue) for issue in issues))
 
 
 class InvalidTimeOfDayError(pyXCTSKError):

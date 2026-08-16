@@ -13,96 +13,25 @@ support for QR code encoding/decoding and distance calculations (see related mod
 
 import json
 from dataclasses import dataclass, field, replace
-from enum import Enum
 from typing import Any
 
 from .passthrough import EXTENSIONS_KEY, read_passthrough, write_passthrough
 from .qrcode_task import QRCodeTask
 from .rounding import round_half_up
 from .shared_enums import TimeOfDay
+from .task_enums import (  # noqa: F401
+    OBSOLETE_DIRECTION_DEFAULT,
+    Direction,
+    EarthModel,
+    GoalType,
+    SSSType,
+    TaskType,
+    TurnpointType,
+)
 
-
-class Direction(str, Enum):
-    """Enumeration of direction types for turnpoints.
-
-    Attributes:
-        ENTER (str): Enter direction.
-        EXIT (str): Exit direction.
-    """
-
-    ENTER = "ENTER"
-    EXIT = "EXIT"
-
-
-# ``sss.direction`` is obsolete: the spec requires readers to ignore it and
-# writers to still emit *some* value so older devices keep working. This is the
-# value used when a task omits the field. EXIT is what all 22 reference tasks
-# carry, so a task read without it re-exports the way XCTrack writes it.
-OBSOLETE_DIRECTION_DEFAULT = Direction.EXIT
-
-
-class EarthModel(str, Enum):
-    """Enumeration of supported earth models.
-
-    Attributes:
-        WGS84 (str): WGS84 ellipsoid.
-        FAI_SPHERE (str): FAI sphere model.
-    """
-
-    WGS84 = "WGS84"
-    FAI_SPHERE = "FAI_SPHERE"
-
-
-class GoalType(str, Enum):
-    """Enumeration of goal types.
-
-    Attributes:
-        CYLINDER (str): Cylinder goal.
-        LINE (str): Line goal.
-    """
-
-    CYLINDER = "CYLINDER"
-    LINE = "LINE"
-
-
-class SSSType(str, Enum):
-    """Enumeration of start of speed section (SSS) types.
-
-    Attributes:
-        RACE (str): Race start.
-        ELAPSED_TIME (str): Elapsed time start.
-    """
-
-    RACE = "RACE"
-    ELAPSED_TIME = "ELAPSED-TIME"
-
-
-class TaskType(str, Enum):
-    """Enumeration of task types.
-
-    Attributes:
-        CLASSIC (str): Classic task.
-        WAYPOINTS (str): Waypoints task.
-    """
-
-    CLASSIC = "CLASSIC"
-    WAYPOINTS = "W"
-
-
-class TurnpointType(str, Enum):
-    """Enumeration of turnpoint types.
-
-    Attributes:
-        NONE (str): No type.
-        TAKEOFF (str): Takeoff point.
-        SSS (str): Start of speed section.
-        ESS (str): End of speed section.
-    """
-
-    NONE = ""
-    TAKEOFF = "TAKEOFF"
-    SSS = "SSS"
-    ESS = "ESS"
+# Re-exported: these are part of task.py's public surface and callers import
+# them from here.
+from .validation import ValidationIssue, validate_task
 
 
 @dataclass
@@ -606,62 +535,23 @@ class Task:
         """
         return QRCodeTask.from_task(self)
 
-    def validate(self) -> list[str]:
+    def validate(self) -> list[ValidationIssue]:
         """Check the task against the spec's structural rules.
 
-        The spec constrains how the special turnpoint types may be arranged:
-
-        - ``TAKEOFF`` "can be used only for the first turnpoint";
-        - ``SSS`` and ``ESS`` "must appear exactly once";
-        - ``SSS`` "must appear before ESS".
-
-        These apply to CLASSIC tasks. An XC/Waypoints task is a plain route
-        with no speed section, so the SSS/ESS rules are not checked for it.
-
-        This is a report, not a gate — parsing accepts structurally invalid
-        tasks so they can still be inspected and converted. Pass
-        ``strict=True`` to :func:`pyxctsk.parse_task` to turn violations into a
+        The rules themselves live in :mod:`pyxctsk.validation`; this is the
+        entry point onto them. Validation is a report, not a gate — parsing
+        accepts structurally invalid tasks so they can still be inspected and
+        converted. Pass ``strict=True`` to :func:`pyxctsk.parse_task` to turn
+        violations into a
         :class:`~pyxctsk.exceptions.TaskValidationError`.
 
         Returns:
-            list[str]: One message per violated rule; empty if the task is valid.
+            list[ValidationIssue]: One issue per violated rule; empty if the
+            task is valid. Each issue names its
+            :class:`~pyxctsk.validation.ValidationRule` and stringifies to a
+            human-readable message.
         """
-        issues: list[str] = []
-
-        if not self.turnpoints:
-            issues.append("task has no turnpoints")
-            return issues
-
-        misplaced = [
-            i
-            for i, tp in enumerate(self.turnpoints)
-            if tp.type == TurnpointType.TAKEOFF and i != 0
-        ]
-        for i in misplaced:
-            issues.append(
-                f"TAKEOFF is only allowed on the first turnpoint, found at index {i}"
-            )
-
-        if self.task_type == TaskType.WAYPOINTS:
-            return issues
-
-        indices = {
-            special: [i for i, tp in enumerate(self.turnpoints) if tp.type == special]
-            for special in (TurnpointType.SSS, TurnpointType.ESS)
-        }
-        for special, found in indices.items():
-            if len(found) != 1:
-                issues.append(
-                    f"{special.value} must appear exactly once, found {len(found)}"
-                )
-
-        sss, ess = indices[TurnpointType.SSS], indices[TurnpointType.ESS]
-        if len(sss) == 1 and len(ess) == 1 and sss[0] > ess[0]:
-            issues.append(
-                f"SSS must appear before ESS, found SSS at {sss[0]} and ESS at {ess[0]}"
-            )
-
-        return issues
+        return validate_task(self)
 
     def find_ess_turnpoint(self) -> Turnpoint | None:
         """Find and return the ESS turnpoint, if any.

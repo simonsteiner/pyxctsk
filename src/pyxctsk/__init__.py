@@ -40,6 +40,7 @@ from .task import (
     TurnpointType,
     Waypoint,
 )
+from .validation import ValidationIssue, ValidationRule
 
 # Constants
 EXTENSION = ".xctsk"
@@ -77,6 +78,8 @@ __all__ = [
     "TimeOfDay",
     "Turnpoint",
     "TurnpointType",
+    "ValidationIssue",
+    "ValidationRule",
     "VERSION",
     "Waypoint",
 ]

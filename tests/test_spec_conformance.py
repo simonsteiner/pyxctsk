@@ -25,6 +25,7 @@ from pyxctsk import (
     parse_task,
 )
 from pyxctsk.goal_line import GoalLine, goal_line_length_from_turnpoints
+from pyxctsk.validation import ValidationRule
 
 # Polyline-encoded "z" literals below are opaque tokens, not words.
 # cspell:ignore Fligr
@@ -201,11 +202,15 @@ class TestStructuralValidation:
     ESS".
     """
 
-    def _mutated(self, mutate) -> list[str]:
+    def _mutated(self, mutate):
         """Return validate() for BASE_TASK after applying a mutation."""
         data = json.loads(task_json())
         mutate(data)
         return Task.from_dict(data).validate()
+
+    def _assert_one(self, issues, rule, message):
+        """Assert a single issue, checking both its rule and its message."""
+        assert [(i.rule, str(i)) for i in issues] == [(rule, message)]
 
     def test_valid_task_reports_nothing(self):
         """The base fixture is spec-valid."""
@@ -221,21 +226,27 @@ class TestStructuralValidation:
         issues = self._mutated(
             lambda d: d["turnpoints"][2].update(type="TAKEOFF"),
         )
-        assert issues == [
-            "TAKEOFF is only allowed on the first turnpoint, found at index 2"
-        ]
+        self._assert_one(
+            issues,
+            ValidationRule.TAKEOFF_NOT_FIRST,
+            "TAKEOFF is only allowed on the first turnpoint, found at index 2",
+        )
 
     def test_sss_must_appear_exactly_once(self):
         """A second SSS is a violation."""
-        assert self._mutated(lambda d: d["turnpoints"][2].update(type="SSS")) == [
-            "SSS must appear exactly once, found 2"
-        ]
+        self._assert_one(
+            self._mutated(lambda d: d["turnpoints"][2].update(type="SSS")),
+            ValidationRule.SPECIAL_NOT_ONCE,
+            "SSS must appear exactly once, found 2",
+        )
 
     def test_ess_must_appear_exactly_once(self):
         """A missing ESS is a violation."""
-        assert self._mutated(lambda d: d["turnpoints"][1].pop("type")) == [
-            "ESS must appear exactly once, found 0"
-        ]
+        self._assert_one(
+            self._mutated(lambda d: d["turnpoints"][1].pop("type")),
+            ValidationRule.SPECIAL_NOT_ONCE,
+            "ESS must appear exactly once, found 0",
+        )
 
     def test_sss_must_precede_ess(self):
         """Order between the two is constrained."""
@@ -244,15 +255,19 @@ class TestStructuralValidation:
             data["turnpoints"][0]["type"] = "ESS"
             data["turnpoints"][1]["type"] = "SSS"
 
-        assert self._mutated(swap) == [
-            "SSS must appear before ESS, found SSS at 1 and ESS at 0"
-        ]
+        self._assert_one(
+            self._mutated(swap),
+            ValidationRule.SSS_AFTER_ESS,
+            "SSS must appear before ESS, found SSS at 1 and ESS at 0",
+        )
 
     def test_empty_task_is_reported_once(self):
         """No turnpoints short-circuits rather than cascading messages."""
         task = Task(task_type=TaskType.CLASSIC, version=1, turnpoints=[])
 
-        assert task.validate() == ["task has no turnpoints"]
+        self._assert_one(
+            task.validate(), ValidationRule.NO_TURNPOINTS, "task has no turnpoints"
+        )
 
     def test_waypoints_tasks_are_exempt_from_speed_section_rules(self):
         """A route "without cylinders" has no speed section to constrain."""
@@ -271,6 +286,42 @@ class TestStructuralValidation:
         assert task.turnpoints[2].type == TurnpointType.TAKEOFF
         assert task.validate() != []
 
+    def test_a_caller_can_branch_on_the_rule_without_reading_prose(self):
+        """The point of the typed issue: react to *which* rule broke.
+
+        A message is free to be reworded; the rule is the contract.
+        """
+
+        def swap(data):
+            data["turnpoints"][0]["type"] = "ESS"
+            data["turnpoints"][1]["type"] = "SSS"
+
+        rules = {issue.rule for issue in self._mutated(swap)}
+
+        assert ValidationRule.SSS_AFTER_ESS in rules
+        assert ValidationRule.NO_TURNPOINTS not in rules
+
+    def test_every_rule_is_reachable(self):
+        """A rule nothing can emit is a rule that does not exist."""
+        emitted = set()
+        for mutate in (
+            lambda d: d["turnpoints"][2].update(type="TAKEOFF"),
+            lambda d: d["turnpoints"][2].update(type="SSS"),
+            lambda d: (
+                d["turnpoints"][0].update(type="ESS"),
+                d["turnpoints"][1].update(type="SSS"),
+            ),
+        ):
+            emitted |= {issue.rule for issue in self._mutated(mutate)}
+        emitted |= {
+            issue.rule
+            for issue in Task(
+                task_type=TaskType.CLASSIC, version=1, turnpoints=[]
+            ).validate()
+        }
+
+        assert emitted == set(ValidationRule)
+
     def test_strict_rejects_an_invalid_task(self):
         """The opt-in flag turns the report into a failure."""
         data = json.loads(task_json())
@@ -279,9 +330,13 @@ class TestStructuralValidation:
         with pytest.raises(TaskValidationError) as excinfo:
             parse_task(json.dumps(data), strict=True)
 
-        assert excinfo.value.issues == [
-            "TAKEOFF is only allowed on the first turnpoint, found at index 2"
-        ]
+        self._assert_one(
+            excinfo.value.issues,
+            ValidationRule.TAKEOFF_NOT_FIRST,
+            "TAKEOFF is only allowed on the first turnpoint, found at index 2",
+        )
+        # The exception message is still the joined prose.
+        assert "found at index 2" in str(excinfo.value)
 
     def test_strict_accepts_a_valid_task(self):
         """Strict must not reject what the spec allows."""
