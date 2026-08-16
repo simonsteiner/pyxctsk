@@ -16,8 +16,13 @@ from .route_optimization import optimized_distance
 from .turnpoint import TaskTurnpoint, distance_through_centers, geodesic_distance
 
 
-def _task_to_turnpoints(task: Task) -> list[TaskTurnpoint]:
-    """Convert Task turnpoints to TaskTurnpoint objects.
+def task_to_turnpoints(task: Task) -> list[TaskTurnpoint]:
+    """Convert a task's turnpoints into the cylinders distance code works on.
+
+    The one place that reads a goal's type off the model and turns it into
+    geometry: a LINE goal becomes a zero-radius point carrying the goal-line
+    length, anything else stays a cylinder, and every turnpoint inherits the
+    task's earth model.
 
     Args:
         task (Task): Task object.
@@ -169,7 +174,7 @@ def calculate_task_distances(
         Dict[str, Any]: Dictionary containing distance calculations and turnpoint details.
     """
     # Convert to TaskTurnpoint objects
-    turnpoints = _task_to_turnpoints(task)
+    turnpoints = task_to_turnpoints(task)
 
     if len(turnpoints) < 2:
         return {

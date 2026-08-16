@@ -214,11 +214,11 @@ class TestSeeYouSemantics:
         against a second implementation.
         """
         from pyxctsk.distance import optimized_route_coordinates
-        from pyxctsk.distance.task_distances import _task_to_turnpoints
+        from pyxctsk.distance.task_distances import task_to_turnpoints
         from pyxctsk.distance.turnpoint import geodesic_distance
 
         task = parse_task((FIXTURES / f"{name}_qr_code.txt").read_text())
-        route = optimized_route_coordinates(_task_to_turnpoints(task))
+        route = optimized_route_coordinates(task_to_turnpoints(task))
         ours = [
             geodesic_distance(route[i - 1], route[i], None) / 1000
             for i in range(1, len(route))

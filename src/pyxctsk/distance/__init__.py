@@ -50,6 +50,7 @@ from .sss import calculate_optimal_sss_entry_point, calculate_sss_info
 from .task_distances import (
     calculate_cumulative_distances,
     calculate_task_distances,
+    task_to_turnpoints,
 )
 from .turnpoint import (
     FAI_SPHERE_RADIUS_M,
@@ -74,6 +75,7 @@ __all__ = [
     "geodesic_distance",
     "calculate_task_distances",
     "calculate_cumulative_distances",
+    "task_to_turnpoints",
     # SSS specific functions
     "calculate_sss_info",
     "calculate_optimal_sss_entry_point",

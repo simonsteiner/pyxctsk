@@ -15,7 +15,7 @@ from pyxctsk.distance import optimized_route_coordinates
 from pyxctsk.distance.sss import (
     calculate_optimal_sss_entry_point,
 )
-from pyxctsk.distance.task_distances import _task_to_turnpoints
+from pyxctsk.distance.task_distances import task_to_turnpoints
 from pyxctsk.distance.turnpoint import TaskTurnpoint
 
 
@@ -99,7 +99,7 @@ class TestSSSRouting:
         the optimized route would incorrectly navigate to turnpoint centers
         instead of optimal perimeter points.
         """
-        turnpoints = _task_to_turnpoints(sss_task)
+        turnpoints = task_to_turnpoints(sss_task)
 
         # Get center route (through turnpoint centers)
         center_route = [(tp.center[0], tp.center[1]) for tp in turnpoints]

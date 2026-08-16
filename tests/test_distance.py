@@ -29,7 +29,7 @@ from pyxctsk.distance import (
     distance_through_centers,
     optimized_distance,
 )
-from pyxctsk.distance.task_distances import _task_to_turnpoints
+from pyxctsk.distance.task_distances import task_to_turnpoints
 from pyxctsk.parser import parse_task
 
 WGS84 = Geod(ellps="WGS84")
@@ -79,7 +79,7 @@ class TestReferenceAccuracy:
         for name, task, ref_km in _load_reference_tasks(
             reference_tasks_dir, reference_json_dir
         ):
-            turnpoints = _task_to_turnpoints(task)
+            turnpoints = task_to_turnpoints(task)
             calc_m = optimized_distance(turnpoints)
             ref_m = ref_km * 1000.0
             diff_m = abs(calc_m - ref_m)
@@ -107,7 +107,7 @@ class TestReferenceAccuracy:
         for name, task, ref_km in _load_reference_tasks(
             reference_tasks_dir, reference_json_dir
         ):
-            turnpoints = _task_to_turnpoints(task)
+            turnpoints = task_to_turnpoints(task)
             calc_km = optimized_distance(turnpoints) / 1000.0
             rel = abs(calc_km - ref_km) / ref_km
             assert rel < 0.01, (
@@ -130,7 +130,7 @@ class TestReferenceAccuracy:
         for name, task, _ in _load_reference_tasks(
             reference_tasks_dir, reference_json_dir
         ):
-            turnpoints = _task_to_turnpoints(task)
+            turnpoints = task_to_turnpoints(task)
             if _has_concentric_pair(turnpoints):
                 continue
             opt = optimized_distance(turnpoints)
@@ -152,7 +152,7 @@ class TestReferenceAccuracy:
         task_file = reference_tasks_dir / "task_nohe.xctsk"
         if not task_file.exists():
             pytest.skip("task_nohe.xctsk not available")
-        turnpoints = _task_to_turnpoints(parse_task(str(task_file)))
+        turnpoints = task_to_turnpoints(parse_task(str(task_file)))
         opt_km = optimized_distance(turnpoints) / 1000.0
         assert opt_km == pytest.approx(96.3, abs=0.15)
         assert opt_km > distance_through_centers(turnpoints) / 1000.0
@@ -238,7 +238,7 @@ class TestGoalLine:
         if not task_file.exists():
             pytest.skip("task_piga_line.xctsk not available")
         task = parse_task(str(task_file))
-        turnpoints = _task_to_turnpoints(task)
+        turnpoints = task_to_turnpoints(task)
 
         distance, route = calculate_iteratively_refined_route(turnpoints)
         assert distance / 1000.0 == pytest.approx(35.4, abs=0.1)
@@ -274,7 +274,7 @@ class TestConvergence:
         for name, task, _ in _load_reference_tasks(
             reference_tasks_dir, reference_json_dir
         ):
-            turnpoints = _task_to_turnpoints(task)
+            turnpoints = task_to_turnpoints(task)
             base = optimized_distance(turnpoints)
             more = optimized_distance(turnpoints, num_iterations=500)
             assert abs(base - more) <= 0.1, (
@@ -315,15 +315,15 @@ class TestEarthModel:
         assert abs(wgs - sph) > 500.0
 
     def test_task_earth_model_propagates(self, reference_tasks_dir: Path):
-        """_task_to_turnpoints carries the task's earthModel to every turnpoint."""
+        """task_to_turnpoints carries the task's earthModel to every turnpoint."""
         task_file = reference_tasks_dir / "task_bevo.xctsk"
         if not task_file.exists():
             pytest.skip("task_bevo.xctsk not available")
         task = parse_task(str(task_file))
         object.__setattr__(task, "earth_model", EarthModel.FAI_SPHERE)
-        turnpoints = _task_to_turnpoints(task)
+        turnpoints = task_to_turnpoints(task)
         assert all(tp.earth_model == EarthModel.FAI_SPHERE for tp in turnpoints)
         # And the sphere distance differs measurably from the WGS84 one.
         object.__setattr__(task, "earth_model", None)
-        wgs_tps = _task_to_turnpoints(task)
+        wgs_tps = task_to_turnpoints(task)
         assert abs(optimized_distance(turnpoints) - optimized_distance(wgs_tps)) > 50.0

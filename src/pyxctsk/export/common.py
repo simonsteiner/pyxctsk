@@ -8,7 +8,7 @@ import math
 
 from ..distance.goal_line import should_skip_last_turnpoint
 from ..distance.route_optimization import optimized_route_coordinates
-from ..distance.task_distances import _task_to_turnpoints
+from ..distance.task_distances import task_to_turnpoints
 from ..model.task import Task, Turnpoint, TurnpointType
 
 # Constants for visualization
@@ -41,7 +41,7 @@ def get_optimized_route_coordinates(task: Task) -> list[tuple[float, float]] | N
     Returns:
         List of (lat, lon) coordinate tuples for the optimized route, or None if not available.
     """
-    task_turnpoints = _task_to_turnpoints(task)
+    task_turnpoints = task_to_turnpoints(task)
     return optimized_route_coordinates(task_turnpoints)
 
 

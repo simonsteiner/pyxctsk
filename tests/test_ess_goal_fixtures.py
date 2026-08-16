@@ -18,7 +18,7 @@ import pytest
 
 from pyxctsk import Task, TurnpointType, parse_task
 from pyxctsk.distance import optimized_distance, optimized_route_coordinates
-from pyxctsk.distance.task_distances import _task_to_turnpoints
+from pyxctsk.distance.task_distances import task_to_turnpoints
 from pyxctsk.distance.turnpoint import geodesic_distance
 
 FIXTURES = Path(__file__).parent / "data" / "reference_tasks" / "ess-goal"
@@ -70,7 +70,7 @@ def test_duplicate_turnpoint_costs_nothing(name):
     so the route through it came out *longer* than the route without it.
     """
     task = load(FIXTURES / f"{name}_qr_code.txt")
-    turnpoints = _task_to_turnpoints(task)
+    turnpoints = task_to_turnpoints(task)
 
     with_duplicate = optimized_distance(turnpoints)
     without_duplicate = optimized_distance(turnpoints[:-1])
@@ -82,7 +82,7 @@ def test_duplicate_turnpoint_costs_nothing(name):
 def test_duplicate_route_points_coincide(name):
     """The two points of the pair must land on the same spot."""
     task = load(FIXTURES / f"{name}_qr_code.txt")
-    route = optimized_route_coordinates(_task_to_turnpoints(task))
+    route = optimized_route_coordinates(task_to_turnpoints(task))
 
     assert geodesic_distance(route[-2], route[-1], None) == pytest.approx(0.0, abs=0.01)
 
@@ -96,7 +96,7 @@ def test_final_point_is_the_true_optimum(name):
     without the duplicate does. On task2 these were 257 m apart.
     """
     task = load(FIXTURES / f"{name}_qr_code.txt")
-    turnpoints = _task_to_turnpoints(task)
+    turnpoints = task_to_turnpoints(task)
 
     with_duplicate = optimized_route_coordinates(turnpoints)[-1]
     without_duplicate = optimized_route_coordinates(turnpoints[:-1])[-1]
