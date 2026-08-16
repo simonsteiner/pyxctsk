@@ -5,6 +5,10 @@ implements the [XCTrack Competition Interfaces](https://xctrack.org/Competition_
 specification and FAI Sporting Code S7F. Each file is dated and kept as written —
 superseded reviews stay for history rather than being edited. Newest first.
 
+- [2026-08-16 — Code-quality review and refactor plan](2026-08-16-code-quality-refactor-plan.md)
+  — **open.** Structural audit of the conformance work itself, with a status checklist.
+  Finds derived state stored on `Goal`, a dead `polyline` concept holding a runtime
+  dependency, and the extensions/unknown passthrough copy-pasted ten times.
 - [2026-08-16 — Competition Interfaces conformance audit](2026-08-16-competition-interfaces-audit.md)
   — **current.** Independent review against the raw spec text and the reference
   polyline snippet, with every finding reproduced by running the library. Finds two
