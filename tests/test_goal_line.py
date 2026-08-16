@@ -24,7 +24,7 @@ from pyxctsk.goal_line import (
 )
 
 
-def _line_goal_task(prev_radius=400, goal_radius=400, line_length=None):
+def _line_goal_task(prev_radius=400, goal_radius=400):
     """Build a two-turnpoint LINE-goal task for goal-line tests."""
     tp1 = Turnpoint(
         radius=prev_radius,
@@ -36,7 +36,7 @@ def _line_goal_task(prev_radius=400, goal_radius=400, line_length=None):
         waypoint=Waypoint(name="Goal", lat=47.0, lon=8.0, alt_smoothed=500),
         type=TurnpointType.NONE,
     )
-    goal = Goal(type=GoalType.LINE, line_length=line_length)
+    goal = Goal(type=GoalType.LINE)
     return Task(task_type=TaskType.CLASSIC, version=1, turnpoints=[tp1, tp2], goal=goal)
 
 
@@ -60,7 +60,7 @@ class TestGoalLineClass:
         """A line goal builds a GoalLine with the expected geometry."""
         gl = GoalLine.from_task(_line_goal_task(goal_radius=300))
         assert gl is not None
-        # Task.__post_init__ sets line_length to 2 * radius.
+        # The goal-line length is twice the last turnpoint's radius.
         assert gl.length == 600.0
         assert gl.center == (47.0, 8.0)
         assert gl.approach_from == (46.0, 8.0)
@@ -310,7 +310,7 @@ class TestCreateGoalLineFeatures:
         tp1 = Turnpoint(radius=400, waypoint=waypoint1, type=TurnpointType.TAKEOFF)
         tp2 = Turnpoint(radius=400, waypoint=waypoint2, type=TurnpointType.NONE)
 
-        goal = Goal(type=GoalType.LINE, line_length=500.0)
+        goal = Goal(type=GoalType.LINE)
         task = Task(
             task_type=TaskType.CLASSIC, version=1, turnpoints=[tp1, tp2], goal=goal
         )
@@ -324,7 +324,7 @@ class TestCreateGoalLineFeatures:
         assert goal_line["type"] == "Feature"
         assert goal_line["geometry"]["type"] == "LineString"
         assert goal_line["properties"]["type"] == "goal_line"
-        # Task.__post_init__ sets line_length to 2 * radius (400 * 2 = 800)
+        # The goal-line length is twice the last radius (400 * 2 = 800).
         assert goal_line["properties"]["length"] == 800.0
 
         # Check control zone feature
@@ -333,15 +333,15 @@ class TestCreateGoalLineFeatures:
         assert control_zone["geometry"]["type"] == "Polygon"
         assert control_zone["properties"]["type"] == "goal_control_zone"
 
-    def test_create_goal_line_features_no_line_length(self):
-        """Test creating goal line features without explicit line length."""
+    def test_create_goal_line_features_length_tracks_goal_radius(self):
+        """The goal-line length follows the goal turnpoint's radius, not the previous one."""
         waypoint1 = Waypoint(name="TP1", lat=46.0, lon=8.0, alt_smoothed=1000)
         waypoint2 = Waypoint(name="Goal", lat=47.0, lon=8.0, alt_smoothed=500)
 
         tp1 = Turnpoint(radius=400, waypoint=waypoint1, type=TurnpointType.TAKEOFF)
         tp2 = Turnpoint(radius=200, waypoint=waypoint2, type=TurnpointType.NONE)
 
-        goal = Goal(type=GoalType.LINE)  # No line_length specified
+        goal = Goal(type=GoalType.LINE)
         task = Task(
             task_type=TaskType.CLASSIC, version=1, turnpoints=[tp1, tp2], goal=goal
         )
@@ -385,7 +385,7 @@ class TestCreateGoalLineFeatures:
         waypoint1 = Waypoint(name="TP1", lat=46.0, lon=8.0, alt_smoothed=1000)
         tp1 = Turnpoint(radius=400, waypoint=waypoint1, type=TurnpointType.TAKEOFF)
 
-        goal = Goal(type=GoalType.LINE, line_length=500.0)
+        goal = Goal(type=GoalType.LINE)
         task = Task(
             task_type=TaskType.CLASSIC,
             version=1,
@@ -406,7 +406,7 @@ class TestCreateGoalLineFeatures:
         tp1 = Turnpoint(radius=400, waypoint=waypoint1, type=TurnpointType.TAKEOFF)
         tp2 = Turnpoint(radius=400, waypoint=waypoint2, type=TurnpointType.NONE)
 
-        goal = Goal(type=GoalType.LINE, line_length=500.0)
+        goal = Goal(type=GoalType.LINE)
         task = Task(
             task_type=TaskType.CLASSIC, version=1, turnpoints=[tp1, tp2], goal=goal
         )

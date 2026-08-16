@@ -1,107 +1,43 @@
-"""XCTrack Task Data Structures and Domain Models.
+"""XCTrack task data structures and domain models.
 
-This module defines immutable dataclasses, enums, and validation logic for representing,
-parsing, and serializing XCTrack competition tasks. It covers the core domain models:
-  - Task, Turnpoint, Waypoint, Takeoff, SSS, Goal, TimeOfDay
-  - Enums for constrained values (e.g., TaskType, TurnpointType, GoalType)
-  - Serialization/deserialization to/from JSON and internal dicts
-  - Validation and logic for task structure and goal/ESS handling
+The core domain models — ``Task``, ``Turnpoint``, ``Waypoint``, ``Takeoff``,
+``SSS``, ``Goal`` — and their serialization to and from the full JSON format.
 
-Intended for use in parsing, generating, and manipulating XCTrack task formats, including
-support for QR code encoding/decoding and distance calculations (see related modules).
+They are plain dataclasses: not frozen, and they do not validate on
+construction. The only thing ``Task.__post_init__`` does is default an
+unspecified goal type, and it returns a copy rather than mutating what it was
+given. Nothing derived is stored on them.
+
+Neighbouring modules hold what this one deliberately does not:
+  - ``task_enums`` — the constrained values (``TaskType``, ``TurnpointType``, …),
+    re-exported here for callers
+  - ``validation`` — the spec's structural rules, reached via ``Task.validate()``
+  - ``qrcode_conversion`` — the mapping to and from the compact QR format
+  - ``time_of_day`` — ``TimeOfDay``, shared with the QR models
 """
 
 import json
-from dataclasses import dataclass, field
-from enum import Enum
+from dataclasses import dataclass, field, replace
 from typing import Any
 
-from .qrcode_encoding import _round_half_up
+from .passthrough import EXTENSIONS_KEY, read_passthrough, write_passthrough
 from .qrcode_task import QRCodeTask
-from .shared_enums import TimeOfDay
+from .rounding import round_half_up
 
-
-class Direction(str, Enum):
-    """Enumeration of direction types for turnpoints.
-
-    Attributes:
-        ENTER (str): Enter direction.
-        EXIT (str): Exit direction.
-    """
-
-    ENTER = "ENTER"
-    EXIT = "EXIT"
-
-
-# ``sss.direction`` is obsolete: the spec requires readers to ignore it and
-# writers to still emit *some* value so older devices keep working. This is the
-# value used when a task omits the field. EXIT is what all 22 reference tasks
-# carry, so a task read without it re-exports the way XCTrack writes it.
-OBSOLETE_DIRECTION_DEFAULT = Direction.EXIT
-
-
-class EarthModel(str, Enum):
-    """Enumeration of supported earth models.
-
-    Attributes:
-        WGS84 (str): WGS84 ellipsoid.
-        FAI_SPHERE (str): FAI sphere model.
-    """
-
-    WGS84 = "WGS84"
-    FAI_SPHERE = "FAI_SPHERE"
-
-
-class GoalType(str, Enum):
-    """Enumeration of goal types.
-
-    Attributes:
-        CYLINDER (str): Cylinder goal.
-        LINE (str): Line goal.
-    """
-
-    CYLINDER = "CYLINDER"
-    LINE = "LINE"
-
-
-class SSSType(str, Enum):
-    """Enumeration of start of speed section (SSS) types.
-
-    Attributes:
-        RACE (str): Race start.
-        ELAPSED_TIME (str): Elapsed time start.
-    """
-
-    RACE = "RACE"
-    ELAPSED_TIME = "ELAPSED-TIME"
-
-
-class TaskType(str, Enum):
-    """Enumeration of task types.
-
-    Attributes:
-        CLASSIC (str): Classic task.
-        WAYPOINTS (str): Waypoints task.
-    """
-
-    CLASSIC = "CLASSIC"
-    WAYPOINTS = "W"
-
-
-class TurnpointType(str, Enum):
-    """Enumeration of turnpoint types.
-
-    Attributes:
-        NONE (str): No type.
-        TAKEOFF (str): Takeoff point.
-        SSS (str): Start of speed section.
-        ESS (str): End of speed section.
-    """
-
-    NONE = ""
-    TAKEOFF = "TAKEOFF"
-    SSS = "SSS"
-    ESS = "ESS"
+# The enums are re-exported: they are part of task.py's public surface and
+# callers import them from here. They live in their own module so validation.py
+# can use them without importing the model it checks.
+from .task_enums import (  # noqa: F401
+    OBSOLETE_DIRECTION_DEFAULT,
+    Direction,
+    EarthModel,
+    GoalType,
+    SSSType,
+    TaskType,
+    TurnpointType,
+)
+from .time_of_day import TimeOfDay
+from .validation import ValidationIssue, validate_task
 
 
 @dataclass
@@ -156,7 +92,7 @@ class Waypoint:
             name=data["name"],
             lat=data["lat"],
             lon=data["lon"],
-            alt_smoothed=_round_half_up(data["altSmoothed"]),
+            alt_smoothed=round_half_up(data["altSmoothed"]),
             description=data.get("description"),
         )
 
@@ -197,10 +133,7 @@ class Turnpoint:
         }
         if self.type and self.type != TurnpointType.NONE:
             result["type"] = self.type.value
-        if self.extensions:
-            result["extensions"] = self.extensions
-        for key, value in self.unknown.items():
-            result.setdefault(key, value)
+        write_passthrough(result, self.extensions, self.unknown, EXTENSIONS_KEY)
         return result
 
     @classmethod
@@ -221,12 +154,13 @@ class Turnpoint:
         if "type" in data and data["type"]:
             turnpoint_type = TurnpointType(data["type"])
 
+        extensions, unknown = read_passthrough(data, cls.KNOWN_KEYS, EXTENSIONS_KEY)
         return cls(
-            radius=_round_half_up(data["radius"]),
+            radius=round_half_up(data["radius"]),
             waypoint=Waypoint.from_dict(data["waypoint"]),
             type=turnpoint_type,
-            extensions=list(data.get("extensions") or []),
-            unknown={k: v for k, v in data.items() if k not in cls.KNOWN_KEYS},
+            extensions=extensions,
+            unknown=unknown,
         )
 
 
@@ -348,30 +282,31 @@ class SSS:
 class Goal:
     """Represents a goal for a task.
 
-    For goal type LINE, the line_length represents the total length of the goal line. The radius of the last turnpoint represents half of this length. The goal line orientation is perpendicular to the azimuth to the last turnpoint center.
+    For goal type LINE, the radius of the last turnpoint represents half of the
+    goal line's total length. The line itself is not stored here — it is derived
+    from that radius by :func:`~pyxctsk.goal_line.goal_line_length_from_turnpoints`,
+    which is the single source of that rule. The goal line orientation is
+    perpendicular to the azimuth to the last turnpoint center.
 
     Attributes:
         type (Optional[GoalType]): Goal type.
         deadline (Optional[TimeOfDay]): Goal deadline.
         finish_altitude (Optional[float]): Elevated goal altitude in meters AGL,
             measured from the altitude of the last turnpoint.
-        line_length (Optional[float]): Length of the goal line (for LINE type).
-            Derived from the last turnpoint's radius, not a spec field — see
-            :meth:`to_dict`.
     """
 
     type: GoalType | None = None
     deadline: TimeOfDay | None = None
     finish_altitude: float | None = None
-    line_length: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
 
         The spec's goal object has exactly three keys — ``type``, ``deadline``
-        and ``finishAltitude``. ``line_length`` is deliberately not written:
-        it is always twice the last turnpoint's radius, which is what the spec
-        already says that radius means, so emitting it would invent a field.
+        and ``finishAltitude``. The non-spec ``lineLength`` older versions wrote
+        is deliberately not emitted: it is always twice the last turnpoint's
+        radius, which is what the spec already says that radius means, so
+        writing it would invent a field.
 
         Returns:
             Dict[str, Any]: Dictionary representation for JSON.
@@ -389,8 +324,9 @@ class Goal:
     def from_dict(cls, data: dict[str, Any]) -> "Goal":
         """Create from dictionary.
 
-        ``lineLength`` is still read, tolerating files older pyxctsk versions
-        wrote, even though it is not a spec field and is no longer written.
+        The non-spec ``lineLength`` older versions wrote is ignored: it is
+        always twice the last turnpoint's radius, so it carries nothing the
+        turnpoints do not already say.
 
         Args:
             data (Dict[str, Any]): Dictionary to parse.
@@ -401,7 +337,6 @@ class Goal:
         goal_type = None
         deadline = None
         finish_altitude = None
-        line_length = None  # No default line length
 
         if "type" in data:
             goal_type = GoalType(data["type"])
@@ -409,14 +344,11 @@ class Goal:
             deadline = TimeOfDay.from_json_string(data["deadline"])
         if data.get("finishAltitude") is not None:
             finish_altitude = data["finishAltitude"]
-        if "lineLength" in data and data["lineLength"] is not None:
-            line_length = float(data["lineLength"])
 
         return cls(
             type=goal_type,
             deadline=deadline,
             finish_altitude=finish_altitude,
-            line_length=line_length,
         )
 
 
@@ -486,13 +418,15 @@ class Task:
     ) -> "Goal | None":
         """Return the effective goal for a task, applying defaults explicitly.
 
-        Contract — a task with at least one turnpoint always has a goal:
-          - if no goal was supplied, an empty one is created;
-          - an unspecified goal type defaults to ``CYLINDER``;
-          - a ``LINE`` goal's ``line_length`` is twice the last turnpoint's
-            radius, since the radius represents half of the goal line.
+        Contract — a task with at least one turnpoint always has a goal, and
+        that goal always has a type:
+          - if no goal was supplied, a ``CYLINDER`` one is created;
+          - a goal with an unspecified type becomes ``CYLINDER``.
 
         With no turnpoints the goal is returned unchanged (typically ``None``).
+        A goal that already satisfies the contract is returned as-is; otherwise
+        a copy is returned, so constructing a Task never mutates the caller's
+        object.
 
         Args:
             turnpoints: The task's turnpoints.
@@ -505,14 +439,10 @@ class Task:
             return goal
 
         if goal is None:
-            goal = Goal()
+            return Goal(type=GoalType.CYLINDER)
 
         if not goal.type:
-            goal.type = GoalType.CYLINDER
-
-        if goal.type == GoalType.LINE:
-            # The last turnpoint's radius represents half of the goal line length.
-            goal.line_length = float(turnpoints[-1].radius * 2)
+            return replace(goal, type=GoalType.CYLINDER)
 
         return goal
 
@@ -536,10 +466,7 @@ class Task:
             result["sss"] = self.sss.to_dict()
         if self.goal:
             result["goal"] = self.goal.to_dict()
-        if self.extensions:
-            result["extensions"] = self.extensions
-        for key, value in self.unknown.items():
-            result.setdefault(key, value)
+        write_passthrough(result, self.extensions, self.unknown, EXTENSIONS_KEY)
 
         return result
 
@@ -571,6 +498,7 @@ class Task:
         if "goal" in data:
             goal = Goal.from_dict(data["goal"])
 
+        extensions, unknown = read_passthrough(data, cls.KNOWN_KEYS, EXTENSIONS_KEY)
         # Goal defaults are derived once in Task.__post_init__; no need to
         # repeat the rules here.
         return cls(
@@ -581,8 +509,8 @@ class Task:
             takeoff=takeoff,
             sss=sss,
             goal=goal,
-            extensions=list(data.get("extensions") or []),
-            unknown={k: v for k, v in data.items() if k not in cls.KNOWN_KEYS},
+            extensions=extensions,
+            unknown=unknown,
         )
 
     def to_json(self) -> str:
@@ -614,62 +542,23 @@ class Task:
         """
         return QRCodeTask.from_task(self)
 
-    def validate(self) -> list[str]:
+    def validate(self) -> list[ValidationIssue]:
         """Check the task against the spec's structural rules.
 
-        The spec constrains how the special turnpoint types may be arranged:
-
-        - ``TAKEOFF`` "can be used only for the first turnpoint";
-        - ``SSS`` and ``ESS`` "must appear exactly once";
-        - ``SSS`` "must appear before ESS".
-
-        These apply to CLASSIC tasks. An XC/Waypoints task is a plain route
-        with no speed section, so the SSS/ESS rules are not checked for it.
-
-        This is a report, not a gate — parsing accepts structurally invalid
-        tasks so they can still be inspected and converted. Pass
-        ``strict=True`` to :func:`pyxctsk.parse_task` to turn violations into a
+        The rules themselves live in :mod:`pyxctsk.validation`; this is the
+        entry point onto them. Validation is a report, not a gate — parsing
+        accepts structurally invalid tasks so they can still be inspected and
+        converted. Pass ``strict=True`` to :func:`pyxctsk.parse_task` to turn
+        violations into a
         :class:`~pyxctsk.exceptions.TaskValidationError`.
 
         Returns:
-            list[str]: One message per violated rule; empty if the task is valid.
+            list[ValidationIssue]: One issue per violated rule; empty if the
+            task is valid. Each issue names its
+            :class:`~pyxctsk.validation.ValidationRule` and stringifies to a
+            human-readable message.
         """
-        issues: list[str] = []
-
-        if not self.turnpoints:
-            issues.append("task has no turnpoints")
-            return issues
-
-        misplaced = [
-            i
-            for i, tp in enumerate(self.turnpoints)
-            if tp.type == TurnpointType.TAKEOFF and i != 0
-        ]
-        for i in misplaced:
-            issues.append(
-                f"TAKEOFF is only allowed on the first turnpoint, found at index {i}"
-            )
-
-        if self.task_type == TaskType.WAYPOINTS:
-            return issues
-
-        indices = {
-            special: [i for i, tp in enumerate(self.turnpoints) if tp.type == special]
-            for special in (TurnpointType.SSS, TurnpointType.ESS)
-        }
-        for special, found in indices.items():
-            if len(found) != 1:
-                issues.append(
-                    f"{special.value} must appear exactly once, found {len(found)}"
-                )
-
-        sss, ess = indices[TurnpointType.SSS], indices[TurnpointType.ESS]
-        if len(sss) == 1 and len(ess) == 1 and sss[0] > ess[0]:
-            issues.append(
-                f"SSS must appear before ESS, found SSS at {sss[0]} and ESS at {ess[0]}"
-            )
-
-        return issues
+        return validate_task(self)
 
     def find_ess_turnpoint(self) -> Turnpoint | None:
         """Find and return the ESS turnpoint, if any.

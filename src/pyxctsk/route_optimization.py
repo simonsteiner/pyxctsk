@@ -149,13 +149,13 @@ def _collapse_duplicate_circles(
     """
     unique: list[PlaneCircle] = [circles[0]]
     index_of: list[int] = [0]
-    for circle in circles[1:]:
-        # ``len(unique) > 1`` keeps index 0 in a class of its own.
-        if len(unique) > 1 and _same_circle(unique[-1], circle):
-            index_of.append(len(unique) - 1)
-        else:
+    for i, circle in enumerate(circles[1:], start=1):
+        # ``i > 1``: index 1 is never collapsed into index 0, per the takeoff
+        # rule above. Every later circle may merge into its predecessor.
+        collapsible = i > 1 and _same_circle(unique[-1], circle)
+        if not collapsible:
             unique.append(circle)
-            index_of.append(len(unique) - 1)
+        index_of.append(len(unique) - 1)
     return unique, index_of
 
 

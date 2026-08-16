@@ -19,6 +19,13 @@ class QRCodeDirection(IntEnum):
     EXIT = 2
 
 
+#: The value used when a QR task omits the obsolete ``s.d`` field. Kept beside
+#: the enum it belongs to, and asserted equal to the full-JSON format's
+#: :data:`~pyxctsk.task.OBSOLETE_DIRECTION_DEFAULT` by the conversion tests, so
+#: the two readers cannot drift apart.
+QR_OBSOLETE_DIRECTION_DEFAULT = QRCodeDirection.EXIT
+
+
 class QRCodeEarthModel(IntEnum):
     """QR code earth model enumeration.
 

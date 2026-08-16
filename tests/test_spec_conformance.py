@@ -24,6 +24,8 @@ from pyxctsk import (
     TurnpointType,
     parse_task,
 )
+from pyxctsk.goal_line import GoalLine, goal_line_length_from_turnpoints
+from pyxctsk.validation import ValidationRule
 
 # Polyline-encoded "z" literals below are opaque tokens, not words.
 # cspell:ignore Fligr
@@ -163,21 +165,33 @@ class TestGoalSerializedShape:
         }
 
     def test_line_length_still_derived_for_geometry(self):
-        """Dropping it from output must not drop it from the model."""
+        """Dropping it from the model must not drop the geometry it fed."""
         goal = {"type": "LINE", "deadline": "18:00:00Z"}
         task = Task.from_json(task_json(goal=goal))
 
         # Twice the last turnpoint's radius, which the spec says is half the line.
-        assert task.goal is not None
-        assert task.goal.line_length == task.turnpoints[-1].radius * 2
+        assert goal_line_length_from_turnpoints(task.turnpoints) == (
+            task.turnpoints[-1].radius * 2
+        )
+        line = GoalLine.from_task(task)
+        assert line is not None
+        assert line.length == task.turnpoints[-1].radius * 2
 
-    def test_legacy_line_length_is_still_read(self):
-        """Files written by older pyxctsk versions must still parse."""
-        goal = {"type": "CYLINDER", "deadline": "18:00:00Z", "lineLength": "800.0"}
+    def test_legacy_line_length_is_ignored(self):
+        """Files written by older pyxctsk versions must still parse.
+
+        The key carried nothing the turnpoints did not already say, so it is
+        read past rather than stored — and never echoed back on output.
+        """
+        goal = {"type": "LINE", "deadline": "18:00:00Z", "lineLength": "800.0"}
         task = Task.from_json(task_json(goal=goal))
 
         assert task.goal is not None
-        assert task.goal.line_length == 800.0
+        assert "lineLength" not in json.loads(task.to_json())["goal"]
+        # The geometry comes from the radius, not from the discarded key.
+        line = GoalLine.from_task(task)
+        assert line is not None
+        assert line.length == task.turnpoints[-1].radius * 2
 
 
 class TestStructuralValidation:
@@ -188,11 +202,15 @@ class TestStructuralValidation:
     ESS".
     """
 
-    def _mutated(self, mutate) -> list[str]:
+    def _mutated(self, mutate):
         """Return validate() for BASE_TASK after applying a mutation."""
         data = json.loads(task_json())
         mutate(data)
         return Task.from_dict(data).validate()
+
+    def _assert_one(self, issues, rule, message):
+        """Assert a single issue, checking both its rule and its message."""
+        assert [(i.rule, str(i)) for i in issues] == [(rule, message)]
 
     def test_valid_task_reports_nothing(self):
         """The base fixture is spec-valid."""
@@ -208,21 +226,27 @@ class TestStructuralValidation:
         issues = self._mutated(
             lambda d: d["turnpoints"][2].update(type="TAKEOFF"),
         )
-        assert issues == [
-            "TAKEOFF is only allowed on the first turnpoint, found at index 2"
-        ]
+        self._assert_one(
+            issues,
+            ValidationRule.TAKEOFF_NOT_FIRST,
+            "TAKEOFF is only allowed on the first turnpoint, found at index 2",
+        )
 
     def test_sss_must_appear_exactly_once(self):
         """A second SSS is a violation."""
-        assert self._mutated(lambda d: d["turnpoints"][2].update(type="SSS")) == [
-            "SSS must appear exactly once, found 2"
-        ]
+        self._assert_one(
+            self._mutated(lambda d: d["turnpoints"][2].update(type="SSS")),
+            ValidationRule.SPECIAL_NOT_ONCE,
+            "SSS must appear exactly once, found 2",
+        )
 
     def test_ess_must_appear_exactly_once(self):
         """A missing ESS is a violation."""
-        assert self._mutated(lambda d: d["turnpoints"][1].pop("type")) == [
-            "ESS must appear exactly once, found 0"
-        ]
+        self._assert_one(
+            self._mutated(lambda d: d["turnpoints"][1].pop("type")),
+            ValidationRule.SPECIAL_NOT_ONCE,
+            "ESS must appear exactly once, found 0",
+        )
 
     def test_sss_must_precede_ess(self):
         """Order between the two is constrained."""
@@ -231,15 +255,19 @@ class TestStructuralValidation:
             data["turnpoints"][0]["type"] = "ESS"
             data["turnpoints"][1]["type"] = "SSS"
 
-        assert self._mutated(swap) == [
-            "SSS must appear before ESS, found SSS at 1 and ESS at 0"
-        ]
+        self._assert_one(
+            self._mutated(swap),
+            ValidationRule.SSS_AFTER_ESS,
+            "SSS must appear before ESS, found SSS at 1 and ESS at 0",
+        )
 
     def test_empty_task_is_reported_once(self):
         """No turnpoints short-circuits rather than cascading messages."""
         task = Task(task_type=TaskType.CLASSIC, version=1, turnpoints=[])
 
-        assert task.validate() == ["task has no turnpoints"]
+        self._assert_one(
+            task.validate(), ValidationRule.NO_TURNPOINTS, "task has no turnpoints"
+        )
 
     def test_waypoints_tasks_are_exempt_from_speed_section_rules(self):
         """A route "without cylinders" has no speed section to constrain."""
@@ -258,6 +286,42 @@ class TestStructuralValidation:
         assert task.turnpoints[2].type == TurnpointType.TAKEOFF
         assert task.validate() != []
 
+    def test_a_caller_can_branch_on_the_rule_without_reading_prose(self):
+        """The point of the typed issue: react to *which* rule broke.
+
+        A message is free to be reworded; the rule is the contract.
+        """
+
+        def swap(data):
+            data["turnpoints"][0]["type"] = "ESS"
+            data["turnpoints"][1]["type"] = "SSS"
+
+        rules = {issue.rule for issue in self._mutated(swap)}
+
+        assert ValidationRule.SSS_AFTER_ESS in rules
+        assert ValidationRule.NO_TURNPOINTS not in rules
+
+    def test_every_rule_is_reachable(self):
+        """A rule nothing can emit is a rule that does not exist."""
+        emitted = set()
+        for mutate in (
+            lambda d: d["turnpoints"][2].update(type="TAKEOFF"),
+            lambda d: d["turnpoints"][2].update(type="SSS"),
+            lambda d: (
+                d["turnpoints"][0].update(type="ESS"),
+                d["turnpoints"][1].update(type="SSS"),
+            ),
+        ):
+            emitted |= {issue.rule for issue in self._mutated(mutate)}
+        emitted |= {
+            issue.rule
+            for issue in Task(
+                task_type=TaskType.CLASSIC, version=1, turnpoints=[]
+            ).validate()
+        }
+
+        assert emitted == set(ValidationRule)
+
     def test_strict_rejects_an_invalid_task(self):
         """The opt-in flag turns the report into a failure."""
         data = json.loads(task_json())
@@ -266,9 +330,13 @@ class TestStructuralValidation:
         with pytest.raises(TaskValidationError) as excinfo:
             parse_task(json.dumps(data), strict=True)
 
-        assert excinfo.value.issues == [
-            "TAKEOFF is only allowed on the first turnpoint, found at index 2"
-        ]
+        self._assert_one(
+            excinfo.value.issues,
+            ValidationRule.TAKEOFF_NOT_FIRST,
+            "TAKEOFF is only allowed on the first turnpoint, found at index 2",
+        )
+        # The exception message is still the joined prose.
+        assert "found at index 2" in str(excinfo.value)
 
     def test_strict_accepts_a_valid_task(self):
         """Strict must not reject what the spec allows."""
@@ -288,7 +356,7 @@ class TestCompressedQRScheme:
         """Each scheme must announce itself correctly."""
         task = Task.from_json(task_json())
 
-        assert task.to_qr_code_task().to_compressed_string().startswith("XCTSKZ:")
+        assert task.to_qr_code_task().to_string(compressed=True).startswith("XCTSKZ:")
         assert task.to_qr_code_task().to_string().startswith("XCTSK:")
 
     def test_plain_remains_the_default(self):
@@ -297,12 +365,6 @@ class TestCompressedQRScheme:
 
         assert qr.to_string() == qr.to_string(compressed=False)
         assert not qr.to_string().startswith("XCTSKZ:")
-
-    def test_the_two_spellings_agree(self):
-        """The keyword arg and the convenience method are one behavior."""
-        qr = Task.from_json(task_json()).to_qr_code_task()
-
-        assert qr.to_compressed_string() == qr.to_string(compressed=True)
 
     @pytest.mark.parametrize("name", ["task_bevo.txt", "task_noha_route.txt"])
     def test_compressed_round_trips_to_the_same_task(self, name):
@@ -323,7 +385,7 @@ class TestCompressedQRScheme:
         """The point of the format is fitting more task in a scannable code."""
         qr = parse_task(str(REFERENCE_QR / "task_bevo.txt")).to_qr_code_task()
 
-        assert len(qr.to_compressed_string()) < len(qr.to_string())
+        assert len(qr.to_string(compressed=True)) < len(qr.to_string())
 
     def test_parser_accepts_both_schemes(self):
         """The spec makes reading both mandatory."""
@@ -331,7 +393,7 @@ class TestCompressedQRScheme:
 
         assert (
             parse_task(qr.to_string()).to_json()
-            == parse_task(qr.to_compressed_string()).to_json()
+            == parse_task(qr.to_string(compressed=True)).to_json()
         )
 
     def test_compressed_url_is_not_mistaken_for_a_file_path(self):
@@ -343,7 +405,7 @@ class TestCompressedQRScheme:
                 task_json(sss={"type": "RACE", "timeGates": [f"1{n}:00:00Z"]})
             )
             .to_qr_code_task()
-            .to_compressed_string()
+            .to_string(compressed=True)
             for n in range(10)
         ]
         assert any("/" in p for p in payloads), "no sample exercised the '/' case"
@@ -399,9 +461,9 @@ class TestNumericEdgeCases:
     )
     def test_ties_round_like_java_math_round(self, value, expected):
         """floor(x + 0.5), not Python's banker's rounding."""
-        from pyxctsk.qrcode_encoding import _round_half_up
+        from pyxctsk.rounding import round_half_up
 
-        assert _round_half_up(value) == expected
+        assert round_half_up(value) == expected
 
 
 class TestTaskTypeValue:
@@ -433,6 +495,73 @@ class TestTaskTypeValue:
         task = parse_task(str(REFERENCE_QR / "task_bevo.txt"))
 
         assert json.loads(task.to_qr_code_task().to_json())["taskType"] == "CLASSIC"
+
+    def test_format_is_identified_by_its_task_type_key_alone(self):
+        """A waypoints payload missing ``V`` is still a waypoints payload.
+
+        The discriminator used to require both ``T`` and ``V``, so a payload
+        with only ``T`` fell through to the competition reader: the task type
+        came out unset and ``T`` was swallowed as an unknown key, which then
+        re-serialized in the wrong shape.
+        """
+        from pyxctsk.qrcode_enums import QRCodeTaskType
+        from pyxctsk.qrcode_task import QRCodeTask
+
+        qr = QRCodeTask.from_dict({"T": "W", "t": [{"n": "A", "z": "|dz~FligrB?"}]})
+
+        assert qr.task_type == QRCodeTaskType.WAYPOINTS
+        assert qr.unknown == {}
+        assert json.loads(qr.to_json()) == {
+            "T": "W",
+            "V": 2,
+            "t": [{"n": "A", "z": "|dz~FligrB?"}],
+        }
+
+    def test_serialized_shape_follows_task_type_alone(self):
+        """There is one source of truth for the shape, not a flag beside it."""
+        qr = parse_task(str(REFERENCE_QR / "task_bevo.txt")).to_qr_code_task()
+
+        assert json.loads(qr.to_json())["taskType"] == "CLASSIC"
+        assert json.loads(qr.as_waypoints().to_json())["T"] == "W"
+
+    def test_as_waypoints_keeps_only_what_the_format_can_represent(self):
+        """Reducing to waypoints must match what reading the payload back gives.
+
+        ``as_waypoints()`` used to flip the task type and nothing else, so the
+        in-memory copy kept radii, turnpoint types and the timing sections that
+        the simplified payload has nowhere to store. Serialized output was
+        right either way, but ``.as_waypoints().to_task()`` and
+        ``parse_task(.to_waypoints_string())`` described different tasks.
+        """
+        qr = parse_task(str(REFERENCE_QR / "task_bevo.txt")).to_qr_code_task()
+
+        direct = qr.as_waypoints().to_task()
+        round_tripped = parse_task(qr.to_waypoints_string())
+
+        assert direct.to_json() == round_tripped.to_json()
+        assert all(tp.radius == 0 for tp in direct.turnpoints)
+        assert all(tp.type is None for tp in direct.turnpoints)
+        assert direct.sss is None
+
+    def test_both_waypoints_entry_points_agree(self):
+        """from_task_waypoints() and to_waypoints_string() are one definition."""
+        from pyxctsk.qrcode_task import QRCodeTask
+
+        task = parse_task(str(REFERENCE_QR / "task_bevo.txt"))
+
+        assert (
+            QRCodeTask.from_task_waypoints(task).to_string()
+            == task.to_qr_code_task().to_waypoints_string()
+        )
+
+    def test_as_waypoints_does_not_mutate_the_original(self):
+        """Downgrading to waypoints returns a copy, so the source is reusable."""
+        qr = parse_task(str(REFERENCE_QR / "task_bevo.txt")).to_qr_code_task()
+
+        before = qr.to_json()
+        qr.to_waypoints_json()
+
+        assert qr.to_json() == before
 
 
 class TestManufacturerExtensions:
@@ -500,6 +629,24 @@ class TestManufacturerExtensions:
         assert all("extensions" not in tp for tp in emitted["turnpoints"])
         assert "x" not in json.loads(task.to_qr_code_task().to_json())
 
+    def test_legacy_p_key_round_trips_as_an_unknown_key(self):
+        """The dead ``p`` field used to swallow the key and drop it on output.
+
+        ``p`` was a pyxctsk-only polyline of the turnpoint coordinates. It sat
+        on the KNOWN_KEYS allow-list, so an incoming ``p`` was captured into a
+        field that ``to_dict`` never wrote — the exact round-trip loss the
+        unknown-key passthrough exists to prevent, hidden by the allow-list.
+        """
+        from pyxctsk.qrcode_task import QRCodeTask
+
+        source = json.loads(Task.from_json(task_json()).to_qr_code_task().to_json())
+        source["p"] = "_p~iF~ps|U"
+
+        qr = QRCodeTask.from_dict(source)
+
+        assert qr.unknown["p"] == "_p~iF~ps|U"
+        assert json.loads(qr.to_json())["p"] == "_p~iF~ps|U"
+
     def test_turnpoint_x_is_not_read_as_a_coordinate(self):
         """The ``x`` key means extensions, not longitude as it once did."""
         from pyxctsk.qrcode_encoding import encode_competition_turnpoint
@@ -511,6 +658,41 @@ class TestManufacturerExtensions:
         assert turnpoint.lon == pytest.approx(8.1)
         assert turnpoint.lat == pytest.approx(46.5)
         assert turnpoint.extensions == [{"k": "v"}]
+
+
+class TestTurnpointCoordinatesAreNeverInvented:
+    """A malformed ``z`` is an error, not a turnpoint at 0°N 0°E.
+
+    Both QR formats require ``z``. Defaulting the coordinates to zero produced
+    a valid-looking turnpoint in the Gulf of Guinea and reported the task as
+    read successfully — a silent fallback papering over malformed input.
+    """
+
+    def _from_dict(self, data):
+        from pyxctsk.qrcode_models import QRCodeTurnpoint
+
+        return QRCodeTurnpoint.from_dict(data)
+
+    def test_missing_z_raises(self):
+        """No coordinates at all is malformed input."""
+        with pytest.raises(KeyError):
+            self._from_dict({"n": "TP"})
+
+    @pytest.mark.parametrize("count", [0, 1, 2, 5])
+    def test_wrong_number_count_raises(self, count):
+        """Only the 3- and 4-number forms are defined."""
+        from pyxctsk.qrcode_encoding import encode_num
+
+        z = "".join(encode_num(n) for n in range(count))
+        with pytest.raises(ValueError, match="3 or 4 numbers"):
+            self._from_dict({"n": "TP", "z": z})
+
+    def test_the_error_reaches_the_parser_as_a_format_error(self):
+        """Raising here must surface as a descriptive parse failure."""
+        from pyxctsk.exceptions import InvalidFormatError
+
+        with pytest.raises(InvalidFormatError, match="could not be parsed"):
+            parse_task('XCTSK:{"taskType":"CLASSIC","version":2,"t":[{"n":"TP"}]}')
 
 
 class TestWaypointsFormatPreservesExtras:
@@ -549,20 +731,20 @@ class TestWaypointsFormatPreservesExtras:
 
     def test_root_extensions_are_written(self):
         """...and come back out again."""
-        emitted = json.loads(self._parsed().to_json(simplified=True))
+        emitted = json.loads(self._parsed().to_waypoints_json())
 
         assert emitted["x"] == [{"id": "ACME", "a": "1"}]
 
     def test_turnpoint_extensions_and_unknown_are_written(self):
         """Per-turnpoint "x" and unknown keys were read but never re-emitted."""
-        emitted = json.loads(self._parsed().to_json(simplified=True))
+        emitted = json.loads(self._parsed().to_waypoints_json())
 
         assert emitted["t"][0]["x"] == [{"k": "v"}]
         assert emitted["t"][0]["zz"] == "turnpoint-extra"
 
     def test_simplified_roundtrip_is_lossless(self):
         """Nothing in the source may be dropped."""
-        emitted = json.loads(self._parsed().to_json(simplified=True))
+        emitted = json.loads(self._parsed().to_waypoints_json())
 
         assert emitted == self.SOURCE
 
@@ -571,7 +753,7 @@ class TestWaypointsFormatPreservesExtras:
         from pyxctsk.qrcode_task import QRCodeTask
 
         plain = {"T": "W", "V": 2, "t": [{"n": "WPT1", "z": "|dz~FligrB?"}]}
-        emitted = json.loads(QRCodeTask.from_dict(plain).to_json(simplified=True))
+        emitted = json.loads(QRCodeTask.from_dict(plain).to_waypoints_json())
 
         assert emitted == plain
 

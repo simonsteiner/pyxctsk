@@ -30,16 +30,12 @@ import binascii
 import json
 import zlib
 from collections import OrderedDict
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Any
 
-import polyline
-
+from .passthrough import QR_EXTENSIONS_KEY, read_passthrough, write_passthrough
 from .qrcode_enums import (
-    QRCodeDirection,
     QRCodeEarthModel,
-    QRCodeGoalType,
-    QRCodeSSSType,
     QRCodeTaskType,
     QRCodeTurnpointType,
 )
@@ -121,7 +117,6 @@ class QRCodeTask:
     version: int = QR_CODE_TASK_VERSION
     task_type: QRCodeTaskType | None = None
     earth_model: QRCodeEarthModel | None = None
-    turnpoints_polyline: str | None = None
     turnpoints: list[QRCodeTurnpoint] = field(default_factory=list)
     takeoff: QRCodeTakeoff | None = None
     sss: QRCodeSSS | None = None
@@ -130,29 +125,26 @@ class QRCodeTask:
     unknown: dict[str, Any] = field(default_factory=dict)
 
     #: Keys this class understands; everything else lands in ``unknown``.
-    #: ``p`` is a legacy pyxctsk field, not a spec one, but it is read here.
     KNOWN_KEYS = frozenset(
-        {"taskType", "version", "T", "V", "t", "s", "g", "e", "to", "tc", "x", "p"}
+        {"taskType", "version", "T", "V", "t", "s", "g", "e", "to", "tc", "x"}
     )
 
-    def to_dict(self, simplified: bool = False) -> dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
 
         Builds the QR code task dictionary in the precise field order required
         by the XCTrack format specification.
 
-        A WAYPOINTS task always uses the simplified form regardless of the
-        argument: the spec's competition format only defines
-        ``"taskType": "CLASSIC"``, and an XC/Waypoints task is identified by
-        ``"T": "W"`` instead.
-
-        Args:
-            simplified: If True, use simplified XC/Waypoints format with only T, V, and t fields
+        The shape follows from :attr:`task_type` alone. A WAYPOINTS task is the
+        simplified XC/Waypoints form, identified by ``"T": "W"``; anything else
+        is the competition form, whose only defined ``taskType`` is
+        ``"CLASSIC"``. To render a task in the other shape, change its type —
+        see :meth:`to_waypoints_json`.
 
         Returns:
             Dictionary with QR code task format fields
         """
-        if simplified or self.task_type == QRCodeTaskType.WAYPOINTS:
+        if self.task_type == QRCodeTaskType.WAYPOINTS:
             # XC/Waypoints simplified format
             simplified_result: OrderedDict[str, Any] = OrderedDict()
             simplified_result["T"] = "W"  # taskType: Waypoints
@@ -166,10 +158,9 @@ class QRCodeTask:
             # Extensions and unknown keys are preserved here for the same
             # reason as in the full format: from_dict reads them, so dropping
             # them on the way out would lose data on a round-trip.
-            if self.extensions:
-                simplified_result["x"] = self.extensions
-            for key, value in self.unknown.items():
-                simplified_result.setdefault(key, value)
+            write_passthrough(
+                simplified_result, self.extensions, self.unknown, QR_EXTENSIONS_KEY
+            )
 
             return simplified_result
 
@@ -192,7 +183,7 @@ class QRCodeTask:
             result["t"] = [tp.to_dict() for tp in self.turnpoints]
 
         # 4. Task type - CLASSIC is the only value this format defines;
-        #    WAYPOINTS took the simplified branch above.
+        #    WAYPOINTS took the branch above.
         if self.task_type is not None:
             result["taskType"] = "CLASSIC"
 
@@ -213,11 +204,8 @@ class QRCodeTask:
         # 7. Version
         result["version"] = self.version
 
-        # 8. Extensions last, matching the order the spec lists them in
-        if self.extensions:
-            result["x"] = self.extensions
-        for key, value in self.unknown.items():
-            result.setdefault(key, value)
+        # 8. Extensions and unknown keys last
+        write_passthrough(result, self.extensions, self.unknown, QR_EXTENSIONS_KEY)
 
         return result
 
@@ -226,9 +214,16 @@ class QRCodeTask:
         """Create from dictionary.
 
         Handles both full format and simplified XC/Waypoints format.
+
+        Each format is identified by its own task-type key, and only that:
+        ``T`` for the simplified one, ``taskType`` for the competition one.
+        The competition format has no ``T``, so there is no ambiguity. Version
+        is not part of the discriminator — a payload missing ``V`` is still
+        plainly a waypoints task, and treating it as a competition one left the
+        task type unset and swallowed ``T`` as an unknown key.
         """
-        # Check if this is the simplified XC/Waypoints format
-        is_simplified = "T" in data and "V" in data
+        is_simplified = "T" in data
+        extensions, unknown = read_passthrough(data, cls.KNOWN_KEYS, QR_EXTENSIONS_KEY)
 
         if is_simplified:
             # Simplified XC/Waypoints format
@@ -245,13 +240,12 @@ class QRCodeTask:
                 version=version,
                 task_type=simplified_task_type,
                 earth_model=None,  # Default to WGS84
-                turnpoints_polyline=None,
                 turnpoints=turnpoints,
                 takeoff=None,
                 sss=None,
                 goal=None,
-                extensions=list(data.get("x") or []),
-                unknown={k: v for k, v in data.items() if k not in cls.KNOWN_KEYS},
+                extensions=extensions,
+                unknown=unknown,
             )
 
         # Full format
@@ -270,10 +264,6 @@ class QRCodeTask:
             e_val = data["e"]
             e_int = e_val if isinstance(e_val, int) else int(str(e_val))
             earth_model = QRCodeEarthModel(e_int)
-
-        turnpoints_polyline = data.get("p")
-        if turnpoints_polyline is not None:
-            turnpoints_polyline = str(turnpoints_polyline)
 
         turnpoints = []
         if "t" in data and isinstance(data["t"], list):
@@ -302,25 +292,57 @@ class QRCodeTask:
             version=version,
             task_type=task_type,
             earth_model=earth_model,
-            turnpoints_polyline=turnpoints_polyline,
             turnpoints=turnpoints,
             takeoff=takeoff,
             sss=sss,
             goal=goal,
-            extensions=list(data.get("x") or []),
-            unknown={k: v for k, v in data.items() if k not in cls.KNOWN_KEYS},
+            extensions=extensions,
+            unknown=unknown,
         )
 
-    def to_json(self, simplified: bool = False) -> str:
+    def to_json(self) -> str:
         """Convert to JSON string.
 
         Returns:
             Compact JSON string suitable for QR code embedding
         """
-        return json.dumps(
-            self.to_dict(simplified=simplified),
-            separators=(",", ":"),
-            ensure_ascii=False,
+        return json.dumps(self.to_dict(), separators=(",", ":"), ensure_ascii=False)
+
+    def as_waypoints(self) -> "QRCodeTask":
+        """Return this task as an XC/Waypoints one.
+
+        Rendering the simplified shape is a change of task type, not a mode
+        flag: ``to_dict`` follows :attr:`task_type` and nothing else.
+
+        The copy is reduced to what the format can represent — "a simple route
+        from waypoints without cylinders". Radii, turnpoint types, descriptions,
+        the timing sections and the earth model are dropped, because the
+        simplified payload has nowhere to put them. Serialized output is
+        unchanged either way, since ``to_dict`` never wrote those fields; what
+        this fixes is the in-memory object, which used to keep values that
+        reading the same payload back would not produce. Extensions and unknown
+        keys stay: the simplified payload does carry those.
+
+        Returns:
+            QRCodeTask: A copy typed WAYPOINTS, carrying only representable
+            values.
+        """
+        return replace(
+            self,
+            task_type=QRCodeTaskType.WAYPOINTS,
+            turnpoints=[
+                replace(
+                    tp,
+                    radius=0,
+                    type=QRCodeTurnpointType.NONE,
+                    description=None,
+                )
+                for tp in self.turnpoints
+            ],
+            earth_model=None,
+            takeoff=None,
+            sss=None,
+            goal=None,
         )
 
     def to_waypoints_json(self) -> str:
@@ -329,13 +351,7 @@ class QRCodeTask:
         Returns:
             Compact JSON string in XC/Waypoints format
         """
-        return self.to_json(simplified=True)
-
-    def _to_scheme_string(self, json_str: str, compressed: bool) -> str:
-        """Prefix a payload with the scheme it belongs to, compressing if asked."""
-        if compressed:
-            return QR_CODE_SCHEME_COMPRESSED + compress_payload(json_str)
-        return QR_CODE_SCHEME + json_str
+        return self.as_waypoints().to_json()
 
     def to_string(self, compressed: bool = False) -> str:
         """Convert to a QR code URL string.
@@ -348,17 +364,9 @@ class QRCodeTask:
         Returns:
             Complete QR code string with the XCTSK: or XCTSKZ: scheme prefix
         """
-        return self._to_scheme_string(self.to_json(), compressed)
-
-    def to_compressed_string(self) -> str:
-        """Convert to an ``XCTSKZ:`` URL string.
-
-        Convenience for :meth:`to_string` with ``compressed=True``.
-
-        Returns:
-            Complete QR code string with the XCTSKZ: scheme prefix
-        """
-        return self.to_string(compressed=True)
+        if compressed:
+            return QR_CODE_SCHEME_COMPRESSED + compress_payload(self.to_json())
+        return QR_CODE_SCHEME + self.to_json()
 
     def to_waypoints_string(self, compressed: bool = False) -> str:
         """Convert to an XC/Waypoints QR code URL string.
@@ -369,7 +377,7 @@ class QRCodeTask:
         Returns:
             Complete QR code string in simplified format
         """
-        return self._to_scheme_string(self.to_waypoints_json(), compressed)
+        return self.as_waypoints().to_string(compressed=compressed)
 
     @classmethod
     def from_json(cls, json_str: str) -> "QRCodeTask":
@@ -409,129 +417,19 @@ class QRCodeTask:
     def from_task(cls, task: "Task") -> "QRCodeTask":
         """Convert from regular Task format.
 
-        Converts a full Task object to the compressed QR code format.
-        This involves encoding coordinates and reducing data size.
-
         Args:
             task: Task object to convert
 
         Returns:
             QRCodeTask instance optimized for QR code embedding
         """
-        from .task import (
-            Direction,
-            EarthModel,
-            GoalType,
-            SSSType,
-            TaskType,
-            TurnpointType,
-        )
+        from .qrcode_conversion import task_to_qr_code_task
 
-        # Convert task type
-        qr_task_type = None
-        if task.task_type == TaskType.CLASSIC:
-            qr_task_type = QRCodeTaskType.CLASSIC
-        elif task.task_type == TaskType.WAYPOINTS:
-            qr_task_type = QRCodeTaskType.WAYPOINTS
-
-        # Convert earth model
-        qr_earth_model = None
-        if task.earth_model == EarthModel.WGS84:
-            qr_earth_model = QRCodeEarthModel.WGS84
-        elif task.earth_model == EarthModel.FAI_SPHERE:
-            qr_earth_model = QRCodeEarthModel.FAI_SPHERE
-
-        # Convert turnpoints
-        qr_turnpoints = []
-        coordinates = []
-
-        for tp in task.turnpoints:
-            qr_type = QRCodeTurnpointType.NONE
-            if tp.type == TurnpointType.TAKEOFF:
-                qr_type = QRCodeTurnpointType.TAKEOFF
-            elif tp.type == TurnpointType.SSS:
-                qr_type = QRCodeTurnpointType.SSS
-            elif tp.type == TurnpointType.ESS:
-                qr_type = QRCodeTurnpointType.ESS
-
-            qr_turnpoint = QRCodeTurnpoint(
-                lat=tp.waypoint.lat,
-                lon=tp.waypoint.lon,
-                radius=tp.radius,
-                name=tp.waypoint.name,
-                alt_smoothed=tp.waypoint.alt_smoothed,
-                type=qr_type,
-                description=tp.waypoint.description,
-                extensions=tp.extensions,
-                unknown=tp.unknown,
-            )
-            qr_turnpoints.append(qr_turnpoint)
-            coordinates.append((tp.waypoint.lat, tp.waypoint.lon))
-
-        # Generate polyline from coordinates
-        turnpoints_polyline = polyline.encode(coordinates, precision=5)
-
-        # Convert takeoff
-        qr_takeoff = None
-        if task.takeoff:
-            qr_takeoff = QRCodeTakeoff(
-                time_open=task.takeoff.time_open,
-                time_close=task.takeoff.time_close,
-            )
-
-        # Convert SSS
-        qr_sss = None
-        if task.sss:
-            qr_direction = (
-                QRCodeDirection.ENTER
-                if task.sss.direction == Direction.ENTER
-                else QRCodeDirection.EXIT
-            )
-            qr_sss_type = (
-                QRCodeSSSType.RACE
-                if task.sss.type == SSSType.RACE
-                else QRCodeSSSType.ELAPSED_TIME
-            )
-
-            qr_sss = QRCodeSSS(
-                direction=qr_direction,
-                type=qr_sss_type,
-                time_gates=task.sss.time_gates,
-            )
-
-        # Convert goal
-        qr_goal = None
-        if task.goal:
-            qr_goal_type = None
-            if task.goal.type == GoalType.LINE:
-                qr_goal_type = QRCodeGoalType.LINE
-            elif task.goal.type == GoalType.CYLINDER:
-                qr_goal_type = QRCodeGoalType.CYLINDER
-
-            qr_goal = QRCodeGoal(
-                deadline=task.goal.deadline,
-                type=qr_goal_type,
-                finish_altitude=task.goal.finish_altitude,
-            )
-
-        return cls(
-            version=QR_CODE_TASK_VERSION,
-            task_type=qr_task_type,
-            earth_model=qr_earth_model,
-            turnpoints_polyline=turnpoints_polyline,
-            turnpoints=qr_turnpoints,
-            takeoff=qr_takeoff,
-            sss=qr_sss,
-            goal=qr_goal,
-            extensions=task.extensions,
-            unknown=task.unknown,
-        )
+        return task_to_qr_code_task(task)
 
     @classmethod
     def from_task_waypoints(cls, task: "Task") -> "QRCodeTask":
         """Convert from regular Task format to XC/Waypoints simplified format.
-
-        Creates a simplified waypoints task with only essential turnpoint data.
 
         Args:
             task: Task object to convert
@@ -539,148 +437,16 @@ class QRCodeTask:
         Returns:
             QRCodeTask instance optimized for XC/Waypoints format
         """
-        # Convert turnpoints to simplified format
-        qr_turnpoints = []
-        for tp in task.turnpoints:
-            # For waypoints format, we don't need type or description
-            qr_turnpoint = QRCodeTurnpoint(
-                lat=tp.waypoint.lat,
-                lon=tp.waypoint.lon,
-                radius=tp.radius,
-                name=tp.waypoint.name,
-                alt_smoothed=tp.waypoint.alt_smoothed,
-                type=QRCodeTurnpointType.NONE,  # Simplified format doesn't use types
-                description=None,  # Simplified format doesn't use descriptions
-            )
-            qr_turnpoints.append(qr_turnpoint)
+        from .qrcode_conversion import task_to_qr_code_waypoints
 
-        return cls(
-            version=QR_CODE_TASK_VERSION,
-            task_type=QRCodeTaskType.WAYPOINTS,
-            earth_model=None,  # Default to WGS84
-            turnpoints_polyline=None,
-            turnpoints=qr_turnpoints,
-            takeoff=None,
-            sss=None,
-            goal=None,
-        )
+        return task_to_qr_code_waypoints(task)
 
     def to_task(self) -> "Task":
         """Convert to regular Task format.
 
-        Converts the compressed QR code format back to a full Task object.
-        This involves decoding coordinates and expanding data structures.
-
         Returns:
             Task object with full format specification
         """
-        from .task import (
-            SSS,
-            Direction,
-            EarthModel,
-            Goal,
-            GoalType,
-            SSSType,
-            Takeoff,
-            Task,
-            TaskType,
-            Turnpoint,
-            TurnpointType,
-            Waypoint,
-        )
+        from .qrcode_conversion import qr_code_task_to_task
 
-        # Convert task type
-        task_type = TaskType.CLASSIC
-        if self.task_type == QRCodeTaskType.WAYPOINTS:
-            task_type = TaskType.WAYPOINTS
-
-        # Convert earth model
-        earth_model = None
-        if self.earth_model == QRCodeEarthModel.WGS84:
-            earth_model = EarthModel.WGS84
-        elif self.earth_model == QRCodeEarthModel.FAI_SPHERE:
-            earth_model = EarthModel.FAI_SPHERE
-
-        # Convert turnpoints
-        turnpoints = []
-        for qr_tp in self.turnpoints:
-            tp_type = None
-            if qr_tp.type == QRCodeTurnpointType.TAKEOFF:
-                tp_type = TurnpointType.TAKEOFF
-            elif qr_tp.type == QRCodeTurnpointType.SSS:
-                tp_type = TurnpointType.SSS
-            elif qr_tp.type == QRCodeTurnpointType.ESS:
-                tp_type = TurnpointType.ESS
-
-            waypoint = Waypoint(
-                name=qr_tp.name,
-                lat=qr_tp.lat,
-                lon=qr_tp.lon,
-                alt_smoothed=qr_tp.alt_smoothed,
-                description=qr_tp.description,
-            )
-
-            turnpoint = Turnpoint(
-                radius=qr_tp.radius,
-                waypoint=waypoint,
-                type=tp_type,
-                extensions=qr_tp.extensions,
-                unknown=qr_tp.unknown,
-            )
-            turnpoints.append(turnpoint)
-
-        # Convert takeoff
-        takeoff = None
-        if self.takeoff:
-            takeoff = Takeoff(
-                time_open=self.takeoff.time_open,
-                time_close=self.takeoff.time_close,
-            )
-
-        # Convert SSS
-        sss = None
-        if self.sss:
-            direction = (
-                Direction.ENTER
-                if self.sss.direction == QRCodeDirection.ENTER
-                else Direction.EXIT
-            )
-            sss_type = (
-                SSSType.RACE
-                if self.sss.type == QRCodeSSSType.RACE
-                else SSSType.ELAPSED_TIME
-            )
-
-            sss = SSS(
-                type=sss_type,
-                direction=direction,
-                time_gates=self.sss.time_gates,
-                time_close=None,  # QR code format doesn't include time_close
-            )
-
-        # Convert goal
-        goal = None
-        if self.goal:
-            goal_type = None
-            if self.goal.type == QRCodeGoalType.LINE:
-                goal_type = GoalType.LINE
-            elif self.goal.type == QRCodeGoalType.CYLINDER:
-                goal_type = GoalType.CYLINDER
-
-            goal = Goal(
-                type=goal_type,
-                deadline=self.goal.deadline,
-                finish_altitude=self.goal.finish_altitude,
-            )
-
-        return Task(
-            task_type=task_type,
-            version=1,  # Regular task version
-            turnpoints=turnpoints,
-            earth_model=earth_model,
-            takeoff=takeoff,
-            sss=sss,
-            goal=goal,
-            extensions=self.extensions,
-            unknown=self.unknown,
-        )
+        return qr_code_task_to_task(self)

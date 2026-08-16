@@ -27,22 +27,15 @@ def _task_to_turnpoints(task: Task) -> list[TaskTurnpoint]:
     """
     # Determine if there's a goal and its type
     goal_type = None
-    goal_line_length = None  # No default goal line length
+    goal_line_length = None  # None unless the goal is a line
 
     # Process goal if there are turnpoints
-    if task.turnpoints:
-        # Goal can be explicitly defined or implicitly defined by the last turnpoint
-        if task.goal:
-            # Explicit goal definition
-            goal_type = task.goal.type.value if task.goal.type else "CYLINDER"
+    if task.turnpoints and task.goal:
+        goal_type = task.goal.type.value if task.goal.type else "CYLINDER"
 
-            # For goal LINE type, get line length from goal or last turnpoint
-            if goal_type == "LINE":
-                # Use goal line length if specified, otherwise derive from turnpoint radius
-                if task.goal.line_length is not None:
-                    goal_line_length = task.goal.line_length
-                else:
-                    goal_line_length = goal_line_length_from_turnpoints(task.turnpoints)
+        # A goal line's length is always twice the last turnpoint's radius.
+        if goal_type == "LINE":
+            goal_line_length = goal_line_length_from_turnpoints(task.turnpoints)
 
     result = []
     earth_model = task.earth_model
@@ -53,10 +46,6 @@ def _task_to_turnpoints(task: Task) -> list[TaskTurnpoint]:
             # This is the goal turnpoint (last one in the list)
             if goal_type == "LINE":
                 # This is a goal line turnpoint
-                if goal_line_length is None and tp.radius > 0:
-                    # Derive goal line length from the last turnpoint radius
-                    goal_line_length = goal_line_length_from_turnpoints(task.turnpoints)
-
                 result.append(
                     TaskTurnpoint(
                         lat=tp.waypoint.lat,

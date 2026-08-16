@@ -191,13 +191,18 @@ def parse_task(data: bytes | str, strict: bool = False) -> Task:
         except UnicodeDecodeError:
             text = None
 
+    # Format detection: the first adapter that recognizes the input wins.
     for parser in _FORMAT_PARSERS:
         task = parser(text, raw)
         if task is not None:
-            if strict:
-                issues = task.validate()
-                if issues:
-                    raise TaskValidationError(issues)
-            return task
+            break
+    else:
+        raise InvalidFormatError("invalid format")
 
-    raise InvalidFormatError("invalid format")
+    # Structural validation is a separate question from which format this was.
+    if strict:
+        issues = task.validate()
+        if issues:
+            raise TaskValidationError(issues)
+
+    return task
