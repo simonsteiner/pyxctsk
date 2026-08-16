@@ -43,6 +43,7 @@ ndarray
 newlinestring
 newpoint
 newpolygon
+noha
 nosetests
 oneline
 openair
