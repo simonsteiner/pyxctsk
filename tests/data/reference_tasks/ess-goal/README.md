@@ -34,8 +34,9 @@ with XCTrack's numbers.
 These were collected while looking for tasks with an **elevated goal**, and the
 directory was originally named for that. They do not contain one: there is no
 `goal.finishAltitude` in `do-t3.xctsk` and no `fa` key in any of the three QR
-payloads. `goal.finishAltitude` support is covered by unit tests in
-`tests/test_spec_conformance.py`; real-world coverage for it is still missing.
+payloads. Real tasks that *do* set an elevated goal live in
+[`../elevated-goal/`](../elevated-goal/) — though they store it outside the
+spec, which is its own story.
 
 ## What they pin
 

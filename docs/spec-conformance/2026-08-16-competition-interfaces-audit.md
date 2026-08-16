@@ -304,6 +304,41 @@ Neither holds given findings 1–3.
 
 ---
 
+## Addendum — a producer that puts the finish altitude outside the spec
+
+Found after the audit, while checking a set of scanned competition QR codes now
+kept in `tests/data/reference_tasks/elevated-goal/`. Eight tasks, all carrying:
+
+```
+root          "o": {"v": 2, "fa": 1220}
+per-turnpoint "o": {"a1": 180}
+```
+
+`fa` is the elevated goal altitude — the goal waypoint sits at 1020 m in every
+task, exactly 200 m below it. The encoding departs from the spec three ways:
+the value belongs at `g.fa` inside the goal object rather than a top-level
+`o`; the spec defines `finishAltitude` as *"meters AGL (computed from the
+altitude of the last turnpoint)"*, so a conformant encoding would be
+`"g": {"fa": 200}` rather than 1220 absolute AMSL; and manufacturer data
+belongs in `x` with an obligatory `id`.
+
+Two things follow for pyxctsk, neither a spec defect on our side:
+
+1. **Unknown fields are now preserved verbatim** (`Task.unknown`,
+   `Turnpoint.unknown`). Parsing these previously discarded the elevated goal
+   silently. Preservation is not interpretation — see below.
+2. **`o.fa` is deliberately not mapped onto `goal.finish_altitude`.** The
+   datums differ, so copying 1220 into a field defined as AGL-above-goal would
+   be wrong by the 1020 m the waypoint already sits at. Turning a value we fail
+   to understand into one we report wrongly is the worse failure, and a test
+   pins `finish_altitude is None` to stop a future change making that trade.
+
+The wider lesson for this audit: `finishAltitude` is *implemented* but still has
+no conformant real-world fixture. The one producer we have seen that sets an
+elevated goal does not use the spec's field.
+
+---
+
 ## Out of scope: `misc/vali-xctrack`
 
 Confirmed by running it:
