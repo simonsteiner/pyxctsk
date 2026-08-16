@@ -328,34 +328,44 @@ class Goal:
     Attributes:
         type (Optional[GoalType]): Goal type.
         deadline (Optional[TimeOfDay]): Goal deadline.
+        finish_altitude (Optional[float]): Elevated goal altitude in meters AGL,
+            measured from the altitude of the last turnpoint.
         line_length (Optional[float]): Length of the goal line (for LINE type).
+            Derived from the last turnpoint's radius, not a spec field — see
+            :meth:`to_dict`.
     """
 
     type: GoalType | None = None
     deadline: TimeOfDay | None = None
+    finish_altitude: float | None = None
     line_length: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
 
+        The spec's goal object has exactly three keys — ``type``, ``deadline``
+        and ``finishAltitude``. ``line_length`` is deliberately not written:
+        it is always twice the last turnpoint's radius, which is what the spec
+        already says that radius means, so emitting it would invent a field.
+
         Returns:
             Dict[str, Any]: Dictionary representation for JSON.
         """
-        result = {}
+        result: dict[str, Any] = {}
         if self.type:
             result["type"] = self.type.value
         if self.deadline:
             result["deadline"] = self.deadline.to_json_string()
-        if self.type == GoalType.LINE and self.line_length is not None:
-            # For goal LINE type, lineLength represents the total length of the goal line
-            result["lineLength"] = str(
-                self.line_length
-            )  # Convert to string for consistency
+        if self.finish_altitude is not None:
+            result["finishAltitude"] = self.finish_altitude
         return result
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Goal":
         """Create from dictionary.
+
+        ``lineLength`` is still read, tolerating files older pyxctsk versions
+        wrote, even though it is not a spec field and is no longer written.
 
         Args:
             data (Dict[str, Any]): Dictionary to parse.
@@ -365,16 +375,24 @@ class Goal:
         """
         goal_type = None
         deadline = None
+        finish_altitude = None
         line_length = None  # No default line length
 
         if "type" in data:
             goal_type = GoalType(data["type"])
         if "deadline" in data:
             deadline = TimeOfDay.from_json_string(data["deadline"])
+        if data.get("finishAltitude") is not None:
+            finish_altitude = data["finishAltitude"]
         if "lineLength" in data and data["lineLength"] is not None:
             line_length = float(data["lineLength"])
 
-        return cls(type=goal_type, deadline=deadline, line_length=line_length)
+        return cls(
+            type=goal_type,
+            deadline=deadline,
+            finish_altitude=finish_altitude,
+            line_length=line_length,
+        )
 
 
 @dataclass

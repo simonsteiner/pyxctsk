@@ -107,6 +107,68 @@ class TestObsoleteSSSDirection:
         assert qr_fallback.name == OBSOLETE_DIRECTION_DEFAULT.name
 
 
+class TestGoalSerializedShape:
+    """Findings 1 and 6 — the goal object's keys are type/deadline/finishAltitude.
+
+    Spec: ``finishAltitude`` is "number, optional, meters AGL - elevated goal
+    altitude". ``lineLength`` is not in the spec at all.
+    """
+
+    def test_finish_altitude_survives_json_roundtrip(self):
+        """A scored competition parameter must not be dropped."""
+        goal = {"type": "CYLINDER", "deadline": "18:00:00Z", "finishAltitude": 50}
+        task = Task.from_json(task_json(goal=goal))
+
+        assert task.goal is not None
+        assert task.goal.finish_altitude == 50
+        assert json.loads(task.to_json())["goal"]["finishAltitude"] == 50
+
+    def test_finish_altitude_survives_qr_roundtrip(self):
+        """The QR format carries it as "fa"."""
+        goal = {"type": "LINE", "deadline": "18:00:00Z", "finishAltitude": 50}
+        task = Task.from_json(task_json(goal=goal))
+
+        qr = task.to_qr_code_task()
+        assert json.loads(qr.to_json())["g"]["fa"] == 50
+        assert qr.to_task().goal.finish_altitude == 50
+
+    def test_finish_altitude_omitted_when_absent(self):
+        """An optional field must stay absent, not become null or zero."""
+        goal = {"type": "CYLINDER", "deadline": "18:00:00Z"}
+        task = Task.from_json(task_json(goal=goal))
+
+        assert "finishAltitude" not in json.loads(task.to_json())["goal"]
+        assert "fa" not in json.loads(task.to_qr_code_task().to_json())["g"]
+
+    def test_goal_keys_are_spec_keys_only(self):
+        """LineLength is not a spec field and must not be written."""
+        goal = {"type": "LINE", "deadline": "18:00:00Z", "finishAltitude": 50}
+        task = Task.from_json(task_json(goal=goal))
+
+        assert set(json.loads(task.to_json())["goal"]) <= {
+            "type",
+            "deadline",
+            "finishAltitude",
+        }
+
+    def test_line_length_still_derived_for_geometry(self):
+        """Dropping it from output must not drop it from the model."""
+        goal = {"type": "LINE", "deadline": "18:00:00Z"}
+        task = Task.from_json(task_json(goal=goal))
+
+        # Twice the last turnpoint's radius, which the spec says is half the line.
+        assert task.goal is not None
+        assert task.goal.line_length == task.turnpoints[-1].radius * 2
+
+    def test_legacy_line_length_is_still_read(self):
+        """Files written by older pyxctsk versions must still parse."""
+        goal = {"type": "CYLINDER", "deadline": "18:00:00Z", "lineLength": "800.0"}
+        task = Task.from_json(task_json(goal=goal))
+
+        assert task.goal is not None
+        assert task.goal.line_length == 800.0
+
+
 class TestWaypointsTaskEncoding:
     """Findings 7 and 8 — the XC/Waypoints ``z`` carries three numbers.
 

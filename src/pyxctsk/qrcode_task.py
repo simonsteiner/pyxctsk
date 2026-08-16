@@ -404,6 +404,7 @@ class QRCodeTask:
             qr_goal = QRCodeGoal(
                 deadline=task.goal.deadline,
                 type=qr_goal_type,
+                finish_altitude=task.goal.finish_altitude,
             )
 
         return cls(
@@ -558,6 +559,7 @@ class QRCodeTask:
             goal = Goal(
                 type=goal_type,
                 deadline=self.goal.deadline,
+                finish_altitude=self.goal.finish_altitude,
             )
 
         return Task(

@@ -38,10 +38,12 @@ class QRCodeGoal:
     Fields correspond to JSON format:
     - deadline: Goal deadline time (optional, defaults to 23:00 local time)
     - type: Goal type - LINE (1) or CYLINDER (2, default)
+    - finish_altitude: Elevated goal altitude in meters AGL (optional, "fa")
     """
 
     deadline: TimeOfDay | None = None
     type: QRCodeGoalType | None = None
+    finish_altitude: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -50,6 +52,8 @@ class QRCodeGoal:
             result["d"] = self.deadline.to_json_string()
         if self.type is not None:
             result["t"] = self.type.value
+        if self.finish_altitude is not None:
+            result["fa"] = self.finish_altitude
         return result
 
     @classmethod
@@ -65,7 +69,11 @@ class QRCodeGoal:
         if "t" in data:
             goal_type = QRCodeGoalType(data["t"])
 
-        return cls(deadline=deadline, type=goal_type)
+        finish_altitude = None
+        if data.get("fa") is not None:
+            finish_altitude = data["fa"]
+
+        return cls(deadline=deadline, type=goal_type, finish_altitude=finish_altitude)
 
 
 @dataclass
