@@ -309,3 +309,39 @@ P1 and P2 are both *deletions* — they remove concepts rather than rearranging 
 touches behavior. Do those two first; they are the cheapest items here and the ones that make
 the module smaller. P3 next, then P5, which is the extraction that stops `qrcode_task.py` from
 becoming the next 1000-line file.
+
+## Outcome
+
+All eleven items were applied on `refactor/code-quality-plan-2026-08-16`, one commit each (P6
+and P7 landed together — collapsing the stringify surface depends on the `simplified` flag
+being gone). The suite went from 320 to 355 tests, green throughout, and every reference QR
+string in `tests/data/reference_tasks/qrcode_string/` is still byte-identical.
+
+What actually came out:
+
+| | before | after |
+|---|---|---|
+| `qrcode_task.py` | 686 lines | 428 |
+| runtime dependencies | 9 | 8 (`polyline` deleted) |
+| passthrough implementations | 10 | 1 (`passthrough.py`) |
+| ways to compute a goal-line length | 4 | 1 |
+| QR stringify entry points | 4 | 2 |
+
+Three new modules, each with one job: `passthrough.py`, `rounding.py`, `qrcode_conversion.py`.
+Four fields deleted outright (`Goal.line_length`, `QRCodeTask.turnpoints_polyline`) or reduced
+to a single source (`OBSOLETE_DIRECTION_DEFAULT`, the `simplified` flag).
+
+Six of the eleven changed public API. They are listed in `CHANGELOG.md` under `[Unreleased]`
+with `BREAKING CHANGE:` footers on the commits: `Goal.line_length`,
+`QRCodeTask.turnpoints_polyline`, `to_compressed_string()`, the `simplified` parameter on
+`to_dict`/`to_json`, and `QRCodeTurnpoint.from_dict` now raising on a malformed `z`. None of
+them affect reading or writing a spec-valid task.
+
+Follow-ups deliberately **not** taken here, for a later review to weigh:
+
+- `task.py` is 690 lines and holds seven dataclasses plus `Task.validate`. Under the 1k line
+  but the largest file in `src/`; splitting the enums out would be the obvious first cut.
+- `Task.validate()` returns `list[str]` — English prose as an error model. Fine today, and a
+  typed model would only pay off if a caller ever needs to branch on *which* rule broke.
+- `QRCodeTask.from_dict` still infers the simplified format from `"T" in data and "V" in data`
+  rather than from a declared discriminator. It matches what producers emit, so leave it.
