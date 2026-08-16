@@ -20,8 +20,9 @@ from pyxctsk import Task, TurnpointType, parse_task
 from pyxctsk.distance import optimized_distance, optimized_route_coordinates
 from pyxctsk.distance.task_distances import task_to_turnpoints
 from pyxctsk.distance.turnpoint import geodesic_distance
+from tests.paths import ESS_GOAL_DIR
 
-FIXTURES = Path(__file__).parent / "data" / "reference_tasks" / "ess-goal"
+FIXTURES = ESS_GOAL_DIR
 
 #: Tasks whose last two turnpoints are the same waypoint, one marked ESS.
 DUPLICATE_GOAL_TASKS = ["task2", "task3", "task4"]

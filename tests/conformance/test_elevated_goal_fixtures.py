@@ -10,14 +10,14 @@ silently dropped, and that pyxctsk does *not* guess at their meaning.
 """
 
 import json
-from pathlib import Path
 from typing import Any
 
 import pytest
 
 from pyxctsk import Task, parse_task
+from tests.paths import ELEVATED_GOAL_DIR
 
-FIXTURES = Path(__file__).parent / "data" / "reference_tasks" / "elevated-goal"
+FIXTURES = ELEVATED_GOAL_DIR
 
 TASKS = [f"task{i}" for i in range(1, 9)]
 

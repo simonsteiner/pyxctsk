@@ -1,4 +1,10 @@
-"""Shared test fixtures and configuration for pyxctsk tests."""
+"""Shared test fixtures and configuration for pyxctsk tests.
+
+Living at the root of ``tests/``, these fixtures are available to every
+subpackage — ``model/``, ``qrcode/``, ``distance/``, ``export/`` and
+``conformance/`` — without any of them importing this file. Directory
+locations come from :mod:`tests.paths`.
+"""
 
 from pathlib import Path
 from typing import Dict, List, Tuple
@@ -6,6 +12,13 @@ from typing import Dict, List, Tuple
 import pytest
 
 from pyxctsk import Task, parse_task
+from tests.paths import (
+    DATA_DIR,
+    REFERENCE_JSON_DIR,
+    REFERENCE_QRCODE_DIR,
+    REFERENCE_XCTSK_DIR,
+    VISUAL_OUTPUT_DIR,
+)
 
 
 def _load_task_from_file(task_file: Path) -> Task:
@@ -34,19 +47,19 @@ def _stem_to_task_name(filename: str) -> str:
 @pytest.fixture(scope="session")
 def test_data_dir() -> Path:
     """Return the path to test data directory."""
-    return Path(__file__).parent / "data"
+    return DATA_DIR
 
 
 @pytest.fixture(scope="session")
-def reference_tasks_dir(test_data_dir: Path) -> Path:
+def reference_tasks_dir() -> Path:
     """Return the path to reference tasks directory."""
-    return test_data_dir / "reference_tasks" / "xctsk"
+    return REFERENCE_XCTSK_DIR
 
 
 @pytest.fixture(scope="session")
-def reference_json_dir(test_data_dir: Path) -> Path:
+def reference_json_dir() -> Path:
     """Return the path to reference JSON data directory."""
-    return test_data_dir / "reference_tasks" / "json"
+    return REFERENCE_JSON_DIR
 
 
 @pytest.fixture(scope="session")
@@ -88,13 +101,13 @@ def loaded_sample_tasks(sample_task_files: List[Path]) -> Dict[str, Task]:
 
 
 @pytest.fixture
-def output_dir(test_data_dir: Path) -> Path:
+def output_dir() -> Path:
     """Create and return output directory for test artifacts."""
-    return _ensure_dir_exists(test_data_dir / "visual_output")
+    return _ensure_dir_exists(VISUAL_OUTPUT_DIR)
 
 
 @pytest.fixture
-def qrcode_test_data(test_data_dir: Path, output_dir: Path) -> Tuple[Path, Path, Path]:
+def qrcode_test_data(output_dir: Path) -> Tuple[Path, Path, Path]:
     """Provide standardized test data directory paths for QR code testing.
 
     Returns:
@@ -103,11 +116,9 @@ def qrcode_test_data(test_data_dir: Path, output_dir: Path) -> Tuple[Path, Path,
         - expected_dir: Directory containing expected QR code strings (.txt files)
         - output_dir: Directory for generated QR code images and test artifacts
     """
-    xctsk_dir = test_data_dir / "reference_tasks" / "xctsk"
-    expected_dir = test_data_dir / "reference_tasks" / "qrcode_string"
     qrcode_output_dir = _ensure_dir_exists(output_dir / "qrcode_test")
 
-    return xctsk_dir, expected_dir, qrcode_output_dir
+    return REFERENCE_XCTSK_DIR, REFERENCE_QRCODE_DIR, qrcode_output_dir
 
 
 @pytest.fixture

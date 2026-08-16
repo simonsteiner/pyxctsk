@@ -11,7 +11,6 @@ tests here deliberately exercise the optional half of the spec instead.
 """
 
 import json
-from pathlib import Path
 
 import pytest
 
@@ -26,11 +25,12 @@ from pyxctsk import (
 )
 from pyxctsk.distance.goal_line import GoalLine, goal_line_length_from_turnpoints
 from pyxctsk.model.validation import ValidationRule
+from tests.paths import REFERENCE_QRCODE_DIR
 
 # Polyline-encoded "z" literals below are opaque tokens, not words.
 # cspell:ignore Fligr
 
-REFERENCE_QR = Path(__file__).parent / "data" / "reference_tasks" / "qrcode_string"
+REFERENCE_QR = REFERENCE_QRCODE_DIR
 
 # A spec-valid CLASSIC task, used as the base for targeted mutations.
 BASE_TASK = {
