@@ -213,9 +213,15 @@ class QRCodeTask:
         """Create from dictionary.
 
         Handles both full format and simplified XC/Waypoints format.
+
+        Each format is identified by its own task-type key, and only that:
+        ``T`` for the simplified one, ``taskType`` for the competition one.
+        The competition format has no ``T``, so there is no ambiguity. Version
+        is not part of the discriminator — a payload missing ``V`` is still
+        plainly a waypoints task, and treating it as a competition one left the
+        task type unset and swallowed ``T`` as an unknown key.
         """
-        # Check if this is the simplified XC/Waypoints format
-        is_simplified = "T" in data and "V" in data
+        is_simplified = "T" in data
         extensions, unknown = read_passthrough(data, cls.KNOWN_KEYS, QR_EXTENSIONS_KEY)
 
         if is_simplified:

@@ -496,6 +496,27 @@ class TestTaskTypeValue:
 
         assert json.loads(task.to_qr_code_task().to_json())["taskType"] == "CLASSIC"
 
+    def test_format_is_identified_by_its_task_type_key_alone(self):
+        """A waypoints payload missing ``V`` is still a waypoints payload.
+
+        The discriminator used to require both ``T`` and ``V``, so a payload
+        with only ``T`` fell through to the competition reader: the task type
+        came out unset and ``T`` was swallowed as an unknown key, which then
+        re-serialized in the wrong shape.
+        """
+        from pyxctsk.qrcode_enums import QRCodeTaskType
+        from pyxctsk.qrcode_task import QRCodeTask
+
+        qr = QRCodeTask.from_dict({"T": "W", "t": [{"n": "A", "z": "|dz~FligrB?"}]})
+
+        assert qr.task_type == QRCodeTaskType.WAYPOINTS
+        assert qr.unknown == {}
+        assert json.loads(qr.to_json()) == {
+            "T": "W",
+            "V": 2,
+            "t": [{"n": "A", "z": "|dz~FligrB?"}],
+        }
+
     def test_serialized_shape_follows_task_type_alone(self):
         """There is one source of truth for the shape, not a flag beside it."""
         qr = parse_task(str(REFERENCE_QR / "task_bevo.txt")).to_qr_code_task()
