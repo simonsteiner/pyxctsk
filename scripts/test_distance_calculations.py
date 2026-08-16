@@ -286,13 +286,18 @@ def compare_task_distances(
         lookup_name = task_name.replace(".xctsk", "").replace("task_", "")
         if lookup_name in json_metadata:
             ref_meta = json_metadata[lookup_name]
-            task_info["json_optimized_distance_km"] = ref_meta.get(
-                "distance_optimized_km"
-            )
+            ref_km = ref_meta.get("distance_optimized_km")
+            if ref_km is not None:
+                ref_km = float(ref_km)
+            task_info["json_optimized_distance_km"] = ref_km
             if verbose:
-                print(
-                    f"  📊 Found JSON reference distance: {task_info['json_optimized_distance_km']:.2f}km"
-                )
+                if ref_km is not None:
+                    print(f"  📊 Found JSON reference distance: {ref_km:.2f}km")
+                else:
+                    print(
+                        f"  ⚠️ JSON metadata for '{lookup_name}' has no "
+                        "'distance_optimized_km'"
+                    )
         elif verbose:
             print(f"  ⚠️ No JSON metadata found for '{lookup_name}'")
 
@@ -384,7 +389,7 @@ def analyze_and_display_results(all_results: List[Dict[str, Any]]):
             info["name"][:14],
             str(info["num_turnpoints"]),
             f"{info['center_distance_km']:.2f}",
-            f"{ref_km:.2f}" if ref_km else "N/A",
+            f"{ref_km:.2f}" if ref_km is not None else "N/A",
         ]
 
         # Add results for each method
@@ -392,7 +397,7 @@ def analyze_and_display_results(all_results: List[Dict[str, Any]]):
             if method in result and "error" not in result[method]:
                 dist_km = result[method]["total_distance"] / 1000
                 row.append(f"{dist_km:.2f}")
-                if ref_km:
+                if ref_km is not None:
                     diff = dist_km - ref_km
                     row.append(f"{diff:+.2f}")
                 else:
