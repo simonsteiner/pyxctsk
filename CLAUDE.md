@@ -36,13 +36,13 @@ uv run python scripts/check_qr_deps.py
 uv build
 ```
 
-The CLI entry point is `pyxctsk` (`pyxctsk.cli:main`), e.g. `pyxctsk convert task.xctsk --format kml -o task.kml`. Formats: `json`, `kml`, `png` (QR image), `qrcode-json` (`XCTSK:` string). Reads from stdin when no input file is given.
+The CLI entry point is `pyxctsk` (`pyxctsk.cli:main`), e.g. `pyxctsk convert task.xctsk --format kml -o task.kml`. Formats: `json`, `kml`, `png` (QR image), `qrcode-json` (`XCTSK:` string); `--compressed`/`-z` switches the two QR formats to `XCTSKZ:`. Reads from stdin when no input file is given.
 
 ## Architecture
 
-**Single parse entry point.** `parser.parse_task()` detects and dispatches on input type (raw JSON, `XCTSK:` URL, or QR-code image path) and returns a `Task`. All callers should go through it rather than format-specific parsers.
+**Single parse entry point.** `parser.parse_task()` detects and dispatches on input type (raw JSON, `XCTSK:`/`XCTSKZ:` URL, or QR-code image path) and returns a `Task`. All callers should go through it rather than format-specific parsers. Pass `strict=True` to also apply `Task.validate()` (the spec's structural rules) and raise `TaskValidationError`; parsing is lenient by default so malformed tasks can still be read and inspected.
 
-**Immutable domain model (`task.py`).** `Task`, `Turnpoint`, `Waypoint`, `SSS`, `Goal`, `Takeoff` are validated dataclasses. Constrained values are enums (`TaskType`, `TurnpointType`, `SSSType`, `Direction`, `GoalType`, `EarthModel`). `Task.to_json()`, `Task.to_qr_code_task()`, etc. handle serialization. Time-of-day values use `TimeOfDay` and serialize to `HH:MM:SSZ` — be careful with quoting when serializing (see recent qrcode time-of-day fix).
+**Domain model (`task.py`).** `Task`, `Turnpoint`, `Waypoint`, `SSS`, `Goal`, `Takeoff` are plain dataclasses — they are not frozen and do not validate on construction; `Task.validate()` is the structural check, and only `TimeOfDay` rejects bad values in `__post_init__`. Constrained values are enums (`TaskType`, `TurnpointType`, `SSSType`, `Direction`, `GoalType`, `EarthModel`), so unknown strings do fail at parse time. `Task.to_json()`, `Task.to_qr_code_task()`, etc. handle serialization. Time-of-day values use `TimeOfDay` and serialize to `HH:MM:SSZ` — be careful with quoting when serializing (see recent qrcode time-of-day fix).
 
 **Distance subsystem is a facade.** `distance.py` only re-exports; the real work lives in focused submodules that must avoid importing back into each other (a circular import between `distance` and `task_distances` was deliberately broken — keep `distance.py` as a thin re-export layer):
 
@@ -54,7 +54,7 @@ The CLI entry point is `pyxctsk` (`pyxctsk.cli:main`), e.g. `pyxctsk convert tas
 
 Distances honor the task's `earthModel` field (WGS84 ellipsoid default, FAI sphere R = 6371 km) via `pyproj`; optimization uses `scipy`.
 
-**QR code subsystem.** `qrcode_task.py` implements XCTrack's compact QR format (v2) with polyline-compressed coordinates for small, sunlight-readable codes. Supporting modules: `qrcode_models.py`, `qrcode_encoding.py`, `qrcode_enums.py`, `qrcode_image.py`. `shared_enums.py` holds enums shared between the full and QR models.
+**QR code subsystem.** `qrcode_task.py` implements XCTrack's compact QR format (v2) with polyline-compressed coordinates for small, sunlight-readable codes. Supporting modules: `qrcode_models.py`, `qrcode_encoding.py`, `qrcode_enums.py`, `qrcode_image.py`. `shared_enums.py` holds enums shared between the full and QR models. Two `z` encodings share one codec: the competition turnpoint is four numbers (lon, lat, alt, radius), the XC/Waypoints one is three (no radius) — decoding dispatches on length, so don't "unify" them. Both the `XCTSK:` and compressed `XCTSKZ:` schemes are read; writing the latter is opt-in via `to_string(compressed=True)`.
 
 **Visualization / export.** `kml.py` (`task_to_kml`), `geojson.py` (`generate_task_geojson`), `goal_line.py` (goal line geometry), `visualization_common.py`.
 

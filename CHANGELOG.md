@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **The `XCTSKZ:` compressed QR encoding is supported in both directions.** Reading is automatic — `parse_task`, the QR-image adapter and `QRCodeTask.from_string` accept either scheme. Writing is opt-in so existing output is unchanged: `to_string(compressed=True)`, the `to_compressed_string()` convenience method, `to_waypoints_string(compressed=True)`, and the CLI's `--compressed` / `-z` flag for the `png` and `qrcode-json` formats. On `task_bevo` the compressed payload is 483 bytes against 720.
+- **`Task.validate()` checks the spec's structural rules** — TAKEOFF only on the first turnpoint; SSS and ESS exactly once; SSS before ESS — and returns one message per violation. Parsing stays lenient so a malformed task can still be read and inspected; `parse_task(data, strict=True)` raises the new `TaskValidationError` instead. XC/Waypoints tasks are exempt from the SSS/ESS rules.
 - **Manufacturer `extensions` are preserved** through both task formats — the root list, per-turnpoint lists, and the QR format's `x` key — carried verbatim as opaque dicts in `Task.extensions` and `Turnpoint.extensions`. They were previously dropped silently on read.
 - **`goal.finishAltitude` is supported** (`Goal.finish_altitude`, QR key `fa`). This elevated-goal altitude in meters AGL is a scored parameter and was previously dropped on every round-trip.
 
@@ -20,8 +22,9 @@ All notable changes to this project will be documented in this file.
 
 - **Breaking (serialized output):** `goal.lineLength` is no longer written. It is not a spec field, was emitted as a string, and is always twice the last turnpoint's radius — which the spec already defines that radius to mean. `Goal.line_length` remains on the model for goal-line geometry, and `from_dict` still reads the key so files written by older versions parse.
 - The non-spec `x`/`y`/`a`/`r` turnpoint coordinate keys are no longer read from QR JSON. Nothing produced them, and `x` is the spec's per-turnpoint extensions key.
+- **Breaking (serialized output):** the competition QR format no longer emits `"taskType":"WAYPOINTS"`, which is not a value either format defines. A WAYPOINTS task now serializes as the simplified `"T":"W"` form from `to_string()` as well as `to_waypoints_string()`, so it reproduces XCTrack's own payload byte-for-byte.
 
-See `docs/spec-conformance/2026-08-16-competition-interfaces-audit.md` for the full review. Still open: the `XCTSKZ:` compressed QR encoding, and validation of the spec's structural rules (TAKEOFF only first; SSS and ESS exactly once; SSS before ESS).
+See `docs/spec-conformance/2026-08-16-competition-interfaces-audit.md` for the full review; every finding it raised is now closed. All 25 reference tasks still round-trip byte-identically against the tools.xcontest.org QR codes and pass `Task.validate()` cleanly.
 
 ## [v0.5.0] - 2026-07-07
 

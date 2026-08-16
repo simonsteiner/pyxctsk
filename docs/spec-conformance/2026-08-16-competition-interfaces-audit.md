@@ -20,19 +20,36 @@ tests in `tests/test_spec_conformance.py` that fail without the change:
 | --- | --- | --- |
 | 1 | `goal.finishAltitude` unimplemented | fixed |
 | 2 | `extensions` unimplemented | fixed |
-| 3 | No `XCTSKZ:` support | **open** — needs an API decision |
+| 3 | No `XCTSKZ:` support | fixed |
 | 4 | `sss.direction` KeyError | fixed |
 | 5 | Float `radius`/`altSmoothed` TypeError | fixed |
 | 6 | Non-spec `goal.lineLength` written | fixed |
 | 7 | Waypoints `z` written with a radius | fixed |
 | 8 | Waypoints `z` read drops altitude, invents radius | fixed |
 | 9 | ~~Unconditional null `tc`/`to`~~ | withdrawn — not a defect |
-| 10 | `taskType:"WAYPOINTS"`; synthesized goal | open, low value |
+| 10 | Non-spec `taskType:"WAYPOINTS"` | fixed |
+| 10b | Goal synthesized when input had none | won't fix — see finding 10 |
 | 11 | Rounding ties differ from the reference | fixed |
 | 12 | Docs overstate coverage | fixed |
-| E | No structural validation | **open** |
+| E | No structural validation | fixed |
 
-All 25 reference QR strings still round-trip byte-identically after the fixes.
+Everything the audit raised is now closed except the synthesized goal, which
+the evidence says is correct behavior: all 22 XCTrack-generated fixtures carry
+an explicit `goal`, so emitting one matches the reference implementation.
+
+All 25 reference QR strings still round-trip byte-identically after the fixes,
+and all 25 tasks pass `Task.validate()` with no issues.
+
+Design decisions taken while fixing these:
+
+- **`XCTSKZ:` writing is opt-in.** Reading both schemes is mandatory per the
+  spec, but `to_string()` still defaults to `XCTSK:` so existing output is
+  unchanged; `to_string(compressed=True)` / `to_compressed_string()` and the
+  CLI's `--compressed` / `-z` select the compressed form.
+- **Validation is a report, not a gate.** `Task.validate()` returns the list of
+  violations and parsing stays lenient, so a malformed task can still be read
+  and inspected; `parse_task(data, strict=True)` opts into a
+  `TaskValidationError`.
 
 ---
 
@@ -327,3 +344,7 @@ and whether the CLI gets a new `--format` value alongside `qrcode-json`.
 
 Finding 5 (float `radius`) and finding 11 (rounding ties) are one-liners that can
 ride along with whichever batch touches `qrcode_encoding.py`.
+
+*(All of the above has since been done — see the Status table at the top. The
+`XCTSKZ:` decision was to take both spellings: a `compressed` keyword argument
+plus a `to_compressed_string()` convenience method.)*
