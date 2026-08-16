@@ -32,6 +32,13 @@ class Direction(str, Enum):
     EXIT = "EXIT"
 
 
+# ``sss.direction`` is obsolete: the spec requires readers to ignore it and
+# writers to still emit *some* value so older devices keep working. This is the
+# value used when a task omits the field. EXIT is what all 22 reference tasks
+# carry, so a task read without it re-exports the way XCTrack writes it.
+OBSOLETE_DIRECTION_DEFAULT = Direction.EXIT
+
+
 class EarthModel(str, Enum):
     """Enumeration of supported earth models.
 
@@ -250,13 +257,14 @@ class SSS:
 
     Attributes:
         type (SSSType): SSS type.
-        direction (Direction): SSS direction.
+        direction (Direction): SSS direction. Obsolete — ignored on read, still
+            written so older devices keep working.
         time_gates (List[TimeOfDay]): List of time gates.
         time_close (Optional[TimeOfDay]): Optional closing time.
     """
 
     type: SSSType
-    direction: Direction
+    direction: Direction = OBSOLETE_DIRECTION_DEFAULT
     time_gates: list[TimeOfDay] = field(default_factory=list)
     time_close: TimeOfDay | None = None
 
@@ -279,6 +287,10 @@ class SSS:
     def from_dict(cls, data: dict[str, Any]) -> "SSS":
         """Create from dictionary.
 
+        ``direction`` is obsolete. The spec requires readers to ignore it, so a
+        task that omits it parses fine and falls back to
+        :data:`OBSOLETE_DIRECTION_DEFAULT`.
+
         Args:
             data (Dict[str, Any]): Dictionary to parse.
 
@@ -295,9 +307,13 @@ class SSS:
         if "timeClose" in data:
             time_close = TimeOfDay.from_json_string(data["timeClose"])
 
+        direction = OBSOLETE_DIRECTION_DEFAULT
+        if data.get("direction"):
+            direction = Direction(data["direction"])
+
         return cls(
             type=SSSType(data["type"]),
-            direction=Direction(data["direction"]),
+            direction=direction,
             time_gates=time_gates,
             time_close=time_close,
         )

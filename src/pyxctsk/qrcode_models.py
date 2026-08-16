@@ -104,10 +104,11 @@ class QRCodeSSS:
         if "g" in data:
             time_gates = [TimeOfDay.from_json_string(gate) for gate in data["g"]]
 
-        # Direction field is OBSOLETE and should be ignored when reading
-        # Use ENTER as default when not present or when ignoring obsolete field
-        direction = QRCodeDirection.ENTER
-        if "d" in data:
+        # Direction field is OBSOLETE and should be ignored when reading.
+        # Falls back to the same value as the full-JSON path (see
+        # task.OBSOLETE_DIRECTION_DEFAULT) so both readers agree.
+        direction = QRCodeDirection.EXIT
+        if data.get("d"):
             # For backwards compatibility, still read it if present
             direction = QRCodeDirection(data["d"])
 
