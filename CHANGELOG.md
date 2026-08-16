@@ -15,6 +15,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- **`Task` ↔ `QRCodeTask` conversion moved to the new `qrcode_conversion` module**, which imports both models at the top level. It was ~280 lines inside `qrcode_task.py` (686 lines → 428), reached through function-local `from .task import ...` blocks that existed only to dodge a circular import — the wire model knowing about the domain model, in the wrong direction. The six enum pairs are now translation tables rather than if/elif chains, with `tests/test_qrcode_conversion.py` asserting both directions stay mutual inverses and cover every enum member. `QRCodeTask.from_task()`, `.from_task_waypoints()`, `.to_task()` and `Task.to_qr_code_task()` are unchanged as API.
 - **The extensions/unknown passthrough lives in one place**, the new `passthrough` module, instead of being written out by hand at each of its ten call sites (four readers, six writers, across `Task`, `Turnpoint`, `QRCodeTask` and `QRCodeTurnpoint`). Behavior is unchanged; the point is that the rule *"an unknown key never shadows a spec field"* is now stated and tested once rather than implied by a bare `setdefault` in six places.
 
 ### Fixed

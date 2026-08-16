@@ -35,12 +35,8 @@ from typing import TYPE_CHECKING, Any
 
 from .passthrough import QR_EXTENSIONS_KEY, read_passthrough, write_passthrough
 from .qrcode_enums import (
-    QRCodeDirection,
     QRCodeEarthModel,
-    QRCodeGoalType,
-    QRCodeSSSType,
     QRCodeTaskType,
-    QRCodeTurnpointType,
 )
 from .qrcode_models import QRCodeGoal, QRCodeSSS, QRCodeTakeoff, QRCodeTurnpoint
 
@@ -397,123 +393,19 @@ class QRCodeTask:
     def from_task(cls, task: "Task") -> "QRCodeTask":
         """Convert from regular Task format.
 
-        Converts a full Task object to the compressed QR code format.
-        This involves encoding coordinates and reducing data size.
-
         Args:
             task: Task object to convert
 
         Returns:
             QRCodeTask instance optimized for QR code embedding
         """
-        from .task import (
-            Direction,
-            EarthModel,
-            GoalType,
-            SSSType,
-            TaskType,
-            TurnpointType,
-        )
+        from .qrcode_conversion import task_to_qr_code_task
 
-        # Convert task type
-        qr_task_type = None
-        if task.task_type == TaskType.CLASSIC:
-            qr_task_type = QRCodeTaskType.CLASSIC
-        elif task.task_type == TaskType.WAYPOINTS:
-            qr_task_type = QRCodeTaskType.WAYPOINTS
-
-        # Convert earth model
-        qr_earth_model = None
-        if task.earth_model == EarthModel.WGS84:
-            qr_earth_model = QRCodeEarthModel.WGS84
-        elif task.earth_model == EarthModel.FAI_SPHERE:
-            qr_earth_model = QRCodeEarthModel.FAI_SPHERE
-
-        # Convert turnpoints
-        qr_turnpoints = []
-
-        for tp in task.turnpoints:
-            qr_type = QRCodeTurnpointType.NONE
-            if tp.type == TurnpointType.TAKEOFF:
-                qr_type = QRCodeTurnpointType.TAKEOFF
-            elif tp.type == TurnpointType.SSS:
-                qr_type = QRCodeTurnpointType.SSS
-            elif tp.type == TurnpointType.ESS:
-                qr_type = QRCodeTurnpointType.ESS
-
-            qr_turnpoint = QRCodeTurnpoint(
-                lat=tp.waypoint.lat,
-                lon=tp.waypoint.lon,
-                radius=tp.radius,
-                name=tp.waypoint.name,
-                alt_smoothed=tp.waypoint.alt_smoothed,
-                type=qr_type,
-                description=tp.waypoint.description,
-                extensions=tp.extensions,
-                unknown=tp.unknown,
-            )
-            qr_turnpoints.append(qr_turnpoint)
-
-        # Convert takeoff
-        qr_takeoff = None
-        if task.takeoff:
-            qr_takeoff = QRCodeTakeoff(
-                time_open=task.takeoff.time_open,
-                time_close=task.takeoff.time_close,
-            )
-
-        # Convert SSS
-        qr_sss = None
-        if task.sss:
-            qr_direction = (
-                QRCodeDirection.ENTER
-                if task.sss.direction == Direction.ENTER
-                else QRCodeDirection.EXIT
-            )
-            qr_sss_type = (
-                QRCodeSSSType.RACE
-                if task.sss.type == SSSType.RACE
-                else QRCodeSSSType.ELAPSED_TIME
-            )
-
-            qr_sss = QRCodeSSS(
-                direction=qr_direction,
-                type=qr_sss_type,
-                time_gates=task.sss.time_gates,
-            )
-
-        # Convert goal
-        qr_goal = None
-        if task.goal:
-            qr_goal_type = None
-            if task.goal.type == GoalType.LINE:
-                qr_goal_type = QRCodeGoalType.LINE
-            elif task.goal.type == GoalType.CYLINDER:
-                qr_goal_type = QRCodeGoalType.CYLINDER
-
-            qr_goal = QRCodeGoal(
-                deadline=task.goal.deadline,
-                type=qr_goal_type,
-                finish_altitude=task.goal.finish_altitude,
-            )
-
-        return cls(
-            version=QR_CODE_TASK_VERSION,
-            task_type=qr_task_type,
-            earth_model=qr_earth_model,
-            turnpoints=qr_turnpoints,
-            takeoff=qr_takeoff,
-            sss=qr_sss,
-            goal=qr_goal,
-            extensions=task.extensions,
-            unknown=task.unknown,
-        )
+        return task_to_qr_code_task(task)
 
     @classmethod
     def from_task_waypoints(cls, task: "Task") -> "QRCodeTask":
         """Convert from regular Task format to XC/Waypoints simplified format.
-
-        Creates a simplified waypoints task with only essential turnpoint data.
 
         Args:
             task: Task object to convert
@@ -521,147 +413,16 @@ class QRCodeTask:
         Returns:
             QRCodeTask instance optimized for XC/Waypoints format
         """
-        # Convert turnpoints to simplified format
-        qr_turnpoints = []
-        for tp in task.turnpoints:
-            # For waypoints format, we don't need type or description
-            qr_turnpoint = QRCodeTurnpoint(
-                lat=tp.waypoint.lat,
-                lon=tp.waypoint.lon,
-                radius=tp.radius,
-                name=tp.waypoint.name,
-                alt_smoothed=tp.waypoint.alt_smoothed,
-                type=QRCodeTurnpointType.NONE,  # Simplified format doesn't use types
-                description=None,  # Simplified format doesn't use descriptions
-            )
-            qr_turnpoints.append(qr_turnpoint)
+        from .qrcode_conversion import task_to_qr_code_waypoints
 
-        return cls(
-            version=QR_CODE_TASK_VERSION,
-            task_type=QRCodeTaskType.WAYPOINTS,
-            earth_model=None,  # Default to WGS84
-            turnpoints=qr_turnpoints,
-            takeoff=None,
-            sss=None,
-            goal=None,
-        )
+        return task_to_qr_code_waypoints(task)
 
     def to_task(self) -> "Task":
         """Convert to regular Task format.
 
-        Converts the compressed QR code format back to a full Task object.
-        This involves decoding coordinates and expanding data structures.
-
         Returns:
             Task object with full format specification
         """
-        from .task import (
-            SSS,
-            Direction,
-            EarthModel,
-            Goal,
-            GoalType,
-            SSSType,
-            Takeoff,
-            Task,
-            TaskType,
-            Turnpoint,
-            TurnpointType,
-            Waypoint,
-        )
+        from .qrcode_conversion import qr_code_task_to_task
 
-        # Convert task type
-        task_type = TaskType.CLASSIC
-        if self.task_type == QRCodeTaskType.WAYPOINTS:
-            task_type = TaskType.WAYPOINTS
-
-        # Convert earth model
-        earth_model = None
-        if self.earth_model == QRCodeEarthModel.WGS84:
-            earth_model = EarthModel.WGS84
-        elif self.earth_model == QRCodeEarthModel.FAI_SPHERE:
-            earth_model = EarthModel.FAI_SPHERE
-
-        # Convert turnpoints
-        turnpoints = []
-        for qr_tp in self.turnpoints:
-            tp_type = None
-            if qr_tp.type == QRCodeTurnpointType.TAKEOFF:
-                tp_type = TurnpointType.TAKEOFF
-            elif qr_tp.type == QRCodeTurnpointType.SSS:
-                tp_type = TurnpointType.SSS
-            elif qr_tp.type == QRCodeTurnpointType.ESS:
-                tp_type = TurnpointType.ESS
-
-            waypoint = Waypoint(
-                name=qr_tp.name,
-                lat=qr_tp.lat,
-                lon=qr_tp.lon,
-                alt_smoothed=qr_tp.alt_smoothed,
-                description=qr_tp.description,
-            )
-
-            turnpoint = Turnpoint(
-                radius=qr_tp.radius,
-                waypoint=waypoint,
-                type=tp_type,
-                extensions=qr_tp.extensions,
-                unknown=qr_tp.unknown,
-            )
-            turnpoints.append(turnpoint)
-
-        # Convert takeoff
-        takeoff = None
-        if self.takeoff:
-            takeoff = Takeoff(
-                time_open=self.takeoff.time_open,
-                time_close=self.takeoff.time_close,
-            )
-
-        # Convert SSS
-        sss = None
-        if self.sss:
-            direction = (
-                Direction.ENTER
-                if self.sss.direction == QRCodeDirection.ENTER
-                else Direction.EXIT
-            )
-            sss_type = (
-                SSSType.RACE
-                if self.sss.type == QRCodeSSSType.RACE
-                else SSSType.ELAPSED_TIME
-            )
-
-            sss = SSS(
-                type=sss_type,
-                direction=direction,
-                time_gates=self.sss.time_gates,
-                time_close=None,  # QR code format doesn't include time_close
-            )
-
-        # Convert goal
-        goal = None
-        if self.goal:
-            goal_type = None
-            if self.goal.type == QRCodeGoalType.LINE:
-                goal_type = GoalType.LINE
-            elif self.goal.type == QRCodeGoalType.CYLINDER:
-                goal_type = GoalType.CYLINDER
-
-            goal = Goal(
-                type=goal_type,
-                deadline=self.goal.deadline,
-                finish_altitude=self.goal.finish_altitude,
-            )
-
-        return Task(
-            task_type=task_type,
-            version=1,  # Regular task version
-            turnpoints=turnpoints,
-            earth_model=earth_model,
-            takeoff=takeoff,
-            sss=sss,
-            goal=goal,
-            extensions=self.extensions,
-            unknown=self.unknown,
-        )
+        return qr_code_task_to_task(self)
