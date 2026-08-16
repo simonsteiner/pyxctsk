@@ -292,3 +292,39 @@ class TestGenerateTaskGeoJSON:
 
         assert result["type"] == "FeatureCollection"
         assert len(result["features"]) == 0
+
+
+class TestRepeatedTurnpoint:
+    """A task may fly the same turnpoint twice, ending on it."""
+
+    def test_repeated_final_turnpoint_is_still_the_goal(self):
+        """The goal is identified by position, not by value.
+
+        `Turnpoint` is a plain dataclass, so a task whose last turnpoint
+        repeats an earlier one verbatim — same name, coordinates, radius and
+        type — has two equal turnpoints. Searching the list by value finds the
+        earlier one and styles the goal as an ordinary turnpoint.
+        """
+
+        def tp(name: str, lat: float, lon: float) -> Turnpoint:
+            return Turnpoint(
+                radius=1000,
+                waypoint=Waypoint(name=name, lat=lat, lon=lon, alt_smoothed=0),
+                type=TurnpointType.NONE,
+            )
+
+        turnpoints = [tp("A", 47.0, 8.0), tp("B", 47.1, 8.1), tp("B", 47.1, 8.1)]
+        task = Task(
+            task_type=TaskType.CLASSIC,
+            version=1,
+            turnpoints=turnpoints,
+            goal=Goal(type=GoalType.CYLINDER),
+        )
+
+        assert turnpoints[-1] == turnpoints[-2], "precondition: the two are equal"
+
+        goal_feature = _create_turnpoint_feature(turnpoints[-1], 2, turnpoints, task)
+        middle_feature = _create_turnpoint_feature(turnpoints[1], 1, turnpoints, task)
+
+        assert goal_feature["properties"]["color"] == "#ff0000"  # goal red
+        assert middle_feature["properties"]["color"] == "#269abc"  # default blue

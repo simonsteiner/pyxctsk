@@ -1,7 +1,15 @@
-"""Common functionality for task visualization modules (KML and GeoJSON).
+"""What the KML and GeoJSON writers both need to draw a task.
 
-This module provides shared utilities for generating visual representations of XCTrack tasks,
-including turnpoint filtering, route coordinate generation, and styling helpers.
+Four questions, each answered once so the two writers cannot answer them
+differently: which turnpoints to draw, where the optimized route runs, what
+colour a turnpoint is, and which turnpoint is the goal. Plus the polygon that
+approximates a cylinder.
+
+The circle approximation here is planar — a fixed metres-per-degree constant,
+not a geodesic — because it draws a decorative outline, not a measured shape.
+Anything a distance depends on is computed properly in
+:mod:`pyxctsk.distance.turnpoint` and :mod:`pyxctsk.distance.goal_line`, and
+this module must not grow a second opinion about task geometry.
 """
 
 import math
@@ -121,6 +129,12 @@ def is_goal_turnpoint(
 ) -> bool:
     """Check if a turnpoint is the goal (last) turnpoint.
 
+    Compares identity, not value. A task may legitimately end by flying the
+    same turnpoint twice — same name, coordinates, radius and type — and
+    ``Turnpoint`` is a plain dataclass, so searching by value would find the
+    earlier occurrence and report the goal as an ordinary turnpoint. The
+    callers pass the task's own turnpoint objects, so identity is exact.
+
     Args:
         turnpoint: The turnpoint to check.
         all_turnpoints: List of all turnpoints in the task.
@@ -133,27 +147,4 @@ def is_goal_turnpoint(
     if task is not None and task.goal is None:
         return False
 
-    try:
-        index = all_turnpoints.index(turnpoint)
-        return index == len(all_turnpoints) - 1
-    except ValueError:
-        return False
-
-
-def get_route_coordinates_with_fallback(
-    task: Task, fallback_coordinates: list[tuple[float, float]]
-) -> list[tuple[float, float]]:
-    """Get route coordinates with fallback to direct coordinates.
-
-    Args:
-        task: The Task object.
-        fallback_coordinates: Fallback coordinates if optimized route is not available.
-
-    Returns:
-        List of (lat, lon) coordinate tuples for the route.
-    """
-    opt_route_coords = get_optimized_route_coordinates(task)
-
-    if opt_route_coords and len(opt_route_coords) >= 2:
-        return opt_route_coords
-    return fallback_coordinates
+    return bool(all_turnpoints) and turnpoint is all_turnpoints[-1]
