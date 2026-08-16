@@ -172,12 +172,18 @@ class Turnpoint:
         extensions (list): Opaque manufacturer extensions, preserved verbatim.
             The spec requires them to be in the same order as the root
             ``extensions`` list, with the ``id`` key not repeated here.
+        unknown (dict): Keys the spec does not define, preserved verbatim.
+            See :attr:`Task.unknown`.
     """
 
     radius: int
     waypoint: Waypoint
     type: TurnpointType | None = None
     extensions: list[dict[str, Any]] = field(default_factory=list)
+    unknown: dict[str, Any] = field(default_factory=dict)
+
+    #: Keys this class understands; everything else lands in ``unknown``.
+    KNOWN_KEYS = frozenset({"radius", "waypoint", "type", "extensions"})
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
@@ -193,6 +199,8 @@ class Turnpoint:
             result["type"] = self.type.value
         if self.extensions:
             result["extensions"] = self.extensions
+        for key, value in self.unknown.items():
+            result.setdefault(key, value)
         return result
 
     @classmethod
@@ -218,6 +226,7 @@ class Turnpoint:
             waypoint=Waypoint.from_dict(data["waypoint"]),
             type=turnpoint_type,
             extensions=list(data.get("extensions") or []),
+            unknown={k: v for k, v in data.items() if k not in cls.KNOWN_KEYS},
         )
 
 
@@ -426,6 +435,15 @@ class Task:
         extensions (list): Opaque manufacturer extensions, preserved verbatim.
             Each carries an obligatory ``id`` identifying manufacturer and
             version; their order defines the order of turnpoint extensions.
+        unknown (dict): Keys the spec does not define, preserved verbatim so a
+            round-trip does not silently discard them. Producers do put data
+            outside the spec's ``extensions`` mechanism — one writes the
+            elevated goal altitude as a root ``{"o": {"v": 2, "fa": 1220}}``.
+            Nothing here is interpreted: the value is carried, not understood,
+            and in particular is never mapped onto a spec field, since a
+            look-alike key may not share the spec's units (that ``fa`` is
+            absolute AMSL where the spec's ``goal.finishAltitude`` is AGL
+            above the last turnpoint).
     """
 
     task_type: TaskType
@@ -436,6 +454,21 @@ class Task:
     sss: SSS | None = None
     goal: Goal | None = None
     extensions: list[dict[str, Any]] = field(default_factory=list)
+    unknown: dict[str, Any] = field(default_factory=dict)
+
+    #: Keys this class understands; everything else lands in ``unknown``.
+    KNOWN_KEYS = frozenset(
+        {
+            "taskType",
+            "version",
+            "earthModel",
+            "turnpoints",
+            "takeoff",
+            "sss",
+            "goal",
+            "extensions",
+        }
+    )
 
     def __post_init__(self) -> None:
         """Post-initialization processing.
@@ -505,6 +538,8 @@ class Task:
             result["goal"] = self.goal.to_dict()
         if self.extensions:
             result["extensions"] = self.extensions
+        for key, value in self.unknown.items():
+            result.setdefault(key, value)
 
         return result
 
@@ -547,6 +582,7 @@ class Task:
             sss=sss,
             goal=goal,
             extensions=list(data.get("extensions") or []),
+            unknown={k: v for k, v in data.items() if k not in cls.KNOWN_KEYS},
         )
 
     def to_json(self) -> str:

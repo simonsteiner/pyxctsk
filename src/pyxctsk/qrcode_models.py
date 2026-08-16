@@ -195,6 +195,10 @@ class QRCodeTurnpoint:
     type: QRCodeTurnpointType = QRCodeTurnpointType.NONE
     description: str | None = None
     extensions: list[dict[str, Any]] = field(default_factory=list)
+    unknown: dict[str, Any] = field(default_factory=dict)
+
+    #: Keys this class understands; everything else lands in ``unknown``.
+    KNOWN_KEYS = frozenset({"z", "n", "d", "t", "x"})
 
     def to_dict(self, simplified: bool = False) -> OrderedDict[str, Any]:
         """Convert to dictionary for JSON serialization.
@@ -250,6 +254,8 @@ class QRCodeTurnpoint:
         # Extensions last, matching the order the spec lists them in
         if self.extensions:
             result["x"] = self.extensions
+        for key, value in self.unknown.items():
+            result.setdefault(key, value)
 
         return result
 
@@ -301,4 +307,5 @@ class QRCodeTurnpoint:
             type=turnpoint_type,
             description=description,
             extensions=list(data.get("x") or []),
+            unknown={k: v for k, v in data.items() if k not in cls.KNOWN_KEYS},
         )

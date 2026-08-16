@@ -5,6 +5,7 @@ altitudemode
 AMSL
 barcodes
 behaviour
+behaviours
 bevo
 brentq
 changealphaint

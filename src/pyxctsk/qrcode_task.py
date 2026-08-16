@@ -127,6 +127,13 @@ class QRCodeTask:
     sss: QRCodeSSS | None = None
     goal: QRCodeGoal | None = None
     extensions: list[dict[str, Any]] = field(default_factory=list)
+    unknown: dict[str, Any] = field(default_factory=dict)
+
+    #: Keys this class understands; everything else lands in ``unknown``.
+    #: ``p`` is a legacy pyxctsk field, not a spec one, but it is read here.
+    KNOWN_KEYS = frozenset(
+        {"taskType", "version", "T", "V", "t", "s", "g", "e", "to", "tc", "x", "p"}
+    )
 
     def to_dict(self, simplified: bool = False) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
@@ -156,6 +163,8 @@ class QRCodeTask:
                 simplified_result["t"] = [
                     tp.to_dict(simplified=True) for tp in self.turnpoints
                 ]
+            for key, value in self.unknown.items():
+                simplified_result.setdefault(key, value)
 
             return simplified_result
 
@@ -202,6 +211,8 @@ class QRCodeTask:
         # 8. Extensions last, matching the order the spec lists them in
         if self.extensions:
             result["x"] = self.extensions
+        for key, value in self.unknown.items():
+            result.setdefault(key, value)
 
         return result
 
@@ -234,6 +245,7 @@ class QRCodeTask:
                 takeoff=None,
                 sss=None,
                 goal=None,
+                unknown={k: v for k, v in data.items() if k not in cls.KNOWN_KEYS},
             )
 
         # Full format
@@ -290,6 +302,7 @@ class QRCodeTask:
             sss=sss,
             goal=goal,
             extensions=list(data.get("x") or []),
+            unknown={k: v for k, v in data.items() if k not in cls.KNOWN_KEYS},
         )
 
     def to_json(self, simplified: bool = False) -> str:
@@ -444,6 +457,7 @@ class QRCodeTask:
                 type=qr_type,
                 description=tp.waypoint.description,
                 extensions=tp.extensions,
+                unknown=tp.unknown,
             )
             qr_turnpoints.append(qr_turnpoint)
             coordinates.append((tp.waypoint.lat, tp.waypoint.lon))
@@ -504,6 +518,7 @@ class QRCodeTask:
             sss=qr_sss,
             goal=qr_goal,
             extensions=task.extensions,
+            unknown=task.unknown,
         )
 
     @classmethod
@@ -604,6 +619,7 @@ class QRCodeTask:
                 waypoint=waypoint,
                 type=tp_type,
                 extensions=qr_tp.extensions,
+                unknown=qr_tp.unknown,
             )
             turnpoints.append(turnpoint)
 
@@ -660,4 +676,5 @@ class QRCodeTask:
             sss=sss,
             goal=goal,
             extensions=self.extensions,
+            unknown=self.unknown,
         )
