@@ -23,7 +23,7 @@ All notable changes to this project will be documented in this file.
 
 ### Removed
 
-- **Breaking (serialized output):** `goal.lineLength` is no longer written. It is not a spec field, was emitted as a string, and is always twice the last turnpoint's radius — which the spec already defines that radius to mean. `Goal.line_length` remains on the model for goal-line geometry, and `from_dict` still reads the key so files written by older versions parse.
+- **Breaking (serialized output and API):** `goal.lineLength` is neither written nor read, and `Goal.line_length` is gone from the model. It is not a spec field, was emitted as a string, and is always twice the last turnpoint's radius — which the spec already defines that radius to mean. It was also never anything but derived: `Task.__post_init__` overwrote whatever was parsed with `radius * 2`, so the value read from JSON never reached a consumer. `goal_line_length_from_turnpoints()` is now the single source of the rule, called directly by `task_distances` and `GoalLine.from_task`; three redundant `field or derive` fallbacks across three modules went with it. Files written by older versions still parse — the key is simply ignored.
 - The non-spec `x`/`y`/`a`/`r` turnpoint coordinate keys are no longer read from QR JSON. Nothing produced them, and `x` is the spec's per-turnpoint extensions key.
 - **Breaking (serialized output):** the competition QR format no longer emits `"taskType":"WAYPOINTS"`, which is not a value either format defines. A WAYPOINTS task now serializes as the simplified `"T":"W"` form from `to_string()` as well as `to_waypoints_string()`, so it reproduces XCTrack's own payload byte-for-byte.
 

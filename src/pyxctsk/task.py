@@ -12,7 +12,7 @@ support for QR code encoding/decoding and distance calculations (see related mod
 """
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import Any
 
@@ -348,30 +348,31 @@ class SSS:
 class Goal:
     """Represents a goal for a task.
 
-    For goal type LINE, the line_length represents the total length of the goal line. The radius of the last turnpoint represents half of this length. The goal line orientation is perpendicular to the azimuth to the last turnpoint center.
+    For goal type LINE, the radius of the last turnpoint represents half of the
+    goal line's total length. The line itself is not stored here — it is derived
+    from that radius by :func:`~pyxctsk.goal_line.goal_line_length_from_turnpoints`,
+    which is the single source of that rule. The goal line orientation is
+    perpendicular to the azimuth to the last turnpoint center.
 
     Attributes:
         type (Optional[GoalType]): Goal type.
         deadline (Optional[TimeOfDay]): Goal deadline.
         finish_altitude (Optional[float]): Elevated goal altitude in meters AGL,
             measured from the altitude of the last turnpoint.
-        line_length (Optional[float]): Length of the goal line (for LINE type).
-            Derived from the last turnpoint's radius, not a spec field — see
-            :meth:`to_dict`.
     """
 
     type: GoalType | None = None
     deadline: TimeOfDay | None = None
     finish_altitude: float | None = None
-    line_length: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
 
         The spec's goal object has exactly three keys — ``type``, ``deadline``
-        and ``finishAltitude``. ``line_length`` is deliberately not written:
-        it is always twice the last turnpoint's radius, which is what the spec
-        already says that radius means, so emitting it would invent a field.
+        and ``finishAltitude``. The non-spec ``lineLength`` older versions wrote
+        is deliberately not emitted: it is always twice the last turnpoint's
+        radius, which is what the spec already says that radius means, so
+        writing it would invent a field.
 
         Returns:
             Dict[str, Any]: Dictionary representation for JSON.
@@ -389,8 +390,9 @@ class Goal:
     def from_dict(cls, data: dict[str, Any]) -> "Goal":
         """Create from dictionary.
 
-        ``lineLength`` is still read, tolerating files older pyxctsk versions
-        wrote, even though it is not a spec field and is no longer written.
+        The non-spec ``lineLength`` older versions wrote is ignored: it is
+        always twice the last turnpoint's radius, so it carries nothing the
+        turnpoints do not already say.
 
         Args:
             data (Dict[str, Any]): Dictionary to parse.
@@ -401,7 +403,6 @@ class Goal:
         goal_type = None
         deadline = None
         finish_altitude = None
-        line_length = None  # No default line length
 
         if "type" in data:
             goal_type = GoalType(data["type"])
@@ -409,14 +410,11 @@ class Goal:
             deadline = TimeOfDay.from_json_string(data["deadline"])
         if data.get("finishAltitude") is not None:
             finish_altitude = data["finishAltitude"]
-        if "lineLength" in data and data["lineLength"] is not None:
-            line_length = float(data["lineLength"])
 
         return cls(
             type=goal_type,
             deadline=deadline,
             finish_altitude=finish_altitude,
-            line_length=line_length,
         )
 
 
@@ -488,11 +486,12 @@ class Task:
 
         Contract — a task with at least one turnpoint always has a goal:
           - if no goal was supplied, an empty one is created;
-          - an unspecified goal type defaults to ``CYLINDER``;
-          - a ``LINE`` goal's ``line_length`` is twice the last turnpoint's
-            radius, since the radius represents half of the goal line.
+          - an unspecified goal type defaults to ``CYLINDER``.
 
         With no turnpoints the goal is returned unchanged (typically ``None``).
+        A goal that already satisfies the contract is returned as-is; otherwise
+        a copy is returned, so constructing a Task never mutates the caller's
+        object.
 
         Args:
             turnpoints: The task's turnpoints.
@@ -505,14 +504,10 @@ class Task:
             return goal
 
         if goal is None:
-            goal = Goal()
+            return Goal(type=GoalType.CYLINDER)
 
         if not goal.type:
-            goal.type = GoalType.CYLINDER
-
-        if goal.type == GoalType.LINE:
-            # The last turnpoint's radius represents half of the goal line length.
-            goal.line_length = float(turnpoints[-1].radius * 2)
+            return replace(goal, type=GoalType.CYLINDER)
 
         return goal
 

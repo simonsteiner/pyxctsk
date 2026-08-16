@@ -24,6 +24,7 @@ from pyxctsk import (
     TurnpointType,
     parse_task,
 )
+from pyxctsk.goal_line import GoalLine, goal_line_length_from_turnpoints
 
 # Polyline-encoded "z" literals below are opaque tokens, not words.
 # cspell:ignore Fligr
@@ -163,21 +164,33 @@ class TestGoalSerializedShape:
         }
 
     def test_line_length_still_derived_for_geometry(self):
-        """Dropping it from output must not drop it from the model."""
+        """Dropping it from the model must not drop the geometry it fed."""
         goal = {"type": "LINE", "deadline": "18:00:00Z"}
         task = Task.from_json(task_json(goal=goal))
 
         # Twice the last turnpoint's radius, which the spec says is half the line.
-        assert task.goal is not None
-        assert task.goal.line_length == task.turnpoints[-1].radius * 2
+        assert goal_line_length_from_turnpoints(task.turnpoints) == (
+            task.turnpoints[-1].radius * 2
+        )
+        line = GoalLine.from_task(task)
+        assert line is not None
+        assert line.length == task.turnpoints[-1].radius * 2
 
-    def test_legacy_line_length_is_still_read(self):
-        """Files written by older pyxctsk versions must still parse."""
-        goal = {"type": "CYLINDER", "deadline": "18:00:00Z", "lineLength": "800.0"}
+    def test_legacy_line_length_is_ignored(self):
+        """Files written by older pyxctsk versions must still parse.
+
+        The key carried nothing the turnpoints did not already say, so it is
+        read past rather than stored — and never echoed back on output.
+        """
+        goal = {"type": "LINE", "deadline": "18:00:00Z", "lineLength": "800.0"}
         task = Task.from_json(task_json(goal=goal))
 
         assert task.goal is not None
-        assert task.goal.line_length == 800.0
+        assert "lineLength" not in json.loads(task.to_json())["goal"]
+        # The geometry comes from the radius, not from the discarded key.
+        line = GoalLine.from_task(task)
+        assert line is not None
+        assert line.length == task.turnpoints[-1].radius * 2
 
 
 class TestStructuralValidation:

@@ -245,7 +245,7 @@ class TestGenerateTaskGeoJSON:
         tp1 = Turnpoint(radius=400, waypoint=waypoint1, type=TurnpointType.TAKEOFF)
         tp2 = Turnpoint(radius=400, waypoint=waypoint2, type=TurnpointType.NONE)
 
-        goal = Goal(type=GoalType.LINE, line_length=500.0)
+        goal = Goal(type=GoalType.LINE)
         task = Task(
             task_type=TaskType.CLASSIC, version=1, turnpoints=[tp1, tp2], goal=goal
         )

@@ -205,12 +205,9 @@ class GoalLine:
         if prev_tp is None:
             return None
 
-        length = task.goal.line_length
-        if length is None:
-            length = goal_line_length_from_turnpoints(task.turnpoints)
+        length = goal_line_length_from_turnpoints(task.turnpoints)
         if length is None:
             return None
-        length = float(length)
 
         return cls(
             center=(last_tp.waypoint.lat, last_tp.waypoint.lon),
