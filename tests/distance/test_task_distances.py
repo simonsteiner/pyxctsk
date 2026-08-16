@@ -1,15 +1,14 @@
-"""Comprehensive distance calculation tests using reference tasks.
+"""The task-distance pipeline: `calculate_task_distances` and its parts.
 
-This module provides comprehensive testing of distance calculation algorithms using
-reference tasks with known expected results. It validates:
-- Algorithm accuracy against reference JSON data
-- Core optimization functionality with synthetic test cases
-- Edge cases and robustness testing
-- Integration testing of the complete distance calculation pipeline
-- Precision validation with high-accuracy settings
+This file covers the layer *above* the optimizer — that a task is turned into
+turnpoints correctly, that cumulative distances accumulate, that the result
+dict has the shape callers read, and that degenerate inputs (no turnpoints,
+one turnpoint, zero radii, concentric circles) do something defined.
 
-The tests use real-world task data to ensure calculations match expected results
-within acceptable tolerances, providing confidence in algorithm correctness.
+How close the optimizer gets to XCTrack's published numbers is not asserted
+here; `test_xctrack_accuracy.py` owns that, and does it on every reference task
+at a tighter tolerance. The one reference check kept below runs through
+`calculate_task_distances`, so it is testing the wiring, not the algorithm.
 """
 
 import json
@@ -299,40 +298,6 @@ class TestDistanceComprehensive:
 
             # Only test first found task to keep test time reasonable
             break
-
-    @pytest.mark.slow
-    def test_algorithm_precision_validation(self, reference_data: Dict[str, Dict]):
-        """Comprehensive precision validation with high-accuracy settings.
-
-        This test uses high precision settings to validate algorithm accuracy
-        and is marked as slow since it takes longer to run.
-        """
-        precision_tasks = ["task_mega", "task_duna"]  # Known complex tasks
-
-        for task_name in precision_tasks:
-            if task_name not in reference_data:
-                continue
-
-            task = reference_data[task_name]["task"]
-            ref_meta = reference_data[task_name]["reference"]["metadata"]
-
-            if "distance_optimized_km" not in ref_meta:
-                continue
-
-            results = calculate_task_distances(task)
-
-            ref_opt_km = ref_meta["distance_optimized_km"]
-            calc_opt_km = results["optimized_distance_km"]
-
-            # With high precision, we should be very close to reference
-            if ref_opt_km > 0:
-                diff_pct = abs(calc_opt_km - ref_opt_km) / ref_opt_km
-                assert diff_pct < 0.01, (  # 1% tolerance for high precision
-                    f"{task_name} high precision: {diff_pct:.2%} difference "
-                    f"(calc: {calc_opt_km:.2f}km, ref: {ref_opt_km:.2f}km)"
-                )
-
-                print(f"{task_name} high precision: {diff_pct:.3%} difference")
 
 
 if __name__ == "__main__":

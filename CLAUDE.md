@@ -19,7 +19,7 @@ uv sync --all-extras
 uv run pytest                                # full suite
 uv run pytest tests/qrcode/test_codec.py -vv -s   # single file, verbose, no capture
 uv run pytest tests/distance -q               # one subpackage
-uv run pytest -m "not slow"                    # skip slow-marked tests
+uv run pytest -m "not slow"                   # skip slow-marked tests (none at present)
 
 # Lint / format / typecheck
 uv run ruff check --fix src/ tests/ scripts/   # lint (E/W/F/I/D) + autofix

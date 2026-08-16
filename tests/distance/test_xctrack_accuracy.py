@@ -13,6 +13,11 @@ These tests encode the acceptance criteria from the route-optimization audit
 - optimized distance never exceeds the distance through centers (except for
   concentric turnpoints, where touching semantics *require* flying back out —
   behaviour XCTrack shares, see task_nohe).
+
+Everything here goes straight at the optimizer. The pipeline that calls it —
+`calculate_task_distances`, cumulative distances, degenerate inputs — is
+`test_task_distances.py`; the optimizer's internals are
+`test_route_optimization.py`.
 """
 
 import json
