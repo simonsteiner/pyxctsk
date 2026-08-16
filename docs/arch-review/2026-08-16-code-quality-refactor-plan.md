@@ -34,12 +34,12 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (record w
 ### Boundaries
 
 - [x] **P8** — Stop inventing `(0, 0)` coordinates in `QRCodeTurnpoint.from_dict`
-- [ ] **P9** — One source of truth for the obsolete-direction default
+- [x] **P9** — One source of truth for the obsolete-direction default
 
 ### Minor
 
-- [ ] **M1** — `_collapse_duplicate_circles`: express "index 0 is special" directly
-- [ ] **M2** — `parse_task`: validate once after the dispatch loop, not inside it
+- [x] **M1** — `_collapse_duplicate_circles`: express "index 0 is special" directly
+- [x] **M2** — `parse_task`: validate once after the dispatch loop, not inside it
 
 ---
 

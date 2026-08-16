@@ -22,6 +22,7 @@ from .qrcode_encoding import (
     encode_waypoint_turnpoint,
 )
 from .qrcode_enums import (
+    QR_OBSOLETE_DIRECTION_DEFAULT,
     QRCodeDirection,
     QRCodeGoalType,
     QRCodeSSSType,
@@ -120,10 +121,8 @@ class QRCodeSSS:
             time_gates = [TimeOfDay.from_json_string(gate) for gate in data["g"]]
 
         # Direction field is OBSOLETE and should be ignored when reading.
-        # Falls back to the same value as the full-JSON path (see
-        # task.OBSOLETE_DIRECTION_DEFAULT) so both readers agree.
-        direction = QRCodeDirection.EXIT
-        if data.get("d"):
+        direction = QR_OBSOLETE_DIRECTION_DEFAULT
+        if data.get("d") is not None:
             # For backwards compatibility, still read it if present
             direction = QRCodeDirection(data["d"])
 

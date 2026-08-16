@@ -23,13 +23,21 @@ from pyxctsk.qrcode_conversion import (
     _TO_QR_TURNPOINT_TYPE,
 )
 from pyxctsk.qrcode_enums import (
+    QR_OBSOLETE_DIRECTION_DEFAULT,
     QRCodeDirection,
     QRCodeEarthModel,
     QRCodeGoalType,
     QRCodeSSSType,
     QRCodeTaskType,
 )
-from pyxctsk.task import Direction, EarthModel, GoalType, SSSType, TaskType
+from pyxctsk.task import (
+    OBSOLETE_DIRECTION_DEFAULT,
+    Direction,
+    EarthModel,
+    GoalType,
+    SSSType,
+    TaskType,
+)
 
 TABLE_PAIRS = [
     ("task type", _TO_QR_TASK_TYPE, _FROM_QR_TASK_TYPE),
@@ -77,3 +85,13 @@ def test_every_domain_value_is_mapped(enum, table):
 def test_every_qr_value_is_mapped(enum, table):
     """The same, coming back the other way."""
     assert set(enum) == set(table)
+
+
+def test_the_two_obsolete_direction_defaults_agree():
+    """Each layer names the fallback beside its own enum; they must match.
+
+    ``sss.direction`` is obsolete and ignored on read, so both readers invent a
+    value when a task omits it. If they invented different ones, the same task
+    would export differently depending on which format it arrived in.
+    """
+    assert _TO_QR_DIRECTION[OBSOLETE_DIRECTION_DEFAULT] == QR_OBSOLETE_DIRECTION_DEFAULT
