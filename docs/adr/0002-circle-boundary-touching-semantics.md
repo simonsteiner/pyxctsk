@@ -43,6 +43,18 @@ The optimized route uses boundary semantics with these endpoint rules:
   `task_nohe` value explicitly.
 - Two identical concentric turnpoints yield optimized distance = radius (not 0); the
   synthetic regression test was updated accordingly.
+- **Consecutive *identical* circles (same center and same radius) are collapsed before
+  optimizing** (`_collapse_duplicate_circles`, added 2026-08-16). Touching a circle and
+  then touching the same circle again is satisfied by one touch, so the duplicate must
+  cost zero. Optimizing the two points separately instead created a spurious local
+  minimum — once they coincide, moving either adds length to the leg between them
+  exactly as fast as it saves on the neighbouring leg, so the alternating sweep froze
+  wherever it happened to be. On `tests/data/reference_tasks/ess-goal/task2` that left
+  the final point at bearing 90.05° from the goal center instead of 170.16°, inflating
+  the optimized distance by 168 m. Index 0 is exempt (the route starts at the takeoff
+  *center*, so repeating the takeoff circle is a real center-to-boundary leg), and
+  concentric circles of *different* radii are untouched — their out-and-back is
+  required, per the rules above.
 - A takeoff inside the SSS cylinder, nested start cylinders, and overlapping cylinders
   all route through segment–circle intersections without spurious detours (covered in
   `tests/test_distance.py::TestCrossingCase`).

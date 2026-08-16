@@ -1,0 +1,40 @@
+{
+  "_comment": "Values displayed by SeeYou Navigator for these two tasks, transcribed from the app UI. Leg distances are the optimized route.",
+  "seeyou-finish-1220": {
+    "task_type": "Race to goal",
+    "start_procedure": "Start opens once",
+    "start_time": "12:30",
+    "start_direction": "On exit",
+    "qnh": "Auto",
+    "finish_altitude_label": "Finish altitude - Minimum altitude at finish point (MSL)",
+    "finish_altitude_displayed": "1220 m",
+    "total_km": 146.1,
+    "legs": 7,
+    "optimized_km": 81.6,
+    "leg_km": [
+      0.0,
+      23.3,
+      10.6,
+      13.6,
+      12.2,
+      16.6,
+      5.3
+    ]
+  },
+  "seeyou-finish-auto": {
+    "task_type": "Race to goal",
+    "start_procedure": "Start opens once",
+    "start_time": "13:00",
+    "start_direction": "On exit",
+    "qnh": "Auto",
+    "finish_altitude_label": "Finish altitude - Minimum altitude at finish point (MSL)",
+    "finish_altitude_displayed": "Auto (423 m MSL)",
+    "total_km": 58.3,
+    "legs": 2,
+    "optimized_km": 64.1,
+    "leg_km": [
+      2.9,
+      61.2
+    ]
+  }
+}

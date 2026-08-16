@@ -22,6 +22,22 @@ class InvalidFormatError(pyXCTSKError):
     pass
 
 
+class TaskValidationError(pyXCTSKError):
+    """Raised when a task breaks the spec's structural rules.
+
+    Distinct from :class:`InvalidFormatError`: the input parsed fine, but the
+    turnpoints it describes are not a well-formed task.
+
+    Attributes:
+        issues (list[str]): One message per violated rule.
+    """
+
+    def __init__(self, issues: list[str]):
+        """Initialize with the list of structural violations."""
+        self.issues = issues
+        super().__init__("; ".join(issues))
+
+
 class InvalidTimeOfDayError(pyXCTSKError):
     """Raised when time of day format is invalid."""
 

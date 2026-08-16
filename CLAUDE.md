@@ -36,13 +36,15 @@ uv run python scripts/check_qr_deps.py
 uv build
 ```
 
-The CLI entry point is `pyxctsk` (`pyxctsk.cli:main`), e.g. `pyxctsk convert task.xctsk --format kml -o task.kml`. Formats: `json`, `kml`, `png` (QR image), `qrcode-json` (`XCTSK:` string). Reads from stdin when no input file is given.
+The CLI entry point is `pyxctsk` (`pyxctsk.cli:main`), e.g. `pyxctsk convert task.xctsk --format kml -o task.kml`. Formats: `json`, `kml`, `png` (QR image), `qrcode-json` (`XCTSK:` string); `--compressed`/`-z` switches the two QR formats to `XCTSKZ:`. Reads from stdin when no input file is given.
 
 ## Architecture
 
-**Single parse entry point.** `parser.parse_task()` detects and dispatches on input type (raw JSON, `XCTSK:` URL, or QR-code image path) and returns a `Task`. All callers should go through it rather than format-specific parsers.
+**Single parse entry point.** `parser.parse_task()` detects and dispatches on input type (raw JSON, `XCTSK:`/`XCTSKZ:` URL, or QR-code image path) and returns a `Task`. All callers should go through it rather than format-specific parsers. Pass `strict=True` to also apply `Task.validate()` (the spec's structural rules) and raise `TaskValidationError`; parsing is lenient by default so malformed tasks can still be read and inspected.
 
-**Immutable domain model (`task.py`).** `Task`, `Turnpoint`, `Waypoint`, `SSS`, `Goal`, `Takeoff` are validated dataclasses. Constrained values are enums (`TaskType`, `TurnpointType`, `SSSType`, `Direction`, `GoalType`, `EarthModel`). `Task.to_json()`, `Task.to_qr_code_task()`, etc. handle serialization. Time-of-day values use `TimeOfDay` and serialize to `HH:MM:SSZ` — be careful with quoting when serializing (see recent qrcode time-of-day fix).
+**Unknown fields are preserved, never interpreted.** `Task.unknown` and `Turnpoint.unknown` carry any key the spec doesn't define straight back out in both formats (`KNOWN_KEYS` on each class is the allow-list), and they can't shadow a spec field. Real producers put data outside the spec's `extensions` mechanism — see `tests/data/reference_tasks/elevated-goal/`, which stores the elevated goal as a root `{"o":{"v":2,"fa":1220}}`. Resist mapping such a field onto a spec field just because the key matches: that `fa` is absolute AMSL where `goal.finishAltitude` is AGL above the last turnpoint, so copying it across would be wrong by ~1 km.
+
+**Domain model (`task.py`).** `Task`, `Turnpoint`, `Waypoint`, `SSS`, `Goal`, `Takeoff` are plain dataclasses — they are not frozen and do not validate on construction; `Task.validate()` is the structural check, and only `TimeOfDay` rejects bad values in `__post_init__`. Constrained values are enums (`TaskType`, `TurnpointType`, `SSSType`, `Direction`, `GoalType`, `EarthModel`), so unknown strings do fail at parse time. `Task.to_json()`, `Task.to_qr_code_task()`, etc. handle serialization. Time-of-day values use `TimeOfDay` and serialize to `HH:MM:SSZ` — be careful with quoting when serializing (see recent qrcode time-of-day fix).
 
 **Distance subsystem is a facade.** `distance.py` only re-exports; the real work lives in focused submodules that must avoid importing back into each other (a circular import between `distance` and `task_distances` was deliberately broken — keep `distance.py` as a thin re-export layer):
 
@@ -54,7 +56,7 @@ The CLI entry point is `pyxctsk` (`pyxctsk.cli:main`), e.g. `pyxctsk convert tas
 
 Distances honor the task's `earthModel` field (WGS84 ellipsoid default, FAI sphere R = 6371 km) via `pyproj`; optimization uses `scipy`.
 
-**QR code subsystem.** `qrcode_task.py` implements XCTrack's compact QR format (v2) with polyline-compressed coordinates for small, sunlight-readable codes. Supporting modules: `qrcode_models.py`, `qrcode_encoding.py`, `qrcode_enums.py`, `qrcode_image.py`. `shared_enums.py` holds enums shared between the full and QR models.
+**QR code subsystem.** `qrcode_task.py` implements XCTrack's compact QR format (v2) with polyline-compressed coordinates for small, sunlight-readable codes. Supporting modules: `qrcode_models.py`, `qrcode_encoding.py`, `qrcode_enums.py`, `qrcode_image.py`. `shared_enums.py` holds enums shared between the full and QR models. Two `z` encodings share one codec: the competition turnpoint is four numbers (lon, lat, alt, radius), the XC/Waypoints one is three (no radius) — decoding dispatches on length, so don't "unify" them. Both the `XCTSK:` and compressed `XCTSKZ:` schemes are read; writing the latter is opt-in via `to_string(compressed=True)`.
 
 **Visualization / export.** `kml.py` (`task_to_kml`), `geojson.py` (`generate_task_geojson`), `goal_line.py` (goal line geometry), `visualization_common.py`.
 
@@ -68,4 +70,4 @@ Distances honor the task's `earthModel` field (WGS84 ellipsoid default, FAI sphe
 
 ## Tests & reference data
 
-Reference fixtures live in `tests/data/reference_tasks/`: `xctsk/` (input `.xctsk`), `json/` (expected metadata incl. pre-computed distances and QR strings), `qrcode_string/` (expected `XCTSK:` strings). `test_distance_reference.py` and `test_qrcode.py` auto-discover these. Generated visual outputs go to `tests/data/visual_output/`. `XCTRACK_ANALYSIS.md` documents spec coverage against the official XCTrack interface.
+Reference fixtures live in `tests/data/reference_tasks/`: `xctsk/` (input `.xctsk`), `json/` (expected metadata incl. pre-computed distances and QR strings), `qrcode_string/` (expected `XCTSK:` strings). `test_distance_reference.py` and `test_qrcode.py` auto-discover these. Generated visual outputs go to `tests/data/visual_output/`. Note that corpus only covers the fields tools.xcontest.org exports — no `goal.finishAltitude`, no `extensions`, no non-integer radii — so it does not exercise the optional half of the spec; that blind spot is why several conformance gaps survived a green suite. Two further sets fill shapes it misses, each with its own README: `ess-goal/` (ESS as last turnpoint, and ESS duplicated as goal) and `elevated-goal/` (the same feature in two encodings — the spec's `goal.finishAltitude` in metres AGL, and SeeYou Navigator's non-spec root `o.fa` in absolute AMSL). `docs/spec-conformance/` reviews the library against the official XCTrack interface; the 2026-08-16 audit there is current.

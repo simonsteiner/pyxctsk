@@ -47,6 +47,12 @@ from .turnpoint import (
 #: A planar circle: (x, y, radius) in the local Transverse Mercator plane.
 PlaneCircle = tuple[float, float, float]
 
+#: Two circles closer than this in both center and radius are the same circle.
+#: Identical turnpoints project through the same transformer to bit-identical
+#: coordinates, so this only guards against float noise, not real geometry —
+#: concentric cylinders of *different* radii stay distinct (see ADR 0002).
+_SAME_CIRCLE_TOLERANCE_M = 1e-6
+
 
 def _plane_circles(
     turnpoints: Sequence[TurnpointGeometry], earth_model: object
@@ -105,6 +111,54 @@ def _closest_circle_point(
     return (cx + radius * dx / dist, cy + radius * dy / dist)
 
 
+def _same_circle(a: PlaneCircle, b: PlaneCircle) -> bool:
+    """Return True if two planar circles are the same circle."""
+    return (
+        math.hypot(a[0] - b[0], a[1] - b[1]) <= _SAME_CIRCLE_TOLERANCE_M
+        and abs(a[2] - b[2]) <= _SAME_CIRCLE_TOLERANCE_M
+    )
+
+
+def _collapse_duplicate_circles(
+    circles: Sequence[PlaneCircle],
+) -> tuple[list[PlaneCircle], list[int]]:
+    """Collapse runs of consecutive identical circles into one.
+
+    Touching a circle and then touching the same circle again is satisfied by
+    a single touch, so duplicated turnpoints must contribute a zero-length
+    leg. Optimizing them as separate points instead creates a spurious local
+    minimum: once two route points on one circle coincide, moving either adds
+    length to the leg between them exactly as fast as it saves on the
+    neighbouring leg, so the alternating sweep freezes wherever it happens to
+    be rather than at the true optimum. Collapsing first removes the
+    degeneracy; the duplicate points are restored afterwards.
+
+    Index 0 is never collapsed: the route starts at the takeoff *center*, not
+    on its boundary, so a turnpoint repeating the takeoff circle is a real
+    center-to-boundary leg.
+
+    Concentric circles of *different* radii are left alone — their
+    out-and-back leg is required (ADR 0002).
+
+    Args:
+        circles: Planar circles (x, y, radius) in turnpoint order.
+
+    Returns:
+        Tuple of (deduplicated circles, index into that list for each input
+        circle).
+    """
+    unique: list[PlaneCircle] = [circles[0]]
+    index_of: list[int] = [0]
+    for circle in circles[1:]:
+        # ``len(unique) > 1`` keeps index 0 in a class of its own.
+        if len(unique) > 1 and _same_circle(unique[-1], circle):
+            index_of.append(len(unique) - 1)
+        else:
+            unique.append(circle)
+            index_of.append(len(unique) - 1)
+    return unique, index_of
+
+
 def _polyline_length(points: Sequence[tuple[float, float]]) -> float:
     """Total planar length of a polyline given as (x, y) points."""
     return sum(
@@ -129,6 +183,10 @@ def _optimize_plane_points(
     no successor, is the boundary point nearest its predecessor. Sweeps stop
     once the total path length changes by less than ``epsilon``.
 
+    Consecutive identical circles are optimized as one point and duplicated
+    back afterwards (see :func:`_collapse_duplicate_circles`), so the returned
+    list always has one point per input circle.
+
     Args:
         circles: Planar circles (x, y, radius) in turnpoint order.
         max_sweeps: Upper bound on alternating sweeps.
@@ -136,12 +194,17 @@ def _optimize_plane_points(
         show_progress: Whether to print per-sweep progress.
 
     Returns:
-        The optimized (x, y) route points, one per circle.
+        The optimized (x, y) route points, one per input circle.
     """
+    if not circles:
+        return []
+
+    circles, index_of = _collapse_duplicate_circles(circles)
+
     n = len(circles)
     points: list[tuple[float, float]] = [(c[0], c[1]) for c in circles]
     if n < 2:
-        return points
+        return [points[j] for j in index_of]
 
     previous_length = _polyline_length(points)
     for sweep in range(max_sweeps):
@@ -163,7 +226,7 @@ def _optimize_plane_points(
             break
         previous_length = current_length
 
-    return points
+    return [points[j] for j in index_of]
 
 
 def calculate_iteratively_refined_route(

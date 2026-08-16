@@ -25,7 +25,10 @@ This module provides:
 - Parsing from QR code strings and JSON.
 """
 
+import base64
+import binascii
 import json
+import zlib
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
@@ -47,7 +50,47 @@ if TYPE_CHECKING:
 
 # Constants
 QR_CODE_SCHEME = "XCTSK:"
+# The spec's zlib+base64 variant: "It is recommended that the software accepts
+# both XCTSK and XCTSKZ [...] In the future we prefer to use the XCTSKZ
+# encoding." Reading both is mandatory; which one we write is the caller's
+# choice, and XCTSK: stays the default so existing output is unchanged.
+QR_CODE_SCHEME_COMPRESSED = "XCTSKZ:"
 QR_CODE_TASK_VERSION = 2
+
+
+def compress_payload(json_str: str) -> str:
+    """Compress a QR payload to the ``XCTSKZ:`` body: zlib, then base64.
+
+    Args:
+        json_str: The task JSON to compress.
+
+    Returns:
+        str: The base64-encoded zlib stream, as ASCII.
+    """
+    return base64.b64encode(zlib.compress(json_str.encode("utf-8"))).decode("ascii")
+
+
+def decompress_payload(payload: str) -> str:
+    """Decompress an ``XCTSKZ:`` body back to task JSON.
+
+    Args:
+        payload: The base64-encoded zlib stream that followed ``XCTSKZ:``.
+
+    Returns:
+        str: The decompressed task JSON.
+
+    Raises:
+        ValueError: If the payload is not valid base64 or not a zlib stream.
+    """
+    try:
+        raw = base64.b64decode(payload, validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise ValueError(f"XCTSKZ payload is not valid base64: {exc}") from exc
+
+    try:
+        return zlib.decompress(raw).decode("utf-8")
+    except (zlib.error, UnicodeDecodeError) as exc:
+        raise ValueError(f"XCTSKZ payload is not a zlib stream: {exc}") from exc
 
 
 @dataclass
@@ -83,6 +126,14 @@ class QRCodeTask:
     takeoff: QRCodeTakeoff | None = None
     sss: QRCodeSSS | None = None
     goal: QRCodeGoal | None = None
+    extensions: list[dict[str, Any]] = field(default_factory=list)
+    unknown: dict[str, Any] = field(default_factory=dict)
+
+    #: Keys this class understands; everything else lands in ``unknown``.
+    #: ``p`` is a legacy pyxctsk field, not a spec one, but it is read here.
+    KNOWN_KEYS = frozenset(
+        {"taskType", "version", "T", "V", "t", "s", "g", "e", "to", "tc", "x", "p"}
+    )
 
     def to_dict(self, simplified: bool = False) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
@@ -90,13 +141,18 @@ class QRCodeTask:
         Builds the QR code task dictionary in the precise field order required
         by the XCTrack format specification.
 
+        A WAYPOINTS task always uses the simplified form regardless of the
+        argument: the spec's competition format only defines
+        ``"taskType": "CLASSIC"``, and an XC/Waypoints task is identified by
+        ``"T": "W"`` instead.
+
         Args:
             simplified: If True, use simplified XC/Waypoints format with only T, V, and t fields
 
         Returns:
             Dictionary with QR code task format fields
         """
-        if simplified:
+        if simplified or self.task_type == QRCodeTaskType.WAYPOINTS:
             # XC/Waypoints simplified format
             simplified_result: OrderedDict[str, Any] = OrderedDict()
             simplified_result["T"] = "W"  # taskType: Waypoints
@@ -107,6 +163,13 @@ class QRCodeTask:
                 simplified_result["t"] = [
                     tp.to_dict(simplified=True) for tp in self.turnpoints
                 ]
+            # Extensions and unknown keys are preserved here for the same
+            # reason as in the full format: from_dict reads them, so dropping
+            # them on the way out would lose data on a round-trip.
+            if self.extensions:
+                simplified_result["x"] = self.extensions
+            for key, value in self.unknown.items():
+                simplified_result.setdefault(key, value)
 
             return simplified_result
 
@@ -128,11 +191,10 @@ class QRCodeTask:
         if self.turnpoints:
             result["t"] = [tp.to_dict() for tp in self.turnpoints]
 
-        # 4. Task type
+        # 4. Task type - CLASSIC is the only value this format defines;
+        #    WAYPOINTS took the simplified branch above.
         if self.task_type is not None:
-            result["taskType"] = (
-                "CLASSIC" if self.task_type == QRCodeTaskType.CLASSIC else "WAYPOINTS"
-            )
+            result["taskType"] = "CLASSIC"
 
         # 5. Takeoff fields - always include them as null if not set
         # This is important to match the expected test output exactly
@@ -148,8 +210,14 @@ class QRCodeTask:
         if self.earth_model is not None and self.earth_model != QRCodeEarthModel.WGS84:
             result["e"] = self.earth_model.value
 
-        # 7. Version - always at the end
+        # 7. Version
         result["version"] = self.version
+
+        # 8. Extensions last, matching the order the spec lists them in
+        if self.extensions:
+            result["x"] = self.extensions
+        for key, value in self.unknown.items():
+            result.setdefault(key, value)
 
         return result
 
@@ -182,6 +250,8 @@ class QRCodeTask:
                 takeoff=None,
                 sss=None,
                 goal=None,
+                extensions=list(data.get("x") or []),
+                unknown={k: v for k, v in data.items() if k not in cls.KNOWN_KEYS},
             )
 
         # Full format
@@ -237,6 +307,8 @@ class QRCodeTask:
             takeoff=takeoff,
             sss=sss,
             goal=goal,
+            extensions=list(data.get("x") or []),
+            unknown={k: v for k, v in data.items() if k not in cls.KNOWN_KEYS},
         )
 
     def to_json(self, simplified: bool = False) -> str:
@@ -259,21 +331,45 @@ class QRCodeTask:
         """
         return self.to_json(simplified=True)
 
-    def to_string(self) -> str:
-        """Convert to XCTSK: URL string.
+    def _to_scheme_string(self, json_str: str, compressed: bool) -> str:
+        """Prefix a payload with the scheme it belongs to, compressing if asked."""
+        if compressed:
+            return QR_CODE_SCHEME_COMPRESSED + compress_payload(json_str)
+        return QR_CODE_SCHEME + json_str
+
+    def to_string(self, compressed: bool = False) -> str:
+        """Convert to a QR code URL string.
+
+        Args:
+            compressed: If True, emit the ``XCTSKZ:`` form — the same JSON
+                zlib-compressed and base64-encoded, which the spec prefers going
+                forward because it fits far more task into a scannable code.
 
         Returns:
-            Complete QR code string with XCTSK: scheme prefix
+            Complete QR code string with the XCTSK: or XCTSKZ: scheme prefix
         """
-        return QR_CODE_SCHEME + self.to_json()
+        return self._to_scheme_string(self.to_json(), compressed)
 
-    def to_waypoints_string(self) -> str:
-        """Convert to XC/Waypoints XCTSK: URL string.
+    def to_compressed_string(self) -> str:
+        """Convert to an ``XCTSKZ:`` URL string.
+
+        Convenience for :meth:`to_string` with ``compressed=True``.
 
         Returns:
-            Complete QR code string with XCTSK: scheme prefix in simplified format
+            Complete QR code string with the XCTSKZ: scheme prefix
         """
-        return QR_CODE_SCHEME + self.to_waypoints_json()
+        return self.to_string(compressed=True)
+
+    def to_waypoints_string(self, compressed: bool = False) -> str:
+        """Convert to an XC/Waypoints QR code URL string.
+
+        Args:
+            compressed: If True, emit the ``XCTSKZ:`` form.
+
+        Returns:
+            Complete QR code string in simplified format
+        """
+        return self._to_scheme_string(self.to_waypoints_json(), compressed)
 
     @classmethod
     def from_json(cls, json_str: str) -> "QRCodeTask":
@@ -283,22 +379,31 @@ class QRCodeTask:
 
     @classmethod
     def from_string(cls, url_str: str) -> "QRCodeTask":
-        """Create from XC/Waypoints XCTSK: URL string.
+        """Create from a QR code URL string in either scheme.
+
+        Both ``XCTSK:`` and ``XCTSKZ:`` are accepted, as the spec requires.
 
         Args:
-            url_str: Complete QR code string with XCTSK: scheme prefix
+            url_str: Complete QR code string with a scheme prefix
 
         Returns:
             QRCodeTask instance
 
         Raises:
-            ValueError: If URL doesn't start with XCTSK: scheme
+            ValueError: If the string carries neither scheme, or if an
+                ``XCTSKZ:`` payload cannot be decompressed.
         """
-        if not url_str.startswith(QR_CODE_SCHEME):
-            raise ValueError(f"Invalid QR code scheme, expected {QR_CODE_SCHEME}")
+        if url_str.startswith(QR_CODE_SCHEME_COMPRESSED):
+            payload = url_str[len(QR_CODE_SCHEME_COMPRESSED) :]
+            return cls.from_json(decompress_payload(payload))
 
-        json_str = url_str[len(QR_CODE_SCHEME) :]
-        return cls.from_json(json_str)
+        if url_str.startswith(QR_CODE_SCHEME):
+            return cls.from_json(url_str[len(QR_CODE_SCHEME) :])
+
+        raise ValueError(
+            f"Invalid QR code scheme, expected {QR_CODE_SCHEME} "
+            f"or {QR_CODE_SCHEME_COMPRESSED}"
+        )
 
     @classmethod
     def from_task(cls, task: "Task") -> "QRCodeTask":
@@ -357,6 +462,8 @@ class QRCodeTask:
                 alt_smoothed=tp.waypoint.alt_smoothed,
                 type=qr_type,
                 description=tp.waypoint.description,
+                extensions=tp.extensions,
+                unknown=tp.unknown,
             )
             qr_turnpoints.append(qr_turnpoint)
             coordinates.append((tp.waypoint.lat, tp.waypoint.lon))
@@ -404,6 +511,7 @@ class QRCodeTask:
             qr_goal = QRCodeGoal(
                 deadline=task.goal.deadline,
                 type=qr_goal_type,
+                finish_altitude=task.goal.finish_altitude,
             )
 
         return cls(
@@ -415,6 +523,8 @@ class QRCodeTask:
             takeoff=qr_takeoff,
             sss=qr_sss,
             goal=qr_goal,
+            extensions=task.extensions,
+            unknown=task.unknown,
         )
 
     @classmethod
@@ -514,6 +624,8 @@ class QRCodeTask:
                 radius=qr_tp.radius,
                 waypoint=waypoint,
                 type=tp_type,
+                extensions=qr_tp.extensions,
+                unknown=qr_tp.unknown,
             )
             turnpoints.append(turnpoint)
 
@@ -558,6 +670,7 @@ class QRCodeTask:
             goal = Goal(
                 type=goal_type,
                 deadline=self.goal.deadline,
+                finish_altitude=self.goal.finish_altitude,
             )
 
         return Task(
@@ -568,4 +681,6 @@ class QRCodeTask:
             takeoff=takeoff,
             sss=sss,
             goal=goal,
+            extensions=self.extensions,
+            unknown=self.unknown,
         )

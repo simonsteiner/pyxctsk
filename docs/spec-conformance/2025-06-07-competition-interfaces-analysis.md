@@ -1,5 +1,12 @@
 # XCTrack Competition Interface Support Analysis
 
+> **Superseded — retained for history.** The "100% / complete coverage" conclusion
+> below does not hold. See
+> [`2026-08-16-competition-interfaces-audit.md`](./2026-08-16-competition-interfaces-audit.md),
+> which found `goal.finishAltitude` and `extensions` unimplemented, no `XCTSKZ:`
+> support, and two crashes on spec-valid input. This document remains useful as the
+> record of the QR encoding fixes made in June 2025 (§ "Issues Fixed During Analysis").
+
 *This analysis was performed by Claude Sonnet 4 (Anthropic's AI model) via GitHub Copilot Chat on June 7, 2025*
 
 *Documentation source: [XCTrack Competition Interfaces](https://xctrack.org/Competition_Interfaces.html) - fetched and analyzed automatically*

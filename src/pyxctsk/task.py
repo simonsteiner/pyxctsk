@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
+from .qrcode_encoding import _round_half_up
 from .qrcode_task import QRCodeTask
 from .shared_enums import TimeOfDay
 
@@ -30,6 +31,13 @@ class Direction(str, Enum):
 
     ENTER = "ENTER"
     EXIT = "EXIT"
+
+
+# ``sss.direction`` is obsolete: the spec requires readers to ignore it and
+# writers to still emit *some* value so older devices keep working. This is the
+# value used when a task omits the field. EXIT is what all 22 reference tasks
+# carry, so a task read without it re-exports the way XCTrack writes it.
+OBSOLETE_DIRECTION_DEFAULT = Direction.EXIT
 
 
 class EarthModel(str, Enum):
@@ -134,6 +142,10 @@ class Waypoint:
     def from_dict(cls, data: dict[str, Any]) -> "Waypoint":
         """Create from dictionary.
 
+        The spec types ``altSmoothed`` as a number rather than an integer, but
+        it is metres AMSL and the QR encoding can only carry whole metres, so a
+        fractional value is rounded to honor this class's ``int`` annotation.
+
         Args:
             data (Dict[str, Any]): Dictionary to parse.
 
@@ -144,7 +156,7 @@ class Waypoint:
             name=data["name"],
             lat=data["lat"],
             lon=data["lon"],
-            alt_smoothed=data["altSmoothed"],
+            alt_smoothed=_round_half_up(data["altSmoothed"]),
             description=data.get("description"),
         )
 
@@ -157,11 +169,21 @@ class Turnpoint:
         radius (int): Turnpoint radius in meters.
         waypoint (Waypoint): Associated waypoint.
         type (Optional[TurnpointType]): Type of turnpoint.
+        extensions (list): Opaque manufacturer extensions, preserved verbatim.
+            The spec requires them to be in the same order as the root
+            ``extensions`` list, with the ``id`` key not repeated here.
+        unknown (dict): Keys the spec does not define, preserved verbatim.
+            See :attr:`Task.unknown`.
     """
 
     radius: int
     waypoint: Waypoint
     type: TurnpointType | None = None
+    extensions: list[dict[str, Any]] = field(default_factory=list)
+    unknown: dict[str, Any] = field(default_factory=dict)
+
+    #: Keys this class understands; everything else lands in ``unknown``.
+    KNOWN_KEYS = frozenset({"radius", "waypoint", "type", "extensions"})
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
@@ -169,17 +191,25 @@ class Turnpoint:
         Returns:
             Dict[str, Any]: Dictionary representation for JSON.
         """
-        result = {
+        result: dict[str, Any] = {
             "radius": self.radius,
             "waypoint": self.waypoint.to_dict(),
         }
         if self.type and self.type != TurnpointType.NONE:
             result["type"] = self.type.value
+        if self.extensions:
+            result["extensions"] = self.extensions
+        for key, value in self.unknown.items():
+            result.setdefault(key, value)
         return result
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Turnpoint":
         """Create from dictionary.
+
+        The spec types ``radius`` as a number rather than an integer; it is
+        metres and the QR encoding can only carry whole metres, so a fractional
+        value is rounded to honor this class's ``int`` annotation.
 
         Args:
             data (Dict[str, Any]): Dictionary to parse.
@@ -192,9 +222,11 @@ class Turnpoint:
             turnpoint_type = TurnpointType(data["type"])
 
         return cls(
-            radius=data["radius"],
+            radius=_round_half_up(data["radius"]),
             waypoint=Waypoint.from_dict(data["waypoint"]),
             type=turnpoint_type,
+            extensions=list(data.get("extensions") or []),
+            unknown={k: v for k, v in data.items() if k not in cls.KNOWN_KEYS},
         )
 
 
@@ -250,13 +282,14 @@ class SSS:
 
     Attributes:
         type (SSSType): SSS type.
-        direction (Direction): SSS direction.
+        direction (Direction): SSS direction. Obsolete — ignored on read, still
+            written so older devices keep working.
         time_gates (List[TimeOfDay]): List of time gates.
         time_close (Optional[TimeOfDay]): Optional closing time.
     """
 
     type: SSSType
-    direction: Direction
+    direction: Direction = OBSOLETE_DIRECTION_DEFAULT
     time_gates: list[TimeOfDay] = field(default_factory=list)
     time_close: TimeOfDay | None = None
 
@@ -279,6 +312,10 @@ class SSS:
     def from_dict(cls, data: dict[str, Any]) -> "SSS":
         """Create from dictionary.
 
+        ``direction`` is obsolete. The spec requires readers to ignore it, so a
+        task that omits it parses fine and falls back to
+        :data:`OBSOLETE_DIRECTION_DEFAULT`.
+
         Args:
             data (Dict[str, Any]): Dictionary to parse.
 
@@ -295,9 +332,13 @@ class SSS:
         if "timeClose" in data:
             time_close = TimeOfDay.from_json_string(data["timeClose"])
 
+        direction = OBSOLETE_DIRECTION_DEFAULT
+        if data.get("direction"):
+            direction = Direction(data["direction"])
+
         return cls(
             type=SSSType(data["type"]),
-            direction=Direction(data["direction"]),
+            direction=direction,
             time_gates=time_gates,
             time_close=time_close,
         )
@@ -312,34 +353,44 @@ class Goal:
     Attributes:
         type (Optional[GoalType]): Goal type.
         deadline (Optional[TimeOfDay]): Goal deadline.
+        finish_altitude (Optional[float]): Elevated goal altitude in meters AGL,
+            measured from the altitude of the last turnpoint.
         line_length (Optional[float]): Length of the goal line (for LINE type).
+            Derived from the last turnpoint's radius, not a spec field — see
+            :meth:`to_dict`.
     """
 
     type: GoalType | None = None
     deadline: TimeOfDay | None = None
+    finish_altitude: float | None = None
     line_length: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
 
+        The spec's goal object has exactly three keys — ``type``, ``deadline``
+        and ``finishAltitude``. ``line_length`` is deliberately not written:
+        it is always twice the last turnpoint's radius, which is what the spec
+        already says that radius means, so emitting it would invent a field.
+
         Returns:
             Dict[str, Any]: Dictionary representation for JSON.
         """
-        result = {}
+        result: dict[str, Any] = {}
         if self.type:
             result["type"] = self.type.value
         if self.deadline:
             result["deadline"] = self.deadline.to_json_string()
-        if self.type == GoalType.LINE and self.line_length is not None:
-            # For goal LINE type, lineLength represents the total length of the goal line
-            result["lineLength"] = str(
-                self.line_length
-            )  # Convert to string for consistency
+        if self.finish_altitude is not None:
+            result["finishAltitude"] = self.finish_altitude
         return result
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Goal":
         """Create from dictionary.
+
+        ``lineLength`` is still read, tolerating files older pyxctsk versions
+        wrote, even though it is not a spec field and is no longer written.
 
         Args:
             data (Dict[str, Any]): Dictionary to parse.
@@ -349,16 +400,24 @@ class Goal:
         """
         goal_type = None
         deadline = None
+        finish_altitude = None
         line_length = None  # No default line length
 
         if "type" in data:
             goal_type = GoalType(data["type"])
         if "deadline" in data:
             deadline = TimeOfDay.from_json_string(data["deadline"])
+        if data.get("finishAltitude") is not None:
+            finish_altitude = data["finishAltitude"]
         if "lineLength" in data and data["lineLength"] is not None:
             line_length = float(data["lineLength"])
 
-        return cls(type=goal_type, deadline=deadline, line_length=line_length)
+        return cls(
+            type=goal_type,
+            deadline=deadline,
+            finish_altitude=finish_altitude,
+            line_length=line_length,
+        )
 
 
 @dataclass
@@ -373,6 +432,18 @@ class Task:
         takeoff (Optional[Takeoff]): Takeoff window.
         sss (Optional[SSS]): Start of speed section.
         goal (Optional[Goal]): Task goal.
+        extensions (list): Opaque manufacturer extensions, preserved verbatim.
+            Each carries an obligatory ``id`` identifying manufacturer and
+            version; their order defines the order of turnpoint extensions.
+        unknown (dict): Keys the spec does not define, preserved verbatim so a
+            round-trip does not silently discard them. Producers do put data
+            outside the spec's ``extensions`` mechanism — one writes the
+            elevated goal altitude as a root ``{"o": {"v": 2, "fa": 1220}}``.
+            Nothing here is interpreted: the value is carried, not understood,
+            and in particular is never mapped onto a spec field, since a
+            look-alike key may not share the spec's units (that ``fa`` is
+            absolute AMSL where the spec's ``goal.finishAltitude`` is AGL
+            above the last turnpoint).
     """
 
     task_type: TaskType
@@ -382,6 +453,22 @@ class Task:
     takeoff: Takeoff | None = None
     sss: SSS | None = None
     goal: Goal | None = None
+    extensions: list[dict[str, Any]] = field(default_factory=list)
+    unknown: dict[str, Any] = field(default_factory=dict)
+
+    #: Keys this class understands; everything else lands in ``unknown``.
+    KNOWN_KEYS = frozenset(
+        {
+            "taskType",
+            "version",
+            "earthModel",
+            "turnpoints",
+            "takeoff",
+            "sss",
+            "goal",
+            "extensions",
+        }
+    )
 
     def __post_init__(self) -> None:
         """Post-initialization processing.
@@ -449,6 +536,10 @@ class Task:
             result["sss"] = self.sss.to_dict()
         if self.goal:
             result["goal"] = self.goal.to_dict()
+        if self.extensions:
+            result["extensions"] = self.extensions
+        for key, value in self.unknown.items():
+            result.setdefault(key, value)
 
         return result
 
@@ -490,6 +581,8 @@ class Task:
             takeoff=takeoff,
             sss=sss,
             goal=goal,
+            extensions=list(data.get("extensions") or []),
+            unknown={k: v for k, v in data.items() if k not in cls.KNOWN_KEYS},
         )
 
     def to_json(self) -> str:
@@ -520,6 +613,63 @@ class Task:
             QRCodeTask: QRCodeTask object created from this task.
         """
         return QRCodeTask.from_task(self)
+
+    def validate(self) -> list[str]:
+        """Check the task against the spec's structural rules.
+
+        The spec constrains how the special turnpoint types may be arranged:
+
+        - ``TAKEOFF`` "can be used only for the first turnpoint";
+        - ``SSS`` and ``ESS`` "must appear exactly once";
+        - ``SSS`` "must appear before ESS".
+
+        These apply to CLASSIC tasks. An XC/Waypoints task is a plain route
+        with no speed section, so the SSS/ESS rules are not checked for it.
+
+        This is a report, not a gate — parsing accepts structurally invalid
+        tasks so they can still be inspected and converted. Pass
+        ``strict=True`` to :func:`pyxctsk.parse_task` to turn violations into a
+        :class:`~pyxctsk.exceptions.TaskValidationError`.
+
+        Returns:
+            list[str]: One message per violated rule; empty if the task is valid.
+        """
+        issues: list[str] = []
+
+        if not self.turnpoints:
+            issues.append("task has no turnpoints")
+            return issues
+
+        misplaced = [
+            i
+            for i, tp in enumerate(self.turnpoints)
+            if tp.type == TurnpointType.TAKEOFF and i != 0
+        ]
+        for i in misplaced:
+            issues.append(
+                f"TAKEOFF is only allowed on the first turnpoint, found at index {i}"
+            )
+
+        if self.task_type == TaskType.WAYPOINTS:
+            return issues
+
+        indices = {
+            special: [i for i, tp in enumerate(self.turnpoints) if tp.type == special]
+            for special in (TurnpointType.SSS, TurnpointType.ESS)
+        }
+        for special, found in indices.items():
+            if len(found) != 1:
+                issues.append(
+                    f"{special.value} must appear exactly once, found {len(found)}"
+                )
+
+        sss, ess = indices[TurnpointType.SSS], indices[TurnpointType.ESS]
+        if len(sss) == 1 and len(ess) == 1 and sss[0] > ess[0]:
+            issues.append(
+                f"SSS must appear before ESS, found SSS at {sss[0]} and ESS at {ess[0]}"
+            )
+
+        return issues
 
     def find_ess_turnpoint(self) -> Turnpoint | None:
         """Find and return the ESS turnpoint, if any.

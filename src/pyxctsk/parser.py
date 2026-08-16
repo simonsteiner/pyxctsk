@@ -22,9 +22,13 @@ Functions:
 import json
 from io import BytesIO
 
-from .exceptions import EmptyInputError, InvalidFormatError
-from .qrcode_task import QR_CODE_SCHEME, QRCodeTask
+from .exceptions import EmptyInputError, InvalidFormatError, TaskValidationError
+from .qrcode_task import QR_CODE_SCHEME, QR_CODE_SCHEME_COMPRESSED, QRCodeTask
 from .task import Task
+
+# Both QR schemes the spec defines. XCTSKZ: is checked first because XCTSK: is
+# not a prefix of it, but keeping them ordered makes the intent obvious.
+_QR_SCHEMES = (QR_CODE_SCHEME_COMPRESSED, QR_CODE_SCHEME)
 
 # Optional QR code dependencies
 try:
@@ -48,10 +52,10 @@ _PARSE_ERRORS = (json.JSONDecodeError, ValueError, KeyError, UnicodeDecodeError)
 def _looks_like_file_path(data: str) -> bool:
     """Return True if a string should be treated as a path to read.
 
-    XCTSK: URLs are excluded because they may contain path-like characters
-    but are never files.
+    QR code URLs are excluded because they may contain path-like characters
+    but are never files. Base64 in an XCTSKZ: payload routinely contains "/".
     """
-    if data.startswith(QR_CODE_SCHEME):
+    if data.startswith(_QR_SCHEMES):
         return False
     return "/" in data or "\\" in data or data.endswith(_FILE_EXTENSIONS)
 
@@ -65,26 +69,33 @@ def _read_file(path: str) -> bytes | None:
         return None
 
 
-def _parse_xctsk_url(text: str | None, raw: bytes) -> Task | None:
-    """Parse the compact ``XCTSK:`` URL format.
+def _qr_url_text(text: str | None, raw: bytes) -> str | None:
+    """Return the input as text if it carries either QR scheme, else None."""
+    if text is not None and text.startswith(_QR_SCHEMES):
+        return text
+    for scheme in _QR_SCHEMES:
+        if raw.startswith(scheme.encode("utf-8")):
+            return raw.decode("utf-8", errors="strict")
+    return None
 
-    A string carrying the ``XCTSK:`` prefix can only be this format, so a
-    malformed payload raises a descriptive error rather than silently
-    falling through to other adapters.
+
+def _parse_xctsk_url(text: str | None, raw: bytes) -> Task | None:
+    """Parse the compact ``XCTSK:`` and ``XCTSKZ:`` URL formats.
+
+    A string carrying either prefix can only be this format, so a malformed
+    payload raises a descriptive error rather than silently falling through
+    to other adapters.
     """
-    scheme = QR_CODE_SCHEME
-    if text is not None and text.startswith(scheme):
-        payload = text[len(scheme) :]
-    elif raw.startswith(scheme.encode("utf-8")):
-        payload = raw[len(scheme) :].decode("utf-8")
-    else:
+    url = _qr_url_text(text, raw)
+    if url is None:
         return None
 
     try:
-        return QRCodeTask.from_json(payload).to_task()
+        return QRCodeTask.from_string(url).to_task()
     except _PARSE_ERRORS as exc:
+        scheme = url.split(":", 1)[0]
         raise InvalidFormatError(
-            f"recognized XCTSK: URL but its payload could not be parsed: {exc}"
+            f"recognized {scheme}: URL but its payload could not be parsed: {exc}"
         ) from exc
 
 
@@ -123,10 +134,9 @@ def _parse_qrcode_image(text: str | None, raw: bytes) -> Task | None:
 
     for qr_code in qr_codes:
         payload = qr_code.text
-        if payload.startswith(QR_CODE_SCHEME):
+        if payload.startswith(_QR_SCHEMES):
             try:
-                qr_task_json = payload[len(QR_CODE_SCHEME) :]
-                return QRCodeTask.from_json(qr_task_json).to_task()
+                return QRCodeTask.from_string(payload).to_task()
             except _PARSE_ERRORS:
                 continue
     return None
@@ -143,11 +153,14 @@ _FORMAT_PARSERS = (
 )
 
 
-def parse_task(data: bytes | str) -> Task:
+def parse_task(data: bytes | str, strict: bool = False) -> Task:
     """Parse a XCTrack Task from a variety of input formats.
 
     Args:
         data: Input data as bytes, string, or file path.
+        strict: If True, also apply :meth:`Task.validate` and reject a task
+            that breaks the spec's structural rules. Off by default so that a
+            malformed task can still be read, inspected and converted.
 
     Returns:
         Task: Parsed Task object.
@@ -155,6 +168,7 @@ def parse_task(data: bytes | str) -> Task:
     Raises:
         EmptyInputError: If input is empty.
         InvalidFormatError: If input format is invalid or cannot be parsed.
+        TaskValidationError: If ``strict`` and the task is structurally invalid.
     """
     if not data:
         raise EmptyInputError("empty input")
@@ -163,7 +177,7 @@ def parse_task(data: bytes | str) -> Task:
     if isinstance(data, str) and _looks_like_file_path(data):
         file_data = _read_file(data)
         if file_data is not None:
-            return parse_task(file_data)
+            return parse_task(file_data, strict=strict)
 
     # Normalize to (decoded text, raw bytes). text is None when the bytes are
     # not valid UTF-8 (e.g. a binary image); text-based adapters then skip.
@@ -180,6 +194,10 @@ def parse_task(data: bytes | str) -> Task:
     for parser in _FORMAT_PARSERS:
         task = parser(text, raw)
         if task is not None:
+            if strict:
+                issues = task.validate()
+                if issues:
+                    raise TaskValidationError(issues)
             return task
 
     raise InvalidFormatError("invalid format")

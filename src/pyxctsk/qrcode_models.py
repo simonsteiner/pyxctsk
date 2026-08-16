@@ -15,9 +15,11 @@ from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Any
 
-import polyline
-
-from .qrcode_encoding import decode_nums, encode_competition_turnpoint
+from .qrcode_encoding import (
+    decode_nums,
+    encode_competition_turnpoint,
+    encode_waypoint_turnpoint,
+)
 from .qrcode_enums import (
     QRCodeDirection,
     QRCodeGoalType,
@@ -36,16 +38,24 @@ class QRCodeGoal:
     Fields correspond to JSON format:
     - deadline: Goal deadline time (optional, defaults to 23:00 local time)
     - type: Goal type - LINE (1) or CYLINDER (2, default)
+    - finish_altitude: Elevated goal altitude in meters AGL (optional, "fa")
     """
 
     deadline: TimeOfDay | None = None
     type: QRCodeGoalType | None = None
+    finish_altitude: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary for JSON serialization."""
+        """Convert to dictionary for JSON serialization.
+
+        Keys are emitted in the order tools.xcontest.org uses — ``d``, ``fa``,
+        ``t`` — so output stays byte-identical to the reference producer.
+        """
         result: dict[str, Any] = {}
         if self.deadline:
             result["d"] = self.deadline.to_json_string()
+        if self.finish_altitude is not None:
+            result["fa"] = self.finish_altitude
         if self.type is not None:
             result["t"] = self.type.value
         return result
@@ -63,7 +73,11 @@ class QRCodeGoal:
         if "t" in data:
             goal_type = QRCodeGoalType(data["t"])
 
-        return cls(deadline=deadline, type=goal_type)
+        finish_altitude = None
+        if data.get("fa") is not None:
+            finish_altitude = data["fa"]
+
+        return cls(deadline=deadline, type=goal_type, finish_altitude=finish_altitude)
 
 
 @dataclass
@@ -104,10 +118,11 @@ class QRCodeSSS:
         if "g" in data:
             time_gates = [TimeOfDay.from_json_string(gate) for gate in data["g"]]
 
-        # Direction field is OBSOLETE and should be ignored when reading
-        # Use ENTER as default when not present or when ignoring obsolete field
-        direction = QRCodeDirection.ENTER
-        if "d" in data:
+        # Direction field is OBSOLETE and should be ignored when reading.
+        # Falls back to the same value as the full-JSON path (see
+        # task.OBSOLETE_DIRECTION_DEFAULT) so both readers agree.
+        direction = QRCodeDirection.EXIT
+        if data.get("d"):
             # For backwards compatibility, still read it if present
             direction = QRCodeDirection(data["d"])
 
@@ -183,6 +198,11 @@ class QRCodeTurnpoint:
     alt_smoothed: int
     type: QRCodeTurnpointType = QRCodeTurnpointType.NONE
     description: str | None = None
+    extensions: list[dict[str, Any]] = field(default_factory=list)
+    unknown: dict[str, Any] = field(default_factory=dict)
+
+    #: Keys this class understands; everything else lands in ``unknown``.
+    KNOWN_KEYS = frozenset({"z", "n", "d", "t", "x"})
 
     def to_dict(self, simplified: bool = False) -> OrderedDict[str, Any]:
         """Convert to dictionary for JSON serialization.
@@ -198,14 +218,33 @@ class QRCodeTurnpoint:
             Dictionary with fields: d (description), n (name), t (type), z (encoded coords)
             For simplified format: only n (name) and z (encoded coords)
         """
+        if simplified:
+            # XC/Waypoints simplified format - name and encoded coordinates.
+            # Its "z" carries three numbers; the radius belongs to the
+            # competition format only.
+            simplified_result: OrderedDict[str, Any] = OrderedDict(
+                [
+                    ("n", self.name),
+                    (
+                        "z",
+                        encode_waypoint_turnpoint(
+                            self.lon, self.lat, self.alt_smoothed
+                        ),
+                    ),
+                ]
+            )
+            # from_dict reads "x" and unknown keys for these payloads too, so
+            # they have to be written back or a round-trip loses them.
+            if self.extensions:
+                simplified_result["x"] = self.extensions
+            for key, value in self.unknown.items():
+                simplified_result.setdefault(key, value)
+            return simplified_result
+
         # Use the XCTrack custom encoding
         encoded = encode_competition_turnpoint(
             self.lon, self.lat, self.alt_smoothed, self.radius
         )
-
-        if simplified:
-            # XC/Waypoints simplified format - only name and encoded coordinates
-            return OrderedDict([("n", self.name), ("z", encoded)])
 
         # Full format - Create result dictionary with exact order to match expected output
         result: OrderedDict[str, Any] = OrderedDict()
@@ -221,8 +260,13 @@ class QRCodeTurnpoint:
         if self.type == QRCodeTurnpointType.SSS or self.type == QRCodeTurnpointType.ESS:
             result["t"] = self.type.value
 
-        # Add z last
         result["z"] = encoded
+
+        # Extensions last, matching the order the spec lists them in
+        if self.extensions:
+            result["x"] = self.extensions
+        for key, value in self.unknown.items():
+            result.setdefault(key, value)
 
         return result
 
@@ -230,8 +274,10 @@ class QRCodeTurnpoint:
     def from_dict(cls, data: dict[str, Any]) -> "QRCodeTurnpoint":
         """Create from dictionary.
 
-        Decodes turnpoint data from QR code JSON format. Handles both individual
-        coordinate fields (x, y, a, r) and polyline-encoded data (z field).
+        The ``z`` field is the only source of coordinates, and its length says
+        which format it is: four numbers for a competition turnpoint
+        (lon, lat, altitude, radius), three for an XC/Waypoints one
+        (lon, lat, altitude — a route "without cylinders", hence radius 0).
 
         Args:
             data: Dictionary with turnpoint data
@@ -239,38 +285,23 @@ class QRCodeTurnpoint:
         Returns:
             QRCodeTurnpoint instance
         """
-        # Use individual fields for better reliability
-        lon = data.get("x", 0.0)
-        lat = data.get("y", 0.0)
-        alt_smoothed = data.get("a", 0)
-        radius = data.get("r", 1000)
+        lon = 0.0
+        lat = 0.0
+        alt_smoothed = 0
+        radius = 0
 
-        # Fallback: try polyline decoding if individual fields not available
-        if "z" in data and ("x" not in data or "y" not in data):
-            try:
-                # Try using our custom decoder for XCTrack format first
-                nums = decode_nums(data["z"])
-                if len(nums) >= 4:
-                    lon = nums[0] / 1e5
-                    lat = nums[1] / 1e5
-                    alt_smoothed = nums[2]
-                    radius = nums[3]
-                elif len(nums) >= 2:
-                    lon = nums[0] / 1e5
-                    lat = nums[1] / 1e5
-            except Exception:
-                # Fallback to standard polyline library
-                try:
-                    coords = polyline.decode(data["z"], precision=5)
-                    if coords:
-                        coord = coords[0]  # Take first coordinate
-                        lon, lat = (
-                            coord[1],
-                            coord[0],
-                        )  # Note: polyline lib uses lat,lon order
-                except Exception:
-                    # If all else fails, use defaults
-                    pass
+        nums = decode_nums(data["z"]) if "z" in data else []
+        if len(nums) >= 4:
+            lon, lat, alt_smoothed, radius = (
+                nums[0] / 1e5,
+                nums[1] / 1e5,
+                nums[2],
+                nums[3],
+            )
+        elif len(nums) == 3:
+            lon, lat, alt_smoothed = nums[0] / 1e5, nums[1] / 1e5, nums[2]
+        elif len(nums) == 2:
+            lon, lat = nums[0] / 1e5, nums[1] / 1e5
 
         turnpoint_type = QRCodeTurnpointType.NONE
         if "t" in data:
@@ -286,4 +317,6 @@ class QRCodeTurnpoint:
             alt_smoothed=alt_smoothed,
             type=turnpoint_type,
             description=description,
+            extensions=list(data.get("x") or []),
+            unknown={k: v for k, v in data.items() if k not in cls.KNOWN_KEYS},
         )
