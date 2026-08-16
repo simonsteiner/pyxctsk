@@ -1,0 +1,278 @@
+# Competition Interfaces conformance audit — pyxctsk
+
+**Date:** 2026-08-16
+**Spec:** [XCTrack Competition Interfaces](https://xctrack.org/Competition_Interfaces.html)
+(raw page text, not a summary) + the reference polyline implementation,
+[GitLab snippet 1927372](https://gitlab.com/xcontest-public/xctrack-public/snippets/1927372)
+**Supersedes:** [`2025-06-07-competition-interfaces-analysis.md`](./2025-06-07-competition-interfaces-analysis.md)
+**Baseline:** `774d675`, test suite green (130 passed, `-m "not slow"`)
+
+Every finding below was reproduced by running the library, not by reading alone.
+
+---
+
+## TL;DR
+
+The core is faithful. The polyline codec matches XCTrack's reference Java snippet
+operation-for-operation, the QR field abbreviations are right, goal-line geometry
+matches *"perpendicular to the azimuth to the center of last turnpoint"*, and the
+earth-model handling is correct.
+
+The gaps cluster in three places:
+
+1. **Two spec fields are entirely unimplemented** — `goal.finishAltitude` and
+   `extensions` (root, per-turnpoint, and QR `x`). Both are silently dropped.
+2. **Spec-valid input raises** — omitting the obsolete `sss.direction` is a
+   `KeyError`; a non-integer `radius` is a `TypeError`.
+3. **Output carries fields the spec does not define** — `goal.lineLength`, a radius
+   in the waypoints-format `z`, and unconditional `"tc":null,"to":null`.
+
+`XCTSKZ:` (zlib + base64), which the spec says is the preferred future encoding, is
+supported in neither direction.
+
+### Why the test suite doesn't catch any of this
+
+All 22 competition fixtures in `tests/data/reference_tasks/xctsk/` are
+tools.xcontest.org exports with an identical field set:
+
+| field | occurrences |
+| --- | --- |
+| `sss.direction` | 22 / 22 (always present) |
+| `goal.finishAltitude` | 0 / 22 |
+| `extensions` (root or turnpoint) | 0 / 22 |
+| non-integer `radius` | 0 / 213 turnpoints |
+
+The corpus never exercises the optional half of the spec, so the reader gaps are
+invisible to it.
+
+---
+
+## High — silent data loss
+
+### 1. `goal.finishAltitude` is not implemented
+
+**Files:** `src/pyxctsk/task.py:306-361` (`Goal`), `src/pyxctsk/qrcode_models.py:30-66`
+(`QRCodeGoal`, QR key `fa`)
+
+Spec: `"finishAltitude": number, optional, meters AGL — elevated goal altitude`.
+There is no corresponding field in either model. Reproduced:
+
+```text
+in:  "goal":{"type":"LINE","deadline":"18:00:00Z","finishAltitude":50}
+out: "goal":{"type":"LINE","deadline":"18:00:00Z","lineLength":"400.0"}
+```
+
+This is a scored competition parameter — the spec notes that missing the required
+finish altitude costs penalty points — so losing it on any round-trip through
+pyxctsk is the most consequential gap in this audit.
+
+### 2. `extensions` is not implemented anywhere
+
+**Files:** `src/pyxctsk/task.py` (no field), `src/pyxctsk/qrcode_models.py:243`
+
+Dropped in all three positions the spec defines: the root `extensions` list, each
+`turnpoints[i].extensions`, and the QR `x` key.
+
+There is a latent collision underneath this. `QRCodeTurnpoint.from_dict` reads
+`data.get("x")` as **longitude**, but in the spec a turnpoint's `x` *is* the
+extensions list. Today the `z` decode overwrites the bogus value so nothing visibly
+breaks, but `x` / `y` / `a` / `r` are invented keys that appear nowhere in the spec,
+and `x` actively conflicts with it.
+
+### 3. `XCTSKZ:` is not supported, read or write
+
+**Files:** `src/pyxctsk/parser.py:42-143`, `src/pyxctsk/qrcode_task.py:49`
+
+Spec: *"It is recommended that the software accepts both XCTSK and XCTSKZ and is able
+to produce QR code in both formats. In the future we prefer to use the XCTSKZ
+encoding."*
+
+A valid zlib-compressed, base64-encoded payload fails with
+`InvalidFormatError: invalid format`. Given the stated direction of travel this is
+the largest forward-compatibility risk in the library.
+
+---
+
+## High — spec-valid input raises
+
+### 4. Omitting the obsolete `sss.direction` is a `KeyError`
+
+**File:** `src/pyxctsk/task.py:301`
+
+Spec: *"this has been obsolete. Devices **must ignore this field when reading** a
+task and should produce some value when exporting a task in order to stay compatible
+with older devices."*
+
+`SSS.from_dict` does `Direction(data["direction"])` unconditionally, so a conformant
+producer that has dropped the field cannot be read at all. The QR path already gets
+this right (`src/pyxctsk/qrcode_models.py:107-112` defaults to `ENTER`); the
+full-JSON path was simply never brought in line.
+
+### 5. A non-integer `radius` or `altSmoothed` crashes QR encoding
+
+**File:** `src/pyxctsk/qrcode_encoding.py:28`
+
+```text
+TypeError: unsupported operand type(s) for <<: 'float' and 'int'
+```
+
+The spec types `radius` and `altSmoothed` as `number`, not integer.
+`Turnpoint.from_dict` passes both through uncoerced despite the `int` annotation, so
+`"radius": 400.0` — valid JSON any other producer may emit — reaches `encode_num`
+as a float.
+
+---
+
+## Medium — output is not spec-conformant
+
+### 6. `goal.lineLength` is invented
+
+**File:** `src/pyxctsk/task.py:333-337`
+
+The spec's `goal` object has exactly three keys: `type`, `deadline`,
+`finishAltitude`. `lineLength` is not one of them, and it is emitted as a *string*
+(`"400.0"`) rather than a number. It is also pure redundancy — always
+`2 × turnpoints[-1].radius`, which is precisely what the spec already says the last
+turnpoint's radius means.
+
+Keep it as a derived property; do not serialize it.
+
+### 7. The waypoints-format `z` carries a fourth number
+
+**Files:** `src/pyxctsk/qrcode_models.py:187-227`, `src/pyxctsk/qrcode_task.py:99-111`
+
+Spec, XC / Waypoints task: `"z": string, required - polyline encoded coordinates
+with altitude` — three numbers, no radius. Confirmed against the real XCTrack
+fixture `tests/data/reference_tasks/xctsk/task_dami_route.xctsk`:
+
+<!-- cspell:ignore Fligr -->
+
+```text
+fixture      "z":"|dz~FligrB?"        -> [-4191839, -1888423, 0]        (3 numbers)
+pyxctsk      "z":"|dz~FligrB?o}@"     -> [-4191839, -1888423, 0, 1000]  (4 numbers)
+```
+
+The trailing `o}@` is a radius of 1000 the source file never contained — see
+finding 8 for where it comes from.
+
+### 8. Reading a conformant waypoints file corrupts it
+
+**File:** `src/pyxctsk/qrcode_models.py:246, 255-260`
+
+Two defects on the three-number `z` path:
+
+- **Altitude is silently discarded.** The decoder branches on `len(nums) >= 4` then
+  `len(nums) >= 2`; there is no `== 3` branch, so `nums[2]` is never read. Verified:
+  a `z` encoding altitude 1234 parses to `alt_smoothed=0`.
+- **`radius` falls back to a hardcoded `1000`,** so every waypoint gains a 1 km
+  cylinder that is not in the data. That fabricated value is what finding 7 then
+  writes back out.
+
+Parsing `task_dami_route.xctsk` yields `radius=1000, alt_smoothed=0` for a waypoint
+whose source record contains neither.
+
+### 9. `"tc":null,"to":null` are always emitted
+
+**File:** `src/pyxctsk/qrcode_task.py:137-145`
+
+Twenty wasted bytes in every QR payload, in a format that exists solely to minimize
+size for sunlight scanning. Both keys are optional in the spec. The code comment
+concedes the reason — *"This is important to match the expected test output
+exactly"* — i.e. the test was written to the implementation rather than to the spec.
+
+### 10. Smaller output noise
+
+- A `goal` object is synthesized into JSON output even when the input had none
+  (`Task._derive_goal`, `src/pyxctsk/task.py:396-430`), so `to_json()` adds
+  `"goal":{"type":"CYLINDER"}` that the source file did not contain.
+- The full v2 QR dict can emit `"taskType":"WAYPOINTS"`
+  (`src/pyxctsk/qrcode_task.py:132-135`), which is not a spec value — the waypoints
+  format is signalled by `"T":"W"`.
+
+---
+
+## Medium — no structural validation
+
+The spec states four invariants that nothing in the library enforces:
+
+- `TAKEOFF` may be used only for the first turnpoint
+- `SSS` and `ESS` must each appear exactly once
+- `SSS` must appear before `ESS`
+- the last turnpoint is always goal
+
+There is no validation code and no `ValidationError` in the hierarchy
+(`src/pyxctsk/exceptions.py`); `TimeOfDay` is the only type that validates anything.
+`CLAUDE.md` describes the domain model as "validated dataclasses", which overstates
+what is there. Either the code or the claim should move.
+
+---
+
+## Low
+
+### 11. Rounding ties diverge from the reference implementation
+
+**File:** `src/pyxctsk/qrcode_encoding.py:58-59`
+
+Java's `Math.round` is `floor(x + 0.5)`; Python's `round` is banker's rounding.
+
+```text
+round(612344.5)            -> 612344
+math.floor(612344.5 + 0.5) -> 612345   # what the reference snippet produces
+```
+
+A ≈1.1 m difference in a rare tie case — comfortably inside the FAI 5 m tolerance the
+spec cites, but `math.floor(x + 0.5)` would match the reference exactly for one line
+of change.
+
+### 12. Documentation overstates coverage
+
+- [`2025-06-07-competition-interfaces-analysis.md`](./2025-06-07-competition-interfaces-analysis.md)
+  claims "100%" and "complete coverage" for every category, including the QR format
+  and goal configuration.
+- `README.md:7` states the library "implements the full XCTrack Competition
+  Interfaces specification".
+
+Neither holds given findings 1–3.
+
+---
+
+## Out of scope: `misc/vali-xctrack`
+
+Confirmed by running it:
+
+```text
+Usage: vali-xct FILE
+  Validate the G-record signature of an XCTrack IGC file.
+  IGCVALI:PASSED,1   (exit 0)
+  IGCVALI:FAILED,2   (exit 1)
+  IGCVALI:ERROR,200  (exit 1)
+```
+
+It verifies the **G-record signature in IGC tracklogs** — flight validation, wholly
+disjoint from the `.xctsk` task format this library implements. pyxctsk has no IGC
+support of any kind; the only `igc` matches in the repository are inside the vendored
+`scripts/task_viewer/airscore_clone`.
+
+So there is nothing here to audit *against*: this is a separate capability, not an
+unmet obligation of the Competition Interfaces spec. Adding flight verification would
+be a new subsystem and a deliberate scope decision.
+
+---
+
+## Suggested order of work
+
+| # | Finding | Why first |
+| --- | --- | --- |
+| 1 | `sss.direction` KeyError (4) | one line; breaks real input today |
+| 2 | `finishAltitude` + `extensions` passthrough (1, 2) | spec fields, scored data loss |
+| 3 | Waypoints `z` read/write (7, 8) | corrupts real XCTrack files both ways |
+| 4 | Drop `lineLength` and null `tc`/`to` (6, 9) | output conformance, contained |
+| 5 | `XCTSKZ:` read + write (3) | needs a design call — see below |
+| 6 | Structural validation (E), then the docs (12) | |
+
+Items 1–4 are contained and naturally land together. Item 5 is the one needing a
+decision up front: whether `to_string()` gains a mode argument or a sibling method,
+and whether the CLI gets a new `--format` value alongside `qrcode-json`.
+
+Finding 5 (float `radius`) and finding 11 (rounding ties) are one-liners that can
+ride along with whichever batch touches `qrcode_encoding.py`.
