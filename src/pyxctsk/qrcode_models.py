@@ -219,10 +219,10 @@ class QRCodeTurnpoint:
             For simplified format: only n (name) and z (encoded coords)
         """
         if simplified:
-            # XC/Waypoints simplified format - only name and encoded coordinates.
+            # XC/Waypoints simplified format - name and encoded coordinates.
             # Its "z" carries three numbers; the radius belongs to the
             # competition format only.
-            return OrderedDict(
+            simplified_result: OrderedDict[str, Any] = OrderedDict(
                 [
                     ("n", self.name),
                     (
@@ -233,6 +233,13 @@ class QRCodeTurnpoint:
                     ),
                 ]
             )
+            # from_dict reads "x" and unknown keys for these payloads too, so
+            # they have to be written back or a round-trip loses them.
+            if self.extensions:
+                simplified_result["x"] = self.extensions
+            for key, value in self.unknown.items():
+                simplified_result.setdefault(key, value)
+            return simplified_result
 
         # Use the XCTrack custom encoding
         encoded = encode_competition_turnpoint(

@@ -163,6 +163,11 @@ class QRCodeTask:
                 simplified_result["t"] = [
                     tp.to_dict(simplified=True) for tp in self.turnpoints
                 ]
+            # Extensions and unknown keys are preserved here for the same
+            # reason as in the full format: from_dict reads them, so dropping
+            # them on the way out would lose data on a round-trip.
+            if self.extensions:
+                simplified_result["x"] = self.extensions
             for key, value in self.unknown.items():
                 simplified_result.setdefault(key, value)
 
@@ -245,6 +250,7 @@ class QRCodeTask:
                 takeoff=None,
                 sss=None,
                 goal=None,
+                extensions=list(data.get("x") or []),
                 unknown={k: v for k, v in data.items() if k not in cls.KNOWN_KEYS},
             )
 

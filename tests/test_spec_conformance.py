@@ -25,6 +25,9 @@ from pyxctsk import (
     parse_task,
 )
 
+# Polyline-encoded "z" literals below are opaque tokens, not words.
+# cspell:ignore Fligr
+
 REFERENCE_QR = Path(__file__).parent / "data" / "reference_tasks" / "qrcode_string"
 
 # A spec-valid CLASSIC task, used as the base for targeted mutations.
@@ -508,6 +511,69 @@ class TestManufacturerExtensions:
         assert turnpoint.lon == pytest.approx(8.1)
         assert turnpoint.lat == pytest.approx(46.5)
         assert turnpoint.extensions == [{"k": "v"}]
+
+
+class TestWaypointsFormatPreservesExtras:
+    """The XC/Waypoints path must preserve what the competition path does.
+
+    The simplified branches were initially left behind when extensions and
+    unknown-field passthrough were added, so a waypoints payload could be read
+    with its extras and re-encoded without them. Reading and writing have to
+    stay symmetric or the round-trip loses data silently.
+    """
+
+    SOURCE = {
+        "T": "W",
+        "V": 2,
+        "t": [
+            {
+                "n": "WPT1",
+                "z": "|dz~FligrB?",
+                "x": [{"k": "v"}],
+                "zz": "turnpoint-extra",
+            },
+            {"n": "WPT2", "z": "vqz_G~{ztB?"},
+        ],
+        "x": [{"id": "ACME", "a": "1"}],
+        "o": {"v": 2, "fa": 1220},
+    }
+
+    def _parsed(self):
+        from pyxctsk.qrcode_task import QRCodeTask
+
+        return QRCodeTask.from_dict(json.loads(json.dumps(self.SOURCE)))
+
+    def test_root_extensions_are_read(self):
+        """A simplified payload's root "x" must reach .extensions."""
+        assert self._parsed().extensions == [{"id": "ACME", "a": "1"}]
+
+    def test_root_extensions_are_written(self):
+        """...and come back out again."""
+        emitted = json.loads(self._parsed().to_json(simplified=True))
+
+        assert emitted["x"] == [{"id": "ACME", "a": "1"}]
+
+    def test_turnpoint_extensions_and_unknown_are_written(self):
+        """Per-turnpoint "x" and unknown keys were read but never re-emitted."""
+        emitted = json.loads(self._parsed().to_json(simplified=True))
+
+        assert emitted["t"][0]["x"] == [{"k": "v"}]
+        assert emitted["t"][0]["zz"] == "turnpoint-extra"
+
+    def test_simplified_roundtrip_is_lossless(self):
+        """Nothing in the source may be dropped."""
+        emitted = json.loads(self._parsed().to_json(simplified=True))
+
+        assert emitted == self.SOURCE
+
+    def test_a_plain_waypoints_task_gains_nothing(self):
+        """Absent extras must stay absent — no empty "x" appearing."""
+        from pyxctsk.qrcode_task import QRCodeTask
+
+        plain = {"T": "W", "V": 2, "t": [{"n": "WPT1", "z": "|dz~FligrB?"}]}
+        emitted = json.loads(QRCodeTask.from_dict(plain).to_json(simplified=True))
+
+        assert emitted == plain
 
 
 class TestWaypointsTaskEncoding:
