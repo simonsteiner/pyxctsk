@@ -418,9 +418,10 @@ class Task:
     ) -> "Goal | None":
         """Return the effective goal for a task, applying defaults explicitly.
 
-        Contract — a task with at least one turnpoint always has a goal:
-          - if no goal was supplied, an empty one is created;
-          - an unspecified goal type defaults to ``CYLINDER``.
+        Contract — a task with at least one turnpoint always has a goal, and
+        that goal always has a type:
+          - if no goal was supplied, a ``CYLINDER`` one is created;
+          - a goal with an unspecified type becomes ``CYLINDER``.
 
         With no turnpoints the goal is returned unchanged (typically ``None``).
         A goal that already satisfies the contract is returned as-is; otherwise
