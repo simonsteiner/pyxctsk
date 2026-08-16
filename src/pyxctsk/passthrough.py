@@ -64,6 +64,12 @@ def write_passthrough(
     overwrite it would turn a value we merely failed to understand into one we
     report wrongly.
 
+    ``ext_key`` is excluded outright rather than left to that rule, because the
+    rule only protects keys already in ``result``: with an empty extensions
+    list nothing is written, and an ``unknown[ext_key]`` would then land in the
+    output as the extensions field — carrying a value of any shape into a key
+    the spec says is a list.
+
     Args:
         result: The dict built by the model's ``to_dict``, modified in place.
         extensions: The model's opaque extensions list.
@@ -73,4 +79,5 @@ def write_passthrough(
     if extensions:
         result[ext_key] = extensions
     for key, value in unknown.items():
-        result.setdefault(key, value)
+        if key != ext_key:
+            result.setdefault(key, value)

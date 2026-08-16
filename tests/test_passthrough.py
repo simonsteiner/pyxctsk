@@ -6,6 +6,8 @@ per model. The model-level round-trips live in ``test_spec_conformance.py`` and
 ``test_elevated_goal_fixtures.py``.
 """
 
+import pytest
+
 from pyxctsk.passthrough import (
     EXTENSIONS_KEY,
     QR_EXTENSIONS_KEY,
@@ -96,10 +98,26 @@ class TestWritePassthrough:
         assert result["o"] == 1
 
     def test_unknown_cannot_shadow_extensions_either(self):
-        """The extensions key is written first, so it is protected too."""
+        """A real extensions list wins over an unknown key of the same name."""
         result: dict = {}
         write_passthrough(
             result, [{"id": "ACME"}], {"extensions": "rogue"}, EXTENSIONS_KEY
         )
 
         assert result["extensions"] == [{"id": "ACME"}]
+
+    @pytest.mark.parametrize("ext_key", [EXTENSIONS_KEY, QR_EXTENSIONS_KEY])
+    def test_unknown_cannot_become_the_extensions_key(self, ext_key):
+        """With nothing to write, the shadowing rule alone is not enough.
+
+        "A key the model already wrote wins" only protects keys that are
+        *there*. An empty extensions list writes nothing, so an
+        ``unknown[ext_key]`` used to sail through ``setdefault`` and land in
+        the output as the extensions field — a value of any shape occupying a
+        key the spec defines as a list.
+        """
+        result: dict = {}
+        write_passthrough(result, [], {ext_key: "rogue", "o": 1}, ext_key)
+
+        assert ext_key not in result
+        assert result == {"o": 1}
