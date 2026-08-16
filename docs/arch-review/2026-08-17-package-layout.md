@@ -1,8 +1,11 @@
 # 2026-08-17 — Package layout: 27 flat modules into four packages
 
-**Status: applied.** Branch `refactor/package-layout-2026-08-17`, eight commits.
-Full suite green throughout (362 tests before, 354 after — see [Progress](#progress),
-item 7). This is a record of what changed and why, not a proposal.
+<!-- Commit hashes below are hashes, not words. cspell:ignore caadbdb -->
+
+**Status: applied.** Branch `refactor/package-layout-2026-08-17`, twelve commits.
+Full suite green throughout (362 tests before, 357 after — the difference is tests
+deleted for asserting nothing, items 7 and 12). This is a record of what changed and
+why, not a proposal.
 
 ## The friction
 
@@ -77,12 +80,12 @@ initialized module 'pyxctsk.distance.task_distances'
 Moving the file down one layer fixed it and is the more honest placement anyway: the
 shapes of a task should not live in the package that knows about file formats.
 
-**`qrcode/__init__.py` deliberately does not re-export `conversion`.** `model/task.py`
-imports `qrcode/task.py` at module level so `Task.to_qr_code_task()` can exist, and
-`qrcode/conversion.py` imports `model/task.py`. Re-exporting conversion from the
-package `__init__` would close that loop on the first `import pyxctsk`. The `__init__`
-says so, in the file, so the next person to "tidy up the exports" finds out before CI
-does.
+**`qrcode/__init__.py` could not re-export `conversion`** as first written.
+`model/task.py` imported `qrcode/task.py` at module level so `Task.to_qr_code_task()`
+could exist, and `qrcode/conversion.py` imports `model/task.py`; re-exporting
+conversion from the package `__init__` closed that loop on the first `import pyxctsk`.
+Resolved in the follow-up pass below by cutting the model's import — see
+[Follow-ups](#follow-ups).
 
 Both of these are the kind of thing the flat layout let stay implicit. Packages made
 them assertions the interpreter checks.
@@ -124,22 +127,46 @@ plus `import pyxctsk.<pkg>` for all four packages in isolation — a package-lev
 only shows up when a specific submodule is the entry point, which the test suite does
 not exercise on its own.
 
-## Follow-ups, not done here
+## Follow-ups
 
-- **`model → qrcode` is the one remaining back edge.** `Task.to_qr_code_task()` is why
-  the domain model imports a serialization format. Cutting it means either a lazy
-  import inside the method (the idiom the 2026-08-16 review removed from
-  `qrcode_task.py`, in the other direction) or dropping the convenience method in
-  favour of `pyxctsk.qrcode.conversion.task_to_qr_code_task(task)`. Worth deciding
-  deliberately rather than by accident; it is currently held in place by a comment in
-  `qrcode/__init__.py`.
-- **`export/common.py` is a bag of helpers**, not a module with an interface: circle
-  coordinates in 2-D and 3-D, colour hex, route coordinates with a fallback, "is this
-  the goal turnpoint". Some of it is geometry that belongs beside `turnpoint.py`, some
-  is styling that belongs to whichever writer uses it. Left alone here because
-  splitting it is a design question, not a move.
-- **`tests/distance/test_distance.py` and `test_reference.py` overlap** — both walk the
-  reference corpus asserting distances. Worth reading side by side once.
+All four were taken on in a second pass on the same branch.
+
+- [x] 9. **The `model → qrcode` back edge is gone** (`017fa45`). It existed for one
+  method: `Task.to_qr_code_task()`, whose return type and delegation pulled
+  `qrcode/task.py` into the model at module level. The method now reaches
+  `qrcode.conversion.task_to_qr_code_task` through a function-local import and the
+  annotation through `TYPE_CHECKING`, so `model` imports nothing else in the package,
+  `conversion` sits cleanly above both, and the qrcode facade can finally name it.
+  Public API unchanged.
+- [x] 10. **The layering is asserted, not described** (`caadbdb`).
+  `tests/test_layering.py` parses every module and checks the layer rules, the
+  sibling-import rule, and that the function-local cross-package imports are exactly
+  the two known cycle-breakers. Each check was confirmed to fail when its rule is
+  broken — the sibling-import check was rewritten after the first version passed a
+  real violation (`from ..export.common import x` from inside `export/`).
+- [x] 11. **`export/common.py` pruned, and a latent defect fixed** (`3521cfb`).
+  `is_goal_turnpoint` searched the turnpoint list by value; `Turnpoint` is a plain
+  dataclass, so a task that ends by flying the same turnpoint twice matched the
+  earlier occurrence and drew its goal in the default blue. Now compared by identity,
+  with a regression test that fails on the old implementation. The reference corpus
+  never hit it: the ess-goal fixtures duplicate their final waypoint but differ in
+  `type`. Also deleted `get_route_coordinates_with_fallback` (no callers), and the
+  module docstring now says why the cylinder outline here is a planar approximation
+  while everything a distance depends on is geodesic.
+- [x] 12. **The three distance test files have distinct jobs** (`ba7ab11`).
+  `test_distance.py` → `test_xctrack_accuracy.py` (our numbers vs XCTrack's),
+  `test_reference.py` → `test_task_distances.py` (the pipeline above the optimizer),
+  and `test_route_optimization.py` unchanged (internals). Two subsumed tests deleted:
+  a precision check running 1% on two tasks where the accuracy file already asserts 1%
+  on every task, and a smoke test bracketing one task's distance between 100 and
+  200 km. 359 → 357 tests.
+
+Still open, deliberately:
+
+- **`export/common.py` remains one module** rather than being split into geometry and
+  styling. After pruning, what is left is exactly the four questions both writers must
+  answer identically plus the cylinder polygon — splitting that would create two
+  shallow modules and a decision about which one a writer asks first.
 - **Old reviews in this directory use pre-split import paths** in their code snippets.
   Only the 2026-07-07 findings doc, whose snippets are meant to be run, was updated;
   the rest are left as written.
