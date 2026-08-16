@@ -54,6 +54,7 @@ try:
     )
 except ImportError as e:
     AIRSCORE_AVAILABLE = False
+    calculate_airscore_distances = None  # type: ignore[assignment]
     print(f"AirScore distance calculation not available: {e}")
 
 
