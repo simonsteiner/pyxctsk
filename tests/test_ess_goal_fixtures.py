@@ -18,8 +18,8 @@ import pytest
 
 from pyxctsk import Task, TurnpointType, parse_task
 from pyxctsk.distance import optimized_distance, optimized_route_coordinates
-from pyxctsk.task_distances import _task_to_turnpoints
-from pyxctsk.turnpoint import geodesic_distance
+from pyxctsk.distance.task_distances import _task_to_turnpoints
+from pyxctsk.distance.turnpoint import geodesic_distance
 
 FIXTURES = Path(__file__).parent / "data" / "reference_tasks" / "ess-goal"
 

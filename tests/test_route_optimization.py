@@ -10,13 +10,17 @@ from dataclasses import dataclass
 
 import pytest
 
-from pyxctsk.route_optimization import (
+from pyxctsk.distance.route_optimization import (
     _closest_circle_point,
     _optimize_plane_points,
     _polyline_length,
     calculate_iteratively_refined_route,
 )
-from pyxctsk.turnpoint import TaskTurnpoint, TurnpointGeometry, plane_optimal_point
+from pyxctsk.distance.turnpoint import (
+    TaskTurnpoint,
+    TurnpointGeometry,
+    plane_optimal_point,
+)
 
 
 @dataclass

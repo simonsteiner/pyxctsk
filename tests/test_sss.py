@@ -12,11 +12,11 @@ All essential SSS test functionality is maintained in this single module.
 from geopy.distance import geodesic
 
 from pyxctsk.distance import optimized_route_coordinates
-from pyxctsk.sss_calculations import (
+from pyxctsk.distance.sss import (
     calculate_optimal_sss_entry_point,
 )
-from pyxctsk.task_distances import _task_to_turnpoints
-from pyxctsk.turnpoint import TaskTurnpoint
+from pyxctsk.distance.task_distances import _task_to_turnpoints
+from pyxctsk.distance.turnpoint import TaskTurnpoint
 
 
 class TestSSSCalculations:

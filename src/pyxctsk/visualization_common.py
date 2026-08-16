@@ -7,9 +7,9 @@ including turnpoint filtering, route coordinate generation, and styling helpers.
 import math
 
 from .distance import optimized_route_coordinates
+from .distance.task_distances import _task_to_turnpoints
 from .goal_line import should_skip_last_turnpoint
 from .model.task import Task, Turnpoint, TurnpointType
-from .task_distances import _task_to_turnpoints
 
 # Constants for visualization
 CIRCLE_POINTS = 64  # Number of points to approximate circle

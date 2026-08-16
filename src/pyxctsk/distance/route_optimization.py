@@ -35,7 +35,7 @@ from collections.abc import Sequence
 
 from pyproj import Transformer
 
-from .optimization_config import CONVERGENCE_EPSILON_M, DEFAULT_NUM_ITERATIONS
+from .config import CONVERGENCE_EPSILON_M, DEFAULT_NUM_ITERATIONS
 from .turnpoint import (
     TurnpointGeometry,
     geod_for_earth_model,

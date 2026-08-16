@@ -32,8 +32,8 @@ from pyxctsk.distance import (
     distance_through_centers,
     optimized_distance,
 )
+from pyxctsk.distance.task_distances import _task_to_turnpoints
 from pyxctsk.parser import parse_task
-from pyxctsk.task_distances import _task_to_turnpoints
 
 # Add task_viewer and its subdirectories to path to import AirScore utilities
 task_viewer_path = Path(__file__).parent / "task_viewer"

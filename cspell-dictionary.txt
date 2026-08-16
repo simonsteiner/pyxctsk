@@ -48,6 +48,7 @@ levelname
 libzbar
 linecontrol
 linestyle
+lonlat
 lons
 lorili
 MATEC

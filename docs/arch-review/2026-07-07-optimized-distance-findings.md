@@ -154,8 +154,8 @@ uv run python - <<'EOF'
 import json
 from pathlib import Path
 from pyxctsk.parser import parse_task
-from pyxctsk.task_distances import _task_to_turnpoints
-from pyxctsk.route_optimization import optimized_distance
+from pyxctsk.distance.task_distances import _task_to_turnpoints
+from pyxctsk.distance.route_optimization import optimized_distance
 
 xdir = Path('tests/data/reference_tasks/xctsk')
 jdir = Path('tests/data/reference_tasks/json')
