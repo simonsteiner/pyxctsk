@@ -401,6 +401,37 @@ class TestNumericEdgeCases:
         assert _round_half_up(value) == expected
 
 
+class TestTaskTypeValue:
+    """Finding 10 — ``taskType`` in the competition format is only "CLASSIC".
+
+    Spec: the v2 competition format defines ``"taskType": "CLASSIC"``. An
+    XC/Waypoints task is signalled by ``"T": "W"`` in the simplified format,
+    so "WAYPOINTS" is not a value either format defines.
+    """
+
+    @pytest.mark.parametrize("name", ["task_noha_route.txt", "task_dami_route.txt"])
+    def test_waypoints_task_serializes_as_the_simplified_format(self, name):
+        """to_string() on a waypoints task must produce XCTrack's own form."""
+        expected = (REFERENCE_QR / name).read_text().strip()
+        task = parse_task(str(REFERENCE_QR / name))
+
+        assert task.to_qr_code_task().to_string() == expected
+
+    def test_waypoints_value_is_never_emitted(self):
+        """The non-spec "WAYPOINTS" value must not appear anywhere."""
+        task = parse_task(str(REFERENCE_QR / "task_noha_route.txt"))
+        emitted = json.loads(task.to_qr_code_task().to_json())
+
+        assert "taskType" not in emitted
+        assert emitted["T"] == "W"
+
+    def test_classic_still_says_classic(self):
+        """The competition format is untouched."""
+        task = parse_task(str(REFERENCE_QR / "task_bevo.txt"))
+
+        assert json.loads(task.to_qr_code_task().to_json())["taskType"] == "CLASSIC"
+
+
 class TestManufacturerExtensions:
     """Finding 2 — manufacturer extensions must survive verbatim.
 

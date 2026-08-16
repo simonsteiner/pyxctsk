@@ -134,13 +134,18 @@ class QRCodeTask:
         Builds the QR code task dictionary in the precise field order required
         by the XCTrack format specification.
 
+        A WAYPOINTS task always uses the simplified form regardless of the
+        argument: the spec's competition format only defines
+        ``"taskType": "CLASSIC"``, and an XC/Waypoints task is identified by
+        ``"T": "W"`` instead.
+
         Args:
             simplified: If True, use simplified XC/Waypoints format with only T, V, and t fields
 
         Returns:
             Dictionary with QR code task format fields
         """
-        if simplified:
+        if simplified or self.task_type == QRCodeTaskType.WAYPOINTS:
             # XC/Waypoints simplified format
             simplified_result: OrderedDict[str, Any] = OrderedDict()
             simplified_result["T"] = "W"  # taskType: Waypoints
@@ -172,11 +177,10 @@ class QRCodeTask:
         if self.turnpoints:
             result["t"] = [tp.to_dict() for tp in self.turnpoints]
 
-        # 4. Task type
+        # 4. Task type - CLASSIC is the only value this format defines;
+        #    WAYPOINTS took the simplified branch above.
         if self.task_type is not None:
-            result["taskType"] = (
-                "CLASSIC" if self.task_type == QRCodeTaskType.CLASSIC else "WAYPOINTS"
-            )
+            result["taskType"] = "CLASSIC"
 
         # 5. Takeoff fields - always include them as null if not set
         # This is important to match the expected test output exactly
