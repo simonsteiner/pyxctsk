@@ -11,6 +11,31 @@ Every finding below was reproduced by running the library, not by reading alone.
 
 ---
 
+## Status
+
+Fixed on branch `docs/xctrack-spec-conformance-audit`, each with regression
+tests in `tests/test_spec_conformance.py` that fail without the change:
+
+| # | Finding | Status |
+| --- | --- | --- |
+| 1 | `goal.finishAltitude` unimplemented | fixed |
+| 2 | `extensions` unimplemented | fixed |
+| 3 | No `XCTSKZ:` support | **open** — needs an API decision |
+| 4 | `sss.direction` KeyError | fixed |
+| 5 | Float `radius`/`altSmoothed` TypeError | fixed |
+| 6 | Non-spec `goal.lineLength` written | fixed |
+| 7 | Waypoints `z` written with a radius | fixed |
+| 8 | Waypoints `z` read drops altitude, invents radius | fixed |
+| 9 | ~~Unconditional null `tc`/`to`~~ | withdrawn — not a defect |
+| 10 | `taskType:"WAYPOINTS"`; synthesized goal | open, low value |
+| 11 | Rounding ties differ from the reference | fixed |
+| 12 | Docs overstate coverage | fixed |
+| E | No structural validation | **open** |
+
+All 25 reference QR strings still round-trip byte-identically after the fixes.
+
+---
+
 ## TL;DR
 
 The core is faithful. The polyline codec matches XCTrack's reference Java snippet

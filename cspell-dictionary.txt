@@ -21,6 +21,7 @@ fobe
 forcelist
 frombuffer
 fuvu
+geodesically
 geospatial
 htmlcov
 iconstyle
@@ -38,13 +39,16 @@ libzbar
 linecontrol
 linestyle
 lons
+MATEC
 minversion
 motu
 ndarray
+neighbours
 newlinestring
 newpoint
 newpolygon
 noha
+nohe
 nosetests
 oneline
 openair

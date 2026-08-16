@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Manufacturer `extensions` are preserved** through both task formats — the root list, per-turnpoint lists, and the QR format's `x` key — carried verbatim as opaque dicts in `Task.extensions` and `Turnpoint.extensions`. They were previously dropped silently on read.
+- **`goal.finishAltitude` is supported** (`Goal.finish_altitude`, QR key `fa`). This elevated-goal altitude in meters AGL is a scored parameter and was previously dropped on every round-trip.
+
+### Fixed
+
+- **A task omitting the obsolete `sss.direction` now parses.** The spec requires readers to ignore the field, but `SSS.from_dict` raised `KeyError` when it was absent. It falls back to `OBSOLETE_DIRECTION_DEFAULT` (`EXIT`, the value in all 22 reference tasks) and is still written on export for older devices. The QR reader's fallback changed from `ENTER` to `EXIT` so both paths agree.
+- **XC/Waypoints tasks encode and decode three numbers, not four.** Its `z` holds longitude, latitude and altitude — a "route without cylinders". pyxctsk read every `z` as the four-number competition form, so waypoint altitudes were discarded (read as 0) and a 1000 m radius was invented; writing then appended that fabricated radius. Decoding now dispatches on the `z` length.
+- **A non-integer `radius` or `altSmoothed` no longer crashes QR encoding** with `TypeError`. The spec types both as `number`; they are rounded to whole meters at the parse boundary, which is all the QR encoding can carry.
+- **Polyline rounding matches the reference implementation.** Ties now use `floor(x + 0.5)` (Java's `Math.round`) instead of Python's banker's rounding, which differed by ~1.1 m of longitude on exact halves.
+
+### Removed
+
+- **Breaking (serialized output):** `goal.lineLength` is no longer written. It is not a spec field, was emitted as a string, and is always twice the last turnpoint's radius — which the spec already defines that radius to mean. `Goal.line_length` remains on the model for goal-line geometry, and `from_dict` still reads the key so files written by older versions parse.
+- The non-spec `x`/`y`/`a`/`r` turnpoint coordinate keys are no longer read from QR JSON. Nothing produced them, and `x` is the spec's per-turnpoint extensions key.
+
+See `docs/spec-conformance/2026-08-16-competition-interfaces-audit.md` for the full review. Still open: the `XCTSKZ:` compressed QR encoding, and validation of the spec's structural rules (TAKEOFF only first; SSS and ESS exactly once; SSS before ESS).
+
 ## [v0.5.0] - 2026-07-07
 
 ### Changed
