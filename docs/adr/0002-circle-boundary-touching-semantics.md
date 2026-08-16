@@ -17,7 +17,7 @@ The reference task `task_nohe` (concentric 10 km/200 m/10 km/100 m turnpoints, a
 concentric 300 m/4 km/200 m ESS-goal cluster) settles which one XCTrack uses: XCTrack
 displays an optimized distance of **96.3 km, more than the 82.6 km through the centers**
 — impossible under disk semantics, and reproduced exactly by boundary semantics
-(pyxctsk: 96.38 km). See `docs/XCTrack-Optimized-Distance-Findings.md`.
+(pyxctsk: 96.38 km). See `docs/arch-review/2026-07-07-optimized-distance-findings.md`.
 
 ## Decision
 

@@ -1,4 +1,9 @@
-# Audit: pyxctsk Route Optimization vs. FAI S7F & the Ding et al. "Touring n Circles" Algorithm
+# Route-optimization audit — pyxctsk vs. FAI S7F & Ding et al. "Touring n Circles"
+
+**Date:** 2026-07-07
+**Spec:** FAI Sporting Code S7F 2026 §4/§6.2.3.1/§7 + Ding, Xie & Jiang (MATEC 2018)
+**Companion:** [`2026-07-07-optimized-distance-findings.md`](./2026-07-07-optimized-distance-findings.md)
+**Resolution:** PR [#8](https://github.com/simonsteiner/pyxctsk/pull/8); decisions in [`../adr/`](../adr/README.md)
 
 ## TL;DR
 - **pyxctsk gets the Earth model right but the optimization algorithm wrong.** It computes leg distances on the WGS84 ellipsoid via `geopy.distance.geodesic` (Karney's algorithm), which matches FAI S7F 2026 §4.2/§7.1.4–7.1.5, but it replaces the mandated geometric shortest-path method (Ding et al. 2018 "PathFinder" with point-circle-point reflection/crossing cases, run in a localized Transverse Mercator plane) with a heuristic dynamic-programming + beam-search + iterative-refinement scheme that can return non-optimal (too-long) distances.
@@ -68,7 +73,7 @@ Reference cross-checks: igc-xc-score (mmomtchev) confirms the FAI approach — i
 
 ## Resolution (2026-07-07)
 
-The prompt below was executed in PR [#8](https://github.com/simonsteiner/pyxctsk/pull/8). Outcomes, including the verification of finding 2 (the old `optimal_point` used geodesic azimuth math, not planar degrees — its actual defects were an azimuth-wraparound stall, a center fallback for near-coincident neighbours, and the missing crossing case) and the discovery that XCTrack's own displayed distances deviate up to ~1% from the true WGS84 optimum on giant-cylinder tasks, are documented in [XCTrack-Optimized-Distance-Findings.md](XCTrack-Optimized-Distance-Findings.md). Design decisions are recorded in [adr/](adr/README.md).
+The prompt below was executed in PR [#8](https://github.com/simonsteiner/pyxctsk/pull/8). Outcomes, including the verification of finding 2 (the old `optimal_point` used geodesic azimuth math, not planar degrees — its actual defects were an azimuth-wraparound stall, a center fallback for near-coincident neighbours, and the missing crossing case) and the discovery that XCTrack's own displayed distances deviate up to ~1% from the true WGS84 optimum on giant-cylinder tasks, are documented in [`2026-07-07-optimized-distance-findings.md`](./2026-07-07-optimized-distance-findings.md). Design decisions are recorded in [`../adr/`](../adr/README.md).
 
 ---
 

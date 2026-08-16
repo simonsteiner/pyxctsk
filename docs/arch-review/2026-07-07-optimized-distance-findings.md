@@ -1,6 +1,9 @@
-# XCTrack Optimized-Distance Findings
+# XCTrack optimized-distance findings — pyxctsk
 
-Companion to [Audit-of-pyxctsk-Route-Optimization.md](Audit-of-pyxctsk-Route-Optimization.md).
+**Date:** 2026-07-07
+**Scope:** what XCTrack's displayed optimized distances actually mean
+**Companion:** [`2026-07-07-route-optimization-audit.md`](./2026-07-07-route-optimization-audit.md)
+
 This documents what was learned about XCTrack's displayed optimized distances while
 implementing the FAI S7F §7 / Ding–Xie–Jiang route optimizer in pyxctsk (PR #8), so the
 knowledge is not lost with the working session. All measurements were made against the

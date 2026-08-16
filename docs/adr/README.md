@@ -1,8 +1,8 @@
 # Architecture Decision Records
 
 Decisions made while making the route/distance optimization faithful to FAI Sporting
-Code S7F 2026 §7 (PR #8). Background: [../Audit-of-pyxctsk-Route-Optimization.md](../Audit-of-pyxctsk-Route-Optimization.md)
-and [../XCTrack-Optimized-Distance-Findings.md](../XCTrack-Optimized-Distance-Findings.md).
+Code S7F 2026 §7 (PR #8). Background: [../arch-review/2026-07-07-route-optimization-audit.md](../arch-review/2026-07-07-route-optimization-audit.md)
+and [../arch-review/2026-07-07-optimized-distance-findings.md](../arch-review/2026-07-07-optimized-distance-findings.md).
 
 - [0001 — Use the Ding–Xie–Jiang alternating point-circle-point optimizer](0001-ding-xie-jiang-route-optimizer.md)
 - [0002 — Circle-boundary ("touching") semantics for the optimized route](0002-circle-boundary-touching-semantics.md)

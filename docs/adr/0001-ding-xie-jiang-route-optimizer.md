@@ -12,7 +12,7 @@ algorithm to use: run the shortest-path search in a localized Transverse Mercato
 Algorithm for Touring n Circles"* ([MATEC Web of Conferences 232, 03027, EITCE 2018](https://www.matec-conferences.org/articles/matecconf/pdf/2018/91/matecconf_eitce2018_03027.pdf))
 — converge at ε = 0.1 m (§7.1.3), transform back to WGS84, snap each point onto its
 control-zone boundary ("ProjectionCorrection", §7.1.7), and only then measure distances
-on the ellipsoid. See `docs/Audit-of-pyxctsk-Route-Optimization.md`.
+on the ellipsoid. See `docs/arch-review/2026-07-07-route-optimization-audit.md`.
 
 ## Decision
 
@@ -46,7 +46,7 @@ coordinate-descent sweeps converge monotonically.
   the reference tasks but with no guarantee), and is roughly an order of magnitude
   faster — the full test suite dropped from minutes to ~10 s.
 - Accuracy against XCTrack's displayed values is limited by *XCTrack's own* optimizer,
-  not by pyxctsk — see `docs/XCTrack-Optimized-Distance-Findings.md`. Acceptance tests
+  not by pyxctsk — see `docs/arch-review/2026-07-07-optimized-distance-findings.md`. Acceptance tests
   assert 0.1 %/50 m (plus 50 m display rounding) on well-conditioned tasks and 1 %
   overall.
 - The DP internals (`_run_dp`, look-ahead strategies, beam width) are gone; the

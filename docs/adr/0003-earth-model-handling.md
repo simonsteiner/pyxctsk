@@ -34,4 +34,4 @@ measurement, boundary-point placement, and the optimization projection.
   algorithm; pyproj parameterizes the sphere cleanly and provides fwd/inv in one object).
 - All 22 reference tasks declare WGS84, so reference accuracy is unchanged by this
   decision. Notably, computing them on the FAI sphere does *not* reproduce XCTrack's
-  displayed values either (ruled out in `docs/XCTrack-Optimized-Distance-Findings.md`).
+  displayed values either (ruled out in `docs/arch-review/2026-07-07-optimized-distance-findings.md`).

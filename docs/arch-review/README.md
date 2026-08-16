@@ -10,6 +10,15 @@ superseded reviews stay for history rather than being edited. Newest first.
   polyline snippet, with every finding reproduced by running the library. Finds two
   unimplemented spec fields (`goal.finishAltitude`, `extensions`), no `XCTSKZ:`
   support, two crashes on spec-valid input, and several non-spec fields in the output.
+- [2026-07-07 — Route-optimization audit](2026-07-07-route-optimization-audit.md)
+  — pyxctsk's route optimizer against FAI Sporting Code S7F 2026 §7 and the
+  Ding–Xie–Jiang "Touring n Circles" algorithm it cites. Found the beam-search
+  heuristic, the missing localized Transverse Mercator projection and the ignored
+  `earthModel`; resolved in PR #8.
+- [2026-07-07 — XCTrack optimized-distance findings](2026-07-07-optimized-distance-findings.md)
+  — companion to the audit: what XCTrack's *displayed* optimized distances actually
+  mean (circle-boundary touching semantics, takeoff/goal-line centers, and XCTrack's
+  own ~1 % deviation from the true WGS84 optimum on giant-cylinder tasks).
 - [2026-06-30 — Distance & QR architecture review](2026-06-30-distance-qr.md)
   — deepening opportunities in the distance and QR subsystems, in *deep module*
   terms (interface, depth, seam, deletion test). Companion visual report:

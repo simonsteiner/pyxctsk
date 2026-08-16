@@ -1,7 +1,7 @@
 """Acceptance tests for the FAI S7F §7 / Ding-Xie-Jiang route optimization.
 
 These tests encode the acceptance criteria from the route-optimization audit
-(docs/Audit-of-pyxctsk-Route-Optimization.md):
+(docs/arch-review/2026-07-07-route-optimization-audit.md):
 
 - optimized distances match XCTrack's displayed optimized distance on real
   tasks (within 0.1% and 50 m on 5+ tasks; reference values are rounded to
