@@ -13,17 +13,7 @@ not symmetric and stay at the call sites: an unrecognized turnpoint type is
 ``NONE`` going out and ``None`` coming back, for instance.
 """
 
-from .qrcode_enums import (
-    QRCodeDirection,
-    QRCodeEarthModel,
-    QRCodeGoalType,
-    QRCodeSSSType,
-    QRCodeTaskType,
-    QRCodeTurnpointType,
-)
-from .qrcode_models import QRCodeGoal, QRCodeSSS, QRCodeTakeoff, QRCodeTurnpoint
-from .qrcode_task import QR_CODE_TASK_VERSION, QRCodeTask
-from .task import (
+from .model.task import (
     SSS,
     Direction,
     EarthModel,
@@ -37,6 +27,16 @@ from .task import (
     TurnpointType,
     Waypoint,
 )
+from .qrcode_enums import (
+    QRCodeDirection,
+    QRCodeEarthModel,
+    QRCodeGoalType,
+    QRCodeSSSType,
+    QRCodeTaskType,
+    QRCodeTurnpointType,
+)
+from .qrcode_models import QRCodeGoal, QRCodeSSS, QRCodeTakeoff, QRCodeTurnpoint
+from .qrcode_task import QR_CODE_TASK_VERSION, QRCodeTask
 
 #: The task version the full JSON format carries.
 TASK_VERSION = 1

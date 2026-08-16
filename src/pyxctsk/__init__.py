@@ -22,10 +22,7 @@ from .exceptions import (
 )
 from .geojson import generate_task_geojson
 from .kml import task_to_kml
-from .parser import parse_task
-from .qrcode_image import generate_qrcode_image
-from .qrcode_task import QRCodeTask
-from .task import (
+from .model.task import (
     SSS,
     Direction,
     EarthModel,
@@ -40,7 +37,10 @@ from .task import (
     TurnpointType,
     Waypoint,
 )
-from .validation import ValidationIssue, ValidationRule
+from .model.validation import ValidationIssue, ValidationRule
+from .parser import parse_task
+from .qrcode_image import generate_qrcode_image
+from .qrcode_task import QRCodeTask
 
 # Constants
 EXTENSION = ".xctsk"

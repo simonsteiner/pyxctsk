@@ -8,6 +8,14 @@ symmetry is pinned here.
 
 import pytest
 
+from pyxctsk.model.task import (
+    OBSOLETE_DIRECTION_DEFAULT,
+    Direction,
+    EarthModel,
+    GoalType,
+    SSSType,
+    TaskType,
+)
 from pyxctsk.qrcode_conversion import (
     _FROM_QR_DIRECTION,
     _FROM_QR_EARTH_MODEL,
@@ -29,14 +37,6 @@ from pyxctsk.qrcode_enums import (
     QRCodeGoalType,
     QRCodeSSSType,
     QRCodeTaskType,
-)
-from pyxctsk.task import (
-    OBSOLETE_DIRECTION_DEFAULT,
-    Direction,
-    EarthModel,
-    GoalType,
-    SSSType,
-    TaskType,
 )
 
 TABLE_PAIRS = [

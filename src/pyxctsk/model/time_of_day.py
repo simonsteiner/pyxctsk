@@ -9,7 +9,7 @@ the task dataclasses, which are checked by ``validation.py`` instead.
 import re
 from dataclasses import dataclass
 
-from .exceptions import InvalidTimeOfDayError
+from ..exceptions import InvalidTimeOfDayError
 
 
 @dataclass(frozen=True)

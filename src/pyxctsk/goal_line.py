@@ -15,7 +15,7 @@ from dataclasses import dataclass
 
 from pyproj import Geod
 
-from .task import GoalType, Task
+from .model.task import GoalType, Task
 
 # Initialize WGS84 ellipsoid for geographical calculations
 geod = Geod(ellps="WGS84")

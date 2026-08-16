@@ -10,7 +10,7 @@ Functions:
 Intended for internal use in QR code generation and parsing for paragliding/hang gliding competition tasks.
 """
 
-from .rounding import round_half_up
+from .model.rounding import round_half_up
 
 
 def encode_num(num: int) -> str:

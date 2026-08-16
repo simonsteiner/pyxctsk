@@ -5,7 +5,7 @@ types may be arranged. Those rules live here rather than on ``Task`` so that
 adding one means editing a rule, not a method on the domain model — and so the
 model does not have to carry the vocabulary of its own diagnostics.
 
-This module imports only :mod:`task_enums`, never ``task`` itself, so there is
+This module imports only :mod:`~pyxctsk.model.enums`, never ``task`` itself, so there is
 no cycle: it is reached through :meth:`pyxctsk.Task.validate`.
 
 Validation is a report, not a gate. Parsing accepts structurally invalid tasks
@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING
 
-from .task_enums import TaskType, TurnpointType
+from .enums import TaskType, TurnpointType
 
 if TYPE_CHECKING:
     from .task import Task

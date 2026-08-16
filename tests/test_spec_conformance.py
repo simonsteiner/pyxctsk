@@ -25,7 +25,7 @@ from pyxctsk import (
     parse_task,
 )
 from pyxctsk.goal_line import GoalLine, goal_line_length_from_turnpoints
-from pyxctsk.validation import ValidationRule
+from pyxctsk.model.validation import ValidationRule
 
 # Polyline-encoded "z" literals below are opaque tokens, not words.
 # cspell:ignore Fligr
@@ -109,9 +109,9 @@ class TestObsoleteSSSDirection:
 
     def test_both_readers_agree_on_the_fallback(self):
         """The QR reader and the full-JSON reader must not diverge here."""
+        from pyxctsk.model.task import OBSOLETE_DIRECTION_DEFAULT
         from pyxctsk.qrcode_enums import QRCodeDirection
         from pyxctsk.qrcode_models import QRCodeSSS
-        from pyxctsk.task import OBSOLETE_DIRECTION_DEFAULT
 
         qr_fallback = QRCodeSSS.from_dict({"t": 1, "g": ["12:00:00Z"]}).direction
 
@@ -461,7 +461,7 @@ class TestNumericEdgeCases:
     )
     def test_ties_round_like_java_math_round(self, value, expected):
         """floor(x + 0.5), not Python's banker's rounding."""
-        from pyxctsk.rounding import round_half_up
+        from pyxctsk.model.rounding import round_half_up
 
         assert round_half_up(value) == expected
 

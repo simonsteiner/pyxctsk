@@ -8,7 +8,7 @@ import math
 
 from .distance import optimized_route_coordinates
 from .goal_line import should_skip_last_turnpoint
-from .task import Task, Turnpoint, TurnpointType
+from .model.task import Task, Turnpoint, TurnpointType
 from .task_distances import _task_to_turnpoints
 
 # Constants for visualization

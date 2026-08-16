@@ -3,7 +3,7 @@
 import simplekml  # type: ignore
 
 from .goal_line import get_goal_line_data
-from .task import Task, Turnpoint, TurnpointType
+from .model.task import Task, Turnpoint, TurnpointType
 from .visualization_common import (
     generate_circle_coordinates_3d,
     get_optimized_route_coordinates,

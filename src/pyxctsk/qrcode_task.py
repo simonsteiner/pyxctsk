@@ -33,7 +33,7 @@ from collections import OrderedDict
 from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Any
 
-from .passthrough import QR_EXTENSIONS_KEY, read_passthrough, write_passthrough
+from .model.passthrough import QR_EXTENSIONS_KEY, read_passthrough, write_passthrough
 from .qrcode_enums import (
     QRCodeEarthModel,
     QRCodeTaskType,
@@ -42,7 +42,7 @@ from .qrcode_enums import (
 from .qrcode_models import QRCodeGoal, QRCodeSSS, QRCodeTakeoff, QRCodeTurnpoint
 
 if TYPE_CHECKING:
-    from .task import Task
+    from .model.task import Task
 
 # Constants
 QR_CODE_SCHEME = "XCTSK:"

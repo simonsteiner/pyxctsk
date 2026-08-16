@@ -15,7 +15,8 @@ from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Any
 
-from .passthrough import QR_EXTENSIONS_KEY, read_passthrough, write_passthrough
+from .model.passthrough import QR_EXTENSIONS_KEY, read_passthrough, write_passthrough
+from .model.time_of_day import TimeOfDay
 from .qrcode_encoding import (
     decode_nums,
     encode_competition_turnpoint,
@@ -28,7 +29,6 @@ from .qrcode_enums import (
     QRCodeSSSType,
     QRCodeTurnpointType,
 )
-from .time_of_day import TimeOfDay
 
 
 @dataclass

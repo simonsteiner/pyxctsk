@@ -11,8 +11,8 @@ This module provides functions to:
 from typing import Any
 
 from .goal_line import goal_line_length_from_turnpoints
+from .model.task import Task
 from .route_optimization import optimized_distance
-from .task import Task
 from .turnpoint import TaskTurnpoint, distance_through_centers, geodesic_distance
 
 

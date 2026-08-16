@@ -8,7 +8,7 @@ per model. The model-level round-trips live in ``test_spec_conformance.py`` and
 
 import pytest
 
-from pyxctsk.passthrough import (
+from pyxctsk.model.passthrough import (
     EXTENSIONS_KEY,
     QR_EXTENSIONS_KEY,
     read_passthrough,

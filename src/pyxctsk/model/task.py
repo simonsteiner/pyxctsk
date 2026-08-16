@@ -9,7 +9,7 @@ unspecified goal type, and it returns a copy rather than mutating what it was
 given. Nothing derived is stored on them.
 
 Neighbouring modules hold what this one deliberately does not:
-  - ``task_enums`` — the constrained values (``TaskType``, ``TurnpointType``, …),
+  - ``enums`` — the constrained values (``TaskType``, ``TurnpointType``, …),
     re-exported here for callers
   - ``validation`` — the spec's structural rules, reached via ``Task.validate()``
   - ``qrcode_conversion`` — the mapping to and from the compact QR format
@@ -20,14 +20,12 @@ import json
 from dataclasses import dataclass, field, replace
 from typing import Any
 
-from .passthrough import EXTENSIONS_KEY, read_passthrough, write_passthrough
-from .qrcode_task import QRCodeTask
-from .rounding import round_half_up
+from ..qrcode_task import QRCodeTask
 
 # The enums are re-exported: they are part of task.py's public surface and
 # callers import them from here. They live in their own module so validation.py
 # can use them without importing the model it checks.
-from .task_enums import (  # noqa: F401
+from .enums import (  # noqa: F401
     OBSOLETE_DIRECTION_DEFAULT,
     Direction,
     EarthModel,
@@ -36,6 +34,8 @@ from .task_enums import (  # noqa: F401
     TaskType,
     TurnpointType,
 )
+from .passthrough import EXTENSIONS_KEY, read_passthrough, write_passthrough
+from .rounding import round_half_up
 from .time_of_day import TimeOfDay
 from .validation import ValidationIssue, validate_task
 
@@ -545,7 +545,7 @@ class Task:
     def validate(self) -> list[ValidationIssue]:
         """Check the task against the spec's structural rules.
 
-        The rules themselves live in :mod:`pyxctsk.validation`; this is the
+        The rules themselves live in :mod:`pyxctsk.model.validation`; this is the
         entry point onto them. Validation is a report, not a gate — parsing
         accepts structurally invalid tasks so they can still be inspected and
         converted. Pass ``strict=True`` to :func:`pyxctsk.parse_task` to turn
@@ -555,7 +555,7 @@ class Task:
         Returns:
             list[ValidationIssue]: One issue per violated rule; empty if the
             task is valid. Each issue names its
-            :class:`~pyxctsk.validation.ValidationRule` and stringifies to a
+            :class:`~pyxctsk.model.validation.ValidationRule` and stringifies to a
             human-readable message.
         """
         return validate_task(self)
