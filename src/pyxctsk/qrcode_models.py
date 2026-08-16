@@ -15,6 +15,7 @@ from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Any
 
+from .passthrough import QR_EXTENSIONS_KEY, read_passthrough, write_passthrough
 from .qrcode_encoding import (
     decode_nums,
     encode_competition_turnpoint,
@@ -235,10 +236,9 @@ class QRCodeTurnpoint:
             )
             # from_dict reads "x" and unknown keys for these payloads too, so
             # they have to be written back or a round-trip loses them.
-            if self.extensions:
-                simplified_result["x"] = self.extensions
-            for key, value in self.unknown.items():
-                simplified_result.setdefault(key, value)
+            write_passthrough(
+                simplified_result, self.extensions, self.unknown, QR_EXTENSIONS_KEY
+            )
             return simplified_result
 
         # Use the XCTrack custom encoding
@@ -262,11 +262,7 @@ class QRCodeTurnpoint:
 
         result["z"] = encoded
 
-        # Extensions last, matching the order the spec lists them in
-        if self.extensions:
-            result["x"] = self.extensions
-        for key, value in self.unknown.items():
-            result.setdefault(key, value)
+        write_passthrough(result, self.extensions, self.unknown, QR_EXTENSIONS_KEY)
 
         return result
 
@@ -309,6 +305,7 @@ class QRCodeTurnpoint:
 
         description = data.get("d")
 
+        extensions, unknown = read_passthrough(data, cls.KNOWN_KEYS, QR_EXTENSIONS_KEY)
         return cls(
             lat=lat,
             lon=lon,
@@ -317,6 +314,6 @@ class QRCodeTurnpoint:
             alt_smoothed=alt_smoothed,
             type=turnpoint_type,
             description=description,
-            extensions=list(data.get("x") or []),
-            unknown={k: v for k, v in data.items() if k not in cls.KNOWN_KEYS},
+            extensions=extensions,
+            unknown=unknown,
         )

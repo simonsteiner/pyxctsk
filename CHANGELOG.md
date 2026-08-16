@@ -13,6 +13,10 @@ All notable changes to this project will be documented in this file.
 - **Manufacturer `extensions` are preserved** through both task formats — the root list, per-turnpoint lists, and the QR format's `x` key — carried verbatim as opaque dicts in `Task.extensions` and `Turnpoint.extensions`. They were previously dropped silently on read.
 - **`goal.finishAltitude` is supported** (`Goal.finish_altitude`, QR key `fa`). This elevated-goal altitude in meters AGL is a scored parameter and was previously dropped on every round-trip.
 
+### Changed
+
+- **The extensions/unknown passthrough lives in one place**, the new `passthrough` module, instead of being written out by hand at each of its ten call sites (four readers, six writers, across `Task`, `Turnpoint`, `QRCodeTask` and `QRCodeTurnpoint`). Behavior is unchanged; the point is that the rule *"an unknown key never shadows a spec field"* is now stated and tested once rather than implied by a bare `setdefault` in six places.
+
 ### Fixed
 
 - **A task omitting the obsolete `sss.direction` now parses.** The spec requires readers to ignore the field, but `SSS.from_dict` raised `KeyError` when it was absent. It falls back to `OBSOLETE_DIRECTION_DEFAULT` (`EXIT`, the value in all 22 reference tasks) and is still written on export for older devices. The QR reader's fallback changed from `ENTER` to `EXIT` so both paths agree.

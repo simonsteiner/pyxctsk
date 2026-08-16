@@ -22,7 +22,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (record w
 
 - [x] **P1** — Delete `Goal.line_length`; derived state stored on the model, with three dead fallbacks
 - [x] **P2** — Delete `QRCodeTask.turnpoints_polyline` and the `polyline` runtime dependency
-- [ ] **P3** — Extract the extensions/unknown passthrough idiom (10 copy-pasted sites)
+- [x] **P3** — Extract the extensions/unknown passthrough idiom (10 copy-pasted sites)
 
 ### Structural
 

@@ -33,6 +33,7 @@ from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from .passthrough import QR_EXTENSIONS_KEY, read_passthrough, write_passthrough
 from .qrcode_enums import (
     QRCodeDirection,
     QRCodeEarthModel,
@@ -162,10 +163,9 @@ class QRCodeTask:
             # Extensions and unknown keys are preserved here for the same
             # reason as in the full format: from_dict reads them, so dropping
             # them on the way out would lose data on a round-trip.
-            if self.extensions:
-                simplified_result["x"] = self.extensions
-            for key, value in self.unknown.items():
-                simplified_result.setdefault(key, value)
+            write_passthrough(
+                simplified_result, self.extensions, self.unknown, QR_EXTENSIONS_KEY
+            )
 
             return simplified_result
 
@@ -209,11 +209,8 @@ class QRCodeTask:
         # 7. Version
         result["version"] = self.version
 
-        # 8. Extensions last, matching the order the spec lists them in
-        if self.extensions:
-            result["x"] = self.extensions
-        for key, value in self.unknown.items():
-            result.setdefault(key, value)
+        # 8. Extensions and unknown keys last
+        write_passthrough(result, self.extensions, self.unknown, QR_EXTENSIONS_KEY)
 
         return result
 
@@ -225,6 +222,7 @@ class QRCodeTask:
         """
         # Check if this is the simplified XC/Waypoints format
         is_simplified = "T" in data and "V" in data
+        extensions, unknown = read_passthrough(data, cls.KNOWN_KEYS, QR_EXTENSIONS_KEY)
 
         if is_simplified:
             # Simplified XC/Waypoints format
@@ -245,8 +243,8 @@ class QRCodeTask:
                 takeoff=None,
                 sss=None,
                 goal=None,
-                extensions=list(data.get("x") or []),
-                unknown={k: v for k, v in data.items() if k not in cls.KNOWN_KEYS},
+                extensions=extensions,
+                unknown=unknown,
             )
 
         # Full format
@@ -297,8 +295,8 @@ class QRCodeTask:
             takeoff=takeoff,
             sss=sss,
             goal=goal,
-            extensions=list(data.get("x") or []),
-            unknown={k: v for k, v in data.items() if k not in cls.KNOWN_KEYS},
+            extensions=extensions,
+            unknown=unknown,
         )
 
     def to_json(self, simplified: bool = False) -> str:

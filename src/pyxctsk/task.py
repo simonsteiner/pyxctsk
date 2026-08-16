@@ -16,6 +16,7 @@ from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import Any
 
+from .passthrough import EXTENSIONS_KEY, read_passthrough, write_passthrough
 from .qrcode_encoding import _round_half_up
 from .qrcode_task import QRCodeTask
 from .shared_enums import TimeOfDay
@@ -197,10 +198,7 @@ class Turnpoint:
         }
         if self.type and self.type != TurnpointType.NONE:
             result["type"] = self.type.value
-        if self.extensions:
-            result["extensions"] = self.extensions
-        for key, value in self.unknown.items():
-            result.setdefault(key, value)
+        write_passthrough(result, self.extensions, self.unknown, EXTENSIONS_KEY)
         return result
 
     @classmethod
@@ -221,12 +219,13 @@ class Turnpoint:
         if "type" in data and data["type"]:
             turnpoint_type = TurnpointType(data["type"])
 
+        extensions, unknown = read_passthrough(data, cls.KNOWN_KEYS, EXTENSIONS_KEY)
         return cls(
             radius=_round_half_up(data["radius"]),
             waypoint=Waypoint.from_dict(data["waypoint"]),
             type=turnpoint_type,
-            extensions=list(data.get("extensions") or []),
-            unknown={k: v for k, v in data.items() if k not in cls.KNOWN_KEYS},
+            extensions=extensions,
+            unknown=unknown,
         )
 
 
@@ -531,10 +530,7 @@ class Task:
             result["sss"] = self.sss.to_dict()
         if self.goal:
             result["goal"] = self.goal.to_dict()
-        if self.extensions:
-            result["extensions"] = self.extensions
-        for key, value in self.unknown.items():
-            result.setdefault(key, value)
+        write_passthrough(result, self.extensions, self.unknown, EXTENSIONS_KEY)
 
         return result
 
@@ -566,6 +562,7 @@ class Task:
         if "goal" in data:
             goal = Goal.from_dict(data["goal"])
 
+        extensions, unknown = read_passthrough(data, cls.KNOWN_KEYS, EXTENSIONS_KEY)
         # Goal defaults are derived once in Task.__post_init__; no need to
         # repeat the rules here.
         return cls(
@@ -576,8 +573,8 @@ class Task:
             takeoff=takeoff,
             sss=sss,
             goal=goal,
-            extensions=list(data.get("extensions") or []),
-            unknown={k: v for k, v in data.items() if k not in cls.KNOWN_KEYS},
+            extensions=extensions,
+            unknown=unknown,
         )
 
     def to_json(self) -> str:
