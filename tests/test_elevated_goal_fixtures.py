@@ -159,3 +159,83 @@ def test_unknown_fields_never_shadow_spec_fields():
 
     assert emitted["taskType"] == "CLASSIC"
     assert emitted["o"] == {"keep": 1}
+
+
+class TestConformantElevatedGoal:
+    """The spec-conformant counterpart, from tools.xcontest.org.
+
+    Same feature, encoded the way the spec defines it: ``goal.finishAltitude``
+    in the full format and ``g.fa`` in the QR one, both in metres AGL above the
+    last turnpoint. Kept beside the SeeYou tasks so the two conventions can be
+    compared directly.
+    """
+
+    #: Metres AGL above the last turnpoint, per the spec's definition.
+    FINISH_ALTITUDE_AGL = 300
+    #: Altitude of the goal waypoint the offset is measured from.
+    GOAL_WAYPOINT_ALTITUDE = 428
+
+    @pytest.mark.parametrize(
+        "filename", ["xcontest-conformant.xctsk", "xcontest-conformant_qr_code.txt"]
+    )
+    def test_finish_altitude_is_read_from_the_spec_field(self, filename):
+        """Both formats must yield the same finish altitude."""
+        task = parse_task((FIXTURES / filename).read_text().strip())
+
+        assert task.validate() == []
+        assert task.goal is not None
+        assert task.goal.finish_altitude == self.FINISH_ALTITUDE_AGL
+        assert task.unknown == {}
+
+    def test_the_value_is_agl_not_absolute(self):
+        """300 m is below the goal waypoint's own 428 m, so it cannot be AMSL.
+
+        This is what distinguishes the spec's datum from the SeeYou ``o.fa``
+        convention in the tasks above, and why the two must not be conflated.
+        """
+        task = parse_task((FIXTURES / "xcontest-conformant.xctsk").read_text())
+        goal_altitude = task.turnpoints[-1].waypoint.alt_smoothed
+
+        assert goal_altitude == self.GOAL_WAYPOINT_ALTITUDE
+        assert self.FINISH_ALTITUDE_AGL < goal_altitude
+
+    def test_qr_roundtrip_is_byte_identical(self):
+        """Our QR output must match the reference producer exactly."""
+        expected = (FIXTURES / "xcontest-conformant_qr_code.txt").read_text().strip()
+        task = parse_task(expected)
+
+        emitted = json.loads(task.to_qr_code_task().to_json())
+        emitted = {
+            k: v for k, v in emitted.items() if not (k in ("tc", "to") and v is None)
+        }
+        rebuilt = "XCTSK:" + json.dumps(
+            emitted, separators=(",", ":"), ensure_ascii=False
+        )
+
+        assert rebuilt == expected
+
+    def test_full_json_roundtrip_preserves_finish_altitude(self):
+        """And the .xctsk format survives a reparse."""
+        task = parse_task((FIXTURES / "xcontest-conformant.xctsk").read_text())
+
+        assert json.loads(task.to_json())["goal"]["finishAltitude"] == (
+            self.FINISH_ALTITUDE_AGL
+        )
+        assert parse_task(task.to_json()).goal.finish_altitude == (
+            self.FINISH_ALTITUDE_AGL
+        )
+
+    def test_concentric_sss_and_goal_keep_their_out_and_back(self):
+        """SSS r=61.6 km and goal r=400 m share a center, so the route flies out.
+
+        Guards the duplicate-collapse fix: these two circles are concentric but
+        differ in radius, so they must not be merged (ADR 0002).
+        """
+        from pyxctsk.distance import calculate_task_distances
+
+        task = parse_task((FIXTURES / "xcontest-conformant.xctsk").read_text())
+        result = calculate_task_distances(task)
+
+        assert task.turnpoints[-2].radius == 61600
+        assert task.turnpoints[-1].radius == 400
+        assert result["optimized_distance_km"] > result["center_distance_km"]

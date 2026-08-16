@@ -333,9 +333,30 @@ Two things follow for pyxctsk, neither a spec defect on our side:
    to understand into one we report wrongly is the worse failure, and a test
    pins `finish_altitude is None` to stop a future change making that trade.
 
-The wider lesson for this audit: `finishAltitude` is *implemented* but still has
-no conformant real-world fixture. The one producer we have seen that sets an
-elevated goal does not use the spec's field.
+### Both conventions, side by side
+
+A conformant counterpart was then uploaded to tools.xcontest.org (task code
+`6f83e4192cd55562`) and is kept alongside as `xcontest-conformant.*`. It settles
+the datum question, because the two producers disagree:
+
+| producer | field | value | goal waypoint | datum | goal AMSL |
+| --- | --- | --- | --- | --- | --- |
+| tools.xcontest.org | `goal.finishAltitude` / `g.fa` | 300 | 428 m | **AGL**, per spec | 728 m |
+| SeeYou Navigator | root `o.fa` | 1220 | 1020 m | **absolute AMSL** | 1220 m |
+
+The conformant task proves the spec's reading directly: 300 is *below* the goal
+waypoint's own 428 m, so it cannot be an absolute altitude. Conversely 1220 read
+as AGL would put that goal 1.2 km above the ground, where read as absolute it is
+an ordinary 200 m elevated goal.
+
+So the decision above was the right one — mapping `o.fa` onto
+`goal.finish_altitude` would have reported a 1220 m goal height instead of
+200 m. Our reading of `finishAltitude` matches the reference producer exactly,
+and our QR output for that task is byte-identical to it.
+
+One byte-level fix came out of this: `QRCodeGoal.to_dict` emitted `d, t, fa`
+where tools.xcontest.org emits `d, fa, t`. Invisible until a fixture carried
+`fa` at all. Now matched.
 
 ---
 

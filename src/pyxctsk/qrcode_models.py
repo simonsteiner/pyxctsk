@@ -46,14 +46,18 @@ class QRCodeGoal:
     finish_altitude: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary for JSON serialization."""
+        """Convert to dictionary for JSON serialization.
+
+        Keys are emitted in the order tools.xcontest.org uses — ``d``, ``fa``,
+        ``t`` — so output stays byte-identical to the reference producer.
+        """
         result: dict[str, Any] = {}
         if self.deadline:
             result["d"] = self.deadline.to_json_string()
-        if self.type is not None:
-            result["t"] = self.type.value
         if self.finish_altitude is not None:
             result["fa"] = self.finish_altitude
+        if self.type is not None:
+            result["t"] = self.type.value
         return result
 
     @classmethod

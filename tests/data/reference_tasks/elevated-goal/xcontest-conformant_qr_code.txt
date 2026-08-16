@@ -1,0 +1,1 @@
+XCTSK:{"g":{"d":"14:30:00Z","fa":300,"t":2},"s":{"d":2,"g":["11:00:00Z"],"t":1},"t":[{"d":"Takeoff","n":"S11","z":"ixyl@o~k_HgoA_X"},{"d":"SSS","n":"L15","t":2,"z":"y{mq@q`~_HwY_iwB"},{"d":"Goal","n":"L15","t":3,"z":"y{mq@q`~_HwY_X"}],"taskType":"CLASSIC","version":2}
