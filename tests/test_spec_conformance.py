@@ -141,7 +141,7 @@ class TestGoalSerializedShape:
         assert "fa" not in json.loads(task.to_qr_code_task().to_json())["g"]
 
     def test_goal_keys_are_spec_keys_only(self):
-        """LineLength is not a spec field and must not be written."""
+        """The non-spec ``lineLength`` key must not be written."""
         goal = {"type": "LINE", "deadline": "18:00:00Z", "finishAltitude": 50}
         task = Task.from_json(task_json(goal=goal))
 
@@ -167,6 +167,84 @@ class TestGoalSerializedShape:
 
         assert task.goal is not None
         assert task.goal.line_length == 800.0
+
+
+class TestManufacturerExtensions:
+    """Finding 2 — manufacturer extensions must survive verbatim.
+
+    Spec: the root ``extensions`` list holds objects each with an obligatory
+    ``id``; ``turnpoints[i].extensions`` must be "in the same order as the
+    extensions field on the root object", with ``id`` not repeated. The QR
+    format carries both as ``x``.
+    """
+
+    ROOT = [{"id": "XCT1", "v": "1"}, {"id": "ACME2", "k": "z"}]
+    PER_TURNPOINT = [{"w": "3"}, {"k": "y"}]
+
+    def _task_with_extensions(self) -> Task:
+        turnpoints = json.loads(json.dumps(BASE_TASK["turnpoints"]))
+        turnpoints[0]["extensions"] = self.PER_TURNPOINT
+        return Task.from_json(
+            task_json(turnpoints=turnpoints, extensions=self.ROOT),
+        )
+
+    def test_root_extensions_survive_json_roundtrip(self):
+        """Opaque manufacturer data must be preserved, not interpreted."""
+        task = self._task_with_extensions()
+
+        assert task.extensions == self.ROOT
+        assert json.loads(task.to_json())["extensions"] == self.ROOT
+
+    def test_turnpoint_extensions_survive_json_roundtrip(self):
+        """Per-turnpoint extensions belong to their turnpoint."""
+        task = self._task_with_extensions()
+
+        assert task.turnpoints[0].extensions == self.PER_TURNPOINT
+        emitted = json.loads(task.to_json())["turnpoints"]
+        assert emitted[0]["extensions"] == self.PER_TURNPOINT
+        assert "extensions" not in emitted[1]
+
+    def test_extensions_survive_qr_roundtrip(self):
+        """Both levels travel through the QR format's "x" key."""
+        qr = self._task_with_extensions().to_qr_code_task()
+
+        as_dict = json.loads(qr.to_json())
+        assert as_dict["x"] == self.ROOT
+        assert as_dict["t"][0]["x"] == self.PER_TURNPOINT
+
+        back = qr.to_task()
+        assert back.extensions == self.ROOT
+        assert back.turnpoints[0].extensions == self.PER_TURNPOINT
+
+    def test_order_is_preserved(self):
+        """The spec pins turnpoint extensions to the root list's order."""
+        task = self._task_with_extensions()
+
+        assert [e["id"] for e in json.loads(task.to_json())["extensions"]] == [
+            "XCT1",
+            "ACME2",
+        ]
+
+    def test_absent_extensions_emit_no_key(self):
+        """An optional list must stay absent rather than become []."""
+        task = Task.from_json(task_json())
+
+        emitted = json.loads(task.to_json())
+        assert "extensions" not in emitted
+        assert all("extensions" not in tp for tp in emitted["turnpoints"])
+        assert "x" not in json.loads(task.to_qr_code_task().to_json())
+
+    def test_turnpoint_x_is_not_read_as_a_coordinate(self):
+        """The ``x`` key means extensions, not longitude as it once did."""
+        from pyxctsk.qrcode_encoding import encode_competition_turnpoint
+        from pyxctsk.qrcode_models import QRCodeTurnpoint
+
+        z = encode_competition_turnpoint(8.1, 46.5, 1234, 400)
+        turnpoint = QRCodeTurnpoint.from_dict({"n": "X", "z": z, "x": [{"k": "v"}]})
+
+        assert turnpoint.lon == pytest.approx(8.1)
+        assert turnpoint.lat == pytest.approx(46.5)
+        assert turnpoint.extensions == [{"k": "v"}]
 
 
 class TestWaypointsTaskEncoding:

@@ -83,6 +83,7 @@ class QRCodeTask:
     takeoff: QRCodeTakeoff | None = None
     sss: QRCodeSSS | None = None
     goal: QRCodeGoal | None = None
+    extensions: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self, simplified: bool = False) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
@@ -148,8 +149,12 @@ class QRCodeTask:
         if self.earth_model is not None and self.earth_model != QRCodeEarthModel.WGS84:
             result["e"] = self.earth_model.value
 
-        # 7. Version - always at the end
+        # 7. Version
         result["version"] = self.version
+
+        # 8. Extensions last, matching the order the spec lists them in
+        if self.extensions:
+            result["x"] = self.extensions
 
         return result
 
@@ -237,6 +242,7 @@ class QRCodeTask:
             takeoff=takeoff,
             sss=sss,
             goal=goal,
+            extensions=list(data.get("x") or []),
         )
 
     def to_json(self, simplified: bool = False) -> str:
@@ -357,6 +363,7 @@ class QRCodeTask:
                 alt_smoothed=tp.waypoint.alt_smoothed,
                 type=qr_type,
                 description=tp.waypoint.description,
+                extensions=tp.extensions,
             )
             qr_turnpoints.append(qr_turnpoint)
             coordinates.append((tp.waypoint.lat, tp.waypoint.lon))
@@ -416,6 +423,7 @@ class QRCodeTask:
             takeoff=qr_takeoff,
             sss=qr_sss,
             goal=qr_goal,
+            extensions=task.extensions,
         )
 
     @classmethod
@@ -515,6 +523,7 @@ class QRCodeTask:
                 radius=qr_tp.radius,
                 waypoint=waypoint,
                 type=tp_type,
+                extensions=qr_tp.extensions,
             )
             turnpoints.append(turnpoint)
 
@@ -570,4 +579,5 @@ class QRCodeTask:
             takeoff=takeoff,
             sss=sss,
             goal=goal,
+            extensions=self.extensions,
         )

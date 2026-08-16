@@ -194,6 +194,7 @@ class QRCodeTurnpoint:
     alt_smoothed: int
     type: QRCodeTurnpointType = QRCodeTurnpointType.NONE
     description: str | None = None
+    extensions: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self, simplified: bool = False) -> OrderedDict[str, Any]:
         """Convert to dictionary for JSON serialization.
@@ -244,8 +245,11 @@ class QRCodeTurnpoint:
         if self.type == QRCodeTurnpointType.SSS or self.type == QRCodeTurnpointType.ESS:
             result["t"] = self.type.value
 
-        # Add z last
         result["z"] = encoded
+
+        # Extensions last, matching the order the spec lists them in
+        if self.extensions:
+            result["x"] = self.extensions
 
         return result
 
@@ -296,4 +300,5 @@ class QRCodeTurnpoint:
             alt_smoothed=alt_smoothed,
             type=turnpoint_type,
             description=description,
+            extensions=list(data.get("x") or []),
         )

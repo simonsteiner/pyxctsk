@@ -164,11 +164,15 @@ class Turnpoint:
         radius (int): Turnpoint radius in meters.
         waypoint (Waypoint): Associated waypoint.
         type (Optional[TurnpointType]): Type of turnpoint.
+        extensions (list): Opaque manufacturer extensions, preserved verbatim.
+            The spec requires them to be in the same order as the root
+            ``extensions`` list, with the ``id`` key not repeated here.
     """
 
     radius: int
     waypoint: Waypoint
     type: TurnpointType | None = None
+    extensions: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
@@ -176,12 +180,14 @@ class Turnpoint:
         Returns:
             Dict[str, Any]: Dictionary representation for JSON.
         """
-        result = {
+        result: dict[str, Any] = {
             "radius": self.radius,
             "waypoint": self.waypoint.to_dict(),
         }
         if self.type and self.type != TurnpointType.NONE:
             result["type"] = self.type.value
+        if self.extensions:
+            result["extensions"] = self.extensions
         return result
 
     @classmethod
@@ -202,6 +208,7 @@ class Turnpoint:
             radius=data["radius"],
             waypoint=Waypoint.from_dict(data["waypoint"]),
             type=turnpoint_type,
+            extensions=list(data.get("extensions") or []),
         )
 
 
@@ -407,6 +414,9 @@ class Task:
         takeoff (Optional[Takeoff]): Takeoff window.
         sss (Optional[SSS]): Start of speed section.
         goal (Optional[Goal]): Task goal.
+        extensions (list): Opaque manufacturer extensions, preserved verbatim.
+            Each carries an obligatory ``id`` identifying manufacturer and
+            version; their order defines the order of turnpoint extensions.
     """
 
     task_type: TaskType
@@ -416,6 +426,7 @@ class Task:
     takeoff: Takeoff | None = None
     sss: SSS | None = None
     goal: Goal | None = None
+    extensions: list[dict[str, Any]] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         """Post-initialization processing.
@@ -483,6 +494,8 @@ class Task:
             result["sss"] = self.sss.to_dict()
         if self.goal:
             result["goal"] = self.goal.to_dict()
+        if self.extensions:
+            result["extensions"] = self.extensions
 
         return result
 
@@ -524,6 +537,7 @@ class Task:
             takeoff=takeoff,
             sss=sss,
             goal=goal,
+            extensions=list(data.get("extensions") or []),
         )
 
     def to_json(self) -> str:
