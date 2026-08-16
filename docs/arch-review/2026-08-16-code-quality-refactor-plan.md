@@ -33,7 +33,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (record w
 
 ### Boundaries
 
-- [ ] **P8** — Stop inventing `(0, 0)` coordinates in `QRCodeTurnpoint.from_dict`
+- [x] **P8** — Stop inventing `(0, 0)` coordinates in `QRCodeTurnpoint.from_dict`
 - [ ] **P9** — One source of truth for the obsolete-direction default
 
 ### Minor

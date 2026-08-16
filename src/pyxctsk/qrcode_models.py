@@ -275,19 +275,22 @@ class QRCodeTurnpoint:
         (lon, lat, altitude, radius), three for an XC/Waypoints one
         (lon, lat, altitude — a route "without cylinders", hence radius 0).
 
+        Both formats require ``z``, so a payload without one is malformed
+        rather than a turnpoint at 0°N 0°E — inventing coordinates would put
+        the task in the Gulf of Guinea and report it as read successfully.
+
         Args:
             data: Dictionary with turnpoint data
 
         Returns:
             QRCodeTurnpoint instance
-        """
-        lon = 0.0
-        lat = 0.0
-        alt_smoothed = 0
-        radius = 0
 
-        nums = decode_nums(data["z"]) if "z" in data else []
-        if len(nums) >= 4:
+        Raises:
+            KeyError: If ``z`` or ``n`` is missing.
+            ValueError: If ``z`` does not decode to three or four numbers.
+        """
+        nums = decode_nums(data["z"])
+        if len(nums) == 4:
             lon, lat, alt_smoothed, radius = (
                 nums[0] / 1e5,
                 nums[1] / 1e5,
@@ -296,8 +299,11 @@ class QRCodeTurnpoint:
             )
         elif len(nums) == 3:
             lon, lat, alt_smoothed = nums[0] / 1e5, nums[1] / 1e5, nums[2]
-        elif len(nums) == 2:
-            lon, lat = nums[0] / 1e5, nums[1] / 1e5
+            radius = 0
+        else:
+            raise ValueError(
+                f'turnpoint "z" must hold 3 or 4 numbers, got {len(nums)}: {data["z"]!r}'
+            )
 
         turnpoint_type = QRCodeTurnpointType.NONE
         if "t" in data:

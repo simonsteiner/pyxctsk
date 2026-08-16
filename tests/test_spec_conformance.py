@@ -554,6 +554,41 @@ class TestManufacturerExtensions:
         assert turnpoint.extensions == [{"k": "v"}]
 
 
+class TestTurnpointCoordinatesAreNeverInvented:
+    """A malformed ``z`` is an error, not a turnpoint at 0°N 0°E.
+
+    Both QR formats require ``z``. Defaulting the coordinates to zero produced
+    a valid-looking turnpoint in the Gulf of Guinea and reported the task as
+    read successfully — a silent fallback papering over malformed input.
+    """
+
+    def _from_dict(self, data):
+        from pyxctsk.qrcode_models import QRCodeTurnpoint
+
+        return QRCodeTurnpoint.from_dict(data)
+
+    def test_missing_z_raises(self):
+        """No coordinates at all is malformed input."""
+        with pytest.raises(KeyError):
+            self._from_dict({"n": "TP"})
+
+    @pytest.mark.parametrize("count", [0, 1, 2, 5])
+    def test_wrong_number_count_raises(self, count):
+        """Only the 3- and 4-number forms are defined."""
+        from pyxctsk.qrcode_encoding import encode_num
+
+        z = "".join(encode_num(n) for n in range(count))
+        with pytest.raises(ValueError, match="3 or 4 numbers"):
+            self._from_dict({"n": "TP", "z": z})
+
+    def test_the_error_reaches_the_parser_as_a_format_error(self):
+        """Raising here must surface as a descriptive parse failure."""
+        from pyxctsk.exceptions import InvalidFormatError
+
+        with pytest.raises(InvalidFormatError, match="could not be parsed"):
+            parse_task('XCTSK:{"taskType":"CLASSIC","version":2,"t":[{"n":"TP"}]}')
+
+
 class TestWaypointsFormatPreservesExtras:
     """The XC/Waypoints path must preserve what the competition path does.
 
