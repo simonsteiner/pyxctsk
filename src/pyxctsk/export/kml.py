@@ -2,9 +2,9 @@
 
 import simplekml  # type: ignore
 
-from .goal_line import get_goal_line_data
-from .model.task import Task, Turnpoint, TurnpointType
-from .visualization_common import (
+from ..distance.goal_line import get_goal_line_data
+from ..model.task import Task, Turnpoint, TurnpointType
+from .common import (
     generate_circle_coordinates_3d,
     get_optimized_route_coordinates,
     get_turnpoint_color_hex,

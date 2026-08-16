@@ -12,8 +12,8 @@ All features include geometry and properties suitable for web map display, inclu
 Intended for use in web-based or desktop mapping tools to visualize XCTrack competition tasks.
 """
 
-from .goal_line import get_goal_line_data
-from .visualization_common import (
+from ..distance.goal_line import get_goal_line_data
+from .common import (
     get_optimized_route_coordinates,
     get_turnpoint_color_hex,
     get_turnpoints_to_render,

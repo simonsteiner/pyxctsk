@@ -20,8 +20,8 @@ from .exceptions import (
     InvalidTimeOfDayError,
     TaskValidationError,
 )
-from .geojson import generate_task_geojson
-from .kml import task_to_kml
+from .export.geojson import generate_task_geojson
+from .export.kml import task_to_kml
 from .model.task import (
     SSS,
     Direction,

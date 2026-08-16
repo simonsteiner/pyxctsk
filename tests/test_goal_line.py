@@ -13,8 +13,7 @@ This module covers:
 from unittest.mock import Mock
 
 from pyxctsk import Goal, GoalType, Task, TaskType, Turnpoint, TurnpointType, Waypoint
-from pyxctsk.geojson import _create_goal_line_features
-from pyxctsk.goal_line import (
+from pyxctsk.distance.goal_line import (
     GoalLine,
     _find_previous_turnpoint,
     calculate_goal_line_endpoints,
@@ -22,6 +21,7 @@ from pyxctsk.goal_line import (
     goal_line_length_from_turnpoints,
     should_skip_last_turnpoint,
 )
+from pyxctsk.export.geojson import _create_goal_line_features
 
 
 def _line_goal_task(prev_radius=400, goal_radius=400):
@@ -269,7 +269,7 @@ class TestGenerateSemicircleArc:
         )
 
         # Should have GOAL_LINE_NUM_POINTS + 1 points
-        from pyxctsk.goal_line import GOAL_LINE_NUM_POINTS
+        from pyxctsk.distance.goal_line import GOAL_LINE_NUM_POINTS
 
         assert len(arc_points) == GOAL_LINE_NUM_POINTS + 1
 

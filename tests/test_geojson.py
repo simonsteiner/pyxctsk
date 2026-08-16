@@ -11,7 +11,7 @@ This module covers:
 from unittest.mock import patch
 
 from pyxctsk import Goal, GoalType, Task, TaskType, Turnpoint, TurnpointType, Waypoint
-from pyxctsk.geojson import (
+from pyxctsk.export.geojson import (
     _create_optimized_route_feature,
     _create_turnpoint_feature,
     generate_task_geojson,
@@ -214,7 +214,7 @@ class TestCreateOptimizedRouteFeature:
 class TestGenerateTaskGeoJSON:
     """Test the generate_task_geojson function."""
 
-    @patch("pyxctsk.visualization_common.get_optimized_route_coordinates")
+    @patch("pyxctsk.export.common.get_optimized_route_coordinates")
     def test_generate_task_geojson_basic(self, mock_opt_coords):
         """Test basic GeoJSON generation."""
         # Mock the dependencies
@@ -234,7 +234,7 @@ class TestGenerateTaskGeoJSON:
         assert "features" in result
         assert len(result["features"]) >= 2  # At least turnpoints
 
-    @patch("pyxctsk.visualization_common.get_optimized_route_coordinates")
+    @patch("pyxctsk.export.common.get_optimized_route_coordinates")
     def test_generate_task_geojson_line_goal(self, mock_opt_coords):
         """Test GeoJSON generation with LINE goal."""
         mock_opt_coords.return_value = [(46.0, 8.0), (47.0, 8.0)]
@@ -262,7 +262,7 @@ class TestGenerateTaskGeoJSON:
 
         assert len(turnpoint_features) == 1  # Only first turnpoint
 
-    @patch("pyxctsk.visualization_common.get_optimized_route_coordinates")
+    @patch("pyxctsk.export.common.get_optimized_route_coordinates")
     def test_generate_task_geojson_no_optimized_route(self, mock_opt_coords):
         """Test GeoJSON generation without optimized route."""
         mock_opt_coords.return_value = []  # No optimized route
@@ -281,7 +281,7 @@ class TestGenerateTaskGeoJSON:
 
         assert len(route_features) == 0  # No route feature
 
-    @patch("pyxctsk.visualization_common.get_optimized_route_coordinates")
+    @patch("pyxctsk.export.common.get_optimized_route_coordinates")
     def test_generate_task_geojson_empty_task(self, mock_opt_coords):
         """Test GeoJSON generation with empty task."""
         mock_opt_coords.return_value = []

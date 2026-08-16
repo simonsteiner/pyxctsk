@@ -18,7 +18,14 @@ own. Everything a caller outside the package needs is named here —
   cylinders
 - :mod:`~pyxctsk.distance.task_distances` — per-leg and cumulative distances
 - :mod:`~pyxctsk.distance.sss` — Start-of-Speed-Section entry point and info
+- :mod:`~pyxctsk.distance.goal_line` — the ``GoalLine`` deep module: length,
+  endpoints and semicircular control zone, in one place
 - :mod:`~pyxctsk.distance.config` — convergence epsilon and sweep count
+
+The goal line lives here rather than with the KML and GeoJSON writers that draw
+it because distance calculation needs the same geometry — a LINE goal's
+cylinder is sized from the goal-line length — and the shapes of a task must not
+depend on the formats it is exported to.
 
 Submodules import each other directly, never through this file, which is what
 keeps the re-export layer free of the cycles it was split out to break.
@@ -27,6 +34,12 @@ keeps the re-export layer free of the cycles it was split out to break.
 from .config import (
     CONVERGENCE_EPSILON_M,
     DEFAULT_NUM_ITERATIONS,
+)
+from .goal_line import (
+    GoalLine,
+    get_goal_line_data,
+    goal_line_length_from_turnpoints,
+    should_skip_last_turnpoint,
 )
 from .route_optimization import (
     calculate_iteratively_refined_route,
@@ -49,6 +62,11 @@ from .turnpoint import (
 __all__ = [
     # Core classes
     "TaskTurnpoint",
+    "GoalLine",
+    # Goal-line geometry
+    "get_goal_line_data",
+    "goal_line_length_from_turnpoints",
+    "should_skip_last_turnpoint",
     # Main distance calculation functions
     "optimized_distance",
     "optimized_route_coordinates",

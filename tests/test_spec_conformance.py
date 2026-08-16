@@ -24,7 +24,7 @@ from pyxctsk import (
     TurnpointType,
     parse_task,
 )
-from pyxctsk.goal_line import GoalLine, goal_line_length_from_turnpoints
+from pyxctsk.distance.goal_line import GoalLine, goal_line_length_from_turnpoints
 from pyxctsk.model.validation import ValidationRule
 
 # Polyline-encoded "z" literals below are opaque tokens, not words.

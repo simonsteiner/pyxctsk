@@ -16,7 +16,7 @@ from io import BytesIO
 
 import click
 
-from .kml import task_to_kml
+from .export.kml import task_to_kml
 from .parser import parse_task
 from .qrcode.image import generate_qrcode_image
 
