@@ -164,8 +164,11 @@ def task_to_qr_code_task(task: Task) -> QRCodeTask:
 def task_to_qr_code_waypoints(task: Task) -> QRCodeTask:
     """Convert a Task to the XC/Waypoints simplified QR format.
 
-    The simplified format is "a simple route from waypoints without cylinders",
-    so it carries no turnpoint types, descriptions, timing or goal.
+    The simplified format is "a simple route from waypoints without cylinders".
+    Reducing a task to what it can represent is
+    :meth:`QRCodeTask.as_waypoints`'s job, so this is the ordinary conversion
+    followed by that — rather than a second, subtly different idea of what a
+    waypoints task keeps.
 
     Args:
         task: Task object to convert.
@@ -173,28 +176,7 @@ def task_to_qr_code_waypoints(task: Task) -> QRCodeTask:
     Returns:
         QRCodeTask: A WAYPOINTS task holding only the essential turnpoint data.
     """
-    qr_turnpoints = [
-        QRCodeTurnpoint(
-            lat=tp.waypoint.lat,
-            lon=tp.waypoint.lon,
-            radius=tp.radius,
-            name=tp.waypoint.name,
-            alt_smoothed=tp.waypoint.alt_smoothed,
-            type=QRCodeTurnpointType.NONE,
-            description=None,
-        )
-        for tp in task.turnpoints
-    ]
-
-    return QRCodeTask(
-        version=QR_CODE_TASK_VERSION,
-        task_type=QRCodeTaskType.WAYPOINTS,
-        earth_model=None,  # Default to WGS84
-        turnpoints=qr_turnpoints,
-        takeoff=None,
-        sss=None,
-        goal=None,
-    )
+    return task_to_qr_code_task(task).as_waypoints()
 
 
 def qr_code_task_to_task(qr: QRCodeTask) -> Task:

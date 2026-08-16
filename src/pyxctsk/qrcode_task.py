@@ -37,6 +37,7 @@ from .passthrough import QR_EXTENSIONS_KEY, read_passthrough, write_passthrough
 from .qrcode_enums import (
     QRCodeEarthModel,
     QRCodeTaskType,
+    QRCodeTurnpointType,
 )
 from .qrcode_models import QRCodeGoal, QRCodeSSS, QRCodeTakeoff, QRCodeTurnpoint
 
@@ -313,10 +314,36 @@ class QRCodeTask:
         Rendering the simplified shape is a change of task type, not a mode
         flag: ``to_dict`` follows :attr:`task_type` and nothing else.
 
+        The copy is reduced to what the format can represent — "a simple route
+        from waypoints without cylinders". Radii, turnpoint types, descriptions,
+        the timing sections and the earth model are dropped, because the
+        simplified payload has nowhere to put them. Serialized output is
+        unchanged either way, since ``to_dict`` never wrote those fields; what
+        this fixes is the in-memory object, which used to keep values that
+        reading the same payload back would not produce. Extensions and unknown
+        keys stay: the simplified payload does carry those.
+
         Returns:
-            QRCodeTask: A copy typed WAYPOINTS; unchanged if it already is.
+            QRCodeTask: A copy typed WAYPOINTS, carrying only representable
+            values.
         """
-        return replace(self, task_type=QRCodeTaskType.WAYPOINTS)
+        return replace(
+            self,
+            task_type=QRCodeTaskType.WAYPOINTS,
+            turnpoints=[
+                replace(
+                    tp,
+                    radius=0,
+                    type=QRCodeTurnpointType.NONE,
+                    description=None,
+                )
+                for tp in self.turnpoints
+            ],
+            earth_model=None,
+            takeoff=None,
+            sss=None,
+            goal=None,
+        )
 
     def to_waypoints_json(self) -> str:
         """Convert to XC/Waypoints simplified JSON format.
