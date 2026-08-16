@@ -4,6 +4,7 @@ airscore
 altitudemode
 AMSL
 barcodes
+behaviour
 bevo
 brentq
 changealphaint
@@ -13,6 +14,7 @@ darkred
 defaultdicts
 docstrings
 efgh
+EITCE
 ellps
 endspeed
 esbenp
@@ -44,6 +46,7 @@ MATEC
 minversion
 motu
 ndarray
+neighbouring
 neighbours
 newlinestring
 newpoint
