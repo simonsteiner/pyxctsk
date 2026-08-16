@@ -1,0 +1,1 @@
+XCTSK:{"taskType":"CLASSIC","version":2,"t":[{"z":"ixyl@o~k_HgoA_X","n":"S11","d":"Takeoff","o":{"a1":180}},{"z":"w{mq@o`~_HwY_iwB","n":"L15","d":"SSS","t":2,"o":{"a1":180}},{"z":"w{mq@o`~_HwY_X","n":"L15","d":"Goal","t":3,"o":{"a1":180}}],"s":{"g":["11:00:00Z"],"d":2,"t":1},"g":{"d":"14:30:00Z","t":2},"o":{"v":2}}

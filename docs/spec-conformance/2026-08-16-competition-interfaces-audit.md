@@ -306,16 +306,25 @@ Neither holds given findings 1–3.
 
 ## Addendum — a producer that puts the finish altitude outside the spec
 
-Found after the audit, while checking a set of scanned competition QR codes now
-kept in `tests/data/reference_tasks/elevated-goal/`. Eight tasks, all carrying:
+Found after the audit, while checking a set of QR codes now kept in
+`tests/data/reference_tasks/elevated-goal/`. The producer is **SeeYou
+Navigator** (Naviter), confirmed — the tasks were created in the app. Every one
+carries:
 
 ```
 root          "o": {"v": 2, "fa": 1220}
 per-turnpoint "o": {"a1": 180}
 ```
 
-`fa` is the elevated goal altitude — the goal waypoint sits at 1020 m in every
-task, exactly 200 m below it. The encoding departs from the spec three ways:
+`fa` is the elevated goal altitude. SeeYou's own UI labels the setting
+*"Finish altitude — Minimum altitude at finish point (MSL)"* and shows
+`1220 m`, which settles the datum directly: it is absolute, not an offset. Two
+further behaviours are visible from the app: `fa` is written only when the
+altitude is set explicitly (on Auto the app emits `"o": {"v": 2}` with no `fa`),
+and `a1` is 180 on every turnpoint, consistent with — though not proof of — a
+half-angle for the full-circle cylinders the UI shows.
+
+The encoding departs from the spec three ways:
 the value belongs at `g.fa` inside the goal object rather than a top-level
 `o`; the spec defines `finishAltitude` as *"meters AGL (computed from the
 altitude of the last turnpoint)"*, so a conformant encoding would be
@@ -342,7 +351,7 @@ the datum question, because the two producers disagree:
 | producer | field | value | goal waypoint | datum | goal AMSL |
 | --- | --- | --- | --- | --- | --- |
 | tools.xcontest.org | `goal.finishAltitude` / `g.fa` | 300 | 428 m | **AGL**, per spec | 728 m |
-| SeeYou Navigator | root `o.fa` | 1220 | 1020 m | **absolute AMSL** | 1220 m |
+| SeeYou Navigator | root `o.fa` | 1220 | 1020 m | **absolute MSL** (per its UI) | 1220 m |
 
 The conformant task proves the spec's reading directly: 300 is *below* the goal
 waypoint's own 428 m, so it cannot be an absolute altitude. Conversely 1220 read
@@ -357,6 +366,21 @@ and our QR output for that task is byte-identical to it.
 One byte-level fix came out of this: `QRCodeGoal.to_dict` emitted `d, t, fa`
 where tools.xcontest.org emits `d, fa, t`. Invisible until a fixture carried
 `fa` at all. Now matched.
+
+### An unplanned cross-check of the optimizer
+
+The SeeYou tasks came with the app's own displayed distances
+(`seeyou-reference.json`). Through-centers matches exactly on both (146.1 km,
+58.3 km), and the optimized route matches on **every leg but the first** —
+within the app's 0.1 km display precision. The entire remaining difference is
+the opening leg, because SeeYou measures it from the takeoff cylinder boundary
+where we measure from the takeoff center; on the 2-leg task the gap is exactly
+the 400 m takeoff radius.
+
+That is a producer convention, not an error: ADR 0002 chose the takeoff-center
+start to match XCTrack, which the 22-task corpus validates. Agreement on every
+other leg is independent confirmation of the Ding–Xie–Jiang implementation
+against a second, unrelated one.
 
 ---
 

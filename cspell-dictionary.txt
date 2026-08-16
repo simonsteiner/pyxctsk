@@ -46,6 +46,7 @@ lons
 MATEC
 minversion
 motu
+Naviter
 ndarray
 neighbouring
 neighbours
@@ -72,6 +73,7 @@ qoga
 quno
 relativetoground
 RRGGBB
+seeyou
 simplekml
 Soaringlab
 SUBDIRS

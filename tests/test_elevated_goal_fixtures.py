@@ -161,6 +161,79 @@ def test_unknown_fields_never_shadow_spec_fields():
     assert emitted["o"] == {"keep": 1}
 
 
+class TestSeeYouSemantics:
+    """What SeeYou Navigator's own UI says the ``o`` field means.
+
+    Two tasks captured with their on-screen values (``seeyou-reference.json``),
+    which settle two things the QR payloads alone could only suggest: the app
+    labels the value *"Minimum altitude at finish point (MSL)"*, so ``o.fa`` is
+    absolute; and setting the field to Auto omits ``fa`` entirely.
+    """
+
+    REFERENCE = json.loads((FIXTURES / "seeyou-reference.json").read_text())
+
+    def test_explicit_finish_altitude_is_written_as_msl(self):
+        """The UI shows "1220 m" against an MSL label, and fa is 1220."""
+        task = parse_task((FIXTURES / "seeyou-finish-1220_qr_code.txt").read_text())
+        displayed = self.REFERENCE["seeyou-finish-1220"]
+
+        assert task.unknown["o"] == {"v": 2, "fa": 1220}
+        assert displayed["finish_altitude_displayed"] == "1220 m"
+        assert "(MSL)" in displayed["finish_altitude_label"]
+        # MSL, so it exceeds the goal waypoint's own altitude rather than
+        # being an offset from it.
+        assert task.unknown["o"]["fa"] > task.turnpoints[-1].waypoint.alt_smoothed
+
+    def test_auto_finish_altitude_omits_fa(self):
+        """On Auto the app writes "o" without an fa key at all."""
+        task = parse_task((FIXTURES / "seeyou-finish-auto_qr_code.txt").read_text())
+        displayed = self.REFERENCE["seeyou-finish-auto"]
+
+        assert task.unknown["o"] == {"v": 2}
+        assert "fa" not in task.unknown["o"]
+        assert displayed["finish_altitude_displayed"].startswith("Auto")
+
+    @pytest.mark.parametrize("name", ["seeyou-finish-1220", "seeyou-finish-auto"])
+    def test_centers_distance_matches_seeyou_exactly(self, name):
+        """Through-centers distance is unambiguous, and we agree to 0.1 km."""
+        from pyxctsk.distance import calculate_task_distances
+
+        task = parse_task((FIXTURES / f"{name}_qr_code.txt").read_text())
+        result = calculate_task_distances(task)
+
+        assert result["center_distance_km"] == self.REFERENCE[name]["total_km"]
+
+    @pytest.mark.parametrize("name", ["seeyou-finish-1220", "seeyou-finish-auto"])
+    def test_optimized_legs_match_seeyou_except_the_first(self, name):
+        """Every leg after the first matches; the first differs by convention.
+
+        SeeYou measures the opening leg from the takeoff *cylinder boundary*,
+        we from the takeoff *center* — the convention ADR 0002 chose to match
+        XCTrack. On the 2-leg task the gap is exactly the 400 m takeoff radius.
+        Legs beyond the first are independent validation of the optimizer
+        against a second implementation.
+        """
+        from pyxctsk.distance import optimized_route_coordinates
+        from pyxctsk.task_distances import _task_to_turnpoints
+        from pyxctsk.turnpoint import geodesic_distance
+
+        task = parse_task((FIXTURES / f"{name}_qr_code.txt").read_text())
+        route = optimized_route_coordinates(_task_to_turnpoints(task))
+        ours = [
+            geodesic_distance(route[i - 1], route[i], None) / 1000
+            for i in range(1, len(route))
+        ]
+        theirs = self.REFERENCE[name]["leg_km"]
+
+        assert len(ours) == len(theirs)
+        for i, (mine, seeyou) in enumerate(zip(ours[1:], theirs[1:]), start=2):
+            assert mine == pytest.approx(seeyou, abs=0.05), f"leg {i}"
+
+        # The first leg is longer by at most the takeoff radius, never shorter.
+        takeoff_radius_km = task.turnpoints[0].radius / 1000
+        assert 0 <= ours[0] - theirs[0] <= takeoff_radius_km + 0.05
+
+
 class TestConformantElevatedGoal:
     """The spec-conformant counterpart, from tools.xcontest.org.
 

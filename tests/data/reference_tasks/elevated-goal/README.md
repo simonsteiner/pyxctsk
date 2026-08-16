@@ -7,15 +7,22 @@ the point of keeping them together. Exercised by
 | files | producer | where the finish altitude lives | datum |
 | --- | --- | --- | --- |
 | `xcontest-conformant.*` | tools.xcontest.org | `goal.finishAltitude` / `g.fa` — as the spec defines | **300 m AGL** above the last turnpoint |
-| `task1`–`task8` | SeeYou Navigator (per the person who collected them) | root `"o": {"v": 2, "fa": 1220}` — not a spec field | **1220 m absolute AMSL** |
+| `task1`–`task8`, `seeyou-*` | SeeYou Navigator (confirmed — created in the app by the person who collected them) | root `"o": {"v": 2, "fa": 1220}` — not a spec field | **1220 m absolute MSL** |
 
-The datums are the crux. In the conformant task the goal waypoint is at 428 m
-and `finishAltitude` is 300 — *below* the waypoint's own altitude, so it can
-only be a height above it (goal at 728 m AMSL). In the SeeYou tasks the goal
-waypoint is at 1020 m and `o.fa` is 1220, which read as AGL would put the goal
-1220 m above the ground; read as absolute it is a plausible 200 m elevated
-goal. Same feature, incompatible conventions — which is why `o.fa` is preserved
-but never mapped onto `goal.finish_altitude`.
+The datums are the crux, and both are now confirmed rather than inferred.
+
+SeeYou Navigator labels the setting **"Finish altitude — Minimum altitude at
+finish point (MSL)"** and shows `1220 m` for the task whose QR carries
+`"fa": 1220`. MSL, so absolute. In the conformant task, `finishAltitude` is 300
+against a goal waypoint at 428 m — *below* the waypoint's own altitude, so it
+can only be a height above it, exactly as the spec says (goal at 728 m MSL).
+
+Same feature, incompatible conventions, which is why `o.fa` is preserved but
+never mapped onto `goal.finish_altitude`.
+
+**`fa` is only present when the altitude is set explicitly.** With the field on
+Auto the app writes `"o": {"v": 2}` and no `fa` — see `seeyou-finish-auto`,
+where the UI reads `Auto (423 m MSL)`.
 
 The SeeYou tasks are kept as the scanned QR photo (`*.jpg`) and its decoded
 `XCTSK:` payload (`*.txt`). Tests should prefer the `.txt`, since reading the
@@ -61,8 +68,10 @@ This departs from the spec three ways:
    entry carrying an obligatory `id`. `o` keyed by `v` is not discoverable as
    one.
 
-`a1` is undocumented and constant at 180 across every turnpoint, so this sample
-cannot say what it means.
+`a1` is undocumented and constant at 180 across every turnpoint. Every
+turnpoint in the app shows a cylinder icon, so a half-angle of 180° (a full
+circle) is a plausible reading — but no sample varies it, so that stays a
+guess.
 
 ## What they pin
 
@@ -80,9 +89,12 @@ cannot say what it means.
 
 ## Provenance
 
-`task1`–`task8` are scanned QR photos, attributed to **SeeYou Navigator**
-(Naviter) by the person who collected them — treat that as likely rather than
-confirmed; nothing in the payload names the producer. It is certainly not
+The SeeYou files were **created in SeeYou Navigator** (Naviter) by the person
+who collected them — confirmed, not inferred from the payload. `task1`–`task8`
+are scanned QR photos; `seeyou-finish-1220` and `seeyou-finish-auto` are
+screenshots of the app's own QR share sheet, captured together with the task
+screens whose on-screen values are transcribed in `seeyou-reference.json`. It is
+certainly not
 tools.xcontest.org: the key order is `taskType, version, t, s, g, o`, `tc`/`to`
 are omitted rather than emitted as nulls, and every turnpoint sets `d` equal to
 `n` (or to `""`).
@@ -90,8 +102,31 @@ are omitted rather than emitted as nulls, and every turnpoint sets `d` equal to
 `xcontest-conformant.*` came from tools.xcontest.org, task code
 `6f83e4192cd55562`, uploaded specifically to provide a conformant counterpart.
 
-There are no reference distances for any of these, so they pin
-self-consistency rather than agreement with XCTrack's displayed numbers.
+### Reference distances
+
+`seeyou-reference.json` records what the app displayed for the two `seeyou-*`
+tasks — the only fixtures here with independent distance figures.
+
+Through-centers matches exactly (146.1 km and 58.3 km). The optimized route
+matches on **every leg but the first**:
+
+```
+seeyou-finish-1220   ours 0.23 23.34 10.59 13.64 12.20 16.60 5.30   = 81.89 km
+                   SeeYou 0.0  23.3  10.6  13.6  12.2  16.6  5.3    = 81.6 km
+seeyou-finish-auto   ours 3.33 61.20                                = 64.53 km
+                   SeeYou 2.93 61.20                                = 64.13 km
+```
+
+The whole difference is the opening leg: **SeeYou measures it from the takeoff
+cylinder boundary, we measure from the takeoff center** — the convention
+ADR 0002 adopted to match XCTrack, which the 22-task corpus in `../xctsk/`
+validates. On `seeyou-finish-auto` the gap is exactly the 400 m takeoff radius.
+
+Legs beyond the first agreeing to within the app's 0.1 km display precision is
+independent validation of the optimizer against a second implementation.
+
+The remaining `task1`–`task8` have no reference distances, so they pin
+self-consistency only.
 
 ## Known, accepted round-trip differences
 
