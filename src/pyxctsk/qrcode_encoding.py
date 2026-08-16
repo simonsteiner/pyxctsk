@@ -43,7 +43,11 @@ def encode_num(num: int) -> str:
 
 
 def encode_competition_turnpoint(lon: float, lat: float, alt: int, radius: int) -> str:
-    """Encode turnpoint data using the XCTrack format.
+    """Encode a competition turnpoint as the four numbers of a v2 ``z`` field.
+
+    The competition format encodes longitude, latitude, altitude and radius.
+    See :func:`encode_waypoint_turnpoint` for the XC/Waypoints variant, which
+    has no radius.
 
     Args:
         lon: Longitude
@@ -54,18 +58,29 @@ def encode_competition_turnpoint(lon: float, lat: float, alt: int, radius: int) 
     Returns:
         Encoded string
     """
+    return encode_waypoint_turnpoint(lon, lat, alt) + encode_num(radius)
+
+
+def encode_waypoint_turnpoint(lon: float, lat: float, alt: int) -> str:
+    """Encode a waypoint as the three numbers of an XC/Waypoints ``z`` field.
+
+    The XC/Waypoints task is a "simple route from waypoints without cylinders",
+    so its ``z`` carries only longitude, latitude and altitude — appending a
+    radius here would not round-trip against XCTrack.
+
+    Args:
+        lon: Longitude
+        lat: Latitude
+        alt: Altitude in meters
+
+    Returns:
+        Encoded string
+    """
     # Round coordinates to 5 decimal places (same as Google's polyline)
     lon_int = round(lon * 1e5)
     lat_int = round(lat * 1e5)
 
-    # Encode each component
-    encoded_lon = encode_num(lon_int)
-    encoded_lat = encode_num(lat_int)
-    encoded_alt = encode_num(alt)
-    encoded_radius = encode_num(radius)
-
-    # Concatenate all encoded values
-    return encoded_lon + encoded_lat + encoded_alt + encoded_radius
+    return encode_num(lon_int) + encode_num(lat_int) + encode_num(alt)
 
 
 def decode_nums(encoded_str: str) -> list[int]:

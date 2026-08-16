@@ -15,9 +15,11 @@ from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Any
 
-import polyline
-
-from .qrcode_encoding import decode_nums, encode_competition_turnpoint
+from .qrcode_encoding import (
+    decode_nums,
+    encode_competition_turnpoint,
+    encode_waypoint_turnpoint,
+)
 from .qrcode_enums import (
     QRCodeDirection,
     QRCodeGoalType,
@@ -199,14 +201,26 @@ class QRCodeTurnpoint:
             Dictionary with fields: d (description), n (name), t (type), z (encoded coords)
             For simplified format: only n (name) and z (encoded coords)
         """
+        if simplified:
+            # XC/Waypoints simplified format - only name and encoded coordinates.
+            # Its "z" carries three numbers; the radius belongs to the
+            # competition format only.
+            return OrderedDict(
+                [
+                    ("n", self.name),
+                    (
+                        "z",
+                        encode_waypoint_turnpoint(
+                            self.lon, self.lat, self.alt_smoothed
+                        ),
+                    ),
+                ]
+            )
+
         # Use the XCTrack custom encoding
         encoded = encode_competition_turnpoint(
             self.lon, self.lat, self.alt_smoothed, self.radius
         )
-
-        if simplified:
-            # XC/Waypoints simplified format - only name and encoded coordinates
-            return OrderedDict([("n", self.name), ("z", encoded)])
 
         # Full format - Create result dictionary with exact order to match expected output
         result: OrderedDict[str, Any] = OrderedDict()
@@ -231,8 +245,10 @@ class QRCodeTurnpoint:
     def from_dict(cls, data: dict[str, Any]) -> "QRCodeTurnpoint":
         """Create from dictionary.
 
-        Decodes turnpoint data from QR code JSON format. Handles both individual
-        coordinate fields (x, y, a, r) and polyline-encoded data (z field).
+        The ``z`` field is the only source of coordinates, and its length says
+        which format it is: four numbers for a competition turnpoint
+        (lon, lat, altitude, radius), three for an XC/Waypoints one
+        (lon, lat, altitude — a route "without cylinders", hence radius 0).
 
         Args:
             data: Dictionary with turnpoint data
@@ -240,38 +256,23 @@ class QRCodeTurnpoint:
         Returns:
             QRCodeTurnpoint instance
         """
-        # Use individual fields for better reliability
-        lon = data.get("x", 0.0)
-        lat = data.get("y", 0.0)
-        alt_smoothed = data.get("a", 0)
-        radius = data.get("r", 1000)
+        lon = 0.0
+        lat = 0.0
+        alt_smoothed = 0
+        radius = 0
 
-        # Fallback: try polyline decoding if individual fields not available
-        if "z" in data and ("x" not in data or "y" not in data):
-            try:
-                # Try using our custom decoder for XCTrack format first
-                nums = decode_nums(data["z"])
-                if len(nums) >= 4:
-                    lon = nums[0] / 1e5
-                    lat = nums[1] / 1e5
-                    alt_smoothed = nums[2]
-                    radius = nums[3]
-                elif len(nums) >= 2:
-                    lon = nums[0] / 1e5
-                    lat = nums[1] / 1e5
-            except Exception:
-                # Fallback to standard polyline library
-                try:
-                    coords = polyline.decode(data["z"], precision=5)
-                    if coords:
-                        coord = coords[0]  # Take first coordinate
-                        lon, lat = (
-                            coord[1],
-                            coord[0],
-                        )  # Note: polyline lib uses lat,lon order
-                except Exception:
-                    # If all else fails, use defaults
-                    pass
+        nums = decode_nums(data["z"]) if "z" in data else []
+        if len(nums) >= 4:
+            lon, lat, alt_smoothed, radius = (
+                nums[0] / 1e5,
+                nums[1] / 1e5,
+                nums[2],
+                nums[3],
+            )
+        elif len(nums) == 3:
+            lon, lat, alt_smoothed = nums[0] / 1e5, nums[1] / 1e5, nums[2]
+        elif len(nums) == 2:
+            lon, lat = nums[0] / 1e5, nums[1] / 1e5
 
         turnpoint_type = QRCodeTurnpointType.NONE
         if "t" in data:
