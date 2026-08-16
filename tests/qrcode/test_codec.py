@@ -34,7 +34,7 @@ from pyxctsk.qrcode.task import QRCodeTask
 from tests.conftest import find_xctsk_files
 
 # Use shared QR code test utilities
-from tests.qr_test_utils import QR_CODE_SUPPORT, Image, decode_qr
+from tests.qr_test_utils import QR_CODE_SUPPORT, Image, decode_qr, zxingcpp
 
 
 def test_qr_code_string_generation(qrcode_test_data):
@@ -680,3 +680,22 @@ def test_waypoints_url_format():
     parsed_from_url = QRCodeTask.from_string(url_string)
     assert len(parsed_from_url.turnpoints) == 3, "Should have 3 turnpoints from URL"
     assert parsed_from_url.task_type == QRCodeTaskType.WAYPOINTS
+
+
+class TestQRSupportProbe:
+    """The probe that decides whether the QR image tests run at all.
+
+    Every image test in this module is gated on ``QR_CODE_SUPPORT``, so a
+    probe that silently reported the wrong answer would turn this file into a
+    green no-op rather than a failure.
+    """
+
+    def test_support_flag_matches_imports(self):
+        """QR_CODE_SUPPORT is only True when both decoders actually imported."""
+        if QR_CODE_SUPPORT:
+            assert Image is not None
+            assert zxingcpp is not None
+
+    def test_support_flag_is_a_bool(self):
+        """The probe answers True or False, never an exception or None."""
+        assert isinstance(QR_CODE_SUPPORT, bool)
