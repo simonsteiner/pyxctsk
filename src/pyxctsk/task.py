@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
+from .qrcode_encoding import _round_half_up
 from .qrcode_task import QRCodeTask
 from .shared_enums import TimeOfDay
 
@@ -141,6 +142,10 @@ class Waypoint:
     def from_dict(cls, data: dict[str, Any]) -> "Waypoint":
         """Create from dictionary.
 
+        The spec types ``altSmoothed`` as a number rather than an integer, but
+        it is metres AMSL and the QR encoding can only carry whole metres, so a
+        fractional value is rounded to honor this class's ``int`` annotation.
+
         Args:
             data (Dict[str, Any]): Dictionary to parse.
 
@@ -151,7 +156,7 @@ class Waypoint:
             name=data["name"],
             lat=data["lat"],
             lon=data["lon"],
-            alt_smoothed=data["altSmoothed"],
+            alt_smoothed=_round_half_up(data["altSmoothed"]),
             description=data.get("description"),
         )
 
@@ -194,6 +199,10 @@ class Turnpoint:
     def from_dict(cls, data: dict[str, Any]) -> "Turnpoint":
         """Create from dictionary.
 
+        The spec types ``radius`` as a number rather than an integer; it is
+        metres and the QR encoding can only carry whole metres, so a fractional
+        value is rounded to honor this class's ``int`` annotation.
+
         Args:
             data (Dict[str, Any]): Dictionary to parse.
 
@@ -205,7 +214,7 @@ class Turnpoint:
             turnpoint_type = TurnpointType(data["type"])
 
         return cls(
-            radius=data["radius"],
+            radius=_round_half_up(data["radius"]),
             waypoint=Waypoint.from_dict(data["waypoint"]),
             type=turnpoint_type,
             extensions=list(data.get("extensions") or []),

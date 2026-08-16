@@ -169,6 +169,43 @@ class TestGoalSerializedShape:
         assert task.goal.line_length == 800.0
 
 
+class TestNumericEdgeCases:
+    """Findings 5 and 11 — numeric handling must match the reference.
+
+    Spec: ``radius`` and ``altSmoothed`` are typed "number", not integer. The
+    polyline reference implementation rounds with Java's ``Math.round``.
+    """
+
+    @pytest.mark.parametrize("radius", [400.0, 399.5, 400])
+    def test_non_integer_radius_encodes(self, radius):
+        """A float radius is valid JSON and must not raise TypeError."""
+        turnpoints = json.loads(json.dumps(BASE_TASK["turnpoints"]))
+        turnpoints[0]["radius"] = radius
+        task = Task.from_json(task_json(turnpoints=turnpoints))
+
+        assert task.turnpoints[0].radius == 400
+        assert task.to_qr_code_task().to_string().startswith("XCTSK:")
+
+    def test_non_integer_altitude_encodes(self):
+        """Same for altSmoothed, which the spec also types as a number."""
+        turnpoints = json.loads(json.dumps(BASE_TASK["turnpoints"]))
+        turnpoints[0]["waypoint"]["altSmoothed"] = 1000.6
+        task = Task.from_json(task_json(turnpoints=turnpoints))
+
+        assert task.turnpoints[0].waypoint.alt_smoothed == 1001
+        assert task.to_qr_code_task().to_string().startswith("XCTSK:")
+
+    @pytest.mark.parametrize(
+        ("value", "expected"),
+        [(612344.5, 612345), (612345.5, 612346), (-2.5, -2), (2.5, 3), (2.4, 2)],
+    )
+    def test_ties_round_like_java_math_round(self, value, expected):
+        """floor(x + 0.5), not Python's banker's rounding."""
+        from pyxctsk.qrcode_encoding import _round_half_up
+
+        assert _round_half_up(value) == expected
+
+
 class TestManufacturerExtensions:
     """Finding 2 — manufacturer extensions must survive verbatim.
 

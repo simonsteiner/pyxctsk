@@ -2,6 +2,7 @@ AABBGGRR
 addopts
 airscore
 altitudemode
+AMSL
 barcodes
 bevo
 brentq
