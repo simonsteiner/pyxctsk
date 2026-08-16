@@ -513,6 +513,24 @@ class TestManufacturerExtensions:
         assert all("extensions" not in tp for tp in emitted["turnpoints"])
         assert "x" not in json.loads(task.to_qr_code_task().to_json())
 
+    def test_legacy_p_key_round_trips_as_an_unknown_key(self):
+        """The dead ``p`` field used to swallow the key and drop it on output.
+
+        ``p`` was a pyxctsk-only polyline of the turnpoint coordinates. It sat
+        on the KNOWN_KEYS allow-list, so an incoming ``p`` was captured into a
+        field that ``to_dict`` never wrote — the exact round-trip loss the
+        unknown-key passthrough exists to prevent, hidden by the allow-list.
+        """
+        from pyxctsk.qrcode_task import QRCodeTask
+
+        source = json.loads(Task.from_json(task_json()).to_qr_code_task().to_json())
+        source["p"] = "_p~iF~ps|U"
+
+        qr = QRCodeTask.from_dict(source)
+
+        assert qr.unknown["p"] == "_p~iF~ps|U"
+        assert json.loads(qr.to_json())["p"] == "_p~iF~ps|U"
+
     def test_turnpoint_x_is_not_read_as_a_coordinate(self):
         """The ``x`` key means extensions, not longitude as it once did."""
         from pyxctsk.qrcode_encoding import encode_competition_turnpoint

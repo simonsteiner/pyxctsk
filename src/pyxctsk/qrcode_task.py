@@ -33,8 +33,6 @@ from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-import polyline
-
 from .qrcode_enums import (
     QRCodeDirection,
     QRCodeEarthModel,
@@ -121,7 +119,6 @@ class QRCodeTask:
     version: int = QR_CODE_TASK_VERSION
     task_type: QRCodeTaskType | None = None
     earth_model: QRCodeEarthModel | None = None
-    turnpoints_polyline: str | None = None
     turnpoints: list[QRCodeTurnpoint] = field(default_factory=list)
     takeoff: QRCodeTakeoff | None = None
     sss: QRCodeSSS | None = None
@@ -130,9 +127,8 @@ class QRCodeTask:
     unknown: dict[str, Any] = field(default_factory=dict)
 
     #: Keys this class understands; everything else lands in ``unknown``.
-    #: ``p`` is a legacy pyxctsk field, not a spec one, but it is read here.
     KNOWN_KEYS = frozenset(
-        {"taskType", "version", "T", "V", "t", "s", "g", "e", "to", "tc", "x", "p"}
+        {"taskType", "version", "T", "V", "t", "s", "g", "e", "to", "tc", "x"}
     )
 
     def to_dict(self, simplified: bool = False) -> dict[str, Any]:
@@ -245,7 +241,6 @@ class QRCodeTask:
                 version=version,
                 task_type=simplified_task_type,
                 earth_model=None,  # Default to WGS84
-                turnpoints_polyline=None,
                 turnpoints=turnpoints,
                 takeoff=None,
                 sss=None,
@@ -270,10 +265,6 @@ class QRCodeTask:
             e_val = data["e"]
             e_int = e_val if isinstance(e_val, int) else int(str(e_val))
             earth_model = QRCodeEarthModel(e_int)
-
-        turnpoints_polyline = data.get("p")
-        if turnpoints_polyline is not None:
-            turnpoints_polyline = str(turnpoints_polyline)
 
         turnpoints = []
         if "t" in data and isinstance(data["t"], list):
@@ -302,7 +293,6 @@ class QRCodeTask:
             version=version,
             task_type=task_type,
             earth_model=earth_model,
-            turnpoints_polyline=turnpoints_polyline,
             turnpoints=turnpoints,
             takeoff=takeoff,
             sss=sss,
@@ -443,7 +433,6 @@ class QRCodeTask:
 
         # Convert turnpoints
         qr_turnpoints = []
-        coordinates = []
 
         for tp in task.turnpoints:
             qr_type = QRCodeTurnpointType.NONE
@@ -466,10 +455,6 @@ class QRCodeTask:
                 unknown=tp.unknown,
             )
             qr_turnpoints.append(qr_turnpoint)
-            coordinates.append((tp.waypoint.lat, tp.waypoint.lon))
-
-        # Generate polyline from coordinates
-        turnpoints_polyline = polyline.encode(coordinates, precision=5)
 
         # Convert takeoff
         qr_takeoff = None
@@ -518,7 +503,6 @@ class QRCodeTask:
             version=QR_CODE_TASK_VERSION,
             task_type=qr_task_type,
             earth_model=qr_earth_model,
-            turnpoints_polyline=turnpoints_polyline,
             turnpoints=qr_turnpoints,
             takeoff=qr_takeoff,
             sss=qr_sss,
@@ -558,7 +542,6 @@ class QRCodeTask:
             version=QR_CODE_TASK_VERSION,
             task_type=QRCodeTaskType.WAYPOINTS,
             earth_model=None,  # Default to WGS84
-            turnpoints_polyline=None,
             turnpoints=qr_turnpoints,
             takeoff=None,
             sss=None,
