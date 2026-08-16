@@ -25,7 +25,10 @@ This module provides:
 - Parsing from QR code strings and JSON.
 """
 
+import base64
+import binascii
 import json
+import zlib
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
@@ -47,7 +50,47 @@ if TYPE_CHECKING:
 
 # Constants
 QR_CODE_SCHEME = "XCTSK:"
+# The spec's zlib+base64 variant: "It is recommended that the software accepts
+# both XCTSK and XCTSKZ [...] In the future we prefer to use the XCTSKZ
+# encoding." Reading both is mandatory; which one we write is the caller's
+# choice, and XCTSK: stays the default so existing output is unchanged.
+QR_CODE_SCHEME_COMPRESSED = "XCTSKZ:"
 QR_CODE_TASK_VERSION = 2
+
+
+def compress_payload(json_str: str) -> str:
+    """Compress a QR payload to the ``XCTSKZ:`` body: zlib, then base64.
+
+    Args:
+        json_str: The task JSON to compress.
+
+    Returns:
+        str: The base64-encoded zlib stream, as ASCII.
+    """
+    return base64.b64encode(zlib.compress(json_str.encode("utf-8"))).decode("ascii")
+
+
+def decompress_payload(payload: str) -> str:
+    """Decompress an ``XCTSKZ:`` body back to task JSON.
+
+    Args:
+        payload: The base64-encoded zlib stream that followed ``XCTSKZ:``.
+
+    Returns:
+        str: The decompressed task JSON.
+
+    Raises:
+        ValueError: If the payload is not valid base64 or not a zlib stream.
+    """
+    try:
+        raw = base64.b64decode(payload, validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise ValueError(f"XCTSKZ payload is not valid base64: {exc}") from exc
+
+    try:
+        return zlib.decompress(raw).decode("utf-8")
+    except (zlib.error, UnicodeDecodeError) as exc:
+        raise ValueError(f"XCTSKZ payload is not a zlib stream: {exc}") from exc
 
 
 @dataclass
@@ -265,21 +308,45 @@ class QRCodeTask:
         """
         return self.to_json(simplified=True)
 
-    def to_string(self) -> str:
-        """Convert to XCTSK: URL string.
+    def _to_scheme_string(self, json_str: str, compressed: bool) -> str:
+        """Prefix a payload with the scheme it belongs to, compressing if asked."""
+        if compressed:
+            return QR_CODE_SCHEME_COMPRESSED + compress_payload(json_str)
+        return QR_CODE_SCHEME + json_str
+
+    def to_string(self, compressed: bool = False) -> str:
+        """Convert to a QR code URL string.
+
+        Args:
+            compressed: If True, emit the ``XCTSKZ:`` form — the same JSON
+                zlib-compressed and base64-encoded, which the spec prefers going
+                forward because it fits far more task into a scannable code.
 
         Returns:
-            Complete QR code string with XCTSK: scheme prefix
+            Complete QR code string with the XCTSK: or XCTSKZ: scheme prefix
         """
-        return QR_CODE_SCHEME + self.to_json()
+        return self._to_scheme_string(self.to_json(), compressed)
 
-    def to_waypoints_string(self) -> str:
-        """Convert to XC/Waypoints XCTSK: URL string.
+    def to_compressed_string(self) -> str:
+        """Convert to an ``XCTSKZ:`` URL string.
+
+        Convenience for :meth:`to_string` with ``compressed=True``.
 
         Returns:
-            Complete QR code string with XCTSK: scheme prefix in simplified format
+            Complete QR code string with the XCTSKZ: scheme prefix
         """
-        return QR_CODE_SCHEME + self.to_waypoints_json()
+        return self.to_string(compressed=True)
+
+    def to_waypoints_string(self, compressed: bool = False) -> str:
+        """Convert to an XC/Waypoints QR code URL string.
+
+        Args:
+            compressed: If True, emit the ``XCTSKZ:`` form.
+
+        Returns:
+            Complete QR code string in simplified format
+        """
+        return self._to_scheme_string(self.to_waypoints_json(), compressed)
 
     @classmethod
     def from_json(cls, json_str: str) -> "QRCodeTask":
@@ -289,22 +356,31 @@ class QRCodeTask:
 
     @classmethod
     def from_string(cls, url_str: str) -> "QRCodeTask":
-        """Create from XC/Waypoints XCTSK: URL string.
+        """Create from a QR code URL string in either scheme.
+
+        Both ``XCTSK:`` and ``XCTSKZ:`` are accepted, as the spec requires.
 
         Args:
-            url_str: Complete QR code string with XCTSK: scheme prefix
+            url_str: Complete QR code string with a scheme prefix
 
         Returns:
             QRCodeTask instance
 
         Raises:
-            ValueError: If URL doesn't start with XCTSK: scheme
+            ValueError: If the string carries neither scheme, or if an
+                ``XCTSKZ:`` payload cannot be decompressed.
         """
-        if not url_str.startswith(QR_CODE_SCHEME):
-            raise ValueError(f"Invalid QR code scheme, expected {QR_CODE_SCHEME}")
+        if url_str.startswith(QR_CODE_SCHEME_COMPRESSED):
+            payload = url_str[len(QR_CODE_SCHEME_COMPRESSED) :]
+            return cls.from_json(decompress_payload(payload))
 
-        json_str = url_str[len(QR_CODE_SCHEME) :]
-        return cls.from_json(json_str)
+        if url_str.startswith(QR_CODE_SCHEME):
+            return cls.from_json(url_str[len(QR_CODE_SCHEME) :])
+
+        raise ValueError(
+            f"Invalid QR code scheme, expected {QR_CODE_SCHEME} "
+            f"or {QR_CODE_SCHEME_COMPRESSED}"
+        )
 
     @classmethod
     def from_task(cls, task: "Task") -> "QRCodeTask":

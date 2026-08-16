@@ -29,6 +29,7 @@ def main():
     Parameter Options:
       --format [json|kml|png|qrcode-json]  Output format (default: json)
       --output, -o FILE                    Output file (default: stdout)
+      --compressed, -z                     Emit XCTSKZ: instead of XCTSK:
       INPUT_FILE                           Input file (optional, uses stdin)
 
     \b
@@ -37,11 +38,12 @@ def main():
       pyxctsk convert task.xctsk --format kml -o task.kml
       pyxctsk convert --format png < task.xctsk > task.png
       pyxctsk convert task.xctsk --format qrcode-json
+      pyxctsk convert task.xctsk --format qrcode-json -z
 
     \b
     Formats:
-      Input:  .xctsk files, QR code images (PNG)
-      Output: JSON, KML, QR codes (PNG or XCTSK: URL)
+      Input:  .xctsk files, XCTSK:/XCTSKZ: URLs, QR code images (PNG)
+      Output: JSON, KML, QR codes (PNG or XCTSK:/XCTSKZ: URL)
 
     See README for more examples and details.
     """
@@ -63,17 +65,26 @@ def main():
     type=click.Path(),
     help="Output file (default: stdout)",
 )
-def convert(input_file, output_format: str, output_file: str) -> None:
+@click.option(
+    "--compressed",
+    "-z",
+    is_flag=True,
+    default=False,
+    help="Emit the XCTSKZ: (zlib+base64) QR encoding; png and qrcode-json only",
+)
+def convert(input_file, output_format: str, output_file: str, compressed: bool) -> None:
     """Convert XCTrack task files between supported formats.
 
     Reads an XCTrack task from a file or stdin, parses it, and outputs the
     converted result in the specified format (JSON, KML, PNG QR code, or compact
-    QR string) to a file or stdout.
+    QR string) to a file or stdout. Both XCTSK: and XCTSKZ: inputs are accepted
+    regardless of this flag.
 
     Args:
         input_file (file or None): Input file object opened in binary mode, or None to read from stdin.
         output_format (str): Output format ('json', 'kml', 'png', or 'qrcode-json').
         output_file (str): Output file path, or None to write to stdout.
+        compressed (bool): Emit the XCTSKZ: encoding for QR output formats.
 
     Returns:
         None
@@ -116,7 +127,7 @@ def convert(input_file, output_format: str, output_file: str) -> None:
 
         elif output_format == "png":
             qr_task = task.to_qr_code_task()
-            qr_string = qr_task.to_string()
+            qr_string = qr_task.to_string(compressed=compressed)
             qr_image = generate_qrcode_image(qr_string, size=1024)
 
             if output_file:
@@ -129,7 +140,7 @@ def convert(input_file, output_format: str, output_file: str) -> None:
 
         elif output_format == "qrcode-json":
             qr_task = task.to_qr_code_task()
-            qr_string = qr_task.to_string()
+            qr_string = qr_task.to_string(compressed=compressed)
             if output_file:
                 with open(output_file, "w") as f:
                     f.write(qr_string)

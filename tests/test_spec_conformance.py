@@ -169,6 +169,98 @@ class TestGoalSerializedShape:
         assert task.goal.line_length == 800.0
 
 
+class TestCompressedQRScheme:
+    """Finding 3 — the ``XCTSKZ:`` zlib+base64 encoding.
+
+    Spec: "The QR code can be also compressed using zlib format and converted
+    using base64 encoding to ascii. This must be prefixed with a string
+    'XCTSKZ:'. It is recommended that the software accepts both XCTSK and
+    XCTSKZ and is able to produce QR code in both formats."
+    """
+
+    def test_compressed_output_carries_the_right_prefix(self):
+        """Each scheme must announce itself correctly."""
+        task = Task.from_json(task_json())
+
+        assert task.to_qr_code_task().to_compressed_string().startswith("XCTSKZ:")
+        assert task.to_qr_code_task().to_string().startswith("XCTSK:")
+
+    def test_plain_remains_the_default(self):
+        """Existing callers must see no change."""
+        qr = Task.from_json(task_json()).to_qr_code_task()
+
+        assert qr.to_string() == qr.to_string(compressed=False)
+        assert not qr.to_string().startswith("XCTSKZ:")
+
+    def test_the_two_spellings_agree(self):
+        """The keyword arg and the convenience method are one behavior."""
+        qr = Task.from_json(task_json()).to_qr_code_task()
+
+        assert qr.to_compressed_string() == qr.to_string(compressed=True)
+
+    @pytest.mark.parametrize("name", ["task_bevo.txt", "task_noha_route.txt"])
+    def test_compressed_round_trips_to_the_same_task(self, name):
+        """Compression must be transparent: same task in, same task out."""
+        original = parse_task(str(REFERENCE_QR / name))
+        waypoints = (REFERENCE_QR / name).read_text().startswith('XCTSK:{"T"')
+
+        qr = original.to_qr_code_task()
+        compressed = (
+            qr.to_waypoints_string(compressed=True)
+            if waypoints
+            else qr.to_string(compressed=True)
+        )
+
+        assert parse_task(compressed).to_json() == original.to_json()
+
+    def test_compression_actually_shrinks_a_real_task(self):
+        """The point of the format is fitting more task in a scannable code."""
+        qr = parse_task(str(REFERENCE_QR / "task_bevo.txt")).to_qr_code_task()
+
+        assert len(qr.to_compressed_string()) < len(qr.to_string())
+
+    def test_parser_accepts_both_schemes(self):
+        """The spec makes reading both mandatory."""
+        qr = Task.from_json(task_json()).to_qr_code_task()
+
+        assert (
+            parse_task(qr.to_string()).to_json()
+            == parse_task(qr.to_compressed_string()).to_json()
+        )
+
+    def test_compressed_url_is_not_mistaken_for_a_file_path(self):
+        """Base64 contains "/", which the path heuristic used to trip over."""
+        from pyxctsk.parser import _looks_like_file_path
+
+        payloads = [
+            Task.from_json(
+                task_json(sss={"type": "RACE", "timeGates": [f"1{n}:00:00Z"]})
+            )
+            .to_qr_code_task()
+            .to_compressed_string()
+            for n in range(10)
+        ]
+        assert any("/" in p for p in payloads), "no sample exercised the '/' case"
+        assert not any(_looks_like_file_path(p) for p in payloads)
+
+    @pytest.mark.parametrize(
+        "payload", ["XCTSKZ:not valid base64!!", "XCTSKZ:aGVsbG8=", "XCTSKZ:"]
+    )
+    def test_malformed_compressed_payload_is_reported(self, payload):
+        """A recognized prefix with a bad body must not fall through silently."""
+        from pyxctsk import InvalidFormatError
+
+        with pytest.raises(InvalidFormatError):
+            parse_task(payload)
+
+    def test_unknown_scheme_is_rejected(self):
+        """A lookalike prefix is not silently treated as plain JSON."""
+        from pyxctsk.qrcode_task import QRCodeTask
+
+        with pytest.raises(ValueError, match="Invalid QR code scheme"):
+            QRCodeTask.from_string("NOT-A-SCHEME:{}")
+
+
 class TestNumericEdgeCases:
     """Findings 5 and 11 — numeric handling must match the reference.
 
