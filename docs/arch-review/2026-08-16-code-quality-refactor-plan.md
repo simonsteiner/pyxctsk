@@ -326,6 +326,7 @@ What actually came out:
 | passthrough implementations | 10 | 1 (`passthrough.py`) |
 | ways to compute a goal-line length | 4 | 1 |
 | QR stringify entry points | 4 | 2 |
+| `task.py` | 690 lines | 566 (after the follow-ups) |
 
 Three new modules, each with one job: `passthrough.py`, `rounding.py`, `qrcode_conversion.py`.
 Four fields deleted outright (`Goal.line_length`, `QRCodeTask.turnpoints_polyline`) or reduced
@@ -337,11 +338,41 @@ with `BREAKING CHANGE:` footers on the commits: `Goal.line_length`,
 `to_dict`/`to_json`, and `QRCodeTurnpoint.from_dict` now raising on a malformed `z`. None of
 them affect reading or writing a spec-valid task.
 
-Follow-ups deliberately **not** taken here, for a later review to weigh:
+### Follow-ups
 
-- `task.py` is 690 lines and holds seven dataclasses plus `Task.validate`. Under the 1k line
-  but the largest file in `src/`; splitting the enums out would be the obvious first cut.
-- `Task.validate()` returns `list[str]` — English prose as an error model. Fine today, and a
-  typed model would only pay off if a caller ever needs to branch on *which* rule broke.
-- `QRCodeTask.from_dict` still infers the simplified format from `"T" in data and "V" in data`
-  rather than from a declared discriminator. It matches what producers emit, so leave it.
+Three items were parked for a later review, then taken up straight away. Two of the three
+conclusions changed once they were looked at properly.
+
+**F1 + F2 — decompose `task.py`, and type the validation issues.** These turned out to be one
+change, and the original framing of F1 was wrong. Splitting `task.py` by *kind* — enums in one
+module, dataclasses in another — would have bought nothing: every importer of `.task` wants
+`Task` as well as the enums, so the new module could never be imported alone. That is
+indirection, not decomposition.
+
+Splitting by *concern* does pay, and it is what needs the enums moved. `validation.py` now
+holds the spec's structural rules and imports `task_enums`, never `task`, so it checks the
+model without depending on it — no `TYPE_CHECKING` dance beyond the one type hint, no lazy
+import. Adding a rule means editing a rule. `task.py` is 566 lines and holds exactly the
+domain dataclasses.
+
+F2 then fell out naturally rather than being bolted on. `validate()` returned `list[str]`,
+which made *which* rule broke recoverable only by matching English prose that is free to
+change; it now returns `ValidationIssue` objects naming a `ValidationRule`, and `str()` still
+yields the message so the joined-prose exception text is unchanged. The earlier "only pays off
+if a caller needs to branch" reasoning was too generous to the status quo: a string is the
+loosest possible shape for a structured fact, and the rule identity already existed
+implicitly in the code — it was just not expressed.
+
+**F3 — the QR format discriminator.** Recorded as "matches what producers emit, so leave it".
+That was wrong. `from_dict` keyed on `"T" in data and "V" in data`, so a waypoints payload
+missing its version key fell through to the *competition* reader. It did not fail: `task_type`
+came out `None`, `T` was swallowed into `unknown`, and `to_dict` then emitted the competition
+shape — `tc`/`to`/`version` plus a stray `T` — for something plainly a waypoints task. Each
+format announces itself with its own task-type key and the competition format has no `T`, so
+that key alone is now the discriminator.
+
+Still open, and genuinely fine to leave:
+
+- `shared_enums.py` is named "Common enums" and contains no enums — just `TimeOfDay`, which is
+  shared with the QR models. The name is inherited debt; renaming it to `time_of_day.py` is a
+  mechanical change across four files that nothing currently depends on being done.
