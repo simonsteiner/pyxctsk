@@ -18,9 +18,7 @@ Neighbouring modules hold what this one deliberately does not:
 
 import json
 from dataclasses import dataclass, field, replace
-from typing import Any
-
-from ..qrcode.task import QRCodeTask
+from typing import TYPE_CHECKING, Any
 
 # The enums are re-exported: they are part of task.py's public surface and
 # callers import them from here. They live in their own module so validation.py
@@ -38,6 +36,9 @@ from .passthrough import EXTENSIONS_KEY, read_passthrough, write_passthrough
 from .rounding import round_half_up
 from .time_of_day import TimeOfDay
 from .validation import ValidationIssue, validate_task
+
+if TYPE_CHECKING:
+    from ..qrcode.task import QRCodeTask
 
 
 @dataclass
@@ -534,13 +535,23 @@ class Task:
         data = json.loads(json_str)
         return cls.from_dict(data)
 
-    def to_qr_code_task(self) -> QRCodeTask:
+    def to_qr_code_task(self) -> "QRCodeTask":
         """Convert to QR code task format.
+
+        The import is function-local by necessity, not by oversight. The
+        mapping lives in :mod:`pyxctsk.qrcode.conversion`, which imports this
+        module to build a ``Task`` in the other direction; importing it at
+        module level here would make the two packages a circular import. This
+        method is the only place the model reaches into the QR format at all,
+        which is what lets everything else in :mod:`pyxctsk.model` stay
+        independent of it — a property ``tests/test_layering.py`` enforces.
 
         Returns:
             QRCodeTask: QRCodeTask object created from this task.
         """
-        return QRCodeTask.from_task(self)
+        from ..qrcode.conversion import task_to_qr_code_task
+
+        return task_to_qr_code_task(self)
 
     def validate(self) -> list[ValidationIssue]:
         """Check the task against the spec's structural rules.

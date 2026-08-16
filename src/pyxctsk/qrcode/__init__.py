@@ -26,14 +26,18 @@ package.
 Modules inside the package import each other directly rather than through this
 file; the re-exports below are for callers outside it.
 
-:mod:`~pyxctsk.qrcode.conversion` is deliberately *not* re-exported here. It is
-the one module that reaches into :mod:`pyxctsk.model`, and ``model.task``
-imports ``qrcode.task`` for :meth:`~pyxctsk.Task.to_qr_code_task` — so pulling
-conversion in from this file would run the two packages into a circular import
-on the first ``import pyxctsk``. Import it as
-``from pyxctsk.qrcode.conversion import task_to_qr_code_task``.
+:mod:`~pyxctsk.qrcode.conversion` sits above both packages: it is the only
+module that imports :mod:`pyxctsk.model` and this one together. The two
+convenience methods that read the other way — :meth:`~pyxctsk.Task.to_qr_code_task`
+and :meth:`QRCodeTask.to_task` — reach it through function-local imports for
+that reason, and for no other.
 """
 
+from .conversion import (
+    qr_code_task_to_task,
+    task_to_qr_code_task,
+    task_to_qr_code_waypoints,
+)
 from .enums import (
     QRCodeDirection,
     QRCodeEarthModel,
@@ -56,6 +60,7 @@ __all__ = [
     "QR_CODE_SCHEME",
     "QR_CODE_SCHEME_COMPRESSED",
     "QR_CODE_TASK_VERSION",
+    "qr_code_task_to_task",
     "QRCodeDirection",
     "QRCodeEarthModel",
     "QRCodeGoal",
@@ -67,4 +72,6 @@ __all__ = [
     "QRCodeTaskType",
     "QRCodeTurnpoint",
     "QRCodeTurnpointType",
+    "task_to_qr_code_task",
+    "task_to_qr_code_waypoints",
 ]
