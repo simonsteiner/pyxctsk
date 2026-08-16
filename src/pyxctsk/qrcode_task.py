@@ -30,7 +30,7 @@ import binascii
 import json
 import zlib
 from collections import OrderedDict
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Any
 
 from .passthrough import QR_EXTENSIONS_KEY, read_passthrough, write_passthrough
@@ -128,24 +128,22 @@ class QRCodeTask:
         {"taskType", "version", "T", "V", "t", "s", "g", "e", "to", "tc", "x"}
     )
 
-    def to_dict(self, simplified: bool = False) -> dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
 
         Builds the QR code task dictionary in the precise field order required
         by the XCTrack format specification.
 
-        A WAYPOINTS task always uses the simplified form regardless of the
-        argument: the spec's competition format only defines
-        ``"taskType": "CLASSIC"``, and an XC/Waypoints task is identified by
-        ``"T": "W"`` instead.
-
-        Args:
-            simplified: If True, use simplified XC/Waypoints format with only T, V, and t fields
+        The shape follows from :attr:`task_type` alone. A WAYPOINTS task is the
+        simplified XC/Waypoints form, identified by ``"T": "W"``; anything else
+        is the competition form, whose only defined ``taskType`` is
+        ``"CLASSIC"``. To render a task in the other shape, change its type —
+        see :meth:`to_waypoints_json`.
 
         Returns:
             Dictionary with QR code task format fields
         """
-        if simplified or self.task_type == QRCodeTaskType.WAYPOINTS:
+        if self.task_type == QRCodeTaskType.WAYPOINTS:
             # XC/Waypoints simplified format
             simplified_result: OrderedDict[str, Any] = OrderedDict()
             simplified_result["T"] = "W"  # taskType: Waypoints
@@ -184,7 +182,7 @@ class QRCodeTask:
             result["t"] = [tp.to_dict() for tp in self.turnpoints]
 
         # 4. Task type - CLASSIC is the only value this format defines;
-        #    WAYPOINTS took the simplified branch above.
+        #    WAYPOINTS took the branch above.
         if self.task_type is not None:
             result["taskType"] = "CLASSIC"
 
@@ -295,17 +293,24 @@ class QRCodeTask:
             unknown=unknown,
         )
 
-    def to_json(self, simplified: bool = False) -> str:
+    def to_json(self) -> str:
         """Convert to JSON string.
 
         Returns:
             Compact JSON string suitable for QR code embedding
         """
-        return json.dumps(
-            self.to_dict(simplified=simplified),
-            separators=(",", ":"),
-            ensure_ascii=False,
-        )
+        return json.dumps(self.to_dict(), separators=(",", ":"), ensure_ascii=False)
+
+    def as_waypoints(self) -> "QRCodeTask":
+        """Return this task as an XC/Waypoints one.
+
+        Rendering the simplified shape is a change of task type, not a mode
+        flag: ``to_dict`` follows :attr:`task_type` and nothing else.
+
+        Returns:
+            QRCodeTask: A copy typed WAYPOINTS; unchanged if it already is.
+        """
+        return replace(self, task_type=QRCodeTaskType.WAYPOINTS)
 
     def to_waypoints_json(self) -> str:
         """Convert to XC/Waypoints simplified JSON format.
@@ -313,13 +318,7 @@ class QRCodeTask:
         Returns:
             Compact JSON string in XC/Waypoints format
         """
-        return self.to_json(simplified=True)
-
-    def _to_scheme_string(self, json_str: str, compressed: bool) -> str:
-        """Prefix a payload with the scheme it belongs to, compressing if asked."""
-        if compressed:
-            return QR_CODE_SCHEME_COMPRESSED + compress_payload(json_str)
-        return QR_CODE_SCHEME + json_str
+        return self.as_waypoints().to_json()
 
     def to_string(self, compressed: bool = False) -> str:
         """Convert to a QR code URL string.
@@ -332,17 +331,9 @@ class QRCodeTask:
         Returns:
             Complete QR code string with the XCTSK: or XCTSKZ: scheme prefix
         """
-        return self._to_scheme_string(self.to_json(), compressed)
-
-    def to_compressed_string(self) -> str:
-        """Convert to an ``XCTSKZ:`` URL string.
-
-        Convenience for :meth:`to_string` with ``compressed=True``.
-
-        Returns:
-            Complete QR code string with the XCTSKZ: scheme prefix
-        """
-        return self.to_string(compressed=True)
+        if compressed:
+            return QR_CODE_SCHEME_COMPRESSED + compress_payload(self.to_json())
+        return QR_CODE_SCHEME + self.to_json()
 
     def to_waypoints_string(self, compressed: bool = False) -> str:
         """Convert to an XC/Waypoints QR code URL string.
@@ -353,7 +344,7 @@ class QRCodeTask:
         Returns:
             Complete QR code string in simplified format
         """
-        return self._to_scheme_string(self.to_waypoints_json(), compressed)
+        return self.as_waypoints().to_string(compressed=compressed)
 
     @classmethod
     def from_json(cls, json_str: str) -> "QRCodeTask":

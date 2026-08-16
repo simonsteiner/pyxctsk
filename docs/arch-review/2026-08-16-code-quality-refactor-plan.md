@@ -28,8 +28,8 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (record w
 
 - [x] **P4** — Move `_round_half_up` out of `qrcode_encoding.py`; make it public
 - [x] **P5** — Extract `Task ↔ QRCodeTask` conversion into its own module
-- [ ] **P6** — Drop the `simplified` flag; dispatch on `task_type` alone
-- [ ] **P7** — Collapse the four QR stringify entry points into one
+- [x] **P6** — Drop the `simplified` flag; dispatch on `task_type` alone
+- [x] **P7** — Collapse the four QR stringify entry points into one
 
 ### Boundaries
 

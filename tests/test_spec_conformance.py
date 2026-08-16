@@ -301,7 +301,7 @@ class TestCompressedQRScheme:
         """Each scheme must announce itself correctly."""
         task = Task.from_json(task_json())
 
-        assert task.to_qr_code_task().to_compressed_string().startswith("XCTSKZ:")
+        assert task.to_qr_code_task().to_string(compressed=True).startswith("XCTSKZ:")
         assert task.to_qr_code_task().to_string().startswith("XCTSK:")
 
     def test_plain_remains_the_default(self):
@@ -310,12 +310,6 @@ class TestCompressedQRScheme:
 
         assert qr.to_string() == qr.to_string(compressed=False)
         assert not qr.to_string().startswith("XCTSKZ:")
-
-    def test_the_two_spellings_agree(self):
-        """The keyword arg and the convenience method are one behavior."""
-        qr = Task.from_json(task_json()).to_qr_code_task()
-
-        assert qr.to_compressed_string() == qr.to_string(compressed=True)
 
     @pytest.mark.parametrize("name", ["task_bevo.txt", "task_noha_route.txt"])
     def test_compressed_round_trips_to_the_same_task(self, name):
@@ -336,7 +330,7 @@ class TestCompressedQRScheme:
         """The point of the format is fitting more task in a scannable code."""
         qr = parse_task(str(REFERENCE_QR / "task_bevo.txt")).to_qr_code_task()
 
-        assert len(qr.to_compressed_string()) < len(qr.to_string())
+        assert len(qr.to_string(compressed=True)) < len(qr.to_string())
 
     def test_parser_accepts_both_schemes(self):
         """The spec makes reading both mandatory."""
@@ -344,7 +338,7 @@ class TestCompressedQRScheme:
 
         assert (
             parse_task(qr.to_string()).to_json()
-            == parse_task(qr.to_compressed_string()).to_json()
+            == parse_task(qr.to_string(compressed=True)).to_json()
         )
 
     def test_compressed_url_is_not_mistaken_for_a_file_path(self):
@@ -356,7 +350,7 @@ class TestCompressedQRScheme:
                 task_json(sss={"type": "RACE", "timeGates": [f"1{n}:00:00Z"]})
             )
             .to_qr_code_task()
-            .to_compressed_string()
+            .to_string(compressed=True)
             for n in range(10)
         ]
         assert any("/" in p for p in payloads), "no sample exercised the '/' case"
@@ -446,6 +440,22 @@ class TestTaskTypeValue:
         task = parse_task(str(REFERENCE_QR / "task_bevo.txt"))
 
         assert json.loads(task.to_qr_code_task().to_json())["taskType"] == "CLASSIC"
+
+    def test_serialized_shape_follows_task_type_alone(self):
+        """There is one source of truth for the shape, not a flag beside it."""
+        qr = parse_task(str(REFERENCE_QR / "task_bevo.txt")).to_qr_code_task()
+
+        assert json.loads(qr.to_json())["taskType"] == "CLASSIC"
+        assert json.loads(qr.as_waypoints().to_json())["T"] == "W"
+
+    def test_as_waypoints_does_not_mutate_the_original(self):
+        """Downgrading to waypoints returns a copy, so the source is reusable."""
+        qr = parse_task(str(REFERENCE_QR / "task_bevo.txt")).to_qr_code_task()
+
+        before = qr.to_json()
+        qr.to_waypoints_json()
+
+        assert qr.to_json() == before
 
 
 class TestManufacturerExtensions:
@@ -580,20 +590,20 @@ class TestWaypointsFormatPreservesExtras:
 
     def test_root_extensions_are_written(self):
         """...and come back out again."""
-        emitted = json.loads(self._parsed().to_json(simplified=True))
+        emitted = json.loads(self._parsed().to_waypoints_json())
 
         assert emitted["x"] == [{"id": "ACME", "a": "1"}]
 
     def test_turnpoint_extensions_and_unknown_are_written(self):
         """Per-turnpoint "x" and unknown keys were read but never re-emitted."""
-        emitted = json.loads(self._parsed().to_json(simplified=True))
+        emitted = json.loads(self._parsed().to_waypoints_json())
 
         assert emitted["t"][0]["x"] == [{"k": "v"}]
         assert emitted["t"][0]["zz"] == "turnpoint-extra"
 
     def test_simplified_roundtrip_is_lossless(self):
         """Nothing in the source may be dropped."""
-        emitted = json.loads(self._parsed().to_json(simplified=True))
+        emitted = json.loads(self._parsed().to_waypoints_json())
 
         assert emitted == self.SOURCE
 
@@ -602,7 +612,7 @@ class TestWaypointsFormatPreservesExtras:
         from pyxctsk.qrcode_task import QRCodeTask
 
         plain = {"T": "W", "V": 2, "t": [{"n": "WPT1", "z": "|dz~FligrB?"}]}
-        emitted = json.loads(QRCodeTask.from_dict(plain).to_json(simplified=True))
+        emitted = json.loads(QRCodeTask.from_dict(plain).to_waypoints_json())
 
         assert emitted == plain
 
