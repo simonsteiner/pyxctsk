@@ -30,7 +30,7 @@ from pyxctsk import (
     Waypoint,
     parse_task,
 )
-from pyxctsk.shared_enums import InvalidTimeOfDayError
+from pyxctsk.exceptions import InvalidTimeOfDayError
 
 
 class TestTimeOfDay:

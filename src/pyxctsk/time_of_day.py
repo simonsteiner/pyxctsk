@@ -1,4 +1,10 @@
-"""Common enums shared across pyxctsk modules to avoid circular imports."""
+"""The ``TimeOfDay`` value shared by both task formats.
+
+Its own module because both the domain model and the QR models need it and
+neither should import the other. It is the one value type that validates on
+construction — an out-of-range hour is rejected in ``__post_init__``, unlike
+the task dataclasses, which are checked by ``validation.py`` instead.
+"""
 
 import re
 from dataclasses import dataclass

@@ -1,14 +1,19 @@
-"""XCTrack Task Data Structures and Domain Models.
+"""XCTrack task data structures and domain models.
 
-This module defines immutable dataclasses, enums, and validation logic for representing,
-parsing, and serializing XCTrack competition tasks. It covers the core domain models:
-  - Task, Turnpoint, Waypoint, Takeoff, SSS, Goal, TimeOfDay
-  - Enums for constrained values (e.g., TaskType, TurnpointType, GoalType)
-  - Serialization/deserialization to/from JSON and internal dicts
-  - Validation and logic for task structure and goal/ESS handling
+The core domain models — ``Task``, ``Turnpoint``, ``Waypoint``, ``Takeoff``,
+``SSS``, ``Goal`` — and their serialization to and from the full JSON format.
 
-Intended for use in parsing, generating, and manipulating XCTrack task formats, including
-support for QR code encoding/decoding and distance calculations (see related modules).
+They are plain dataclasses: not frozen, and they do not validate on
+construction. The only thing ``Task.__post_init__`` does is default an
+unspecified goal type, and it returns a copy rather than mutating what it was
+given. Nothing derived is stored on them.
+
+Neighbouring modules hold what this one deliberately does not:
+  - ``task_enums`` — the constrained values (``TaskType``, ``TurnpointType``, …),
+    re-exported here for callers
+  - ``validation`` — the spec's structural rules, reached via ``Task.validate()``
+  - ``qrcode_conversion`` — the mapping to and from the compact QR format
+  - ``time_of_day`` — ``TimeOfDay``, shared with the QR models
 """
 
 import json
@@ -18,7 +23,10 @@ from typing import Any
 from .passthrough import EXTENSIONS_KEY, read_passthrough, write_passthrough
 from .qrcode_task import QRCodeTask
 from .rounding import round_half_up
-from .shared_enums import TimeOfDay
+
+# The enums are re-exported: they are part of task.py's public surface and
+# callers import them from here. They live in their own module so validation.py
+# can use them without importing the model it checks.
 from .task_enums import (  # noqa: F401
     OBSOLETE_DIRECTION_DEFAULT,
     Direction,
@@ -28,9 +36,7 @@ from .task_enums import (  # noqa: F401
     TaskType,
     TurnpointType,
 )
-
-# Re-exported: these are part of task.py's public surface and callers import
-# them from here.
+from .time_of_day import TimeOfDay
 from .validation import ValidationIssue, validate_task
 
 

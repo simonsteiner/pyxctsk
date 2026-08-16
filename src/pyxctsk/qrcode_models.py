@@ -28,7 +28,7 @@ from .qrcode_enums import (
     QRCodeSSSType,
     QRCodeTurnpointType,
 )
-from .shared_enums import TimeOfDay
+from .time_of_day import TimeOfDay
 
 
 @dataclass
@@ -65,8 +65,6 @@ class QRCodeGoal:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "QRCodeGoal":
         """Create from dictionary."""
-        # TimeOfDay imported from shared_enums
-
         deadline = None
         if "d" in data:
             deadline = TimeOfDay.from_json_string(data["d"])
@@ -114,8 +112,6 @@ class QRCodeSSS:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "QRCodeSSS":
         """Create from dictionary."""
-        # TimeOfDay imported from shared_enums
-
         time_gates = []
         if "g" in data:
             time_gates = [TimeOfDay.from_json_string(gate) for gate in data["g"]]
@@ -159,8 +155,6 @@ class QRCodeTakeoff:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "QRCodeTakeoff":
         """Create from dictionary."""
-        # TimeOfDay imported from shared_enums
-
         time_open = None
         time_close = None
 

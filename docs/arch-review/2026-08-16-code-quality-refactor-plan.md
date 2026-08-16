@@ -371,8 +371,13 @@ shape — `tc`/`to`/`version` plus a stray `T` — for something plainly a waypo
 format announces itself with its own task-type key and the competition format has no `T`, so
 that key alone is now the discriminator.
 
-Still open, and genuinely fine to leave:
+**F4 — `shared_enums.py` contained no enums.** Recorded as fine to leave, then done anyway
+since it is three imports. It held only `TimeOfDay`, and its docstring — "Common enums shared
+across pyxctsk modules to avoid circular imports" — described a module that no longer existed;
+`task_enums.py` had by then taken the job the name implied, so keeping both would have been
+actively misleading. Renamed to `time_of_day.py`. Two smaller things fell out: three
+`# TimeOfDay imported from shared_enums` breadcrumbs inside `qrcode_models` methods that only
+ever restated the import, and `tests/test_core.py` reaching `InvalidTimeOfDayError` through
+the module's incidental re-export rather than from `exceptions`.
 
-- `shared_enums.py` is named "Common enums" and contains no enums — just `TimeOfDay`, which is
-  shared with the QR models. The name is inherited debt; renaming it to `time_of_day.py` is a
-  mechanical change across four files that nothing currently depends on being done.
+Nothing is left open from this review.
