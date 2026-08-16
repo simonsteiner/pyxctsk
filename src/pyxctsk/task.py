@@ -578,6 +578,63 @@ class Task:
         """
         return QRCodeTask.from_task(self)
 
+    def validate(self) -> list[str]:
+        """Check the task against the spec's structural rules.
+
+        The spec constrains how the special turnpoint types may be arranged:
+
+        - ``TAKEOFF`` "can be used only for the first turnpoint";
+        - ``SSS`` and ``ESS`` "must appear exactly once";
+        - ``SSS`` "must appear before ESS".
+
+        These apply to CLASSIC tasks. An XC/Waypoints task is a plain route
+        with no speed section, so the SSS/ESS rules are not checked for it.
+
+        This is a report, not a gate — parsing accepts structurally invalid
+        tasks so they can still be inspected and converted. Pass
+        ``strict=True`` to :func:`pyxctsk.parse_task` to turn violations into a
+        :class:`~pyxctsk.exceptions.TaskValidationError`.
+
+        Returns:
+            list[str]: One message per violated rule; empty if the task is valid.
+        """
+        issues: list[str] = []
+
+        if not self.turnpoints:
+            issues.append("task has no turnpoints")
+            return issues
+
+        misplaced = [
+            i
+            for i, tp in enumerate(self.turnpoints)
+            if tp.type == TurnpointType.TAKEOFF and i != 0
+        ]
+        for i in misplaced:
+            issues.append(
+                f"TAKEOFF is only allowed on the first turnpoint, found at index {i}"
+            )
+
+        if self.task_type == TaskType.WAYPOINTS:
+            return issues
+
+        indices = {
+            special: [i for i, tp in enumerate(self.turnpoints) if tp.type == special]
+            for special in (TurnpointType.SSS, TurnpointType.ESS)
+        }
+        for special, found in indices.items():
+            if len(found) != 1:
+                issues.append(
+                    f"{special.value} must appear exactly once, found {len(found)}"
+                )
+
+        sss, ess = indices[TurnpointType.SSS], indices[TurnpointType.ESS]
+        if len(sss) == 1 and len(ess) == 1 and sss[0] > ess[0]:
+            issues.append(
+                f"SSS must appear before ESS, found SSS at {sss[0]} and ESS at {ess[0]}"
+            )
+
+        return issues
+
     def find_ess_turnpoint(self) -> Turnpoint | None:
         """Find and return the ESS turnpoint, if any.
 

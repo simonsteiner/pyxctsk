@@ -22,7 +22,7 @@ Functions:
 import json
 from io import BytesIO
 
-from .exceptions import EmptyInputError, InvalidFormatError
+from .exceptions import EmptyInputError, InvalidFormatError, TaskValidationError
 from .qrcode_task import QR_CODE_SCHEME, QR_CODE_SCHEME_COMPRESSED, QRCodeTask
 from .task import Task
 
@@ -153,11 +153,14 @@ _FORMAT_PARSERS = (
 )
 
 
-def parse_task(data: bytes | str) -> Task:
+def parse_task(data: bytes | str, strict: bool = False) -> Task:
     """Parse a XCTrack Task from a variety of input formats.
 
     Args:
         data: Input data as bytes, string, or file path.
+        strict: If True, also apply :meth:`Task.validate` and reject a task
+            that breaks the spec's structural rules. Off by default so that a
+            malformed task can still be read, inspected and converted.
 
     Returns:
         Task: Parsed Task object.
@@ -165,6 +168,7 @@ def parse_task(data: bytes | str) -> Task:
     Raises:
         EmptyInputError: If input is empty.
         InvalidFormatError: If input format is invalid or cannot be parsed.
+        TaskValidationError: If ``strict`` and the task is structurally invalid.
     """
     if not data:
         raise EmptyInputError("empty input")
@@ -173,7 +177,7 @@ def parse_task(data: bytes | str) -> Task:
     if isinstance(data, str) and _looks_like_file_path(data):
         file_data = _read_file(data)
         if file_data is not None:
-            return parse_task(file_data)
+            return parse_task(file_data, strict=strict)
 
     # Normalize to (decoded text, raw bytes). text is None when the bytes are
     # not valid UTF-8 (e.g. a binary image); text-based adapters then skip.
@@ -190,6 +194,10 @@ def parse_task(data: bytes | str) -> Task:
     for parser in _FORMAT_PARSERS:
         task = parser(text, raw)
         if task is not None:
+            if strict:
+                issues = task.validate()
+                if issues:
+                    raise TaskValidationError(issues)
             return task
 
     raise InvalidFormatError("invalid format")

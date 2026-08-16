@@ -16,6 +16,7 @@ efgh
 ellps
 endspeed
 esbenp
+excinfo
 fminbound
 fobe
 forcelist

@@ -15,7 +15,15 @@ from pathlib import Path
 
 import pytest
 
-from pyxctsk import Direction, SSSType, Task, parse_task
+from pyxctsk import (
+    Direction,
+    SSSType,
+    Task,
+    TaskType,
+    TaskValidationError,
+    TurnpointType,
+    parse_task,
+)
 
 REFERENCE_QR = Path(__file__).parent / "data" / "reference_tasks" / "qrcode_string"
 
@@ -167,6 +175,101 @@ class TestGoalSerializedShape:
 
         assert task.goal is not None
         assert task.goal.line_length == 800.0
+
+
+class TestStructuralValidation:
+    """The spec's structural rules for special turnpoint types.
+
+    Spec: "TAKEOFF type can be used only for the first turnpoint"; "SSS and ESS
+    turnpoints must appear exactly once and SSS turnpoint must appear before
+    ESS".
+    """
+
+    def _mutated(self, mutate) -> list[str]:
+        """Return validate() for BASE_TASK after applying a mutation."""
+        data = json.loads(task_json())
+        mutate(data)
+        return Task.from_dict(data).validate()
+
+    def test_valid_task_reports_nothing(self):
+        """The base fixture is spec-valid."""
+        assert Task.from_json(task_json()).validate() == []
+
+    @pytest.mark.parametrize("name", sorted(p.name for p in REFERENCE_QR.glob("*.txt")))
+    def test_every_reference_task_is_valid(self, name):
+        """Real XCTrack tasks must not trip the validator."""
+        assert parse_task(str(REFERENCE_QR / name)).validate() == []
+
+    def test_takeoff_must_be_first(self):
+        """Only the first turnpoint may be TAKEOFF."""
+        issues = self._mutated(
+            lambda d: d["turnpoints"][2].update(type="TAKEOFF"),
+        )
+        assert issues == [
+            "TAKEOFF is only allowed on the first turnpoint, found at index 2"
+        ]
+
+    def test_sss_must_appear_exactly_once(self):
+        """A second SSS is a violation."""
+        assert self._mutated(lambda d: d["turnpoints"][2].update(type="SSS")) == [
+            "SSS must appear exactly once, found 2"
+        ]
+
+    def test_ess_must_appear_exactly_once(self):
+        """A missing ESS is a violation."""
+        assert self._mutated(lambda d: d["turnpoints"][1].pop("type")) == [
+            "ESS must appear exactly once, found 0"
+        ]
+
+    def test_sss_must_precede_ess(self):
+        """Order between the two is constrained."""
+
+        def swap(data):
+            data["turnpoints"][0]["type"] = "ESS"
+            data["turnpoints"][1]["type"] = "SSS"
+
+        assert self._mutated(swap) == [
+            "SSS must appear before ESS, found SSS at 1 and ESS at 0"
+        ]
+
+    def test_empty_task_is_reported_once(self):
+        """No turnpoints short-circuits rather than cascading messages."""
+        task = Task(task_type=TaskType.CLASSIC, version=1, turnpoints=[])
+
+        assert task.validate() == ["task has no turnpoints"]
+
+    def test_waypoints_tasks_are_exempt_from_speed_section_rules(self):
+        """A route "without cylinders" has no speed section to constrain."""
+        task = parse_task(str(REFERENCE_QR / "task_noha_route.txt"))
+
+        assert task.task_type == TaskType.WAYPOINTS
+        assert task.validate() == []
+
+    def test_parsing_stays_lenient_by_default(self):
+        """A malformed task must remain readable so it can be inspected."""
+        data = json.loads(task_json())
+        data["turnpoints"][2]["type"] = "TAKEOFF"
+
+        task = parse_task(json.dumps(data))
+
+        assert task.turnpoints[2].type == TurnpointType.TAKEOFF
+        assert task.validate() != []
+
+    def test_strict_rejects_an_invalid_task(self):
+        """The opt-in flag turns the report into a failure."""
+        data = json.loads(task_json())
+        data["turnpoints"][2]["type"] = "TAKEOFF"
+
+        with pytest.raises(TaskValidationError) as excinfo:
+            parse_task(json.dumps(data), strict=True)
+
+        assert excinfo.value.issues == [
+            "TAKEOFF is only allowed on the first turnpoint, found at index 2"
+        ]
+
+    def test_strict_accepts_a_valid_task(self):
+        """Strict must not reject what the spec allows."""
+        assert parse_task(task_json(), strict=True).turnpoints
 
 
 class TestCompressedQRScheme:

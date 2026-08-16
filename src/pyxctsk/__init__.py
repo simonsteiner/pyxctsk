@@ -18,6 +18,7 @@ from .exceptions import (
     EmptyInputError,
     InvalidFormatError,
     InvalidTimeOfDayError,
+    TaskValidationError,
 )
 from .geojson import generate_task_geojson
 from .kml import task_to_kml
@@ -72,6 +73,7 @@ __all__ = [
     "Task",
     "TaskTurnpoint",
     "TaskType",
+    "TaskValidationError",
     "TimeOfDay",
     "Turnpoint",
     "TurnpointType",
