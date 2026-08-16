@@ -412,9 +412,9 @@ class TestNumericEdgeCases:
     )
     def test_ties_round_like_java_math_round(self, value, expected):
         """floor(x + 0.5), not Python's banker's rounding."""
-        from pyxctsk.qrcode_encoding import _round_half_up
+        from pyxctsk.rounding import round_half_up
 
-        assert _round_half_up(value) == expected
+        assert round_half_up(value) == expected
 
 
 class TestTaskTypeValue:

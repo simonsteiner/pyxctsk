@@ -17,8 +17,8 @@ from enum import Enum
 from typing import Any
 
 from .passthrough import EXTENSIONS_KEY, read_passthrough, write_passthrough
-from .qrcode_encoding import _round_half_up
 from .qrcode_task import QRCodeTask
+from .rounding import round_half_up
 from .shared_enums import TimeOfDay
 
 
@@ -157,7 +157,7 @@ class Waypoint:
             name=data["name"],
             lat=data["lat"],
             lon=data["lon"],
-            alt_smoothed=_round_half_up(data["altSmoothed"]),
+            alt_smoothed=round_half_up(data["altSmoothed"]),
             description=data.get("description"),
         )
 
@@ -221,7 +221,7 @@ class Turnpoint:
 
         extensions, unknown = read_passthrough(data, cls.KNOWN_KEYS, EXTENSIONS_KEY)
         return cls(
-            radius=_round_half_up(data["radius"]),
+            radius=round_half_up(data["radius"]),
             waypoint=Waypoint.from_dict(data["waypoint"]),
             type=turnpoint_type,
             extensions=extensions,

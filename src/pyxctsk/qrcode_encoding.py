@@ -10,28 +10,7 @@ Functions:
 Intended for internal use in QR code generation and parsing for paragliding/hang gliding competition tasks.
 """
 
-import math
-
-
-def _round_half_up(value: float) -> int:
-    """Round to the nearest integer, breaking ties upward (toward +infinity).
-
-    XCTrack's reference implementation uses Java's ``Math.round``, which is
-    ``floor(x + 0.5)``. Python's built-in ``round`` is banker's rounding, so the
-    two disagree on exact ties: ``round(612344.5)`` is 612344 where Java gives
-    612345. That is ~1.1 m of longitude — inside the FAI 5 m tolerance, but
-    there is no reason to differ from the reference.
-
-    Note this rounds -2.5 to -2, toward +infinity rather than away from zero,
-    which is what Java does.
-
-    Args:
-        value: The number to round.
-
-    Returns:
-        int: The nearest integer, with exact halves rounded up.
-    """
-    return math.floor(value + 0.5)
+from .rounding import round_half_up
 
 
 def encode_num(num: int) -> str:
@@ -81,7 +60,7 @@ def encode_competition_turnpoint(lon: float, lat: float, alt: int, radius: int) 
     Returns:
         Encoded string
     """
-    return encode_waypoint_turnpoint(lon, lat, alt) + encode_num(_round_half_up(radius))
+    return encode_waypoint_turnpoint(lon, lat, alt) + encode_num(round_half_up(radius))
 
 
 def encode_waypoint_turnpoint(lon: float, lat: float, alt: int) -> str:
@@ -100,10 +79,10 @@ def encode_waypoint_turnpoint(lon: float, lat: float, alt: int) -> str:
         Encoded string
     """
     # Round coordinates to 5 decimal places (same as Google's polyline)
-    lon_int = _round_half_up(lon * 1e5)
-    lat_int = _round_half_up(lat * 1e5)
+    lon_int = round_half_up(lon * 1e5)
+    lat_int = round_half_up(lat * 1e5)
 
-    return encode_num(lon_int) + encode_num(lat_int) + encode_num(_round_half_up(alt))
+    return encode_num(lon_int) + encode_num(lat_int) + encode_num(round_half_up(alt))
 
 
 def decode_nums(encoded_str: str) -> list[int]:
