@@ -27,7 +27,7 @@ All notable changes to this project will be documented in this file.
 - The non-spec `x`/`y`/`a`/`r` turnpoint coordinate keys are no longer read from QR JSON. Nothing produced them, and `x` is the spec's per-turnpoint extensions key.
 - **Breaking (serialized output):** the competition QR format no longer emits `"taskType":"WAYPOINTS"`, which is not a value either format defines. A WAYPOINTS task now serializes as the simplified `"T":"W"` form from `to_string()` as well as `to_waypoints_string()`, so it reproduces XCTrack's own payload byte-for-byte.
 
-See `docs/spec-conformance/2026-08-16-competition-interfaces-audit.md` for the full review; every finding it raised is now closed. All 25 reference tasks still round-trip byte-identically against the tools.xcontest.org QR codes and pass `Task.validate()` cleanly.
+See `docs/arch-review/2026-08-16-competition-interfaces-audit.md` for the full review; every finding it raised is now closed. All 25 reference tasks still round-trip byte-identically against the tools.xcontest.org QR codes and pass `Task.validate()` cleanly.
 
 ## [v0.5.0] - 2026-07-07
 

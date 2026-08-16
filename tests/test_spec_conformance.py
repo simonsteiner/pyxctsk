@@ -1,7 +1,7 @@
 """Regression tests for the XCTrack Competition Interfaces conformance audit.
 
 These tests encode the findings from the spec-conformance audit
-(docs/spec-conformance/2026-08-16-competition-interfaces-audit.md). Each test
+(docs/arch-review/2026-08-16-competition-interfaces-audit.md). Each test
 names the finding it pins, so a failure points straight at the spec clause it
 violates.
 
