@@ -1,21 +1,29 @@
 """What the KML and GeoJSON writers both need to draw a task.
 
-Four questions, each answered once so the two writers cannot answer them
-differently: which turnpoints to draw, where the optimized route runs, what
-colour a turnpoint is, and which turnpoint is the goal. Plus the polygon that
-approximates a cylinder.
+:class:`TaskDrawing` is that answer, derived once per task: which turnpoints to
+draw, whether there is a goal line, and the optimized route. Both writers
+render the same value rather than each asking the same questions again — which
+is not only cheaper (the optimizer ran once per format) but the reason the
+answers cannot disagree. They did: the goal line's presence and the decision to
+drop the last turnpoint were computed separately, and a LINE goal with no usable
+approach direction lost its goal from both outputs.
 
-The circle approximation here is planar — a fixed metres-per-degree constant,
-not a geodesic — because it draws a decorative outline, not a measured shape.
-Anything a distance depends on is computed properly in
+Also here: what colour a turnpoint is, and the polygon that approximates a
+cylinder. That circle is planar — a fixed metres-per-degree constant, not a
+geodesic — because it draws a decorative outline, not a measured shape. Anything
+a distance depends on is computed properly in
 :mod:`pyxctsk.distance.turnpoint` and :mod:`pyxctsk.distance.goal_line`, and
 this module must not grow a second opinion about task geometry.
 """
 
 import math
+from dataclasses import dataclass
 
 from ..distance.goal_line import GoalLine
-from ..distance.route_optimization import optimized_route_coordinates
+from ..distance.route_optimization import (
+    OptimizedRoute,
+    calculate_iteratively_refined_route,
+)
 from ..distance.task_distances import task_to_turnpoints
 from ..model.task import Task, Turnpoint, TurnpointType
 
@@ -24,14 +32,24 @@ CIRCLE_POINTS = 64  # Number of points to approximate circle
 METERS_PER_DEGREE = 111320.0  # 1 degree ≈ 111.32 km at equator
 
 
+def _turnpoints_to_render(task: Task, goal_line: GoalLine | None) -> list[Turnpoint]:
+    """Which turnpoints to draw, given whether the task has a goal line.
+
+    A goal line replaces the last turnpoint, so the turnpoint is dropped
+    exactly when there is a line to draw in its place. Taking the goal line as
+    an argument rather than looking it up again is what keeps the two in step.
+    """
+    if goal_line is not None:
+        return task.turnpoints[:-1]
+    return task.turnpoints
+
+
 def get_turnpoints_to_render(task: Task) -> list[Turnpoint]:
     """Get the list of turnpoints that should be rendered for visualization.
 
-    Derived from the one answer to whether the task has a goal line: a goal
-    line replaces the last turnpoint, so the turnpoint is dropped exactly when
-    there is a line to draw in its place. Deciding this independently is what
-    let a LINE goal with no usable approach direction lose its goal from the
-    output — dropped here, and not drawn as a line either.
+    Skips the last turnpoint exactly when the task has a goal line to draw in
+    its place. Prefer :class:`TaskDrawing` when you also need the route or the
+    goal line itself — this asks one of its questions on its own.
 
     Args:
         task: The Task object containing turnpoints.
@@ -39,22 +57,81 @@ def get_turnpoints_to_render(task: Task) -> list[Turnpoint]:
     Returns:
         List of turnpoints to render.
     """
-    if GoalLine.from_task(task) is not None:
-        return task.turnpoints[:-1]
-    return task.turnpoints
+    return _turnpoints_to_render(task, GoalLine.from_task(task))
 
 
-def get_optimized_route_coordinates(task: Task) -> list[tuple[float, float]] | None:
-    """Get optimized route coordinates for the task.
+@dataclass(frozen=True)
+class TaskDrawing:
+    """Everything both writers need to draw one task, derived once.
 
-    Args:
-        task: The Task object.
+    Built by :meth:`from_task`, which runs the optimizer once. Rendering the
+    same task in both formats therefore costs one route, not two, and — more
+    importantly — the two formats cannot disagree about what the task looks
+    like, because they are reading one value rather than each deriving their
+    own.
 
-    Returns:
-        List of (lat, lon) coordinate tuples for the optimized route, or None if not available.
+    A drawing is a snapshot: it holds the turnpoints and route as they were
+    when it was built, so build it after the task is final.
+
+    Attributes:
+        task: The task being drawn, for names, counts and descriptions.
+        turnpoints: The turnpoints to draw, in order — the task's own, less the
+            last one when a goal line replaces it.
+        goal_line: The task's goal line, or None if it has none.
+        route: The optimized route through the task's cylinders.
     """
-    task_turnpoints = task_to_turnpoints(task)
-    return optimized_route_coordinates(task_turnpoints)
+
+    task: Task
+    turnpoints: tuple[Turnpoint, ...]
+    goal_line: GoalLine | None
+    route: OptimizedRoute
+
+    @classmethod
+    def from_task(cls, task: Task) -> "TaskDrawing":
+        """Derive the drawing for a task, optimizing its route once.
+
+        Args:
+            task: The task to draw.
+
+        Returns:
+            The drawing both writers render.
+        """
+        goal_line = GoalLine.from_task(task)
+        return cls(
+            task=task,
+            turnpoints=tuple(_turnpoints_to_render(task, goal_line)),
+            goal_line=goal_line,
+            route=calculate_iteratively_refined_route(task_to_turnpoints(task)),
+        )
+
+    def is_goal(self, turnpoint: Turnpoint) -> bool:
+        """Whether this turnpoint is the task's goal.
+
+        Compares identity, not value: a task may legitimately end by flying the
+        same turnpoint twice, and ``Turnpoint`` is a plain dataclass, so
+        searching by value would find the earlier occurrence and draw the goal
+        as an ordinary turnpoint.
+
+        Args:
+            turnpoint: One of the task's turnpoints.
+
+        Returns:
+            True if this is the goal turnpoint and the task has a goal defined.
+        """
+        return is_goal_turnpoint(turnpoint, self.task.turnpoints, self.task)
+
+    def route_coordinates(self) -> list[tuple[float, float]] | None:
+        """The optimized route as (lat, lon) points, or None if there is no line.
+
+        A route needs two points to be a line, so a task with fewer than two
+        turnpoints has nothing to draw here.
+
+        Returns:
+            The route's (lat, lon) points, or None if there are fewer than two.
+        """
+        if len(self.route.points) < 2:
+            return None
+        return list(self.route.points)
 
 
 def get_turnpoint_color_hex(

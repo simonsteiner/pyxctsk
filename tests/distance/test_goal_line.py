@@ -5,7 +5,6 @@ Unit tests for goal line generation and calculation logic in pyxctsk.
 This module covers:
 - Goal line endpoint calculations based on approach direction
 - Semicircle arc generation for goal control zones
-- Goal line feature creation for GeoJSON output
 - Whether a task has a goal line at all, which is what decides whether the
   last turnpoint is drawn as a cylinder or replaced by the line
 - Helper functions for finding previous turnpoints with valid coordinates
@@ -33,7 +32,6 @@ from pyxctsk.distance.goal_line import (
     generate_semicircle_arc,
     goal_line_length_from_turnpoints,
 )
-from pyxctsk.export.geojson import _create_goal_line_features
 
 
 def _line_goal_task(prev_radius: int = 400, goal_radius: int = 400) -> Task:
@@ -308,124 +306,6 @@ class TestGenerateSemicircleArc:
         for point in arc_points:
             assert abs(point[0] - center_lon) < 1e-10
             assert abs(point[1] - center_lat) < 1e-10
-
-
-class TestCreateGoalLineFeatures:
-    """Test the _create_goal_line_features function."""
-
-    def test_create_goal_line_features_valid_line_goal(self):
-        """Test creating goal line features for valid LINE goal."""
-        # Create a task with LINE goal
-        waypoint1 = Waypoint(name="TP1", lat=46.0, lon=8.0, alt_smoothed=1000)
-        waypoint2 = Waypoint(name="Goal", lat=47.0, lon=8.0, alt_smoothed=500)
-
-        tp1 = Turnpoint(radius=400, waypoint=waypoint1, type=TurnpointType.TAKEOFF)
-        tp2 = Turnpoint(radius=400, waypoint=waypoint2, type=TurnpointType.NONE)
-
-        goal = Goal(type=GoalType.LINE)
-        task = Task(
-            task_type=TaskType.CLASSIC, version=1, turnpoints=[tp1, tp2], goal=goal
-        )
-
-        features = _create_goal_line_features(task)
-
-        assert len(features) == 2  # Goal line + control zone
-
-        # Check goal line feature
-        goal_line = features[0]
-        assert goal_line["type"] == "Feature"
-        assert goal_line["geometry"]["type"] == "LineString"
-        assert goal_line["properties"]["type"] == "goal_line"
-        # The goal-line length is twice the last radius (400 * 2 = 800).
-        assert goal_line["properties"]["length"] == 800.0
-
-        # Check control zone feature
-        control_zone = features[1]
-        assert control_zone["type"] == "Feature"
-        assert control_zone["geometry"]["type"] == "Polygon"
-        assert control_zone["properties"]["type"] == "goal_control_zone"
-
-    def test_create_goal_line_features_length_tracks_goal_radius(self):
-        """The goal-line length follows the goal turnpoint's radius, not the previous one."""
-        waypoint1 = Waypoint(name="TP1", lat=46.0, lon=8.0, alt_smoothed=1000)
-        waypoint2 = Waypoint(name="Goal", lat=47.0, lon=8.0, alt_smoothed=500)
-
-        tp1 = Turnpoint(radius=400, waypoint=waypoint1, type=TurnpointType.TAKEOFF)
-        tp2 = Turnpoint(radius=200, waypoint=waypoint2, type=TurnpointType.NONE)
-
-        goal = Goal(type=GoalType.LINE)
-        task = Task(
-            task_type=TaskType.CLASSIC, version=1, turnpoints=[tp1, tp2], goal=goal
-        )
-
-        features = _create_goal_line_features(task)
-
-        assert len(features) == 2
-        # Should use 2 * radius as line length
-        assert features[0]["properties"]["length"] == 400.0  # 2 * 200
-
-    def test_create_goal_line_features_cylinder_goal(self):
-        """Test creating goal line features for CYLINDER goal."""
-        waypoint1 = Waypoint(name="TP1", lat=46.0, lon=8.0, alt_smoothed=1000)
-        waypoint2 = Waypoint(name="Goal", lat=47.0, lon=8.0, alt_smoothed=500)
-
-        tp1 = Turnpoint(radius=400, waypoint=waypoint1, type=TurnpointType.TAKEOFF)
-        tp2 = Turnpoint(radius=400, waypoint=waypoint2, type=TurnpointType.NONE)
-
-        goal = Goal(type=GoalType.CYLINDER)  # Not LINE type
-        task = Task(
-            task_type=TaskType.CLASSIC, version=1, turnpoints=[tp1, tp2], goal=goal
-        )
-
-        features = _create_goal_line_features(task)
-
-        assert len(features) == 0  # No features for CYLINDER goal
-
-    def test_create_goal_line_features_no_goal(self):
-        """Test creating goal line features when no goal."""
-        waypoint1 = Waypoint(name="TP1", lat=46.0, lon=8.0, alt_smoothed=1000)
-        tp1 = Turnpoint(radius=400, waypoint=waypoint1, type=TurnpointType.TAKEOFF)
-
-        task = Task(task_type=TaskType.CLASSIC, version=1, turnpoints=[tp1], goal=None)
-
-        features = _create_goal_line_features(task)
-
-        assert len(features) == 0
-
-    def test_create_goal_line_features_insufficient_turnpoints(self):
-        """Test creating goal line features with insufficient turnpoints."""
-        waypoint1 = Waypoint(name="TP1", lat=46.0, lon=8.0, alt_smoothed=1000)
-        tp1 = Turnpoint(radius=400, waypoint=waypoint1, type=TurnpointType.TAKEOFF)
-
-        goal = Goal(type=GoalType.LINE)
-        task = Task(
-            task_type=TaskType.CLASSIC,
-            version=1,
-            turnpoints=[tp1],  # Only one turnpoint
-            goal=goal,
-        )
-
-        features = _create_goal_line_features(task)
-
-        assert len(features) == 0
-
-    def test_create_goal_line_features_no_previous_turnpoint(self):
-        """Test creating goal line features when no valid previous turnpoint."""
-        # Create turnpoints with same coordinates
-        waypoint1 = Waypoint(name="TP1", lat=47.0, lon=8.0, alt_smoothed=1000)
-        waypoint2 = Waypoint(name="Goal", lat=47.0, lon=8.0, alt_smoothed=500)
-
-        tp1 = Turnpoint(radius=400, waypoint=waypoint1, type=TurnpointType.TAKEOFF)
-        tp2 = Turnpoint(radius=400, waypoint=waypoint2, type=TurnpointType.NONE)
-
-        goal = Goal(type=GoalType.LINE)
-        task = Task(
-            task_type=TaskType.CLASSIC, version=1, turnpoints=[tp1, tp2], goal=goal
-        )
-
-        features = _create_goal_line_features(task)
-
-        assert len(features) == 0  # No features when no valid previous TP
 
 
 class TestGoalLinePresence:

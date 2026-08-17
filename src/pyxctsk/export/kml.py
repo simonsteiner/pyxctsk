@@ -2,14 +2,11 @@
 
 import simplekml  # type: ignore
 
-from ..distance.goal_line import get_goal_line_data
-from ..model.task import Task, Turnpoint, TurnpointType
+from ..model.task import Task, TurnpointType
 from .common import (
+    TaskDrawing,
     generate_circle_coordinates_3d,
-    get_optimized_route_coordinates,
     get_turnpoint_color_hex,
-    get_turnpoints_to_render,
-    is_goal_turnpoint,
 )
 
 # Constants
@@ -55,26 +52,23 @@ def _create_turnpoint_style(
 
 def _create_turnpoint_elements(
     kml: simplekml.Kml,
-    turnpoints: list[Turnpoint],
+    drawing: TaskDrawing,
     task_altitude: int,
-    original_turnpoints: list[Turnpoint],
-    task: Task | None = None,
 ) -> list[tuple[float, float, int]]:
     """Create turnpoint circles and center points in the KML.
 
     Args:
         kml: The KML document to add elements to.
-        turnpoints: List of turnpoints to render.
+        drawing: The task drawing, which knows both which turnpoints to draw
+            and which of them is the goal.
         task_altitude: Unified altitude for the task.
-        original_turnpoints: Original task turnpoints for goal detection.
-        task: Optional Task object for goal validation.
 
     Returns:
         List of coordinates for the turnpoints.
     """
     coordinates = []
 
-    for i, turnpoint in enumerate(turnpoints):
+    for i, turnpoint in enumerate(drawing.turnpoints):
         coord = (turnpoint.waypoint.lon, turnpoint.waypoint.lat, task_altitude)
         coordinates.append(coord)
 
@@ -96,7 +90,7 @@ def _create_turnpoint_elements(
         )
 
         # Determine if this is the goal turnpoint
-        is_goal = is_goal_turnpoint(turnpoint, original_turnpoints, task)
+        is_goal = drawing.is_goal(turnpoint)
         turnpoint_type = turnpoint.type or TurnpointType.NONE
         circle_polygon.style = _create_turnpoint_style(turnpoint_type, is_goal)
 
@@ -115,22 +109,20 @@ def _create_turnpoint_elements(
 
 def _create_course_line(
     kml: simplekml.Kml,
-    task: Task,
+    drawing: TaskDrawing,
     coordinates: list[tuple[float, float, int]],
 ) -> None:
     """Create the course line connecting all turnpoints.
 
     Args:
         kml: The KML document to add elements to.
-        task: The Task object.
+        drawing: The task drawing, carrying the optimized route.
         coordinates: Fallback coordinates if optimized route is not available.
-        altitude: altitude for the line.
     """
-    # Get optimized route coordinates
-    opt_route_coords = get_optimized_route_coordinates(task)
+    opt_route_coords = drawing.route_coordinates()
 
     # Use optimized route if available, otherwise fallback to direct coordinates
-    if opt_route_coords and len(opt_route_coords) >= 2:
+    if opt_route_coords is not None:
         # Convert from (lat, lon) to (lon, lat) format (no altitude)
         route_coordinates = [(lon, lat) for lat, lon in opt_route_coords]
     else:
@@ -139,7 +131,9 @@ def _create_course_line(
     # Create the course line
     course_line = kml.newlinestring(
         name="Course Line",
-        description=f"XCTrack task course with {len(task.turnpoints)} turnpoints",
+        description=(
+            f"XCTrack task course with {len(drawing.task.turnpoints)} turnpoints"
+        ),
         coords=route_coordinates,
         altitudemode=simplekml.AltitudeMode.clamptoground,
     )
@@ -150,19 +144,22 @@ def _create_course_line(
     course_line.style.linestyle.width = 4
 
 
-def _create_goal_line_elements(kml: simplekml.Kml, task: Task, altitude: int) -> None:
+def _create_goal_line_elements(
+    kml: simplekml.Kml, drawing: TaskDrawing, altitude: int
+) -> None:
     """Create goal line and control zone for LINE type goals.
 
     Args:
         kml: The KML document to add elements to.
-        task: The Task object.
+        drawing: The task drawing, carrying the goal line if there is one.
         altitude: altitude for the line.
     """
-    goal_data = get_goal_line_data(task)
-    if goal_data is None:
+    if drawing.goal_line is None:
         return
 
-    (lon1, lat1), (lon2, lat2), goal_line_length, control_zone_coords = goal_data
+    (lon1, lat1), (lon2, lat2), goal_line_length, control_zone_coords = (
+        drawing.goal_line.data()
+    )
 
     # Create goal line
     goal_line = kml.newlinestring(
@@ -210,24 +207,36 @@ def task_to_kml(task: Task) -> str:
     Returns:
         A string containing the KML representation of the task.
     """
+    return drawing_to_kml(TaskDrawing.from_task(task))
+
+
+def drawing_to_kml(drawing: TaskDrawing) -> str:
+    """Convert an already-derived task drawing to KML.
+
+    Use this to render one drawing in both formats without optimizing the route
+    twice::
+
+        drawing = TaskDrawing.from_task(task)
+        kml, geojson = drawing_to_kml(drawing), drawing_to_geojson(drawing)
+
+    Args:
+        drawing: The task drawing to render.
+
+    Returns:
+        A string containing the KML representation of the task.
+    """
     kml = simplekml.Kml()
     altitude = DEFAULT_ALTITUDE  # Default altitude for KML elements
 
-    # Determine which turnpoints to render
-    # Skip the last turnpoint if it's a LINE type goal (goal line replaces it)
-    turnpoints_to_render = get_turnpoints_to_render(task)
-
     # Create turnpoint elements and get coordinates
-    coordinates = _create_turnpoint_elements(
-        kml, turnpoints_to_render, altitude, task.turnpoints, task
-    )
+    coordinates = _create_turnpoint_elements(kml, drawing, altitude)
 
     # Create course line
     # line is created with clampToGround mode
-    _create_course_line(kml, task, coordinates)
+    _create_course_line(kml, drawing, coordinates)
 
     # Create goal line elements if applicable
     # goal line elements are created 500m above the ground
-    _create_goal_line_elements(kml, task, 500)
+    _create_goal_line_elements(kml, drawing, 500)
 
     return str(kml.kml())

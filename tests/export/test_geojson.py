@@ -8,14 +8,37 @@ This module covers:
 - Task-level GeoJSON output for various goal types and task structures
 """
 
-from unittest.mock import patch
-
 from pyxctsk import Goal, GoalType, Task, TaskType, Turnpoint, TurnpointType, Waypoint
+from pyxctsk.distance import OptimizedRoute
+from pyxctsk.export.common import TaskDrawing
 from pyxctsk.export.geojson import (
+    _create_goal_line_features,
     _create_optimized_route_feature,
     _create_turnpoint_feature,
     generate_task_geojson,
 )
+
+
+def _route(points) -> OptimizedRoute:
+    """An OptimizedRoute through exactly these (lat, lon) points."""
+    return OptimizedRoute(
+        points=tuple(points), legs=(0.0,) * max(0, len(tuple(points)) - 1)
+    )
+
+
+def _drawing_of(turnpoints: list, goal: Goal | None = None) -> TaskDrawing:
+    """A drawing for a task of these turnpoints, with no route computed.
+
+    Building the value directly is the seam the writers' tests need: a feature
+    can be rendered without running the optimizer, and a route can be chosen
+    outright. Four ``@patch("...get_optimized_route_coordinates")`` decorators
+    used to stand in for this and never applied — geojson.py bound the name at
+    import time, so those tests silently ran the real optimizer instead.
+    """
+    task = Task(task_type=TaskType.CLASSIC, version=1, turnpoints=turnpoints, goal=goal)
+    return TaskDrawing(
+        task=task, turnpoints=tuple(turnpoints), goal_line=None, route=_route(())
+    )
 
 
 class TestCreateTurnpointFeature:
@@ -31,7 +54,7 @@ class TestCreateTurnpointFeature:
         turnpoint2 = Turnpoint(radius=400, waypoint=waypoint2, type=TurnpointType.NONE)
         all_turnpoints = [turnpoint, turnpoint2]
 
-        feature = _create_turnpoint_feature(turnpoint, 0, all_turnpoints)
+        feature = _create_turnpoint_feature(_drawing_of(all_turnpoints), turnpoint, 0)
 
         assert feature["type"] == "Feature"
         assert feature["geometry"]["type"] == "Point"
@@ -49,7 +72,7 @@ class TestCreateTurnpointFeature:
         turnpoint2 = Turnpoint(radius=400, waypoint=waypoint2, type=TurnpointType.NONE)
         all_turnpoints = [turnpoint, turnpoint2]
 
-        feature = _create_turnpoint_feature(turnpoint, 0, all_turnpoints)
+        feature = _create_turnpoint_feature(_drawing_of(all_turnpoints), turnpoint, 0)
 
         assert feature["properties"]["color"] == "#ac2925"  # SSS color
         assert feature["properties"]["name"] == "Start"
@@ -62,7 +85,7 @@ class TestCreateTurnpointFeature:
         turnpoint2 = Turnpoint(radius=400, waypoint=waypoint2, type=TurnpointType.NONE)
         all_turnpoints = [turnpoint, turnpoint2]
 
-        feature = _create_turnpoint_feature(turnpoint, 0, all_turnpoints)
+        feature = _create_turnpoint_feature(_drawing_of(all_turnpoints), turnpoint, 0)
 
         assert feature["properties"]["color"] == "#ff8c00"  # ESS color
 
@@ -74,13 +97,12 @@ class TestCreateTurnpointFeature:
         turnpoint2 = Turnpoint(radius=400, waypoint=waypoint2, type=TurnpointType.NONE)
         all_turnpoints = [turnpoint1, turnpoint2]
 
-        # Create a proper task with a goal to make the second turnpoint a goal
+        # A goal must be defined for the last turnpoint to count as the goal.
         goal = Goal(type=GoalType.CYLINDER)
-        task = Task(
-            task_type=TaskType.CLASSIC, version=1, turnpoints=all_turnpoints, goal=goal
-        )
 
-        feature = _create_turnpoint_feature(turnpoint2, 1, all_turnpoints, task)
+        feature = _create_turnpoint_feature(
+            _drawing_of(all_turnpoints, goal), turnpoint2, 1
+        )
 
         assert feature["properties"]["color"] == "#ff0000"  # goal color (red)
 
@@ -92,7 +114,7 @@ class TestCreateTurnpointFeature:
         turnpoint2 = Turnpoint(radius=400, waypoint=waypoint2, type=TurnpointType.NONE)
         all_turnpoints = [turnpoint, turnpoint2]
 
-        feature = _create_turnpoint_feature(turnpoint, 0, all_turnpoints)
+        feature = _create_turnpoint_feature(_drawing_of(all_turnpoints), turnpoint, 0)
 
         assert feature["properties"]["color"] == "#269abc"  # default color
 
@@ -104,7 +126,7 @@ class TestCreateTurnpointFeature:
         turnpoint2 = Turnpoint(radius=400, waypoint=waypoint2, type=TurnpointType.NONE)
         all_turnpoints = [turnpoint, turnpoint2]
 
-        feature = _create_turnpoint_feature(turnpoint, 0, all_turnpoints)
+        feature = _create_turnpoint_feature(_drawing_of(all_turnpoints), turnpoint, 0)
 
         assert (
             feature["properties"]["name"] == "TP1"
@@ -119,7 +141,7 @@ class TestCreateTurnpointFeature:
         turnpoint2 = Turnpoint(radius=400, waypoint=waypoint2, type=TurnpointType.NONE)
         all_turnpoints = [turnpoint, turnpoint2]
 
-        feature = _create_turnpoint_feature(turnpoint, 0, all_turnpoints)
+        feature = _create_turnpoint_feature(_drawing_of(all_turnpoints), turnpoint, 0)
 
         props = feature["properties"]
         assert "name" in props
@@ -138,6 +160,12 @@ class TestCreateTurnpointFeature:
         assert props["turnpoint_index"] == 0
 
 
+def _route_drawing(points) -> TaskDrawing:
+    """A drawing whose route is exactly these (lat, lon) points."""
+    task = Task(task_type=TaskType.CLASSIC, version=1, turnpoints=[])
+    return TaskDrawing(task=task, turnpoints=(), goal_line=None, route=_route(points))
+
+
 class TestCreateOptimizedRouteFeature:
     """Test the _create_optimized_route_feature function."""
 
@@ -145,7 +173,7 @@ class TestCreateOptimizedRouteFeature:
         """Test creating optimized route feature with valid coordinates."""
         coords = [(46.0, 8.0), (46.1, 8.1), (46.2, 8.2)]
 
-        feature = _create_optimized_route_feature(coords)
+        feature = _create_optimized_route_feature(_route_drawing(coords))
 
         assert feature is not None
         assert feature["type"] == "Feature"
@@ -165,7 +193,7 @@ class TestCreateOptimizedRouteFeature:
         """Test creating optimized route feature with single point."""
         coords = [(46.0, 8.0)]
 
-        feature = _create_optimized_route_feature(coords)
+        feature = _create_optimized_route_feature(_route_drawing(coords))
 
         assert feature is None
 
@@ -173,7 +201,7 @@ class TestCreateOptimizedRouteFeature:
         """Test creating optimized route feature with empty coordinates."""
         coords = []
 
-        feature = _create_optimized_route_feature(coords)
+        feature = _create_optimized_route_feature(_route_drawing(coords))
 
         assert feature is None
 
@@ -181,7 +209,7 @@ class TestCreateOptimizedRouteFeature:
         """Test creating optimized route feature with minimum valid points."""
         coords = [(46.0, 8.0), (46.1, 8.1)]
 
-        feature = _create_optimized_route_feature(coords)
+        feature = _create_optimized_route_feature(_route_drawing(coords))
 
         assert feature is not None
         assert len(feature["geometry"]["coordinates"]) == 2
@@ -190,7 +218,7 @@ class TestCreateOptimizedRouteFeature:
         """Test that optimized route feature has all required properties."""
         coords = [(46.0, 8.0), (46.1, 8.1)]
 
-        feature = _create_optimized_route_feature(coords)
+        feature = _create_optimized_route_feature(_route_drawing(coords))
 
         assert (
             feature is not None
@@ -214,12 +242,8 @@ class TestCreateOptimizedRouteFeature:
 class TestGenerateTaskGeoJSON:
     """Test the generate_task_geojson function."""
 
-    @patch("pyxctsk.export.common.get_optimized_route_coordinates")
-    def test_generate_task_geojson_basic(self, mock_opt_coords):
+    def test_generate_task_geojson_basic(self):
         """Test basic GeoJSON generation."""
-        # Mock the dependencies
-        mock_opt_coords.return_value = [(46.0, 8.0), (47.0, 8.0)]
-
         waypoint1 = Waypoint(name="TP1", lat=46.0, lon=8.0, alt_smoothed=1000)
         waypoint2 = Waypoint(name="TP2", lat=47.0, lon=8.0, alt_smoothed=500)
 
@@ -234,11 +258,8 @@ class TestGenerateTaskGeoJSON:
         assert "features" in result
         assert len(result["features"]) >= 2  # At least turnpoints
 
-    @patch("pyxctsk.export.common.get_optimized_route_coordinates")
-    def test_generate_task_geojson_line_goal(self, mock_opt_coords):
+    def test_generate_task_geojson_line_goal(self):
         """Test GeoJSON generation with LINE goal."""
-        mock_opt_coords.return_value = [(46.0, 8.0), (47.0, 8.0)]
-
         waypoint1 = Waypoint(name="TP1", lat=46.0, lon=8.0, alt_smoothed=1000)
         waypoint2 = Waypoint(name="Goal", lat=47.0, lon=8.0, alt_smoothed=500)
 
@@ -262,11 +283,8 @@ class TestGenerateTaskGeoJSON:
 
         assert len(turnpoint_features) == 1  # Only first turnpoint
 
-    @patch("pyxctsk.export.common.get_optimized_route_coordinates")
-    def test_generate_task_geojson_no_optimized_route(self, mock_opt_coords):
+    def test_generate_task_geojson_no_optimized_route(self):
         """Test GeoJSON generation without optimized route."""
-        mock_opt_coords.return_value = []  # No optimized route
-
         waypoint1 = Waypoint(name="TP1", lat=46.0, lon=8.0, alt_smoothed=1000)
         tp1 = Turnpoint(radius=400, waypoint=waypoint1, type=TurnpointType.TAKEOFF)
 
@@ -281,11 +299,8 @@ class TestGenerateTaskGeoJSON:
 
         assert len(route_features) == 0  # No route feature
 
-    @patch("pyxctsk.export.common.get_optimized_route_coordinates")
-    def test_generate_task_geojson_empty_task(self, mock_opt_coords):
+    def test_generate_task_geojson_empty_task(self):
         """Test GeoJSON generation with empty task."""
-        mock_opt_coords.return_value = []
-
         task = Task(task_type=TaskType.CLASSIC, version=1, turnpoints=[])
 
         result = generate_task_geojson(task)
@@ -323,8 +338,9 @@ class TestRepeatedTurnpoint:
 
         assert turnpoints[-1] == turnpoints[-2], "precondition: the two are equal"
 
-        goal_feature = _create_turnpoint_feature(turnpoints[-1], 2, turnpoints, task)
-        middle_feature = _create_turnpoint_feature(turnpoints[1], 1, turnpoints, task)
+        drawing = _drawing_of(turnpoints, task.goal)
+        goal_feature = _create_turnpoint_feature(drawing, turnpoints[-1], 2)
+        middle_feature = _create_turnpoint_feature(drawing, turnpoints[1], 1)
 
         assert goal_feature["properties"]["color"] == "#ff0000"  # goal red
         assert middle_feature["properties"]["color"] == "#269abc"  # default blue
@@ -384,3 +400,126 @@ class TestLineGoalWithoutAnApproach:
         assert "goal_control_zone" in by_type
         names = [f["properties"].get("name") for f in geojson["features"]]
         assert "Goal" not in names, "the goal line replaces the goal cylinder"
+
+
+class TestCreateGoalLineFeatures:
+    """Test the _create_goal_line_features function.
+
+    These moved here from ``tests/distance/test_goal_line.py``: they assert on
+    GeoJSON output, so a distance test had been importing an export private to
+    run them.
+    """
+
+    def test_create_goal_line_features_valid_line_goal(self):
+        """Test creating goal line features for valid LINE goal."""
+        # Create a task with LINE goal
+        waypoint1 = Waypoint(name="TP1", lat=46.0, lon=8.0, alt_smoothed=1000)
+        waypoint2 = Waypoint(name="Goal", lat=47.0, lon=8.0, alt_smoothed=500)
+
+        tp1 = Turnpoint(radius=400, waypoint=waypoint1, type=TurnpointType.TAKEOFF)
+        tp2 = Turnpoint(radius=400, waypoint=waypoint2, type=TurnpointType.NONE)
+
+        goal = Goal(type=GoalType.LINE)
+        task = Task(
+            task_type=TaskType.CLASSIC, version=1, turnpoints=[tp1, tp2], goal=goal
+        )
+
+        features = _create_goal_line_features(TaskDrawing.from_task(task))
+
+        assert len(features) == 2  # Goal line + control zone
+
+        # Check goal line feature
+        goal_line = features[0]
+        assert goal_line["type"] == "Feature"
+        assert goal_line["geometry"]["type"] == "LineString"
+        assert goal_line["properties"]["type"] == "goal_line"
+        # The goal-line length is twice the last radius (400 * 2 = 800).
+        assert goal_line["properties"]["length"] == 800.0
+
+        # Check control zone feature
+        control_zone = features[1]
+        assert control_zone["type"] == "Feature"
+        assert control_zone["geometry"]["type"] == "Polygon"
+        assert control_zone["properties"]["type"] == "goal_control_zone"
+
+    def test_create_goal_line_features_length_tracks_goal_radius(self):
+        """The goal-line length follows the goal turnpoint's radius, not the previous one."""
+        waypoint1 = Waypoint(name="TP1", lat=46.0, lon=8.0, alt_smoothed=1000)
+        waypoint2 = Waypoint(name="Goal", lat=47.0, lon=8.0, alt_smoothed=500)
+
+        tp1 = Turnpoint(radius=400, waypoint=waypoint1, type=TurnpointType.TAKEOFF)
+        tp2 = Turnpoint(radius=200, waypoint=waypoint2, type=TurnpointType.NONE)
+
+        goal = Goal(type=GoalType.LINE)
+        task = Task(
+            task_type=TaskType.CLASSIC, version=1, turnpoints=[tp1, tp2], goal=goal
+        )
+
+        features = _create_goal_line_features(TaskDrawing.from_task(task))
+
+        assert len(features) == 2
+        # Should use 2 * radius as line length
+        assert features[0]["properties"]["length"] == 400.0  # 2 * 200
+
+    def test_create_goal_line_features_cylinder_goal(self):
+        """Test creating goal line features for CYLINDER goal."""
+        waypoint1 = Waypoint(name="TP1", lat=46.0, lon=8.0, alt_smoothed=1000)
+        waypoint2 = Waypoint(name="Goal", lat=47.0, lon=8.0, alt_smoothed=500)
+
+        tp1 = Turnpoint(radius=400, waypoint=waypoint1, type=TurnpointType.TAKEOFF)
+        tp2 = Turnpoint(radius=400, waypoint=waypoint2, type=TurnpointType.NONE)
+
+        goal = Goal(type=GoalType.CYLINDER)  # Not LINE type
+        task = Task(
+            task_type=TaskType.CLASSIC, version=1, turnpoints=[tp1, tp2], goal=goal
+        )
+
+        features = _create_goal_line_features(TaskDrawing.from_task(task))
+
+        assert len(features) == 0  # No features for CYLINDER goal
+
+    def test_create_goal_line_features_no_goal(self):
+        """Test creating goal line features when no goal."""
+        waypoint1 = Waypoint(name="TP1", lat=46.0, lon=8.0, alt_smoothed=1000)
+        tp1 = Turnpoint(radius=400, waypoint=waypoint1, type=TurnpointType.TAKEOFF)
+
+        task = Task(task_type=TaskType.CLASSIC, version=1, turnpoints=[tp1], goal=None)
+
+        features = _create_goal_line_features(TaskDrawing.from_task(task))
+
+        assert len(features) == 0
+
+    def test_create_goal_line_features_insufficient_turnpoints(self):
+        """Test creating goal line features with insufficient turnpoints."""
+        waypoint1 = Waypoint(name="TP1", lat=46.0, lon=8.0, alt_smoothed=1000)
+        tp1 = Turnpoint(radius=400, waypoint=waypoint1, type=TurnpointType.TAKEOFF)
+
+        goal = Goal(type=GoalType.LINE)
+        task = Task(
+            task_type=TaskType.CLASSIC,
+            version=1,
+            turnpoints=[tp1],  # Only one turnpoint
+            goal=goal,
+        )
+
+        features = _create_goal_line_features(TaskDrawing.from_task(task))
+
+        assert len(features) == 0
+
+    def test_create_goal_line_features_no_previous_turnpoint(self):
+        """Test creating goal line features when no valid previous turnpoint."""
+        # Create turnpoints with same coordinates
+        waypoint1 = Waypoint(name="TP1", lat=47.0, lon=8.0, alt_smoothed=1000)
+        waypoint2 = Waypoint(name="Goal", lat=47.0, lon=8.0, alt_smoothed=500)
+
+        tp1 = Turnpoint(radius=400, waypoint=waypoint1, type=TurnpointType.TAKEOFF)
+        tp2 = Turnpoint(radius=400, waypoint=waypoint2, type=TurnpointType.NONE)
+
+        goal = Goal(type=GoalType.LINE)
+        task = Task(
+            task_type=TaskType.CLASSIC, version=1, turnpoints=[tp1, tp2], goal=goal
+        )
+
+        features = _create_goal_line_features(TaskDrawing.from_task(task))
+
+        assert len(features) == 0  # No features when no valid previous TP
