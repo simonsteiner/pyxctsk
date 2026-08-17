@@ -1,7 +1,7 @@
 # 2026-08-17 — Deepening candidates after the package split
 
-**Status: A, B, C, D, F and G applied, E partly** (see [Progress](#progress) and the
-outcome notes below); H is proposed. Companion visual report was written to a temp file, not the
+**Status: all eight applied** (see [Progress](#progress) and the outcome notes
+below), two of them with departures the notes record. Companion visual report was written to a temp file, not the
 repo; this document is the record.
 
 Reviewed at `5a3c207` (the four-package split, merged as PR #12). Vocabulary follows the
@@ -499,7 +499,9 @@ serializable shape) — worth creating lazily when one is taken on.
 
 ## Progress
 
-A, B, C, D, F and G are applied, E partly. H is independent of all of them.
+All eight are applied. E and H depart from what the card proposed in ways the
+outcome notes below record; the card is left as written, per this directory's
+convention.
 
 - [x] A. Optimized route as a value — one run, legs kept, cumulative by `accumulate`
   (`6d5651b` the value object, `7104ad3` the cumulative fix, `608963d` one route shared
@@ -514,12 +516,12 @@ A, B, C, D, F and G are applied, E partly. H is independent of all of them.
 - [x] D. Colour as a value across the export seam; invalid `<color><Style>` fixed
   (`d92cc59` the invalid nesting, from the PR #13 review rather than from this card;
   `f875e50` the palette as `Color` values)
-- [~] E. One cylinder solver and `show_progress` retired (`ae3f746`, `cf48f0b`); the
-  dead SSS surface and `config.py` deliberately left, see below
+- [x] E. One cylinder solver, `show_progress` retired, the dead SSS module deleted
+  (`ae3f746`, `cf48f0b`, `c3fdd26`); `config.py` deliberately kept, see below
 - [x] F. `tests/corpus.py` adapter; dead fixtures deleted; PNGs to `tmp_path`
   (`aa4b742`, `21fd95b`; the inert `@patch`es and the `isinstance(list)` API had
   already gone with A)
-- [ ] H. Validation policy on arrival, wired to a CLI flag
+- [x] H. Validation on arrival for both formats, wired to `--strict` (`d3bb41d`)
 
 Verification for any of these: `uv run pytest`, `ruff check`, `ruff format`, `mypy`
 (strict), plus `import pyxctsk.<pkg>` for all four packages in isolation.
@@ -759,16 +761,53 @@ is one of.
   the sweep stays in plane coordinates. Every route point and total is bit-identical
   across all 22 reference tasks — verified against the previous commit, not argued.
 
-**Left — the dead SSS surface.** `calculate_sss_info` still has zero callers and a
-test body of `assert True`, and `calculate_optimal_sss_entry_point` is a one-line
-pass-through to `optimal_point` with no `src/` caller. Removing them is a separate,
-purely subtractive change and was not part of the option chosen.
+**Done — the dead SSS surface (`c3fdd26`), and it was the whole module.** The card
+lists `calculate_sss_info` and `calculate_optimal_sss_entry_point` as two entries in
+its table; with both gone, the two private helpers that existed only for the first
+have nothing left to serve, so `distance/sss.py` is deleted rather than emptied.
+Coverage rose 94% → 96% by subtraction — the module the card notes at 19% was 19%
+because none of it was reachable. `tests/distance/test_sss.py` survives, asking the
+question that mattered as a query on the computed route: the optimized first leg
+reaches the SSS cylinder's boundary rather than its centre.
 
 **Left — `config.py`.** The card is right that `CONVERGENCE_EPSILON_M` reaches only a
 default on the *private* `_optimize_plane_points` and so is not a seam. It stays, on
 the owner's call. Note `DEFAULT_NUM_ITERATIONS` in the same module *is* load-bearing —
 it is the `num_iterations` default — so deleting the module was never the one-line
 change the card's table implies.
+
+### Outcome of H
+
+Landed as `d3bb41d`. The card's two concrete defects are fixed; its proposed
+three-way policy is not, and that is deliberate.
+
+- **The CLI could never validate, exactly as reported.** `main`'s help advertised
+  "strict error handling" while `convert` called `parse_task` with no `strict` and
+  offered no flag. `--strict` exists now, appears in the help, and names the rule
+  that broke. Off by default, matching the library.
+- **"Validate what arrived" turned out to be a small change, not a redesign.** The
+  card frames this as checking the payload *shape*; in practice the four rules read
+  exactly two things — the order of the turnpoint roles, and whether this is a
+  waypoints task — and both formats can answer both without being converted. So
+  `validate_turnpoint_roles` takes those, and each format is an adapter onto it. No
+  rule moved, no message changed, and the QR path invents nothing: a payload with no
+  goal and `version: 2` validates as itself, where converting first would have given
+  it a CYLINDER goal and `version: 1`.
+- **The three-way policy was not built.** The card proposes replacing `strict: bool`
+  with ignore/report/raise. "Report" has no destination in a function that returns a
+  `Task` — it would have to warn — and no caller asked for it; the CLI's need was a
+  flag, which `strict` already expresses. Adding the third state would be config
+  without a user, which this repo's own rule forbids.
+- **The rule set still under-covers the spec**, as the card says: nothing checks
+  `version`, an empty waypoint name, `radius <= 0`, or the turnpoint-extension
+  ordering rule. That is a gap in *coverage*, not in the seam, and adding rules is a
+  feature rather than a deepening — left for whoever wants those checks.
+- **The layering guard earned its keep mid-change.** The first attempt reached the
+  private `_FROM_QR_TURNPOINT_TYPE` from `qrcode/task.py`, which would have been a
+  third deferred import. The guard failed, and the fix was better placement rather
+  than a new entry: the adapter belongs in `qrcode/conversion.py`, the module whose
+  whole job is translating between the two vocabularies, which `qrcode/task.py`
+  already reaches through the deferred import it has.
 
 ### Outcome of D
 
