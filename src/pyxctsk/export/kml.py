@@ -2,26 +2,29 @@
 
 import simplekml  # type: ignore
 
-from ..model.task import Task, TurnpointType
+from ..model.task import Task
 from .common import (
+    CONTROL_ZONE_EDGE_COLOR,
+    CONTROL_ZONE_FILL_COLOR,
+    GOAL_LINE_COLOR,
+    ROUTE_COLOR,
+    Color,
     TaskDrawing,
     generate_circle_coordinates_3d,
-    get_turnpoint_color_hex,
 )
 
-# Constants
-ALPHA_TRANSPARENCY = 100
+# Constants. Both alphas are opacity bytes, 0x00 transparent to 0xFF opaque, in
+# one radix so they can be compared at a glance.
+FILL_ALPHA = 0x64  # Cylinder and control-zone fills, 39% opaque
+ROUTE_ALPHA = 0xE6  # Course line, 90% opaque
 DEFAULT_ALTITUDE = 5000  # Default altitude for KML elements
 
 
-def _create_turnpoint_style(
-    turnpoint_type: TurnpointType, is_goal: bool = False
-) -> simplekml.Style:
-    """Create style for turnpoint based on its type.
+def _create_turnpoint_style(color: Color) -> simplekml.Style:
+    """Create the style for a turnpoint cylinder in the given colour.
 
     Args:
-        turnpoint_type: The type of turnpoint.
-        is_goal: Whether this is the goal (last) turnpoint.
+        color: The turnpoint's colour, from :meth:`TaskDrawing.color_of`.
 
     Returns:
         A configured simplekml.Style object.
@@ -29,23 +32,8 @@ def _create_turnpoint_style(
     style = simplekml.Style()
     style.linestyle.width = 4
     style.polystyle.outline = 1
-
-    # Get hex color and convert to simplekml color
-    hex_color = get_turnpoint_color_hex(turnpoint_type, is_goal)
-
-    # Convert hex to simplekml color (assuming hex format #RRGGBB)
-    color_map = {
-        "#ff0000": simplekml.Color.red,
-        "#204d74": simplekml.Color.darkblue,
-        "#ac2925": simplekml.Color.darkred,
-        "#ff8c00": simplekml.Color.orange,
-        "#269abc": simplekml.Color.blue,
-    }
-
-    color = color_map.get(hex_color, simplekml.Color.blue)
-
-    style.linestyle.color = color
-    style.polystyle.color = simplekml.Color.changealphaint(ALPHA_TRANSPARENCY, color)
+    style.linestyle.color = color.kml()
+    style.polystyle.color = color.kml(FILL_ALPHA)
 
     return style
 
@@ -83,10 +71,8 @@ def _create_turnpoint_elements(
             altitudemode=simplekml.AltitudeMode.relativetoground,
         )
 
-        # Determine if this is the goal turnpoint
-        is_goal = drawing.is_goal(turnpoint)
-        turnpoint_type = turnpoint.type or TurnpointType.NONE
-        style = _create_turnpoint_style(turnpoint_type, is_goal)
+        # The drawing answers what colour this turnpoint is, goal included.
+        style = _create_turnpoint_style(drawing.color_of(turnpoint))
         circle_polygon.style = style
 
         # Add turnpoint center point, in the same colour as its cylinder.
@@ -127,9 +113,8 @@ def _create_course_line(kml: simplekml.Kml, drawing: TaskDrawing) -> None:
         altitudemode=simplekml.AltitudeMode.clamptoground,
     )
 
-    # Style the course line
-    # Set color to red with 90% transparency (alpha=26 in KML AABBGGRR format)
-    course_line.style.linestyle.color = "E64136ff"  # Red, 90% transparent
+    # Style the course line: the shared route colour, 90% opaque.
+    course_line.style.linestyle.color = ROUTE_COLOR.kml(ROUTE_ALPHA)
     course_line.style.linestyle.width = 4
 
 
@@ -158,7 +143,7 @@ def _create_goal_line_elements(
         extrude=1,
         altitudemode=simplekml.AltitudeMode.relativetoground,
     )
-    goal_line_placemark.style.linestyle.color = simplekml.Color.red
+    goal_line_placemark.style.linestyle.color = GOAL_LINE_COLOR.kml()
     goal_line_placemark.style.linestyle.width = 5
 
     # Create control zone polygon
@@ -173,11 +158,9 @@ def _create_goal_line_elements(
         extrude=1,
         altitudemode=simplekml.AltitudeMode.relativetoground,
     )
-    control_zone.style.linestyle.color = simplekml.Color.cyan
+    control_zone.style.linestyle.color = CONTROL_ZONE_EDGE_COLOR.kml()
     control_zone.style.linestyle.width = 2
-    control_zone.style.polystyle.color = simplekml.Color.changealphaint(
-        ALPHA_TRANSPARENCY, simplekml.Color.cyan
-    )
+    control_zone.style.polystyle.color = CONTROL_ZONE_FILL_COLOR.kml(FILL_ALPHA)
     control_zone.style.polystyle.outline = 1
 
 

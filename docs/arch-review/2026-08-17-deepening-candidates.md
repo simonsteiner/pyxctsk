@@ -1,8 +1,8 @@
 # 2026-08-17 — Deepening candidates after the package split
 
-**Status: A and B applied** (see [Progress](#progress) and the outcome notes below); the
-other six are proposed. Companion visual report was written to a temp file, not the repo;
-this document is the record.
+**Status: A, B, D and G applied** (see [Progress](#progress) and the outcome notes below);
+the other four are proposed. Companion visual report was written to a temp file, not the
+repo; this document is the record.
 
 Reviewed at `5a3c207` (the four-package split, merged as PR #12). Vocabulary follows the
 *deep module* framing: a **module** has an **interface** (everything a caller must know)
@@ -499,19 +499,22 @@ serializable shape) — worth creating lazily when one is taken on.
 
 ## Progress
 
-A and B are applied. Each remaining item is independent; the suggested order for
-the rest is G → C.
+A, B, D and G are applied. Each remaining item is independent; C is next, and it
+wants its own branch.
 
 - [x] A. Optimized route as a value — one run, legs kept, cumulative by `accumulate`
   (`6d5651b` the value object, `7104ad3` the cumulative fix, `608963d` one route shared
   by both writers via `TaskDrawing`, `fb9392f` the table sharing it too)
 - [x] B. `GoalLine.from_task` made total; `should_skip_last_turnpoint` removed; earth
   model honored (`3cf5af1`, `908275d`)
+- [x] G. `_module_level_imports` / `_deferred_imports` collect by "runs at import time"
+  (`03d1e1c`)
 - [ ] C. One field table per serializable shape; `KNOWN_KEYS` derived; cross-format `unknown` quarantined
-- [ ] D. Colour as a value across the export seam; invalid `<color><Style>` fixed
+- [x] D. Colour as a value across the export seam; invalid `<color><Style>` fixed
+  (`d92cc59` the invalid nesting, from the PR #13 review rather than from this card;
+  `f875e50` the palette as `Color` values)
 - [ ] E. One cylinder solver; dead SSS surface, `show_progress` and `config.py` retired
 - [ ] F. `tests/corpus.py` adapter; dead fixtures deleted; inert `@patch`es fixed; PNGs to `tmp_path`
-- [ ] G. `_module_level_imports` / `_deferred_imports` collect by "runs at import time"
 - [ ] H. Validation policy on arrival, wired to a CLI flag
 
 Verification for any of these: `uv run pytest`, `ruff check`, `ruff format`, `mypy`
@@ -588,3 +591,73 @@ and the projection tests, less the four that tested the two deleted functions).
   where it is: the surviving argument is the stronger one, and moving geometry into the
   format package is a layout decision, not a cleanup. The dated layout review is left as
   written, per this directory's convention.
+
+### Outcome of G
+
+Landed as `03d1e1c`, test-only: one classifier walks the tree and splits every relative
+import into "runs at import time" and "deferred", with `_import_time_imports` and
+`_deferred_imports` as its two projections. `_module_level_imports` was renamed because
+"module level" was the wrong name for the question it was asking.
+
+- **The gap was verified by mutation, not by argument.** A `try:`-guarded
+  `from ..distance.turnpoint import …` and a class-body `from ..qrcode.encoding import …`,
+  both added to `model/task.py`, pass every check on the previous collector and are both
+  named with line numbers by the new one. That is the whole claim of the card, reproduced
+  in both directions.
+- **`if TYPE_CHECKING:` needed a distinction the card did not mention.** Only the guarded
+  *body* is type-only — an `else:` on the same `if` is ordinary code that runs on import,
+  so the walker skips `body` and keeps walking `orelse`. Pinned by its own test.
+- **The card contradicts itself about class bodies, and the Problem paragraph is right.**
+  G's **Solution** says to exclude "function, class and `if TYPE_CHECKING:` bodies", but
+  its **Problem** says "a class-body import also runs at import time" — which it does, so
+  excluding class bodies would have re-created the blind spot one level down. The
+  implementation follows the Problem: a class-body import is collected as import-time and
+  checked like any other, and only function bodies defer. The Solution's wording is the
+  error, left as written per this directory's convention.
+- **Nothing in `src/` moved.** All 30 modules still pass all four checks; the suite went
+  388 tests with the eight new snippet tests, and the two optional-dependency `try:`
+  blocks the card names remain absolute imports, so they are still correctly invisible.
+- `CLAUDE.md`'s description of the guard was updated to state the import-time rule, since
+  the old wording ("only module-level imports are checked") was the prose the code had
+  been implementing.
+
+### Outcome of D
+
+The invalid `<color><Style>` nesting was fixed first, in `d92cc59`, out of the PR #13
+review thread. The palette landed as `f875e50`: `Color` values, and one total renderer per
+format — `.hex` for GeoJSON, `.kml(alpha)` for KML.
+
+- **The drift was worse than the card counted.** It reports three of five entries lost;
+  four of the five turnpoint roles were, with only the goal's red surviving the round trip
+  through `simplekml.Color`:
+
+  | role | GeoJSON | KML before | KML after |
+  | --- | --- | --- | --- |
+  | TAKEOFF | `#204d74` | `#00008b` | `#204d74` |
+  | SSS | `#ac2925` | `#8b0000` | `#ac2925` |
+  | ESS | `#ff8c00` | `#ffa500` | `#ff8c00` |
+  | ordinary | `#269abc` | `#0000ff` | `#269abc` |
+  | goal | `#ff0000` | `#ff0000` | `#ff0000` |
+  | route | `#ff4136` | `#ff3641` | `#ff4136` |
+
+- **The course line was a second instance of the same cause.** Not the lookup this time:
+  its colour was hand-written as `E64136ff`, the digits of `#ff4136` in CSS order after
+  the alpha, which KML reads as `aabbggrr` and draws as `#ff3641`. `Color.kml(alpha)` is
+  the only place those bytes get ordered now.
+- **Three colours the card did not name were not shared at all.** The goal line and the
+  control zone's edge and fill were declared separately in each writer and disagreed
+  outright — the goal line was red in KML and *green* in GeoJSON. They are palette entries
+  now, on the GeoJSON values (repo owner's call): those are a chosen hex family, matching
+  the turnpoint palette, where KML's red and cyan were stock `simplekml` constants — the
+  same "whatever the library had" choice that produced the drift in the first place. KML's
+  goal line becomes green and its control zone teal; GeoJSON output is unchanged
+  throughout.
+- **The tests had to change shape, not just grow.** `get_turnpoint_color_hex` was pure and
+  fully covered while both defects lived in the caller adapting its output, so the new
+  tests read the colour back out of *both* rendered documents and compare them — resolving
+  KML's `styleUrl` references rather than counting occurrences. Verified by restoring the
+  old mapping underneath them: both regressions fail. One further test is structural — no
+  `#rrggbb`, `aabbggrr` or `simplekml.Color` literal may appear in either writer, so the
+  next colour spelled out in a writer fails in the suite rather than in a map.
+- **Deleted:** `get_turnpoint_color_hex`, replaced by `turnpoint_color` returning the
+  value. It was never re-exported from the package.

@@ -12,7 +12,13 @@ All features include geometry and properties suitable for web map display, inclu
 Intended for use in web-based or desktop mapping tools to visualize XCTrack competition tasks.
 """
 
-from .common import TaskDrawing, get_turnpoint_color_hex
+from .common import (
+    CONTROL_ZONE_EDGE_COLOR,
+    CONTROL_ZONE_FILL_COLOR,
+    GOAL_LINE_COLOR,
+    ROUTE_COLOR,
+    TaskDrawing,
+)
 
 
 def _create_turnpoint_feature(drawing: TaskDrawing, turnpoint, index: int) -> dict:
@@ -26,7 +32,7 @@ def _create_turnpoint_feature(drawing: TaskDrawing, turnpoint, index: int) -> di
     Returns:
         GeoJSON feature dictionary for the turnpoint.
     """
-    color = get_turnpoint_color_hex(turnpoint.type, drawing.is_goal(turnpoint))
+    color = drawing.color_of(turnpoint).hex
 
     return {
         "type": "Feature",
@@ -75,11 +81,11 @@ def _create_optimized_route_feature(drawing: TaskDrawing) -> dict | None:
         "properties": {
             "name": "Optimized Route",
             "type": "optimized_route",
-            "color": "#ff4136",
+            "color": ROUTE_COLOR.hex,
             "weight": 3,
             "opacity": 0.8,
             "arrowheads": True,
-            "arrow_color": "#ff4136",
+            "arrow_color": ROUTE_COLOR.hex,
             "arrow_size": 8,
             "arrow_spacing": 100,  # meters between arrows
         },
@@ -115,7 +121,7 @@ def _create_goal_line_features(drawing: TaskDrawing) -> list[dict]:
             "type": "goal_line",
             "length": goal_line_length,
             "description": f"Goal line length: {goal_line_length:.0f}m",
-            "stroke": "#00ff00",
+            "stroke": GOAL_LINE_COLOR.hex,
             "stroke-width": 4,
             "stroke-opacity": 1.0,
         },
@@ -139,9 +145,9 @@ def _create_goal_line_features(drawing: TaskDrawing) -> list[dict]:
             "type": "goal_control_zone",
             "radius": control_zone_radius,
             "description": f"Goal control zone radius: {control_zone_radius:.0f}m",
-            "fill": "#4ecdc4",
+            "fill": CONTROL_ZONE_FILL_COLOR.hex,
             "fill-opacity": 0.3,
-            "stroke": "#00bcd4",
+            "stroke": CONTROL_ZONE_EDGE_COLOR.hex,
             "stroke-width": 2,
             "stroke-opacity": 0.8,
         },

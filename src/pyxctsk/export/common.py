@@ -9,8 +9,9 @@ and the decision to drop the last turnpoint were computed separately, and a LINE
 goal with no usable approach direction lost its goal from both outputs. There is
 no free function beside the drawing that answers any of those a second way.
 
-Also here: what colour a turnpoint is, and the polygon that approximates a
-cylinder. That circle is planar — a fixed metres-per-degree constant, not a
+Also here: the palette, as :class:`Color` values that each writer renders with a
+total function of its own format, and the polygon that approximates a cylinder.
+That circle is planar — a fixed metres-per-degree constant, not a
 geodesic — because it draws a decorative outline, not a measured shape. Anything
 a distance depends on is computed properly in
 :mod:`pyxctsk.distance.turnpoint` and :mod:`pyxctsk.distance.goal_line`, and
@@ -98,6 +99,27 @@ class TaskDrawing:
             return False
         return bool(self.task.turnpoints) and turnpoint is self.task.turnpoints[-1]
 
+    def color_of(self, turnpoint: Turnpoint) -> "Color":
+        """The colour this turnpoint is drawn in, in either format.
+
+        Both writers used to compose this themselves out of :meth:`is_goal` and
+        the turnpoint's type, and they spelled the type differently: KML
+        normalized a missing one to ``TurnpointType.NONE`` while GeoJSON passed
+        ``None`` into a parameter annotated ``TurnpointType``. They agreed only
+        by falling through to the same default, which is the shape this module
+        exists to remove — a question both writers must answer identically is a
+        method on the drawing, not something each of them assembles.
+
+        Args:
+            turnpoint: One of the turnpoints being drawn.
+
+        Returns:
+            The colour for that turnpoint, the goal's red included.
+        """
+        return turnpoint_color(
+            turnpoint.type or TurnpointType.NONE, self.is_goal(turnpoint)
+        )
+
     def route_coordinates(self) -> list[tuple[float, float]] | None:
         """The optimized route as (lat, lon) points, or None if there is no line.
 
@@ -112,28 +134,93 @@ class TaskDrawing:
         return list(self.route.points)
 
 
-def get_turnpoint_color_hex(
-    turnpoint_type: TurnpointType, is_goal: bool = False
-) -> str:
-    """Get hex color for turnpoint based on its type.
+@dataclass(frozen=True)
+class Color:
+    """One colour, as the bytes it is, for either writer to render.
+
+    The palette used to be shared as ``#rrggbb`` strings, which meant the KML
+    writer needed a hand-written dict mapping each of those strings back to a
+    ``simplekml.Color`` constant. That dict re-declared the whole palette and
+    lost four of its five turnpoint values — a TAKEOFF turnpoint was ``#204d74``
+    in GeoJSON and ``#00008b`` in KML, and only the goal's red survived — and its
+    ``.get(hex, blue)`` default meant a sixth entry would have degraded to blue
+    rather than failing. A colour value with one total renderer per format has
+    nothing to look up and nothing to default to.
+
+    Attributes:
+        red: Red channel, 0-255.
+        green: Green channel, 0-255.
+        blue: Blue channel, 0-255.
+    """
+
+    red: int
+    green: int
+    blue: int
+
+    @property
+    def hex(self) -> str:
+        """This colour as ``#rrggbb``, which GeoJSON and CSS want."""
+        return f"#{self.red:02x}{self.green:02x}{self.blue:02x}"
+
+    def kml(self, alpha: int = 255) -> str:
+        """This colour as KML's ``aabbggrr``.
+
+        KML orders the channels backwards from CSS and puts alpha first, which
+        is why hand-writing these strings goes wrong: the course line was
+        ``E64136ff``, the digits of ``#ff4136`` after the alpha in CSS order,
+        which KML reads as ``#ff3641``.
+
+        Args:
+            alpha: Opacity, 0 (transparent) to 255 (opaque).
+
+        Returns:
+            The 8-character ``aabbggrr`` string a KML colour field takes.
+        """
+        return f"{alpha:02x}{self.blue:02x}{self.green:02x}{self.red:02x}"
+
+
+#: The one palette. Both writers render these values; neither declares a colour.
+GOAL_COLOR = Color(0xFF, 0x00, 0x00)
+TAKEOFF_COLOR = Color(0x20, 0x4D, 0x74)
+SSS_COLOR = Color(0xAC, 0x29, 0x25)
+ESS_COLOR = Color(0xFF, 0x8C, 0x00)
+TURNPOINT_COLOR = Color(0x26, 0x9A, 0xBC)
+ROUTE_COLOR = Color(0xFF, 0x41, 0x36)
+GOAL_LINE_COLOR = Color(0x00, 0xFF, 0x00)
+CONTROL_ZONE_EDGE_COLOR = Color(0x00, 0xBC, 0xD4)
+CONTROL_ZONE_FILL_COLOR = Color(0x4E, 0xCD, 0xC4)
+
+#: Every :class:`TurnpointType`, spelled out rather than defaulted. A lookup with
+#: a default is what the old KML writer had, and it meant a palette entry it did
+#: not know about rendered as an ordinary turnpoint with nothing failing. This
+#: table is total over the enum, `test_every_turnpoint_type_has_a_colour` says so,
+#: and a new member therefore fails the suite instead of quietly turning blue.
+_TURNPOINT_COLORS = {
+    TurnpointType.NONE: TURNPOINT_COLOR,
+    TurnpointType.TAKEOFF: TAKEOFF_COLOR,
+    TurnpointType.SSS: SSS_COLOR,
+    TurnpointType.ESS: ESS_COLOR,
+}
+
+
+def turnpoint_color(turnpoint_type: TurnpointType, is_goal: bool = False) -> Color:
+    """The colour a turnpoint is drawn in, in either format.
 
     Args:
         turnpoint_type: The type of turnpoint.
-        is_goal: Whether this is the goal (last) turnpoint.
+        is_goal: Whether this is the goal (last) turnpoint. The goal wins over
+            the type: a goal that is also the ESS is drawn as the goal.
 
     Returns:
-        Hex color string for the turnpoint.
+        The turnpoint's colour.
+
+    Raises:
+        KeyError: If the type has no palette entry, which the test over the enum
+            makes a CI failure rather than something a map can hit.
     """
     if is_goal:
-        return "#ff0000"  # Red for goal
-
-    color_mapping = {
-        TurnpointType.TAKEOFF: "#204d74",  # Dark blue
-        TurnpointType.SSS: "#ac2925",  # Dark red
-        TurnpointType.ESS: "#ff8c00",  # Orange
-    }
-
-    return color_mapping.get(turnpoint_type, "#269abc")  # Default blue
+        return GOAL_COLOR
+    return _TURNPOINT_COLORS[turnpoint_type]
 
 
 def generate_circle_coordinates_2d(
