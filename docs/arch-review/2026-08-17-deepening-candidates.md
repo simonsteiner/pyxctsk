@@ -770,11 +770,19 @@ because none of it was reachable. `tests/distance/test_sss.py` survives, asking 
 question that mattered as a query on the computed route: the optimized first leg
 reaches the SSS cylinder's boundary rather than its centre.
 
-**Left — `config.py`.** The card is right that `CONVERGENCE_EPSILON_M` reaches only a
-default on the *private* `_optimize_plane_points` and so is not a seam. It stays, on
-the owner's call. Note `DEFAULT_NUM_ITERATIONS` in the same module *is* load-bearing —
-it is the `num_iterations` default — so deleting the module was never the one-line
-change the card's table implies.
+**Done — `config.py`, but not by retiring anything (`7af325d`).** Revisited, the
+card's diagnosis is the wrong way round. `CONVERGENCE_EPSILON_M` is not a *failed*
+seam; it was never meant to be one. It carries FAI S7F §7.1.3's ε = 0.1 m, and
+ADR 0004 already settled the question — *"precision is governed by the spec's
+ε = 0.1 m, not by a sampling knob"*. Retiring it would have deleted the citation,
+which is the payload, on exactly the argument `model/rounding.py` rests on.
+
+The real defect is the module's *name*. `config.py` sat a value the spec fixes beside
+one genuinely worth tuning — `DEFAULT_NUM_ITERATIONS`, which is what the public
+`num_iterations` parameter defaults to — and `distance/__init__.py` advertised the
+pair as "the tunable optimization parameters". Both now live in
+`route_optimization.py` beside the loop they govern, each documented as what it is,
+and the module is gone. Both stay exported, so nothing breaks.
 
 ### Outcome of H
 
@@ -798,10 +806,26 @@ three-way policy is not, and that is deliberate.
   `Task` — it would have to warn — and no caller asked for it; the CLI's need was a
   flag, which `strict` already expresses. Adding the third state would be config
   without a user, which this repo's own rule forbids.
-- **The rule set still under-covers the spec**, as the card says: nothing checks
-  `version`, an empty waypoint name, `radius <= 0`, or the turnpoint-extension
-  ordering rule. That is a gap in *coverage*, not in the seam, and adding rules is a
-  feature rather than a deepening — left for whoever wants those checks.
+- **The rule set under-covered the spec, and the card's list of what to add is half
+  wrong.** Three of its four are now implemented (`7af325d`); two needed correcting
+  first:
+  - **`radius <= 0` is not a rule.** Zero is legitimate — every XC/Waypoints
+    turnpoint has it, and `plane_circle` reads it as the point itself. The rule
+    implemented is negative-only, and a test pins that zero passes.
+  - **An empty waypoint name is not a rule either.** The key is required, but the
+    GeoJSON writer numbers unnamed turnpoints `TP1`, `TP2`, so empty names are
+    tolerated by design. Not implemented.
+  - **`version`** is real and trivial: each format declares its own, and the rule is
+    stated once with the expected value carried in the structure.
+  - **Extension ordering** is real, and documented twice in `model/task.py` with
+    nothing checking it. Only its checkable half can be enforced — turnpoint
+    extensions carry no `id`, so position is the only thing linking one to a root
+    entry — which is exactly why the spec fixes the order, and gives two rules: more
+    extensions than root entries, and an `id` repeated.
+
+  Widening the rules' input from turnpoint roles to a `TaskStructure` is what let all
+  three reach both formats at once, without either adapter being touched. That is the
+  return on H's shape, and it arrived one commit later rather than being designed for.
 - **The layering guard earned its keep mid-change.** The first attempt reached the
   private `_FROM_QR_TURNPOINT_TYPE` from `qrcode/task.py`, which would have been a
   third deferred import. The guard failed, and the fix was better placement rather
