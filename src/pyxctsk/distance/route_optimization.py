@@ -222,7 +222,6 @@ def _optimize_plane_points(
     circles: Sequence[PlaneCircle],
     max_sweeps: int,
     epsilon: float = CONVERGENCE_EPSILON_M,
-    show_progress: bool = False,
 ) -> list[tuple[float, float]]:
     """Run the Ding–Xie–Jiang alternating optimization in the plane.
 
@@ -242,7 +241,6 @@ def _optimize_plane_points(
         circles: Planar circles (x, y, radius) in turnpoint order.
         max_sweeps: Upper bound on alternating sweeps.
         epsilon: Convergence threshold on total length change, in meters.
-        show_progress: Whether to print per-sweep progress.
 
     Returns:
         The optimized (x, y) route points, one per input circle.
@@ -271,8 +269,6 @@ def _optimize_plane_points(
                         points[i - 1], points[i + 1], (cx, cy), radius
                     )
         current_length = _polyline_length(points)
-        if show_progress:
-            print(f"    🔄 Sweep {sweep + 1}: {current_length / 1000.0:.4f}km")
         if abs(previous_length - current_length) < epsilon:
             break
         previous_length = current_length
@@ -283,7 +279,6 @@ def _optimize_plane_points(
 def calculate_iteratively_refined_route(
     turnpoints: Sequence[TurnpointGeometry],
     num_iterations: int | None = None,
-    show_progress: bool = False,
     earth_model: object = None,
 ) -> OptimizedRoute:
     """Calculate the optimized route with the alternating point-circle-point method.
@@ -296,7 +291,6 @@ def calculate_iteratively_refined_route(
     Args:
         turnpoints (Sequence[TurnpointGeometry]): The task turnpoints.
         num_iterations (Optional[int]): Maximum number of alternating sweeps.
-        show_progress (bool): Whether to show progress indicators.
         earth_model: Earth model selector (``EarthModel`` member, its string
             value, or None). None falls back to the first turnpoint's
             ``earth_model`` attribute, defaulting to WGS84.
@@ -318,15 +312,8 @@ def calculate_iteratively_refined_route(
             earth_model=earth_model,
         )
 
-    if show_progress and turnpoints[-1].goal_type == "LINE":
-        print("    🏁 Task has a goal line finish")
-
     circles, to_geo = _plane_circles(turnpoints, earth_model)
-    plane_points = _optimize_plane_points(
-        circles,
-        max_sweeps=max_sweeps,
-        show_progress=show_progress,
-    )
+    plane_points = _optimize_plane_points(circles, max_sweeps=max_sweeps)
 
     g = geod_for_earth_model(earth_model)
     route: list[tuple[float, float]] = []
@@ -349,19 +336,13 @@ def calculate_iteratively_refined_route(
         _, _, leg = g.inv(route[i][1], route[i][0], route[i + 1][1], route[i + 1][0])
         legs.append(float(leg))
 
-    optimized = OptimizedRoute(
+    return OptimizedRoute(
         points=tuple(route), legs=tuple(legs), earth_model=earth_model
     )
-
-    if show_progress:
-        print(f"    ✅ Optimized route: {optimized.total_m / 1000.0:.3f}km")
-
-    return optimized
 
 
 def optimized_distance(
     turnpoints: Sequence[TurnpointGeometry],
-    show_progress: bool = False,
     num_iterations: int | None = None,
     earth_model: object = None,
 ) -> float:
@@ -373,7 +354,6 @@ def optimized_distance(
 
     Args:
         turnpoints: The task turnpoints.
-        show_progress: Whether to show progress indicators.
         num_iterations: Maximum number of alternating sweeps.
         earth_model: Earth model selector (None uses the turnpoints' model,
             defaulting to WGS84).
@@ -384,6 +364,5 @@ def optimized_distance(
     return calculate_iteratively_refined_route(
         turnpoints,
         num_iterations=num_iterations,
-        show_progress=show_progress,
         earth_model=earth_model,
     ).total_m
