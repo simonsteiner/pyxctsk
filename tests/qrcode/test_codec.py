@@ -571,3 +571,94 @@ class TestQRSupportProbe:
     def test_support_flag_is_a_bool(self):
         """The probe answers True or False, never an exception or None."""
         assert isinstance(QR_CODE_SUPPORT, bool)
+
+
+class TestWithoutTheOptionalDependencies:
+    """The documented behaviour when Pillow and zxing-cpp are absent.
+
+    They are the library's only optional dependency, and both modules that use
+    them carry a ``try: import ... except ImportError`` fallback — which
+    nothing exercised, because the test environment always has them. One
+    ``monkeypatch`` reaches the branch that real users without the extras hit.
+    """
+
+    def test_generating_an_image_says_what_is_missing(self, monkeypatch):
+        """A named ImportError, not an AttributeError on None."""
+        from pyxctsk.qrcode import image
+
+        monkeypatch.setattr(image, "QR_CODE_SUPPORT", False)
+
+        with pytest.raises(ImportError, match="qrcode.*Pillow"):
+            image.generate_qrcode_image("XCTSK:{}")
+
+    def test_the_parser_declines_an_image_rather_than_crashing(self, monkeypatch):
+        """An image is simply not a format this install can read.
+
+        The adapter returns None, so the input falls through to the others and
+        the failure is the ordinary "invalid format" — not a NameError from
+        the module-level ``Image = None``.
+        """
+        from pyxctsk import parser
+        from pyxctsk.exceptions import InvalidFormatError
+
+        monkeypatch.setattr(parser, "QR_CODE_SUPPORT", False)
+
+        with pytest.raises(InvalidFormatError, match="invalid format"):
+            parse_task(b"\x89PNG\r\n\x1a\n not really an image")
+
+    def test_the_text_formats_still_work(self, monkeypatch):
+        """Everything but image decoding is unaffected by the extras."""
+        from pyxctsk import parser
+
+        monkeypatch.setattr(parser, "QR_CODE_SUPPORT", False)
+        qr_string = QRCodeTask(version=2).to_string()
+
+        assert parse_task(qr_string).version == 1
+
+
+class TestTheNestedModelsAreReachableOnTheirOwn:
+    """``to_dict`` / ``from_dict`` on the objects nested inside a QR task.
+
+    The task's own table reaches these shapes directly, so nothing inside the
+    library calls these four methods any more — but they are public API, and
+    ``QRCodeTakeoff``'s pair had never run at all.
+    """
+
+    def test_a_goal_round_trips(self):
+        """Keys in the order tools.xcontest.org writes them."""
+        from pyxctsk.qrcode.models import QRCodeGoal
+
+        source = {"d": "18:00:00Z", "fa": 50, "t": 1}
+        goal = QRCodeGoal.from_dict(source)
+
+        assert goal.deadline.hour == 18
+        assert goal.finish_altitude == 50
+        assert list(goal.to_dict()) == ["d", "fa", "t"]
+        assert goal.to_dict() == source
+
+    def test_a_start_round_trips(self):
+        """The obsolete direction first, the type last."""
+        from pyxctsk.qrcode.models import QRCodeSSS
+
+        source = {"d": 2, "g": ["12:00:00Z"], "t": 1}
+        sss = QRCodeSSS.from_dict(source)
+
+        assert sss.time_gates[0].hour == 12
+        assert list(sss.to_dict()) == ["d", "g", "t"]
+        assert sss.to_dict() == source
+
+    def test_a_takeoff_round_trips(self):
+        """The one shape the task flattens, read on its own terms."""
+        from pyxctsk.qrcode.models import QRCodeTakeoff
+
+        source = {"o": "08:00:00Z", "c": "09:30:00Z"}
+        takeoff = QRCodeTakeoff.from_dict(source)
+
+        assert (takeoff.time_open.hour, takeoff.time_close.hour) == (8, 9)
+        assert takeoff.to_dict() == source
+
+    def test_an_empty_takeoff_writes_nothing(self):
+        """Absent times must stay absent rather than become null."""
+        from pyxctsk.qrcode.models import QRCodeTakeoff
+
+        assert QRCodeTakeoff().to_dict() == {}
