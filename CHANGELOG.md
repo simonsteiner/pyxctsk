@@ -44,6 +44,8 @@ All notable changes to this project will be documented in this file.
   | `distance.turnpoint.geod` | `geod_for_earth_model(earth_model)` |
   | `TaskTurnpoint(..., goal_line_length=...)` | nothing — it was written and never read |
 
+  The dead `AttributeError` branch in `generate_qrcode_image` went with them: it fell back to the pre-9.1 Pillow resampling API, and `pyproject.toml` pins `Pillow>=11.3.0`.
+
   `get_goal_line_data` and `geod` had no callers left at all; the rest had none in `src/`. Output is unchanged — verified byte-identical on `task_bevo`, `task_piga_line` and `task_nohe`.
 - **Breaking (API): the KML and GeoJSON writers take a `TaskDrawing`.** Their private helpers changed shape with it — `_create_turnpoint_feature(drawing, turnpoint, index)` instead of `(turnpoint, index, all_turnpoints, task=None)`, `_create_optimized_route_feature(drawing)` instead of a `Task`-or-`list` union that existed only so tests could inject coordinates, and `_create_goal_line_features(drawing)`. `export.common.get_optimized_route_coordinates` is deleted: it was a two-line pass-through whose only purpose was to be the writers' shared route accessor, which the drawing now is.
 - **Breaking (API): `_task_to_turnpoints` is now `task_to_turnpoints`**, re-exported as `pyxctsk.distance.task_to_turnpoints`. It was private by name only — the export package, five test modules and a script all imported it, and it now crosses a package seam.

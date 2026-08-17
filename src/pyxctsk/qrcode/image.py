@@ -39,11 +39,7 @@ def generate_qrcode_image(data: str, size: int = 1024):
 
     img = qr.make_image(fill_color="black", back_color="white")
 
-    # Resize to requested size
-    try:
-        # Try new Pillow API first
-        img = img.resize((size, size), Image.Resampling.LANCZOS)  # type: ignore
-    except AttributeError:
-        # Fall back to old API for older Pillow versions
-        img = img.resize((size, size), Image.LANCZOS)  # type: ignore
+    # Resize to requested size. Image.Resampling arrived in Pillow 9.1 and
+    # pyproject pins >= 11.3, so there is no older-API branch to fall back to.
+    img = img.resize((size, size), Image.Resampling.LANCZOS)  # type: ignore
     return img
