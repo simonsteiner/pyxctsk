@@ -16,6 +16,8 @@ import pytest
 
 from pyxctsk import (
     Direction,
+    Goal,
+    GoalType,
     SSSType,
     Task,
     TaskType,
@@ -658,6 +660,89 @@ class TestManufacturerExtensions:
         assert turnpoint.lon == pytest.approx(8.1)
         assert turnpoint.lat == pytest.approx(46.5)
         assert turnpoint.extensions == [{"k": "v"}]
+
+
+class TestNestedShapesCarryUnknownKeys:
+    """Passthrough belongs to every serializable shape, not just the outer two.
+
+    ``Task`` and ``Turnpoint`` each had a ``KNOWN_KEYS`` allow-list and an
+    ``unknown`` field. The objects nested inside them did not, so a non-spec key
+    in a ``waypoint``, ``sss``, ``goal`` or ``takeoff`` was read past and
+    dropped — the same round-trip loss the passthrough exists to prevent, one
+    level down.
+    """
+
+    def _source(self) -> dict:
+        data: dict = json.loads(task_json())
+        data["turnpoints"][0]["waypoint"]["zz"] = "waypoint-extra"
+        data["sss"]["zz"] = "sss-extra"
+        data["goal"]["zz"] = "goal-extra"
+        data["takeoff"] = {"timeOpen": "08:00:00Z", "zz": "takeoff-extra"}
+        return data
+
+    def _task(self) -> Task:
+        return Task.from_json(json.dumps(self._source()))
+
+    def test_each_nested_shape_reads_its_own_extras(self):
+        """The key lands on the object it was nested in, not on the task."""
+        task = self._task()
+
+        assert task.turnpoints[0].waypoint.unknown == {"zz": "waypoint-extra"}
+        assert task.sss.unknown == {"zz": "sss-extra"}
+        assert task.goal.unknown == {"zz": "goal-extra"}
+        assert task.takeoff.unknown == {"zz": "takeoff-extra"}
+        assert task.unknown == {}
+
+    def test_they_come_back_out_again(self):
+        """Reading without writing is the loss; both halves are needed."""
+        emitted = json.loads(self._task().to_json())
+
+        assert emitted["turnpoints"][0]["waypoint"]["zz"] == "waypoint-extra"
+        assert emitted["sss"]["zz"] == "sss-extra"
+        assert emitted["goal"]["zz"] == "goal-extra"
+        assert emitted["takeoff"]["zz"] == "takeoff-extra"
+
+    def test_the_roundtrip_is_lossless(self):
+        """Nothing in the source may be dropped."""
+        source = self._source()
+
+        assert json.loads(Task.from_json(json.dumps(source)).to_json()) == source
+
+    def test_an_unknown_key_cannot_shadow_a_nested_spec_field(self):
+        """The never-shadow rule applies at every level it is used."""
+        goal = Goal(type=GoalType.CYLINDER, unknown={"type": "NONSENSE"})
+
+        assert goal.to_dict()["type"] == "CYLINDER"
+
+    def test_the_qr_nested_shapes_carry_them_too(self):
+        """``s`` and ``g`` are objects in the QR format as well."""
+        from pyxctsk.qrcode.task import QRCodeTask
+
+        source = json.loads(Task.from_json(task_json()).to_qr_code_task().to_json())
+        source["s"]["zz"] = "sss-extra"
+        source["g"]["zz"] = "goal-extra"
+
+        qr = QRCodeTask.from_dict(source)
+
+        assert qr.sss.unknown == {"zz": "sss-extra"}
+        assert qr.goal.unknown == {"zz": "goal-extra"}
+        assert json.loads(qr.to_json()) == source
+
+    def test_line_length_stays_dropped(self):
+        """The one key read and deliberately discarded rather than carried.
+
+        ``lineLength`` is always twice the last turnpoint's radius, which is
+        what the spec says that radius means. Carrying it would preserve a
+        derived duplicate that a task can contradict, so it is on the goal's
+        allow-list rather than in its ``unknown``.
+        """
+        data = json.loads(task_json())
+        data["goal"]["lineLength"] = 5000
+
+        task = Task.from_json(json.dumps(data))
+
+        assert task.goal.unknown == {}
+        assert "lineLength" not in json.loads(task.to_json())["goal"]
 
 
 class TestTurnpointCoordinatesAreNeverInvented:

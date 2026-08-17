@@ -41,11 +41,16 @@ class QRCodeGoal:
     - deadline: Goal deadline time (optional, defaults to 23:00 local time)
     - type: Goal type - LINE (1) or CYLINDER (2, default)
     - finish_altitude: Elevated goal altitude in meters AGL (optional, "fa")
+    - unknown: Keys this format does not define, preserved verbatim
     """
 
     deadline: TimeOfDay | None = None
     type: QRCodeGoalType | None = None
     finish_altitude: float | None = None
+    unknown: dict[str, Any] = field(default_factory=dict)
+
+    #: Keys this class understands; everything else lands in ``unknown``.
+    KNOWN_KEYS = frozenset({"d", "fa", "t"})
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
@@ -60,6 +65,7 @@ class QRCodeGoal:
             result["fa"] = self.finish_altitude
         if self.type is not None:
             result["t"] = self.type.value
+        write_passthrough(result, [], self.unknown, None)
         return result
 
     @classmethod
@@ -77,7 +83,13 @@ class QRCodeGoal:
         if data.get("fa") is not None:
             finish_altitude = data["fa"]
 
-        return cls(deadline=deadline, type=goal_type, finish_altitude=finish_altitude)
+        _, unknown = read_passthrough(data, cls.KNOWN_KEYS, None)
+        return cls(
+            deadline=deadline,
+            type=goal_type,
+            finish_altitude=finish_altitude,
+            unknown=unknown,
+        )
 
 
 @dataclass
@@ -90,11 +102,16 @@ class QRCodeSSS:
     - direction: OBSOLETE field kept for backwards compatibility (ignored when reading)
     - type: Start type - RACE (1) or ELAPSED_TIME (2)
     - time_gates: Array of time gates for start timing
+    - unknown: Keys this format does not define, preserved verbatim
     """
 
     direction: QRCodeDirection
     type: QRCodeSSSType
     time_gates: list["TimeOfDay"] = field(default_factory=list)
+    unknown: dict[str, Any] = field(default_factory=dict)
+
+    #: Keys this class understands; everything else lands in ``unknown``.
+    KNOWN_KEYS = frozenset({"d", "g", "t"})
 
     def to_dict(self) -> OrderedDict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -107,6 +124,7 @@ class QRCodeSSS:
             result["g"] = [gate.to_json_string() for gate in self.time_gates]
         # Add type last
         result["t"] = self.type.value
+        write_passthrough(result, [], self.unknown, None)
         return result
 
     @classmethod
@@ -122,10 +140,12 @@ class QRCodeSSS:
             # For backwards compatibility, still read it if present
             direction = QRCodeDirection(data["d"])
 
+        _, unknown = read_passthrough(data, cls.KNOWN_KEYS, None)
         return cls(
             direction=direction,
             type=QRCodeSSSType(data["t"]),
             time_gates=time_gates,
+            unknown=unknown,
         )
 
 
@@ -138,6 +158,13 @@ class QRCodeTakeoff:
     Fields correspond to JSON format:
     - time_open: Takeoff open time (optional)
     - time_close: Takeoff close time (optional)
+
+    The one serializable shape here with no ``unknown``, because it is the one
+    that is not an object on the wire: ``QRCodeTask`` flattens it to the root
+    keys ``to`` and ``tc`` and rebuilds this ``{"o": …, "c": …}`` to read it
+    back. No payload is ever handed to :meth:`from_dict` unfiltered, so an
+    ``unknown`` here could never hold anything — those keys are the task's, and
+    are on its allow-list.
     """
 
     time_open: TimeOfDay | None = None

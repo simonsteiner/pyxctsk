@@ -56,6 +56,17 @@ class TestReadPassthrough:
         assert data["extensions"] == [{"id": "ACME"}]
         assert "p" not in data
 
+    def test_a_shape_without_extensions_still_splits_off_unknown(self):
+        """The nested objects get the unknown half of the rule on its own."""
+        extensions, unknown = read_passthrough(
+            {"lat": 46.5, "extensions": [{"id": "ACME"}]},
+            frozenset({"lat"}),
+            None,
+        )
+
+        assert extensions == []
+        assert unknown == {"extensions": [{"id": "ACME"}]}
+
     def test_qr_format_uses_its_own_extensions_key(self):
         """The QR format spells extensions "x"; "extensions" is then unknown."""
         extensions, unknown = read_passthrough(
@@ -105,6 +116,17 @@ class TestWritePassthrough:
         )
 
         assert result["extensions"] == [{"id": "ACME"}]
+
+    def test_a_shape_without_extensions_reserves_nothing(self):
+        """An unowned ``extensions`` key is carried like any other.
+
+        With no extensions list there is nothing to protect, so the key the
+        other shapes reserve is here just a key the shape does not define.
+        """
+        result: dict = {}
+        write_passthrough(result, [], {"extensions": "carried", "o": 1}, None)
+
+        assert result == {"extensions": "carried", "o": 1}
 
     @pytest.mark.parametrize("ext_key", [EXTENSIONS_KEY, QR_EXTENSIONS_KEY])
     def test_unknown_cannot_become_the_extensions_key(self, ext_key):

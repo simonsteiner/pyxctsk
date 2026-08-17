@@ -51,6 +51,8 @@ class Waypoint:
         lon (float): Longitude in decimal degrees.
         alt_smoothed (int): Smoothed altitude in meters.
         description (Optional[str]): Optional description.
+        unknown (dict): Keys the spec does not define, preserved verbatim.
+            See :attr:`Task.unknown`.
     """
 
     name: str
@@ -58,6 +60,10 @@ class Waypoint:
     lon: float
     alt_smoothed: int
     description: str | None = None
+    unknown: dict[str, Any] = field(default_factory=dict)
+
+    #: Keys this class understands; everything else lands in ``unknown``.
+    KNOWN_KEYS = frozenset({"name", "lat", "lon", "altSmoothed", "description"})
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
@@ -65,7 +71,7 @@ class Waypoint:
         Returns:
             Dict[str, Any]: Dictionary representation for JSON.
         """
-        result = {
+        result: dict[str, Any] = {
             "name": self.name,
             "lat": self.lat,
             "lon": self.lon,
@@ -73,6 +79,7 @@ class Waypoint:
         }
         if self.description:
             result["description"] = self.description
+        write_passthrough(result, [], self.unknown, None)
         return result
 
     @classmethod
@@ -89,12 +96,14 @@ class Waypoint:
         Returns:
             Waypoint: Parsed Waypoint object.
         """
+        _, unknown = read_passthrough(data, cls.KNOWN_KEYS, None)
         return cls(
             name=data["name"],
             lat=data["lat"],
             lon=data["lon"],
             alt_smoothed=round_half_up(data["altSmoothed"]),
             description=data.get("description"),
+            unknown=unknown,
         )
 
 
@@ -172,10 +181,16 @@ class Takeoff:
     Attributes:
         time_open (Optional[TimeOfDay]): Opening time.
         time_close (Optional[TimeOfDay]): Closing time.
+        unknown (dict): Keys the spec does not define, preserved verbatim.
+            See :attr:`Task.unknown`.
     """
 
     time_open: TimeOfDay | None = None
     time_close: TimeOfDay | None = None
+    unknown: dict[str, Any] = field(default_factory=dict)
+
+    #: Keys this class understands; everything else lands in ``unknown``.
+    KNOWN_KEYS = frozenset({"timeOpen", "timeClose"})
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
@@ -183,11 +198,12 @@ class Takeoff:
         Returns:
             Dict[str, Any]: Dictionary representation for JSON.
         """
-        result = {}
+        result: dict[str, Any] = {}
         if self.time_open:
             result["timeOpen"] = self.time_open.to_json_string()
         if self.time_close:
             result["timeClose"] = self.time_close.to_json_string()
+        write_passthrough(result, [], self.unknown, None)
         return result
 
     @classmethod
@@ -208,7 +224,8 @@ class Takeoff:
         if "timeClose" in data:
             time_close = TimeOfDay.from_json_string(data["timeClose"])
 
-        return cls(time_open=time_open, time_close=time_close)
+        _, unknown = read_passthrough(data, cls.KNOWN_KEYS, None)
+        return cls(time_open=time_open, time_close=time_close, unknown=unknown)
 
 
 @dataclass
@@ -221,12 +238,18 @@ class SSS:
             written so older devices keep working.
         time_gates (List[TimeOfDay]): List of time gates.
         time_close (Optional[TimeOfDay]): Optional closing time.
+        unknown (dict): Keys the spec does not define, preserved verbatim.
+            See :attr:`Task.unknown`.
     """
 
     type: SSSType
     direction: Direction = OBSOLETE_DIRECTION_DEFAULT
     time_gates: list[TimeOfDay] = field(default_factory=list)
     time_close: TimeOfDay | None = None
+    unknown: dict[str, Any] = field(default_factory=dict)
+
+    #: Keys this class understands; everything else lands in ``unknown``.
+    KNOWN_KEYS = frozenset({"type", "direction", "timeGates", "timeClose"})
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
@@ -234,13 +257,14 @@ class SSS:
         Returns:
             Dict[str, Any]: Dictionary representation for JSON.
         """
-        result = {
+        result: dict[str, Any] = {
             "type": self.type.value,
             "direction": self.direction.value,
             "timeGates": [gate.to_json_string() for gate in self.time_gates],
         }
         if self.time_close:
             result["timeClose"] = self.time_close.to_json_string()
+        write_passthrough(result, [], self.unknown, None)
         return result
 
     @classmethod
@@ -271,11 +295,13 @@ class SSS:
         if data.get("direction"):
             direction = Direction(data["direction"])
 
+        _, unknown = read_passthrough(data, cls.KNOWN_KEYS, None)
         return cls(
             type=SSSType(data["type"]),
             direction=direction,
             time_gates=time_gates,
             time_close=time_close,
+            unknown=unknown,
         )
 
 
@@ -294,11 +320,26 @@ class Goal:
         deadline (Optional[TimeOfDay]): Goal deadline.
         finish_altitude (Optional[float]): Elevated goal altitude in meters AGL,
             measured from the altitude of the last turnpoint.
+        unknown (dict): Keys the spec does not define, preserved verbatim.
+            See :attr:`Task.unknown`.
     """
 
     type: GoalType | None = None
     deadline: TimeOfDay | None = None
     finish_altitude: float | None = None
+    unknown: dict[str, Any] = field(default_factory=dict)
+
+    #: The non-spec key older versions wrote, read and deliberately discarded
+    #: rather than carried. It is always twice the last turnpoint's radius —
+    #: which is what the spec already says that radius means — so a task whose
+    #: two disagree has one wrong number, and echoing it back would preserve
+    #: it. Everything else this class does not define is carried verbatim;
+    #: naming this one here is what makes the drop a decision rather than an
+    #: omission.
+    IGNORED_KEYS = frozenset({"lineLength"})
+
+    #: Keys this class understands; everything else lands in ``unknown``.
+    KNOWN_KEYS = frozenset({"type", "deadline", "finishAltitude"}) | IGNORED_KEYS
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
@@ -319,6 +360,7 @@ class Goal:
             result["deadline"] = self.deadline.to_json_string()
         if self.finish_altitude is not None:
             result["finishAltitude"] = self.finish_altitude
+        write_passthrough(result, [], self.unknown, None)
         return result
 
     @classmethod
@@ -327,7 +369,9 @@ class Goal:
 
         The non-spec ``lineLength`` older versions wrote is ignored: it is
         always twice the last turnpoint's radius, so it carries nothing the
-        turnpoints do not already say.
+        turnpoints do not already say. It is on :attr:`KNOWN_KEYS` via
+        :attr:`IGNORED_KEYS` for that reason — otherwise the unknown-key
+        passthrough would carry it back out.
 
         Args:
             data (Dict[str, Any]): Dictionary to parse.
@@ -346,10 +390,12 @@ class Goal:
         if data.get("finishAltitude") is not None:
             finish_altitude = data["finishAltitude"]
 
+        _, unknown = read_passthrough(data, cls.KNOWN_KEYS, None)
         return cls(
             type=goal_type,
             deadline=deadline,
             finish_altitude=finish_altitude,
+            unknown=unknown,
         )
 
 
