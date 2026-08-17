@@ -140,8 +140,9 @@ All four were taken on in a second pass on the same branch.
   Public API unchanged.
 - [x] 10. **The layering is asserted, not described** (`caadbdb`).
   `tests/test_layering.py` parses every module and checks the layer rules, the
-  sibling-import rule, and that the function-local cross-package imports are exactly
-  the two known cycle-breakers. Each check was confirmed to fail when its rule is
+  sibling-import rule, and that the function-local imports inside the packages are
+  exactly the two known cycle-breakers (only one of which crosses a package
+  boundary — a distinction the first version of the test blurred, see #12). Each check was confirmed to fail when its rule is
   broken — the sibling-import check was rewritten after the first version passed a
   real violation (`from ..export.common import x` from inside `export/`).
 - [x] 11. **`export/common.py` pruned, and a latent defect fixed** (`3521cfb`).

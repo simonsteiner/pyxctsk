@@ -10,12 +10,15 @@ each — the second one broke `import pyxctsk` outright:
    package's `__init__`, so a partially-initialized package cannot fail an
    import halfway through.
 
-Only *module-level* imports are checked. Imports under ``if TYPE_CHECKING:``
-and inside function bodies are the deliberate escape hatches — a conversion
-method on the model has to reach the QR format somehow — and the point of the
-rule is that they stay rare and visible, not that they never happen. The two
-that exist today are named in :data:`EXPECTED_DEFERRED_IMPORTS`, so adding a
-third is a decision someone has to make on purpose.
+Only *module-level* imports are checked against those two rules. Imports under
+``if TYPE_CHECKING:`` and inside function bodies are the deliberate escape
+hatches — a conversion method on the model has to reach the QR format somehow —
+and the point is that they stay rare and visible, not that they never happen.
+The two function-local ones that exist today are pinned by name in
+:data:`EXPECTED_DEFERRED_IMPORTS`, so adding a third is a decision someone has
+to make on purpose. Both break a cycle; only one of them crosses a package
+boundary, which is why that check is about deferred imports generally rather
+than cross-package ones.
 """
 
 import ast
@@ -37,12 +40,18 @@ ALLOWED: dict[str, set[str]] = {
 #: `test_leaf_modules_are_leaves` keeps this honest.
 LEAVES = {"exceptions"}
 
-#: Every function-local import of one pyxctsk package from another, as
-#: "module -> package". Each one exists to break a cycle that a convenience
-#: method would otherwise create; see the docstring at each site.
+#: Every function-local import of one pyxctsk module by another, as
+#: "importer -> imported". Not all of them cross a package boundary — the
+#: second one does not — but each exists to break an import cycle a convenience
+#: method would otherwise create, which is what makes it worth pinning. See the
+#: docstring at each site for the cycle it breaks.
 EXPECTED_DEFERRED_IMPORTS = {
-    ("model/task.py", "qrcode"),  # Task.to_qr_code_task
-    ("qrcode/task.py", "qrcode"),  # QRCodeTask.from_task / .to_task
+    # Task.to_qr_code_task: conversion imports model.task to build a Task.
+    ("model/task.py", "qrcode.conversion"),
+    # QRCodeTask.from_task / .from_task_waypoints / .to_task: conversion
+    # imports qrcode.task for QRCodeTask, so this one is a cycle inside the
+    # qrcode package rather than between two of them.
+    ("qrcode/task.py", "qrcode.conversion"),
 }
 
 
@@ -56,10 +65,10 @@ def _rel(path: Path) -> str:
     return path.relative_to(SRC).as_posix()
 
 
-def _target_package(node: ast.ImportFrom, module_path: Path) -> str | None:
-    """Resolve a relative `from ... import` to the pyxctsk package it names.
+def _target_module(node: ast.ImportFrom, module_path: Path) -> str | None:
+    """Resolve a relative `from ... import` to the pyxctsk module it names.
 
-    Returns the top-level package or module inside pyxctsk (``"model"``,
+    Returns the dotted path within pyxctsk (``"qrcode.conversion"``,
     ``"exceptions"``, …), or None for third-party and standard-library imports.
     """
     if node.level == 0:  # absolute import: third-party or stdlib
@@ -74,7 +83,17 @@ def _target_package(node: ast.ImportFrom, module_path: Path) -> str | None:
     parts = (node.module or "").split(".") if node.module else []
     resolved = base.relative_to(SRC).as_posix()
     full = [p for p in (resolved.split("/") if resolved != "." else []) + parts if p]
-    return full[0] if full else None
+    return ".".join(full) if full else None
+
+
+def _target_package(node: ast.ImportFrom, module_path: Path) -> str | None:
+    """The top-level pyxctsk package a relative import reaches into.
+
+    ``"qrcode"`` for ``from ..qrcode.conversion import x``. None for
+    third-party and standard-library imports.
+    """
+    target = _target_module(node, module_path)
+    return target.split(".")[0] if target else None
 
 
 def _module_level_imports(tree: ast.Module) -> list[ast.ImportFrom]:
@@ -170,21 +189,21 @@ def test_leaf_modules_are_leaves(parsed):
             )
 
 
-def test_deferred_cross_package_imports_are_the_known_ones(parsed):
-    """Function-local imports across packages stay the documented two."""
+def test_deferred_imports_are_the_known_cycle_breakers(parsed):
+    """Function-local imports inside the packages stay the documented two."""
     found = set()
     for path, tree in parsed:
         package = path.relative_to(SRC).parts[0]
         if package not in ALLOWED:
             continue
         for node in _deferred_imports(tree):
-            target = _target_package(node, path)
-            if target is None or target in LEAVES:
+            target = _target_module(node, path)
+            if target is None or target.split(".")[0] in LEAVES:
                 continue
             found.add((_rel(path), target))
 
     assert found == EXPECTED_DEFERRED_IMPORTS, (
-        "function-local imports across packages changed.\n"
+        "function-local imports inside the packages changed.\n"
         f"  found:    {sorted(found)}\n"
         f"  expected: {sorted(EXPECTED_DEFERRED_IMPORTS)}\n"
         "Each one breaks a cycle; add it to EXPECTED_DEFERRED_IMPORTS with a "
