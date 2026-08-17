@@ -295,8 +295,16 @@ class TestOnePalette:
         that failure mode for a newly added `TurnpointType`, so the table is
         spelled out per member and this test is what makes adding one a CI
         failure rather than a colour nobody chose.
+
+        It asserts the membership directly rather than letting
+        `turnpoint_color`'s `KeyError` be the failure: the property under test is
+        that the table covers the enum, and reading the private table is the only
+        way to say that without the assertion restating the implementation.
         """
-        assert turnpoint_color(turnpoint_type) in common._TURNPOINT_COLORS.values()
+        assert turnpoint_type in common._TURNPOINT_COLORS, (
+            f"{turnpoint_type} has no palette entry, so it would render as "
+            "whatever the lookup fell back to"
+        )
 
     @pytest.mark.parametrize(("turnpoint_type", "is_goal"), ROLES)
     def test_every_role_has_a_colour_of_its_own(self, turnpoint_type, is_goal):
