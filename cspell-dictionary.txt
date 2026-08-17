@@ -10,6 +10,7 @@ bevo
 brentq
 changealphaint
 CIVL
+colours
 conftest
 clamptoground
 dami

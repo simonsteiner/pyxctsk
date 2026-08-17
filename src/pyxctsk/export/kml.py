@@ -4,13 +4,15 @@ import simplekml  # type: ignore
 
 from ..model.task import Task, TurnpointType
 from .common import (
+    ROUTE_COLOR,
     TaskDrawing,
     generate_circle_coordinates_3d,
-    get_turnpoint_color_hex,
+    turnpoint_color,
 )
 
 # Constants
-ALPHA_TRANSPARENCY = 100
+ALPHA_TRANSPARENCY = 100  # Cylinder and control-zone fills, 0-255
+ROUTE_ALPHA = 0xE6  # Course line, 90% opaque
 DEFAULT_ALTITUDE = 5000  # Default altitude for KML elements
 
 
@@ -26,26 +28,13 @@ def _create_turnpoint_style(
     Returns:
         A configured simplekml.Style object.
     """
+    color = turnpoint_color(turnpoint_type, is_goal)
+
     style = simplekml.Style()
     style.linestyle.width = 4
     style.polystyle.outline = 1
-
-    # Get hex color and convert to simplekml color
-    hex_color = get_turnpoint_color_hex(turnpoint_type, is_goal)
-
-    # Convert hex to simplekml color (assuming hex format #RRGGBB)
-    color_map = {
-        "#ff0000": simplekml.Color.red,
-        "#204d74": simplekml.Color.darkblue,
-        "#ac2925": simplekml.Color.darkred,
-        "#ff8c00": simplekml.Color.orange,
-        "#269abc": simplekml.Color.blue,
-    }
-
-    color = color_map.get(hex_color, simplekml.Color.blue)
-
-    style.linestyle.color = color
-    style.polystyle.color = simplekml.Color.changealphaint(ALPHA_TRANSPARENCY, color)
+    style.linestyle.color = color.kml()
+    style.polystyle.color = color.kml(ALPHA_TRANSPARENCY)
 
     return style
 
@@ -127,9 +116,8 @@ def _create_course_line(kml: simplekml.Kml, drawing: TaskDrawing) -> None:
         altitudemode=simplekml.AltitudeMode.clamptoground,
     )
 
-    # Style the course line
-    # Set color to red with 90% transparency (alpha=26 in KML AABBGGRR format)
-    course_line.style.linestyle.color = "E64136ff"  # Red, 90% transparent
+    # Style the course line: the shared route colour, 90% opaque.
+    course_line.style.linestyle.color = ROUTE_COLOR.kml(ROUTE_ALPHA)
     course_line.style.linestyle.width = 4
 
 

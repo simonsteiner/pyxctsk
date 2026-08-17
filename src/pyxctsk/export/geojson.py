@@ -12,7 +12,7 @@ All features include geometry and properties suitable for web map display, inclu
 Intended for use in web-based or desktop mapping tools to visualize XCTrack competition tasks.
 """
 
-from .common import TaskDrawing, get_turnpoint_color_hex
+from .common import ROUTE_COLOR, TaskDrawing, turnpoint_color
 
 
 def _create_turnpoint_feature(drawing: TaskDrawing, turnpoint, index: int) -> dict:
@@ -26,7 +26,7 @@ def _create_turnpoint_feature(drawing: TaskDrawing, turnpoint, index: int) -> di
     Returns:
         GeoJSON feature dictionary for the turnpoint.
     """
-    color = get_turnpoint_color_hex(turnpoint.type, drawing.is_goal(turnpoint))
+    color = turnpoint_color(turnpoint.type, drawing.is_goal(turnpoint)).hex
 
     return {
         "type": "Feature",
@@ -75,11 +75,11 @@ def _create_optimized_route_feature(drawing: TaskDrawing) -> dict | None:
         "properties": {
             "name": "Optimized Route",
             "type": "optimized_route",
-            "color": "#ff4136",
+            "color": ROUTE_COLOR.hex,
             "weight": 3,
             "opacity": 0.8,
             "arrowheads": True,
-            "arrow_color": "#ff4136",
+            "arrow_color": ROUTE_COLOR.hex,
             "arrow_size": 8,
             "arrow_spacing": 100,  # meters between arrows
         },
