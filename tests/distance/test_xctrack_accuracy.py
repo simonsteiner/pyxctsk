@@ -227,7 +227,7 @@ class TestCrossingCase:
 
         # The route point on each intermediate circle lies on the straight
         # line (crossing case): no out-and-back deviation in longitude.
-        _, route = calculate_iteratively_refined_route(turnpoints)
+        route = calculate_iteratively_refined_route(turnpoints).points
         for lat, lon in route:
             assert abs(lon - 8.0) < 1e-4
 
@@ -245,8 +245,9 @@ class TestGoalLine:
         task = parse_task(str(task_file))
         turnpoints = task_to_turnpoints(task)
 
-        distance, route = calculate_iteratively_refined_route(turnpoints)
-        assert distance / 1000.0 == pytest.approx(35.4, abs=0.1)
+        optimized = calculate_iteratively_refined_route(turnpoints)
+        route = optimized.points
+        assert optimized.total_m / 1000.0 == pytest.approx(35.4, abs=0.1)
 
         # The goal line is centred on the goal and perpendicular to the
         # incoming optimized leg, so its center is the optimal crossing: the

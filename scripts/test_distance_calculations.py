@@ -30,7 +30,6 @@ from pyxctsk.distance import (
     TaskTurnpoint,
     calculate_iteratively_refined_route,
     distance_through_centers,
-    optimized_distance,
 )
 from pyxctsk.distance.task_distances import task_to_turnpoints
 from pyxctsk.parser import parse_task
@@ -166,13 +165,12 @@ def get_pyxctsk_result(
     turnpoints: List[TaskTurnpoint], show_progress: bool
 ) -> Dict[str, Any]:
     """Calculates the optimized distance using the pyxctsk library."""
-    distance = optimized_distance(turnpoints, show_progress=show_progress)
-    _, route_points = calculate_iteratively_refined_route(
-        turnpoints, show_progress=False
+    optimized = calculate_iteratively_refined_route(
+        turnpoints, show_progress=show_progress
     )
     return {
-        "total_distance": distance,
-        "route_points": route_points,
+        "total_distance": optimized.total_m,
+        "route_points": list(optimized.points),
     }
 
 

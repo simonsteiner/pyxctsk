@@ -42,6 +42,7 @@ from .goal_line import (
     should_skip_last_turnpoint,
 )
 from .route_optimization import (
+    OptimizedRoute,
     calculate_iteratively_refined_route,
     optimized_distance,
     optimized_route_coordinates,
@@ -64,6 +65,7 @@ __all__ = [
     # Core classes
     "TaskTurnpoint",
     "GoalLine",
+    "OptimizedRoute",
     # Goal-line geometry
     "get_goal_line_data",
     "goal_line_length_from_turnpoints",

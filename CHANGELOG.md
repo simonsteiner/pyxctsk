@@ -15,6 +15,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- **Breaking (API): `calculate_iteratively_refined_route` returns an `OptimizedRoute`** instead of a `(distance_m, points)` tuple. The optimizer measures every leg on its way to the total and used to throw them away, leaving callers to reconstruct them; the value it returns now carries `points`, `legs` and the `earth_model` they were measured on, with `total_m` and `cumulative_m()` derived from those. `optimized_distance` and `optimized_route_coordinates` are unchanged projections of it, and the distances themselves are bit-identical — the legs are summed in the same order as before. Callers unpacking the tuple must use `.total_m` / `.points`. `OptimizedRoute` is exported from `pyxctsk.distance`.
 - **Breaking (API): the package is split into `model`, `qrcode`, `distance` and `export`.** `src/pyxctsk/` had grown to 27 modules in one flat directory, with prefixes (`qrcode_*`, `task_*`) doing the job a directory should. The public API is unchanged — everything re-exported from `pyxctsk` itself is where it was — but every deep import path moves:
 
   | was | now |
