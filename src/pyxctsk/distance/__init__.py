@@ -6,19 +6,17 @@ own. Everything a caller outside the package needs is named here —
 - optimized route and distance through turnpoint cylinders per FAI S7F §7
   (Ding–Xie–Jiang alternating point-circle-point method)
 - earth-model aware distances (WGS84 ellipsoid default, FAI sphere R = 6371 km)
-- SSS (Start of Speed Section) entry point and info
 - cumulative and per-leg task distances
 - the tunable optimization parameters
 
 — while the work lives in focused submodules:
 
-- :mod:`~pyxctsk.distance.turnpoint` — ``TaskTurnpoint``, the earth models, the
-  local Transverse Mercator projection and the planar optimal point
+- :mod:`~pyxctsk.distance.turnpoint` — ``TaskTurnpoint``, the earth models,
+  ``LocalPlane`` and the one planar solver every caller reaches
 - :mod:`~pyxctsk.distance.route_optimization` — the shortest path through the
   cylinders
 - :mod:`~pyxctsk.distance.task_distances` — per-leg and cumulative distances,
   projected from one optimized route
-- :mod:`~pyxctsk.distance.sss` — Start-of-Speed-Section entry point and info
 - :mod:`~pyxctsk.distance.goal_line` — the ``GoalLine`` deep module: length,
   endpoints and semicircular control zone, in one place
 - :mod:`~pyxctsk.distance.config` — convergence epsilon and sweep count
@@ -44,7 +42,6 @@ from .route_optimization import (
     calculate_iteratively_refined_route,
     optimized_distance,
 )
-from .sss import calculate_optimal_sss_entry_point, calculate_sss_info
 from .task_distances import (
     calculate_task_distances,
     task_distances_from_route,
@@ -77,8 +74,6 @@ __all__ = [
     "task_distances_from_route",
     "task_to_turnpoints",
     # SSS specific functions
-    "calculate_sss_info",
-    "calculate_optimal_sss_entry_point",
     # Configuration
     "CONVERGENCE_EPSILON_M",
     "DEFAULT_NUM_ITERATIONS",
