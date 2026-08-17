@@ -170,3 +170,36 @@ class TestValidatingWhatArrived:
         # The converted task does carry those inventions.
         converted = payload.to_task()
         assert converted.goal is not None and converted.version == 1
+
+    def test_the_new_rules_reach_the_qr_format_too(self):
+        """Radius, version and extensions are all things a QR payload carries.
+
+        The rules are stated over a ``TaskStructure``, so a format that can
+        present one gets every rule rather than the subset someone remembered
+        to wire up.
+        """
+        from pyxctsk.model.validation import ValidationRule
+
+        payload = self._payload(1, 2, 3)
+        payload.version = 99
+        payload.turnpoints[0].radius = -1
+        payload.turnpoints[0].extensions = [{"id": "ACME"}]
+
+        rules = {issue.rule for issue in payload.validate()}
+
+        assert rules == {
+            ValidationRule.UNKNOWN_VERSION,
+            ValidationRule.NEGATIVE_RADIUS,
+            ValidationRule.EXTENSION_WITHOUT_ROOT,
+            ValidationRule.EXTENSION_REPEATS_ID,
+        }
+
+    def test_the_qr_format_expects_its_own_version(self):
+        """Version 2 here, version 1 in the full format — one rule, two facts."""
+        payload = self._payload(1, 2, 3)
+
+        assert payload.version == 2
+        assert payload.validate() == []
+        # The same task in the other format declares 1, and is equally valid.
+        assert payload.to_task().version == 1
+        assert payload.to_task().validate() == []

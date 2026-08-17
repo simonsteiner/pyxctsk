@@ -42,7 +42,7 @@ from ..model.task import (
     TurnpointType,
     Waypoint,
 )
-from ..model.validation import ValidationIssue, validate_turnpoint_roles
+from ..model.validation import TaskStructure, ValidationIssue, validate_structure
 from .enums import (
     QRCodeDirection,
     QRCodeEarthModel,
@@ -270,10 +270,10 @@ def qr_code_task_to_task(qr: QRCodeTask) -> Task:
 def validate_qr_code_task(qr: QRCodeTask) -> list[ValidationIssue]:
     """Check a QR payload against the spec's structural rules, as it arrived.
 
-    The rules are stated once, over turnpoint roles
-    (:func:`~pyxctsk.model.validation.validate_turnpoint_roles`); this is the
-    QR format's adapter onto them, and it lives here because translating
-    between the two vocabularies of turnpoint type is what this module is for.
+    The rules are stated once, over a :class:`~pyxctsk.model.validation.TaskStructure`;
+    this is the QR format's adapter onto them, and it lives here because
+    translating between the two vocabularies of turnpoint type is what this
+    module is for.
 
     Checking the payload rather than its conversion is the point. Converting
     first invents ``version=1``, a ``CLASSIC`` task type and a CYLINDER goal
@@ -286,7 +286,14 @@ def validate_qr_code_task(qr: QRCodeTask) -> list[ValidationIssue]:
     Returns:
         list[ValidationIssue]: One issue per violated rule, empty if valid.
     """
-    return validate_turnpoint_roles(
-        [_FROM_QR_TURNPOINT_TYPE.get(tp.type) for tp in qr.turnpoints],
-        is_waypoints_task=qr.task_type == QRCodeTaskType.WAYPOINTS,
+    return validate_structure(
+        TaskStructure(
+            roles=[_FROM_QR_TURNPOINT_TYPE.get(tp.type) for tp in qr.turnpoints],
+            radii=[tp.radius for tp in qr.turnpoints],
+            turnpoint_extensions=[tp.extensions for tp in qr.turnpoints],
+            root_extensions=qr.extensions,
+            version=qr.version,
+            expected_version=QR_CODE_TASK_VERSION,
+            is_waypoints_task=qr.task_type == QRCodeTaskType.WAYPOINTS,
+        )
     )

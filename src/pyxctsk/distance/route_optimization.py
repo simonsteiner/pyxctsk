@@ -38,7 +38,6 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from itertools import accumulate
 
-from .config import CONVERGENCE_EPSILON_M, DEFAULT_NUM_ITERATIONS
 from .turnpoint import (
     LocalPlane,
     TurnpointGeometry,
@@ -47,6 +46,24 @@ from .turnpoint import (
     plane_optimal_point,
     snap_to_boundary,
 )
+
+#: How many alternating sweeps to allow before giving up. A safety bound, not
+#: an accuracy setting — convergence normally stops far earlier — and the one
+#: genuinely tunable number here: it is what ``num_iterations`` defaults to on
+#: :func:`calculate_iteratively_refined_route` and :func:`optimized_distance`.
+DEFAULT_NUM_ITERATIONS = 100
+
+#: The convergence threshold the spec fixes: iteration stops once a full sweep
+#: changes the total path length by less than this (FAI Sporting Code S7F
+#: §7.1.3: ε = 0.1 m).
+#:
+#: **Not a tuning knob.** ADR 0004 settled that "precision is governed by the
+#: spec's ε = 0.1 m, not by a sampling knob", which is why no public entry
+#: point forwards it. It is named rather than inlined because the citation is
+#: the payload — the same reason ``model/rounding.py`` exists. It lived in a
+#: module called ``config.py`` beside the tunable above, which said
+#: *configuration* about a value the spec settles.
+CONVERGENCE_EPSILON_M = 0.1
 
 #: A planar circle: (x, y, radius) in the local Transverse Mercator plane.
 PlaneCircle = tuple[float, float, float]

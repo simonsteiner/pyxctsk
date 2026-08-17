@@ -7,7 +7,8 @@ own. Everything a caller outside the package needs is named here —
   (Ding–Xie–Jiang alternating point-circle-point method)
 - earth-model aware distances (WGS84 ellipsoid default, FAI sphere R = 6371 km)
 - cumulative and per-leg task distances
-- the tunable optimization parameters
+- the optimizer's sweep limit, the one number here worth tuning, beside the
+  convergence threshold the spec fixes
 
 — while the work lives in focused submodules:
 
@@ -19,7 +20,6 @@ own. Everything a caller outside the package needs is named here —
   projected from one optimized route
 - :mod:`~pyxctsk.distance.goal_line` — the ``GoalLine`` deep module: length,
   endpoints and semicircular control zone, in one place
-- :mod:`~pyxctsk.distance.config` — convergence epsilon and sweep count
 
 The goal line lives here rather than with the KML and GeoJSON writers that draw
 it because the shapes of a task must not depend on the formats it is exported
@@ -32,12 +32,10 @@ Submodules import each other directly, never through this file, which is what
 keeps the re-export layer free of the cycles it was split out to break.
 """
 
-from .config import (
-    CONVERGENCE_EPSILON_M,
-    DEFAULT_NUM_ITERATIONS,
-)
 from .goal_line import GoalLine, goal_line_length_from_turnpoints
 from .route_optimization import (
+    CONVERGENCE_EPSILON_M,
+    DEFAULT_NUM_ITERATIONS,
     OptimizedRoute,
     calculate_iteratively_refined_route,
     optimized_distance,

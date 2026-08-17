@@ -315,6 +315,13 @@ class TestStructuralValidation:
                 d["turnpoints"][0].update(type="ESS"),
                 d["turnpoints"][1].update(type="SSS"),
             ),
+            lambda d: d["turnpoints"][2].update(radius=-1),
+            lambda d: d.update(version=99),
+            lambda d: d["turnpoints"][2].update(extensions=[{"a": "1"}]),
+            lambda d: (
+                d.update(extensions=[{"id": "ACME"}]),
+                d["turnpoints"][2].update(extensions=[{"id": "ACME", "a": "1"}]),
+            ),
         ):
             emitted |= {issue.rule for issue in self._mutated(mutate)}
         emitted |= {
@@ -325,6 +332,82 @@ class TestStructuralValidation:
         }
 
         assert emitted == set(ValidationRule)
+
+    def test_a_negative_radius_is_rejected(self):
+        """A cylinder cannot be smaller than a point."""
+        issues = self._mutated(lambda d: d["turnpoints"][2].update(radius=-1))
+
+        self._assert_one(
+            issues,
+            ValidationRule.NEGATIVE_RADIUS,
+            "turnpoint 2 has a negative radius (-1)",
+        )
+
+    def test_a_zero_radius_is_not(self):
+        """Zero is legitimate: every XC/Waypoints turnpoint has it.
+
+        The 2026-08-17 review's candidate H proposed rejecting ``radius <= 0``.
+        That would fail every waypoints task, and the optimizer reads radius 0
+        as the point itself.
+        """
+        issues = self._mutated(lambda d: d["turnpoints"][2].update(radius=0))
+
+        assert issues == []
+
+    def test_a_version_this_format_does_not_define_is_rejected(self):
+        """The full format is version 1; the QR one says 2."""
+        issues = self._mutated(lambda d: d.update(version=2))
+
+        self._assert_one(
+            issues,
+            ValidationRule.UNKNOWN_VERSION,
+            "this format defines version 1, the task declares 2",
+        )
+
+    def test_a_turnpoint_extension_with_no_root_entry_is_rejected(self):
+        """Spec: turnpoint extensions are "in the same order as the root ones".
+
+        Position is the only thing linking one to a root entry, so a turnpoint
+        carrying more of them than the root list has entries has some that
+        correspond to nothing.
+        """
+        issues = self._mutated(
+            lambda d: d["turnpoints"][2].update(extensions=[{"a": "1"}])
+        )
+
+        self._assert_one(
+            issues,
+            ValidationRule.EXTENSION_WITHOUT_ROOT,
+            "turnpoint 2 has 1 extensions but the root list has 0, so some "
+            "correspond to nothing",
+        )
+
+    def test_a_turnpoint_extension_repeating_the_id_is_rejected(self):
+        """Spec: the ``id`` is "not repeated" on the turnpoint entries."""
+        issues = self._mutated(
+            lambda d: (
+                d.update(extensions=[{"id": "ACME"}]),
+                d["turnpoints"][2].update(extensions=[{"id": "ACME", "a": "1"}]),
+            )
+        )
+
+        self._assert_one(
+            issues,
+            ValidationRule.EXTENSION_REPEATS_ID,
+            "turnpoint 2 repeats the extension id 'ACME', which belongs to the "
+            "root entry",
+        )
+
+    def test_well_formed_extensions_pass(self):
+        """One root entry, one matching turnpoint entry without the id."""
+        issues = self._mutated(
+            lambda d: (
+                d.update(extensions=[{"id": "ACME"}]),
+                d["turnpoints"][2].update(extensions=[{"a": "1"}]),
+            )
+        )
+
+        assert issues == []
 
     def test_strict_rejects_an_invalid_task(self):
         """The opt-in flag turns the report into a failure."""
