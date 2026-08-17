@@ -12,7 +12,7 @@ from typing import Any
 
 from ..model.task import Task
 from .goal_line import goal_line_length_from_turnpoints
-from .route_optimization import optimized_distance
+from .route_optimization import OptimizedRoute, calculate_iteratively_refined_route
 from .turnpoint import TaskTurnpoint, distance_through_centers, geodesic_distance
 
 
@@ -104,29 +104,33 @@ def _calculate_savings(center_km: float, opt_km: float) -> tuple[float, float]:
 def _create_turnpoint_details(
     task_turnpoints,
     task_distance_turnpoints: list[TaskTurnpoint],
-    show_progress: bool = False,
+    route: OptimizedRoute,
 ) -> list[dict[str, Any]]:
     """Create detailed turnpoint information including cumulative distances.
+
+    The optimized column is read off ``route`` rather than recomputed. Both
+    are distances along one route, so a turnpoint's cumulative optimized
+    distance is by construction a prefix of the task's optimized distance —
+    which is what re-optimizing a truncated task did not give: the optimizer
+    treats the last circle of whatever it is handed as the finish, so the
+    truncated optimum bent the route towards turnpoint i instead of passing
+    through it, understating the prefix by up to 5 km on the reference tasks.
 
     Args:
         task_turnpoints: Original task turnpoints.
         task_distance_turnpoints (List[TaskTurnpoint]): Distance calculation turnpoints.
-        show_progress (bool): Whether to show progress.
+        route (OptimizedRoute): The task's optimized route.
 
     Returns:
         List[Dict[str, Any]]: List of dictionaries with turnpoint details.
     """
     turnpoint_details = []
     cumulative_center = 0.0
+    cumulative_optimized = route.cumulative_m()
 
     for i, (tp, task_tp) in enumerate(zip(task_turnpoints, task_distance_turnpoints)):
-        cumulative_opt = 0.0
-
         # Calculate cumulative distances for all turnpoints
         if i > 0:
-            if show_progress and i > 1:
-                print(f"    🔄 Turnpoint {i + 1}/{len(task_distance_turnpoints)}")
-
             # Calculate center distance incrementally
             prev_tp = task_distance_turnpoints[i - 1]
             leg_distance = (
@@ -135,12 +139,9 @@ def _create_turnpoint_details(
             )
             cumulative_center += leg_distance
 
-            # For optimized distance, calculate using all turnpoints up to current
-            partial_turnpoints = task_distance_turnpoints[: i + 1]
-            if len(partial_turnpoints) >= 2:
-                cumulative_opt = (
-                    optimized_distance(partial_turnpoints, show_progress=False) / 1000.0
-                )
+        cumulative_opt = (
+            cumulative_optimized[i] / 1000.0 if i < len(cumulative_optimized) else 0.0
+        )
 
         turnpoint_details.append(
             {
@@ -199,11 +200,14 @@ def calculate_task_distances(
         print(f"  ✅ Center distance: {center_dist / 1000.0:.1f}km")
         print("  🎯 Starting optimized calculation...")
 
-    opt_dist = optimized_distance(
+    # One optimizer run for the whole task; the per-turnpoint column below is a
+    # projection of this route, not a second optimization per prefix.
+    route = calculate_iteratively_refined_route(
         distance_turnpoints,
         show_progress=show_progress,
         num_iterations=num_iterations,
     )
+    opt_dist = route.total_m
 
     if show_progress:
         print(f"  ✅ Optimized distance: {opt_dist / 1000.0:.1f}km")
@@ -224,7 +228,7 @@ def calculate_task_distances(
     turnpoint_details = _create_turnpoint_details(
         task.turnpoints,
         turnpoints,
-        show_progress,
+        route,
     )
 
     if show_progress:
@@ -237,26 +241,3 @@ def calculate_task_distances(
         "savings_percent": round(savings_percent, 1),
         "turnpoints": turnpoint_details,
     }
-
-
-def calculate_cumulative_distances(
-    turnpoints: list[TaskTurnpoint],
-    index: int,
-) -> tuple[float, float]:
-    """Calculate cumulative distances up to a specific turnpoint index.
-
-    Args:
-        turnpoints (List[TaskTurnpoint]): List of TaskTurnpoint objects.
-        index (int): Index of the turnpoint (0-based).
-
-    Returns:
-        Tuple[float, float]: Tuple of (center_distance_km, optimized_distance_km).
-    """
-    if index == 0 or len(turnpoints) <= 1:
-        return 0.0, 0.0
-
-    partial_turnpoints = turnpoints[: index + 1]
-    center_dist = distance_through_centers(partial_turnpoints) / 1000.0
-    opt_dist = optimized_distance(partial_turnpoints, show_progress=False) / 1000.0
-
-    return center_dist, opt_dist

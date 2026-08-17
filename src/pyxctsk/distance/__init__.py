@@ -49,7 +49,6 @@ from .route_optimization import (
 )
 from .sss import calculate_optimal_sss_entry_point, calculate_sss_info
 from .task_distances import (
-    calculate_cumulative_distances,
     calculate_task_distances,
     task_to_turnpoints,
 )
@@ -76,7 +75,6 @@ __all__ = [
     "distance_through_centers",
     "geodesic_distance",
     "calculate_task_distances",
-    "calculate_cumulative_distances",
     "task_to_turnpoints",
     # SSS specific functions
     "calculate_sss_info",

@@ -20,10 +20,11 @@ import pytest
 
 from pyxctsk.distance import (
     TaskTurnpoint,
-    calculate_cumulative_distances,
+    calculate_iteratively_refined_route,
     calculate_task_distances,
     distance_through_centers,
     optimized_distance,
+    task_to_turnpoints,
 )
 from pyxctsk.parser import parse_task
 
@@ -171,33 +172,43 @@ class TestDistanceComprehensive:
             f"Savings {savings_pct:.1%} outside reasonable range [2%-80%]"
         )
 
-    def test_cumulative_distance_calculations(
-        self, test_turnpoints: List[TaskTurnpoint]
+    def test_cumulative_optimized_is_a_prefix_of_the_route(
+        self, reference_data: Dict[str, Dict]
     ):
-        """Test cumulative distance calculations through turnpoint sequence."""
-        # Test cumulative calculations for different endpoints
-        for target_idx in range(1, len(test_turnpoints)):
-            center_cum, opt_cum = calculate_cumulative_distances(
-                test_turnpoints, target_idx
-            )
+        """The cumulative column must be measured along the task's own route.
 
-            assert center_cum > 0, (
-                f"Cumulative center distance to {target_idx} should be positive"
-            )
-            assert opt_cum > 0, (
-                f"Cumulative optimized distance to {target_idx} should be positive"
-            )
-            assert opt_cum <= center_cum, (
-                "Cumulative optimization should not exceed center distance"
-            )
+        Regression: the column was recomputed per turnpoint by re-optimizing
+        ``turnpoints[:i + 1]``. The optimizer treats the last circle it is
+        handed as the finish, so each of those runs bent the route towards
+        turnpoint i instead of passing through it — the numbers were optima of
+        truncated tasks, not distances along the route drawn beside them.
+        On task_bevo turnpoint 7 the two were 5.09 km apart, both derived from
+        the same Task. Only the non-decreasing property was asserted before,
+        which both readings satisfy.
+        """
+        checked = 0
+        for name in ("task_bevo", "task_gibe", "task_duna"):
+            if name not in reference_data:
+                continue
+            task = reference_data[name]["task"]
 
-            # Cumulative distances should increase with more turnpoints
-            if target_idx > 1:
-                prev_center, prev_opt = calculate_cumulative_distances(
-                    test_turnpoints, target_idx - 1
-                )
-                assert center_cum > prev_center, "Center cumulative should increase"
-                assert opt_cum > prev_opt, "Optimized cumulative should increase"
+            results = calculate_task_distances(task)
+            route = calculate_iteratively_refined_route(task_to_turnpoints(task))
+
+            expected = [round(m / 1000.0, 1) for m in route.cumulative_m()]
+            actual = [tp["cumulative_optimized_km"] for tp in results["turnpoints"]]
+            assert actual == expected, f"{name}: cumulative column left the route"
+
+            # The last turnpoint's cumulative distance is the task distance.
+            assert actual[-1] == results["optimized_distance_km"]
+
+            # An optimized prefix never exceeds the same prefix through centers.
+            for tp in results["turnpoints"]:
+                assert tp["cumulative_optimized_km"] <= tp["cumulative_center_km"]
+            checked += 1
+
+        if checked == 0:
+            pytest.skip("No reference task with a known route available")
 
     def test_edge_cases_and_robustness(self):
         """Test algorithm robustness with edge cases."""
