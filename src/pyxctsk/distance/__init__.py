@@ -36,16 +36,11 @@ from .config import (
     CONVERGENCE_EPSILON_M,
     DEFAULT_NUM_ITERATIONS,
 )
-from .goal_line import (
-    GoalLine,
-    get_goal_line_data,
-    goal_line_length_from_turnpoints,
-)
+from .goal_line import GoalLine, goal_line_length_from_turnpoints
 from .route_optimization import (
     OptimizedRoute,
     calculate_iteratively_refined_route,
     optimized_distance,
-    optimized_route_coordinates,
 )
 from .sss import calculate_optimal_sss_entry_point, calculate_sss_info
 from .task_distances import (
@@ -67,11 +62,9 @@ __all__ = [
     "GoalLine",
     "OptimizedRoute",
     # Goal-line geometry
-    "get_goal_line_data",
     "goal_line_length_from_turnpoints",
     # Main distance calculation functions
     "optimized_distance",
-    "optimized_route_coordinates",
     "distance_through_centers",
     "geodesic_distance",
     "calculate_task_distances",

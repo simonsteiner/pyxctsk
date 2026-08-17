@@ -32,9 +32,6 @@ FAI_SPHERE_RADIUS_M = 6_371_000.0
 _WGS84_GEOD = Geod(ellps="WGS84")
 _FAI_SPHERE_GEOD = Geod(a=FAI_SPHERE_RADIUS_M, b=FAI_SPHERE_RADIUS_M)
 
-# Retained module-level name for backwards compatibility (WGS84 ellipsoid).
-geod = _WGS84_GEOD
-
 
 def _is_fai_sphere(earth_model: object) -> bool:
     """Return True if the given earth model designates the FAI sphere.

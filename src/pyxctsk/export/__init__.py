@@ -24,7 +24,7 @@ Modules inside the package import each other directly rather than through this
 file; the re-exports below are for callers outside it.
 """
 
-from .common import TaskDrawing, get_turnpoints_to_render
+from .common import TaskDrawing
 from .geojson import drawing_to_geojson, generate_task_geojson
 from .kml import drawing_to_kml, task_to_kml
 
@@ -33,6 +33,5 @@ __all__ = [
     "drawing_to_geojson",
     "drawing_to_kml",
     "generate_task_geojson",
-    "get_turnpoints_to_render",
     "task_to_kml",
 ]

@@ -95,12 +95,12 @@ def _create_goal_line_features(drawing: TaskDrawing) -> list[dict]:
     Returns:
         The goal-line and control-zone features, or an empty list.
     """
-    if drawing.goal_line is None:
+    goal_line = drawing.goal_line
+    if goal_line is None:
         return []
 
-    (lon1, lat1), (lon2, lat2), goal_line_length, control_zone_coords = (
-        drawing.goal_line.data()
-    )
+    (lon1, lat1), (lon2, lat2), _ = goal_line.endpoints()
+    goal_line_length = goal_line.length
     features = []
 
     # Create goal line feature
@@ -126,9 +126,7 @@ def _create_goal_line_features(drawing: TaskDrawing) -> list[dict]:
     control_zone_radius = goal_line_length / 2
 
     # Convert control zone coordinates to GeoJSON format [lon, lat]
-    control_zone_geojson_coords = [
-        [coord[0], coord[1]] for coord in control_zone_coords
-    ]
+    control_zone_geojson_coords = [[lon, lat] for lon, lat in goal_line.control_zone()]
 
     control_zone_feature = {
         "type": "Feature",

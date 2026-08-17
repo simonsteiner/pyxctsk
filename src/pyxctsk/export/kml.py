@@ -154,27 +154,27 @@ def _create_goal_line_elements(
         drawing: The task drawing, carrying the goal line if there is one.
         altitude: altitude for the line.
     """
-    if drawing.goal_line is None:
+    goal_line = drawing.goal_line
+    if goal_line is None:
         return
 
-    (lon1, lat1), (lon2, lat2), goal_line_length, control_zone_coords = (
-        drawing.goal_line.data()
-    )
+    (lon1, lat1), (lon2, lat2), _ = goal_line.endpoints()
+    goal_line_length = goal_line.length
 
     # Create goal line
-    goal_line = kml.newlinestring(
+    goal_line_placemark = kml.newlinestring(
         name="Goal Line",
         description=f"Goal line length: {goal_line_length:.0f}m",
         coords=[(lon1, lat1, altitude), (lon2, lat2, altitude)],
         extrude=1,
         altitudemode=simplekml.AltitudeMode.relativetoground,
     )
-    goal_line.style.linestyle.color = simplekml.Color.red
-    goal_line.style.linestyle.width = 5
+    goal_line_placemark.style.linestyle.color = simplekml.Color.red
+    goal_line_placemark.style.linestyle.width = 5
 
     # Create control zone polygon
     control_zone_coords_3d = [
-        (coord[0], coord[1], altitude) for coord in control_zone_coords
+        (lon, lat, altitude) for lon, lat in goal_line.control_zone()
     ]
 
     control_zone = kml.newpolygon(

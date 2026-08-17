@@ -27,9 +27,9 @@ from pyxctsk import (
 from pyxctsk.distance import geodesic_distance
 from pyxctsk.distance.goal_line import (
     GoalLine,
+    _endpoints_from_coords,
     _find_previous_turnpoint,
-    calculate_goal_line_endpoints,
-    generate_semicircle_arc,
+    _generate_semicircle_arc,
     goal_line_length_from_turnpoints,
 )
 
@@ -185,77 +185,36 @@ class TestFindPreviousTurnpoint:
         assert result is None  # Should be treated as same coordinates
 
 
-class TestCalculateGoalLineEndpoints:
-    """Test the calculate_goal_line_endpoints function."""
+class TestEndpointsFromCoords:
+    """The endpoint math, on raw coordinates.
 
-    def test_calculate_goal_line_endpoints_basic(self):
-        """Test basic goal line endpoint calculation."""
-        last_tp = Mock()
-        last_tp.waypoint = Mock()
-        last_tp.waypoint.lat = 47.0
-        last_tp.waypoint.lon = 8.0
+    These used to build Mock turnpoints to reach it through a back-compat
+    adapter (`calculate_goal_line_endpoints`); the core takes coordinates.
+    """
 
-        prev_tp = Mock()
-        prev_tp.waypoint = Mock()
-        prev_tp.waypoint.lat = 46.0
-        prev_tp.waypoint.lon = 8.0
-
-        goal_line_length = 400.0
-
-        (lon1, lat1), (lon2, lat2), forward_azimuth = calculate_goal_line_endpoints(
-            last_tp, prev_tp, goal_line_length
+    def test_approach_from_the_south_runs_the_line_east_west(self):
+        """Approaching due north, the forward azimuth is 0 and the line is E-W."""
+        (lon1, lat1), (lon2, lat2), forward_azimuth = _endpoints_from_coords(
+            47.0, 8.0, 46.0, 8.0, 400.0
         )
 
-        # Both endpoints should be valid coordinates
-        assert isinstance(lon1, float)
-        assert isinstance(lat1, float)
-        assert isinstance(lon2, float)
-        assert isinstance(lat2, float)
-        assert isinstance(forward_azimuth, float)
-
-        # Forward azimuth should be approximately 0 (north) for this setup
         assert abs(forward_azimuth) < 1.0 or abs(forward_azimuth - 360) < 1.0
+        # The endpoints straddle the goal in longitude, at the goal's latitude.
+        assert lon1 > 8.0 > lon2
+        assert abs(lat1 - 47.0) < 1e-4 and abs(lat2 - 47.0) < 1e-4
 
-    def test_calculate_goal_line_endpoints_east_west(self):
-        """Test goal line endpoints for east-west approach."""
-        last_tp = Mock()
-        last_tp.waypoint = Mock()
-        last_tp.waypoint.lat = 47.0
-        last_tp.waypoint.lon = 8.0
+    def test_approach_from_the_west_runs_the_line_north_south(self):
+        """Approaching due east, the forward azimuth is 90."""
+        _, _, forward_azimuth = _endpoints_from_coords(47.0, 8.0, 47.0, 7.0, 400.0)
 
-        prev_tp = Mock()
-        prev_tp.waypoint = Mock()
-        prev_tp.waypoint.lat = 47.0
-        prev_tp.waypoint.lon = 7.0  # West of goal
-
-        goal_line_length = 400.0
-
-        (lon1, lat1), (lon2, lat2), forward_azimuth = calculate_goal_line_endpoints(
-            last_tp, prev_tp, goal_line_length
-        )
-
-        # Forward azimuth should be approximately 90 (east)
         assert abs(forward_azimuth - 90) < 1.0
 
-    def test_calculate_goal_line_endpoints_zero_length(self):
-        """Test goal line endpoints with zero length."""
-        last_tp = Mock()
-        last_tp.waypoint = Mock()
-        last_tp.waypoint.lat = 47.0
-        last_tp.waypoint.lon = 8.0
-
-        prev_tp = Mock()
-        prev_tp.waypoint = Mock()
-        prev_tp.waypoint.lat = 46.0
-        prev_tp.waypoint.lon = 8.0
-
-        goal_line_length = 0.0
-
-        (lon1, lat1), (lon2, lat2), forward_azimuth = calculate_goal_line_endpoints(
-            last_tp, prev_tp, goal_line_length
+    def test_zero_length_puts_both_endpoints_on_the_goal(self):
+        """A zero-length line degenerates to the goal center."""
+        (lon1, lat1), (lon2, lat2), _ = _endpoints_from_coords(
+            47.0, 8.0, 46.0, 8.0, 0.0
         )
 
-        # Both endpoints should be at the goal center
         assert abs(lon1 - 8.0) < 1e-10
         assert abs(lat1 - 47.0) < 1e-10
         assert abs(lon2 - 8.0) < 1e-10
@@ -263,7 +222,7 @@ class TestCalculateGoalLineEndpoints:
 
 
 class TestGenerateSemicircleArc:
-    """Test the generate_semicircle_arc function."""
+    """Test the semicircle arc generator."""
 
     def test_generate_semicircle_arc_basic(self):
         """Test basic semicircle arc generation."""
@@ -274,7 +233,7 @@ class TestGenerateSemicircleArc:
         through_azimuth = 0.0  # North
         radius = 200.0
 
-        arc_points = generate_semicircle_arc(
+        arc_points = _generate_semicircle_arc(
             center_lon, center_lat, start_azimuth, end_azimuth, through_azimuth, radius
         )
 
@@ -298,7 +257,7 @@ class TestGenerateSemicircleArc:
         through_azimuth = 0.0
         radius = 0.0
 
-        arc_points = generate_semicircle_arc(
+        arc_points = _generate_semicircle_arc(
             center_lon, center_lat, start_azimuth, end_azimuth, through_azimuth, radius
         )
 

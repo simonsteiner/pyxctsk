@@ -27,9 +27,10 @@ distance (including mandatory "out and back" legs between concentric
 cylinders of different radii).
 
 The main entry point is `calculate_iteratively_refined_route`, which returns an
-`OptimizedRoute` carrying the points *and* the per-leg distances it measured;
-`optimized_distance` and `optimized_route_coordinates` are thin projections of
-that value.
+`OptimizedRoute` carrying the points *and* the per-leg distances it measured.
+`optimized_distance` is kept beside it for the common case of wanting only the
+number; anything else — the points, the legs, a cumulative distance — is a field
+or method on the route rather than another function here.
 """
 
 import math
@@ -382,29 +383,3 @@ def optimized_distance(
         show_progress=show_progress,
         earth_model=earth_model,
     ).total_m
-
-
-def optimized_route_coordinates(
-    turnpoints: Sequence[TurnpointGeometry],
-    num_iterations: int | None = None,
-    earth_model: object = None,
-) -> list[tuple[float, float]]:
-    """Compute the fully optimized route coordinates through the turnpoints.
-
-    Args:
-        turnpoints: The task turnpoints.
-        num_iterations: Maximum number of alternating sweeps.
-        earth_model: Earth model selector (None uses the turnpoints' model,
-            defaulting to WGS84).
-
-    Returns:
-        List of (lat, lon) tuples representing the optimized route coordinates.
-    """
-    return list(
-        calculate_iteratively_refined_route(
-            turnpoints,
-            num_iterations=num_iterations,
-            show_progress=False,
-            earth_model=earth_model,
-        ).points
-    )

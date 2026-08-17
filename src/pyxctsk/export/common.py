@@ -1,12 +1,13 @@
 """What the KML and GeoJSON writers both need to draw a task.
 
 :class:`TaskDrawing` is that answer, derived once per task: which turnpoints to
-draw, whether there is a goal line, and the optimized route. Both writers
-render the same value rather than each asking the same questions again — which
-is not only cheaper (the optimizer ran once per format) but the reason the
-answers cannot disagree. They did: the goal line's presence and the decision to
-drop the last turnpoint were computed separately, and a LINE goal with no usable
-approach direction lost its goal from both outputs.
+draw, which of them is the goal, whether there is a goal line, and the optimized
+route. Both writers render the same value rather than each asking the same
+questions again — which is not only cheaper (the optimizer ran once per format)
+but the reason the answers cannot disagree. They did: the goal line's presence
+and the decision to drop the last turnpoint were computed separately, and a LINE
+goal with no usable approach direction lost its goal from both outputs. There is
+no free function beside the drawing that answers any of those a second way.
 
 Also here: what colour a turnpoint is, and the polygon that approximates a
 cylinder. That circle is planar — a fixed metres-per-degree constant, not a
@@ -30,34 +31,6 @@ from ..model.task import Task, Turnpoint, TurnpointType
 # Constants for visualization
 CIRCLE_POINTS = 64  # Number of points to approximate circle
 METERS_PER_DEGREE = 111320.0  # 1 degree ≈ 111.32 km at equator
-
-
-def _turnpoints_to_render(task: Task, goal_line: GoalLine | None) -> list[Turnpoint]:
-    """Which turnpoints to draw, given whether the task has a goal line.
-
-    A goal line replaces the last turnpoint, so the turnpoint is dropped
-    exactly when there is a line to draw in its place. Taking the goal line as
-    an argument rather than looking it up again is what keeps the two in step.
-    """
-    if goal_line is not None:
-        return task.turnpoints[:-1]
-    return task.turnpoints
-
-
-def get_turnpoints_to_render(task: Task) -> list[Turnpoint]:
-    """Get the list of turnpoints that should be rendered for visualization.
-
-    Skips the last turnpoint exactly when the task has a goal line to draw in
-    its place. Prefer :class:`TaskDrawing` when you also need the route or the
-    goal line itself — this asks one of its questions on its own.
-
-    Args:
-        task: The Task object containing turnpoints.
-
-    Returns:
-        List of turnpoints to render.
-    """
-    return _turnpoints_to_render(task, GoalLine.from_task(task))
 
 
 @dataclass(frozen=True)
@@ -97,9 +70,12 @@ class TaskDrawing:
             The drawing both writers render.
         """
         goal_line = GoalLine.from_task(task)
+        # A goal line replaces the last turnpoint, so it is dropped exactly when
+        # there is a line to draw in its place — one decision, made here.
+        turnpoints = task.turnpoints[:-1] if goal_line else task.turnpoints
         return cls(
             task=task,
-            turnpoints=tuple(_turnpoints_to_render(task, goal_line)),
+            turnpoints=tuple(turnpoints),
             goal_line=goal_line,
             route=calculate_iteratively_refined_route(task_to_turnpoints(task)),
         )
@@ -118,7 +94,9 @@ class TaskDrawing:
         Returns:
             True if this is the goal turnpoint and the task has a goal defined.
         """
-        return is_goal_turnpoint(turnpoint, self.task.turnpoints, self.task)
+        if self.task.goal is None:
+            return False
+        return bool(self.task.turnpoints) and turnpoint is self.task.turnpoints[-1]
 
     def route_coordinates(self) -> list[tuple[float, float]] | None:
         """The optimized route as (lat, lon) points, or None if there is no line.
@@ -201,31 +179,3 @@ def generate_circle_coordinates_3d(
     """
     coords_2d = generate_circle_coordinates_2d(center_lat, center_lon, radius_meters)
     return [(lon, lat, altitude) for lon, lat in coords_2d]
-
-
-def is_goal_turnpoint(
-    turnpoint: Turnpoint,
-    all_turnpoints: list[Turnpoint],
-    task: Task | None = None,
-) -> bool:
-    """Check if a turnpoint is the goal (last) turnpoint.
-
-    Compares identity, not value. A task may legitimately end by flying the
-    same turnpoint twice — same name, coordinates, radius and type — and
-    ``Turnpoint`` is a plain dataclass, so searching by value would find the
-    earlier occurrence and report the goal as an ordinary turnpoint. The
-    callers pass the task's own turnpoint objects, so identity is exact.
-
-    Args:
-        turnpoint: The turnpoint to check.
-        all_turnpoints: List of all turnpoints in the task.
-        task: Optional Task object to check if it has a goal defined.
-
-    Returns:
-        True if this is the goal turnpoint and the task has a goal defined.
-    """
-    # If task is provided, check if it actually has a goal
-    if task is not None and task.goal is None:
-        return False
-
-    return bool(all_turnpoints) and turnpoint is all_turnpoints[-1]

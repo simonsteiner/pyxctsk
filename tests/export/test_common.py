@@ -8,7 +8,7 @@ and cannot produce two different pictures of the same task.
 
 from pyxctsk import Goal, GoalType, Task, TaskType, Turnpoint, TurnpointType, Waypoint
 from pyxctsk.export import common
-from pyxctsk.export.common import TaskDrawing, get_turnpoints_to_render
+from pyxctsk.export.common import TaskDrawing
 from pyxctsk.export.geojson import drawing_to_geojson, generate_task_geojson
 from pyxctsk.export.kml import drawing_to_kml
 
@@ -85,14 +85,6 @@ class TestTaskDrawing:
         assert drawing.goal_line is not None
         assert drawing.goal_line.approach_from == (45.5, 8.0)
         assert len(drawing.turnpoints) == 2
-
-    def test_matches_the_free_function(self):
-        """``get_turnpoints_to_render`` answers the drawing's question the same way."""
-        for goal_type in (None, GoalType.CYLINDER, GoalType.LINE):
-            task = _task(goal_type)
-            assert list(TaskDrawing.from_task(task).turnpoints) == (
-                get_turnpoints_to_render(task)
-            )
 
     def test_route_below_two_points_is_not_a_line(self):
         """One turnpoint is a point, not a line, so there is nothing to draw."""

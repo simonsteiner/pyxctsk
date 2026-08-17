@@ -14,9 +14,10 @@ disagree: a LINE goal whose previous turnpoint sits at the same coordinates has
 no approach direction and so no goal line, but a separate predicate dropped the
 turnpoint anyway and the goal vanished from the output entirely.
 
-The free functions kept here (``calculate_goal_line_endpoints``,
-``generate_semicircle_arc``, ``get_goal_line_data``) are thin adapters over the
-same core, retained for backwards compatibility.
+Everything else here is :class:`GoalLine`'s own implementation. Callers use the
+object: ``length``, ``endpoints()`` and ``control_zone()``. There is deliberately
+no tuple-shaped accessor beside them — the writers used to unpack a positional
+4-tuple that carried exactly those three answers.
 """
 
 from dataclasses import dataclass
@@ -103,34 +104,7 @@ def _endpoints_from_coords(
     return (lon1, lat1), (lon2, lat2), forward_azimuth
 
 
-def calculate_goal_line_endpoints(
-    last_tp, prev_tp, goal_line_length: float, earth_model: object = None
-) -> tuple[tuple[float, float], tuple[float, float], float]:
-    """Calculate the endpoints of the goal line and return the forward azimuth.
-
-    Object adapter over :func:`_endpoints_from_coords`.
-
-    Args:
-        last_tp: The last turnpoint (goal center)
-        prev_tp: The previous turnpoint to determine approach direction
-        goal_line_length: Length of the goal line in meters
-        earth_model: Earth model selector (``EarthModel`` member, its string
-            value, or None for WGS84)
-
-    Returns:
-        Tuple of ((lon1, lat1), (lon2, lat2), forward_azimuth)
-    """
-    return _endpoints_from_coords(
-        last_tp.waypoint.lat,
-        last_tp.waypoint.lon,
-        prev_tp.waypoint.lat,
-        prev_tp.waypoint.lon,
-        goal_line_length,
-        earth_model,
-    )
-
-
-def generate_semicircle_arc(
+def _generate_semicircle_arc(
     center_lon: float,
     center_lat: float,
     start_azimuth: float,
@@ -255,7 +229,7 @@ class GoalLine:
         perpendicular_azimuth_1 = (forward_azimuth + 90) % 360
         perpendicular_azimuth_2 = (forward_azimuth - 90) % 360
 
-        front_arc_points = generate_semicircle_arc(
+        front_arc_points = _generate_semicircle_arc(
             self.center[1],
             self.center[0],
             perpendicular_azimuth_2,
@@ -267,35 +241,3 @@ class GoalLine:
 
         # Closed polygon: endpoint2 -> front arc -> endpoint1 -> endpoint2
         return [(lon2, lat2)] + front_arc_points + [(lon1, lat1), (lon2, lat2)]
-
-    def data(
-        self,
-    ) -> tuple[
-        tuple[float, float], tuple[float, float], float, list[tuple[float, float]]
-    ]:
-        """Return (start, end, length, control_zone_coords) for rendering."""
-        (lon1, lat1), (lon2, lat2), _ = self.endpoints()
-        return (lon1, lat1), (lon2, lat2), self.length, self.control_zone()
-
-
-def get_goal_line_data(
-    task: Task,
-) -> (
-    tuple[tuple[float, float], tuple[float, float], float, list[tuple[float, float]]]
-    | None
-):
-    """Get goal line data for LINE type goals.
-
-    Thin adapter over :meth:`GoalLine.from_task` / :meth:`GoalLine.data`.
-
-    Args:
-        task: The task object
-
-    Returns:
-        Tuple of (goal_line_start, goal_line_end, goal_line_length, control_zone_coords)
-        or None if not a LINE type goal or insufficient data
-    """
-    goal_line = GoalLine.from_task(task)
-    if goal_line is None:
-        return None
-    return goal_line.data()

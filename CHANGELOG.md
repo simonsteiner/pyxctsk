@@ -31,6 +31,19 @@ All notable changes to this project will be documented in this file.
 
   Dependencies now run one way, `model → qrcode` and `model → distance → export`. Goal-line geometry landed in `distance/` rather than beside the KML and GeoJSON writers that draw it, because `task_distances` sizes a LINE goal's cylinder from the goal-line length — with it in `export/` that edge closes a real import cycle. Each package's `__init__.py` re-exports its own interface and documents what it holds.
 - **The domain model no longer imports the QR format.** `Task.to_qr_code_task()` pulled `pyxctsk.qrcode.task` into `pyxctsk.model.task` at module level; it now reaches `pyxctsk.qrcode.conversion` through a function-local import. Behaviour is identical, and `from pyxctsk.qrcode import task_to_qr_code_task` now works — the package's own interface could not name its conversion module while that edge existed. `tests/test_layering.py` parses the import graph and fails if any package imports one it may not depend on.
+- **Breaking (API): the back-compat and duplicate accessors around the goal line and the route are removed.** The library is early enough that a second way to ask a question costs more than it saves:
+
+  | removed | ask instead |
+  | --- | --- |
+  | `GoalLine.data()`, `get_goal_line_data(task)` | `goal_line.length`, `.endpoints()`, `.control_zone()` |
+  | `calculate_goal_line_endpoints(...)` | `GoalLine.endpoints()` |
+  | `generate_semicircle_arc(...)` | now `_generate_semicircle_arc`, internal to `control_zone()` |
+  | `optimized_route_coordinates(turnpoints)` | `calculate_iteratively_refined_route(turnpoints).points` |
+  | `export.common.get_turnpoints_to_render(task)` | `TaskDrawing.from_task(task).turnpoints` |
+  | `export.common.is_goal_turnpoint(...)` | `TaskDrawing.is_goal(turnpoint)` |
+  | `distance.turnpoint.geod` | `geod_for_earth_model(earth_model)` |
+
+  `get_goal_line_data` and `geod` had no callers left at all; the rest had none in `src/`. Output is unchanged — verified byte-identical on `task_bevo`, `task_piga_line` and `task_nohe`.
 - **Breaking (API): the KML and GeoJSON writers take a `TaskDrawing`.** Their private helpers changed shape with it — `_create_turnpoint_feature(drawing, turnpoint, index)` instead of `(turnpoint, index, all_turnpoints, task=None)`, `_create_optimized_route_feature(drawing)` instead of a `Task`-or-`list` union that existed only so tests could inject coordinates, and `_create_goal_line_features(drawing)`. `export.common.get_optimized_route_coordinates` is deleted: it was a two-line pass-through whose only purpose was to be the writers' shared route accessor, which the drawing now is.
 - **Breaking (API): `_task_to_turnpoints` is now `task_to_turnpoints`**, re-exported as `pyxctsk.distance.task_to_turnpoints`. It was private by name only — the export package, five test modules and a script all imported it, and it now crosses a package seam.
 - **`Task` ↔ `QRCodeTask` conversion moved to the new `qrcode_conversion` module**, which imports both models at the top level. It was ~280 lines inside `qrcode_task.py` (686 lines → 428), reached through function-local `from .task import ...` blocks that existed only to dodge a circular import — the wire model knowing about the domain model, in the wrong direction. The six enum pairs are now translation tables rather than if/elif chains, with `tests/test_qrcode_conversion.py` asserting both directions stay mutual inverses and cover every enum member. `QRCodeTask.from_task()`, `.from_task_waypoints()`, `.to_task()` and `Task.to_qr_code_task()` are unchanged as API.

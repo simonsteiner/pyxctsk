@@ -11,7 +11,7 @@ All essential SSS test functionality is maintained in this single module.
 
 from geopy.distance import geodesic
 
-from pyxctsk.distance import optimized_route_coordinates
+from pyxctsk.distance import calculate_iteratively_refined_route
 from pyxctsk.distance.sss import (
     calculate_optimal_sss_entry_point,
 )
@@ -105,7 +105,7 @@ class TestSSSRouting:
         center_route = [(tp.center[0], tp.center[1]) for tp in turnpoints]
 
         # Get optimized route (should navigate to perimeter points)
-        optimized_route = optimized_route_coordinates(turnpoints)
+        optimized_route = calculate_iteratively_refined_route(turnpoints).points
 
         # Verify routes have same number of points
         assert len(center_route) == len(optimized_route), (
