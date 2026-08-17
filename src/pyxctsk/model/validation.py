@@ -12,16 +12,27 @@ Validation is a report, not a gate. Parsing accepts structurally invalid tasks
 so a malformed file can still be read, inspected and converted; pass
 ``strict=True`` to :func:`pyxctsk.parse_task` to turn violations into a
 :class:`~pyxctsk.exceptions.TaskValidationError`.
+
+The rules read exactly two things — the order of the turnpoint roles, and
+whether this is a waypoints task — so :func:`validate_turnpoint_roles` takes
+those and nothing else. That is what lets a QR payload be checked *as it
+arrived*: converting it to a ``Task`` first invents a version, a task type and
+a goal the payload never carried, and validating inventions reports on the
+converter rather than on the input. :func:`validate_task` is the adapter for
+the full format and :meth:`pyxctsk.QRCodeTask.validate` for the compact one.
 """
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Sequence
 
 from .enums import TaskType, TurnpointType
 
 if TYPE_CHECKING:
     from .task import Task
+
+#: The version the full JSON task format declares. The QR format says 2.
+FULL_FORMAT_VERSION = 1
 
 
 class ValidationRule(str, Enum):
@@ -37,12 +48,26 @@ class ValidationRule(str, Enum):
         SPECIAL_NOT_ONCE (str): "SSS and ESS turnpoints must appear exactly
             once."
         SSS_AFTER_ESS (str): "SSS turnpoint must appear before ESS."
+        NEGATIVE_RADIUS (str): A cylinder cannot have a negative radius. Zero
+            is legitimate — every XC/Waypoints turnpoint has it, and it means
+            the point itself.
+        UNKNOWN_VERSION (str): The task declares a version this format does not
+            define.
+        EXTENSION_WITHOUT_ROOT (str): "Turnpoint extensions must be in the same
+            order as the root ones" — so a turnpoint carrying more of them than
+            the root list has entries has some that correspond to nothing.
+        EXTENSION_REPEATS_ID (str): A turnpoint extension repeats the ``id``
+            key, which the spec says belongs to the root entry alone.
     """
 
     NO_TURNPOINTS = "NO_TURNPOINTS"
     TAKEOFF_NOT_FIRST = "TAKEOFF_NOT_FIRST"
     SPECIAL_NOT_ONCE = "SPECIAL_NOT_ONCE"
     SSS_AFTER_ESS = "SSS_AFTER_ESS"
+    NEGATIVE_RADIUS = "NEGATIVE_RADIUS"
+    UNKNOWN_VERSION = "UNKNOWN_VERSION"
+    EXTENSION_WITHOUT_ROOT = "EXTENSION_WITHOUT_ROOT"
+    EXTENSION_REPEATS_ID = "EXTENSION_REPEATS_ID"
 
 
 @dataclass(frozen=True)
@@ -66,41 +91,86 @@ class ValidationIssue:
         return self.message
 
 
-def validate_task(task: "Task") -> list[ValidationIssue]:
-    """Check a task against the spec's structural rules.
+@dataclass(frozen=True)
+class TaskStructure:
+    """What the spec's structural rules read, in either format.
+
+    The rules do not need a task — they need the handful of facts below, and
+    both formats can present them without being turned into the other. That is
+    what makes a QR payload checkable *as it arrived*: converting it first
+    invents a version, a task type and a goal it never carried, so a report on
+    the conversion is partly a report on the converter.
+
+    Attributes:
+        roles: The turnpoints' types, in task order. None for an ordinary one.
+        radii: The turnpoints' cylinder radii, in the same order.
+        turnpoint_extensions: Each turnpoint's opaque extensions list, in the
+            same order again.
+        root_extensions: The task's own extensions list, whose order the
+            turnpoint ones must follow.
+        version: The version the payload declares.
+        expected_version: The version this format defines — 1 for the full
+            JSON format, 2 for the QR one. Carried rather than assumed, so the
+            rule is stated once for both.
+        is_waypoints_task: Whether this is an XC/Waypoints task, which has no
+            speed section to constrain.
+    """
+
+    roles: Sequence[TurnpointType | None]
+    radii: Sequence[float]
+    turnpoint_extensions: Sequence[Sequence[Any]]
+    root_extensions: Sequence[Any]
+    version: int
+    expected_version: int
+    is_waypoints_task: bool
+
+
+def validate_structure(structure: TaskStructure) -> list[ValidationIssue]:
+    """Check a task's structure against the spec's rules.
 
     The rules, quoting the spec:
 
     - ``TAKEOFF`` "can be used only for the first turnpoint";
     - ``SSS`` and ``ESS`` "must appear exactly once";
-    - ``SSS`` "must appear before ESS".
+    - ``SSS`` "must appear before ESS";
+    - turnpoint extensions are "in the same order as the root extensions" with
+      the ``id`` "not repeated".
 
-    These apply to CLASSIC tasks. An XC/Waypoints task is a plain route with no
-    speed section, so the SSS/ESS rules are not checked for it.
+    The speed-section rules apply to CLASSIC tasks only; an XC/Waypoints task
+    is a plain route without one.
 
     Args:
-        task: The task to check.
+        structure: What the rules read, presented by either format.
 
     Returns:
         list[ValidationIssue]: One issue per violated rule, empty if valid.
     """
-    if not task.turnpoints:
+    if not structure.roles:
         return [ValidationIssue(ValidationRule.NO_TURNPOINTS, "task has no turnpoints")]
 
+    issues = _turnpoint_role_issues(structure)
+    issues += _radius_issues(structure)
+    issues += _version_issues(structure)
+    issues += _extension_issues(structure)
+    return issues
+
+
+def _turnpoint_role_issues(structure: TaskStructure) -> list[ValidationIssue]:
+    """Return issues about where the special turnpoint types sit."""
     issues = [
         ValidationIssue(
             ValidationRule.TAKEOFF_NOT_FIRST,
             f"TAKEOFF is only allowed on the first turnpoint, found at index {i}",
         )
-        for i, tp in enumerate(task.turnpoints)
-        if tp.type == TurnpointType.TAKEOFF and i != 0
+        for i, role in enumerate(structure.roles)
+        if role == TurnpointType.TAKEOFF and i != 0
     ]
 
-    if task.task_type == TaskType.WAYPOINTS:
+    if structure.is_waypoints_task:
         return issues
 
     indices = {
-        special: [i for i, tp in enumerate(task.turnpoints) if tp.type == special]
+        special: [i for i, role in enumerate(structure.roles) if role == special]
         for special in (TurnpointType.SSS, TurnpointType.ESS)
     }
     for special, found in indices.items():
@@ -123,3 +193,87 @@ def validate_task(task: "Task") -> list[ValidationIssue]:
         )
 
     return issues
+
+
+def _radius_issues(structure: TaskStructure) -> list[ValidationIssue]:
+    """Return issues about impossible cylinder sizes.
+
+    Zero is not one of them: an XC/Waypoints turnpoint has radius 0, and the
+    optimizer reads that as the point itself.
+    """
+    return [
+        ValidationIssue(
+            ValidationRule.NEGATIVE_RADIUS,
+            f"turnpoint {i} has a negative radius ({radius})",
+        )
+        for i, radius in enumerate(structure.radii)
+        if radius < 0
+    ]
+
+
+def _version_issues(structure: TaskStructure) -> list[ValidationIssue]:
+    """Return an issue if the payload declares a version this format lacks."""
+    if structure.version == structure.expected_version:
+        return []
+    return [
+        ValidationIssue(
+            ValidationRule.UNKNOWN_VERSION,
+            f"this format defines version {structure.expected_version}, "
+            f"the task declares {structure.version}",
+        )
+    ]
+
+
+def _extension_issues(structure: TaskStructure) -> list[ValidationIssue]:
+    """Return issues about how manufacturer extensions are arranged.
+
+    Only the checkable half of the ordering rule. Turnpoint extensions carry
+    no ``id``, so nothing identifies which root entry one belongs to except
+    its position — which is exactly why the spec fixes the order, and why a
+    turnpoint with more of them than the root list has entries is broken.
+    """
+    issues = []
+    for i, extensions in enumerate(structure.turnpoint_extensions):
+        if len(extensions) > len(structure.root_extensions):
+            issues.append(
+                ValidationIssue(
+                    ValidationRule.EXTENSION_WITHOUT_ROOT,
+                    f"turnpoint {i} has {len(extensions)} extensions but the "
+                    f"root list has {len(structure.root_extensions)}, so some "
+                    f"correspond to nothing",
+                )
+            )
+        for extension in extensions:
+            if isinstance(extension, dict) and "id" in extension:
+                issues.append(
+                    ValidationIssue(
+                        ValidationRule.EXTENSION_REPEATS_ID,
+                        f"turnpoint {i} repeats the extension id "
+                        f"{extension['id']!r}, which belongs to the root entry",
+                    )
+                )
+    return issues
+
+
+def validate_task(task: "Task") -> list[ValidationIssue]:
+    """Check a task against the spec's structural rules.
+
+    The full format's adapter onto :func:`validate_structure`.
+
+    Args:
+        task: The task to check.
+
+    Returns:
+        list[ValidationIssue]: One issue per violated rule, empty if valid.
+    """
+    return validate_structure(
+        TaskStructure(
+            roles=[tp.type for tp in task.turnpoints],
+            radii=[tp.radius for tp in task.turnpoints],
+            turnpoint_extensions=[tp.extensions for tp in task.turnpoints],
+            root_extensions=task.extensions,
+            version=task.version,
+            expected_version=FULL_FORMAT_VERSION,
+            is_waypoints_task=task.task_type == TaskType.WAYPOINTS,
+        )
+    )

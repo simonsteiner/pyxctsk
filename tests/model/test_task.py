@@ -31,6 +31,7 @@ from pyxctsk import (
     parse_task,
 )
 from pyxctsk.exceptions import InvalidTimeOfDayError
+from tests.corpus import reference_task
 
 
 class TestTimeOfDay:
@@ -185,29 +186,17 @@ class TestTaskSerialization:
 class TestTaskParsing:
     """Task parsing from various input formats."""
 
-    def test_parse_real_task_file(self, reference_tasks_dir):
+    def test_parse_real_task_file(self):
         """Test parsing real task files."""
-        # Use a known task file for consistent testing
-        task_file = reference_tasks_dir / "task_gibe.xctsk"
-        if not task_file.exists():
-            pytest.skip(f"Reference task file not found: {task_file}")
-
-        with open(task_file, "r") as f:
-            task_data = f.read()
-
-        task = parse_task(task_data)
+        task = parse_task(reference_task("task_gibe").xctsk_path.read_text())
         assert task.task_type == TaskType.CLASSIC
         assert task.version == 1
         assert task.earth_model == EarthModel.WGS84
         assert len(task.turnpoints) == 17  # Based on the test file
 
-    def test_parse_task_from_file_path(self, reference_tasks_dir):
+    def test_parse_task_from_file_path(self):
         """Test parsing task directly from file path."""
-        task_file = reference_tasks_dir / "task_gibe.xctsk"
-        if not task_file.exists():
-            pytest.skip(f"Reference task file not found: {task_file}")
-
-        task = parse_task(str(task_file))
+        task = parse_task(str(reference_task("task_gibe").xctsk_path))
         assert task.task_type == TaskType.CLASSIC
         assert len(task.turnpoints) > 0
 

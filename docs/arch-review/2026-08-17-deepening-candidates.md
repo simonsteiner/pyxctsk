@@ -1,7 +1,7 @@
 # 2026-08-17 — Deepening candidates after the package split
 
-**Status: A, B, D and G applied** (see [Progress](#progress) and the outcome notes below);
-the other four are proposed. Companion visual report was written to a temp file, not the
+**Status: all eight applied** (see [Progress](#progress) and the outcome notes
+below), two of them with departures the notes record. Companion visual report was written to a temp file, not the
 repo; this document is the record.
 
 Reviewed at `5a3c207` (the four-package split, merged as PR #12). Vocabulary follows the
@@ -499,8 +499,9 @@ serializable shape) — worth creating lazily when one is taken on.
 
 ## Progress
 
-A, B, D and G are applied. Each remaining item is independent; C is next, and it
-wants its own branch.
+All eight are applied. E and H depart from what the card proposed in ways the
+outcome notes below record; the card is left as written, per this directory's
+convention.
 
 - [x] A. Optimized route as a value — one run, legs kept, cumulative by `accumulate`
   (`6d5651b` the value object, `7104ad3` the cumulative fix, `608963d` one route shared
@@ -509,13 +510,18 @@ wants its own branch.
   model honored (`3cf5af1`, `908275d`)
 - [x] G. `_module_level_imports` / `_deferred_imports` collect by "runs at import time"
   (`03d1e1c`)
-- [ ] C. One field table per serializable shape; `KNOWN_KEYS` derived; cross-format `unknown` quarantined
+- [x] C. One field table per serializable shape; `KNOWN_KEYS` derived; cross-format
+  `unknown` quarantined (`f06119a` the per-shape key sets, `1f5f0ce` passthrough for
+  the nested shapes, `3fa8389` the quarantine, `447e294` the tables)
 - [x] D. Colour as a value across the export seam; invalid `<color><Style>` fixed
   (`d92cc59` the invalid nesting, from the PR #13 review rather than from this card;
   `f875e50` the palette as `Color` values)
-- [ ] E. One cylinder solver; dead SSS surface, `show_progress` and `config.py` retired
-- [ ] F. `tests/corpus.py` adapter; dead fixtures deleted; inert `@patch`es fixed; PNGs to `tmp_path`
-- [ ] H. Validation policy on arrival, wired to a CLI flag
+- [x] E. One cylinder solver, `show_progress` retired, the dead SSS module deleted
+  (`ae3f746`, `cf48f0b`, `c3fdd26`); `config.py` deliberately kept, see below
+- [x] F. `tests/corpus.py` adapter; dead fixtures deleted; PNGs to `tmp_path`
+  (`aa4b742`, `21fd95b`; the inert `@patch`es and the `isinstance(list)` API had
+  already gone with A)
+- [x] H. Validation on arrival for both formats, wired to `--strict` (`d3bb41d`)
 
 Verification for any of these: `uv run pytest`, `ruff check`, `ruff format`, `mypy`
 (strict), plus `import pyxctsk.<pkg>` for all four packages in isolation.
@@ -620,6 +626,212 @@ import into "runs at import time" and "deferred", with `_import_time_imports` an
 - `CLAUDE.md`'s description of the guard was updated to state the import-time rule, since
   the old wording ("only module-level imports are checked") was the prose the code had
   been implementing.
+
+### Outcome of C
+
+Landed as four commits on `refactor/one-field-table-per-shape`, staged deliberately:
+the three defects first, one commit each with the suite green between them, then the
+tables on top. Output is byte-identical to `main` across all 65 reference inputs
+rendered four ways each — full JSON, `XCTSK:`, waypoints `XCTSK:`, `XCTSKZ:` — checked
+by hash against a worktree, with the import path asserted on both sides. 407 → 521
+tests.
+
+- **The card's three defects all reproduced, and one was worse than reported.** The
+  QR union allow-list, the four-of-eleven passthrough coverage and the cross-format
+  `unknown` collision were each fixed with a regression test that fails on `fc03dc3`.
+  The union defect had a *second* instance one level down that the card does not
+  name: `QRCodeTurnpoint` also read `d` and `t` in a payload of the simplified shape,
+  which `as_waypoints()` then strips — so a description in a waypoints payload was
+  read into an attribute and dropped on the way out. Two turnpoint tables fix it the
+  same way two task tables fix the first.
+- **The design turns on one thing the card does not say: a field owns *keys*,
+  plural.** The card proposes rows of `(attr, wire_key, codec, optionality)`, which
+  covers 32 of the 36 rows and cannot express the other four at all — `z` is four
+  attributes in one key, the QR takeoff is one attribute across `to` and `tc`,
+  `taskType` reads three spellings and writes one, and `T` names a shape rather than
+  carrying data. Letting a row own a *set* of keys makes the table total, which is
+  what makes `Shape.keys` derivable; the four irregular rows are `Field` subclasses
+  declared beside the shape that needs them. Without that the table would have had to
+  keep a hand-written escape hatch, and the escape hatch is where all three defects
+  lived.
+- **Optionality had to be one decision, not two.** Reading and writing each have
+  their own notion of absence — a null direction falls back on read while the field
+  is still always written; an empty description is absent both ways; a TAKEOFF
+  turnpoint's type is read but never written. Those were the answers written in two
+  places that stopped matching. They are now one `Optionality` per row, four named
+  constants covering 30 rows and five bespoke ones named where their reason lives
+  (`_OBSOLETE`, `_SPEED_SECTION_ONLY`, `_NON_DEFAULT_EARTH_MODEL`,
+  `_A_DICT_OR_NOTHING`, `_A_LIST_OR_NOTHING`).
+- **The derived key sets equal the hand-written ones exactly.** That is the evidence
+  the tables describe the format rather than a new reading of it, and it is asserted
+  rather than eyeballed.
+- **Two clauses of the card were not followed.** It proposes `conversion.py` map
+  "table to table"; that was dropped, because `Turnpoint` nests a `Waypoint` where
+  `QRCodeTurnpoint` is flat, so there is no attribute copy to derive, and the six
+  enum tables already exist and are already pinned as mutual inverses. And it counts
+  eleven shapes wanting passthrough where the answer is ten: `QRCodeTakeoff` is not
+  an object on the wire — the task flattens it to root `to`/`tc` and rebuilds it to
+  read back — so an `unknown` there could never hold anything. Both are recorded
+  here rather than edited into the card, per this directory's convention.
+- **One key is read and deliberately discarded**, and that needed naming. The goal's
+  non-spec `lineLength` was dropped before this change only because `Goal` had no
+  passthrough at all; giving it one would have started echoing back a value that is
+  always twice the last turnpoint's radius and that a task can contradict.
+  `Goal.IGNORED_KEYS` and `Shape.ignored_keys` make the drop a decision with a test,
+  rather than the `p`-key bug (`tests/conformance/test_spec_conformance.py`) in
+  reverse.
+- **Leniency was unified where it had drifted.** Four shapes disagreed about whether
+  an explicit null meant "absent" or "invalid" — `Goal.from_dict` would have raised on
+  `{"type": null}` where `SSS.from_dict` fell back. Null now means absent everywhere,
+  which is the more lenient of the two behaviours and consistent with a reader
+  documented as lenient.
+- **Breaking:** `QRCodeTask.KNOWN_KEYS` is gone (replaced by the two shapes' sets);
+  `QRCodeSSS` takes `type` first with `direction` defaulted, matching the full
+  format's `SSS`, which it had not; `QRCodeTurnpoint.from_dict` takes a `simplified`
+  flag mirroring `to_dict`; and two `to_dict`s return `dict` rather than
+  `OrderedDict`, insertion order having been the language guarantee since 3.7.
+- **`CONTEXT.md` was created**, which the card suggests doing lazily when a candidate
+  names a concept worth recording. It holds the competition's vocabulary and the
+  format's — *serializable shape*, *field table*, *wire key*, *unknown key* — as a
+  glossary, with no implementation in it. No ADR: the trade-off this change makes is
+  recorded here, which is what this directory is for.
+
+### Outcome of F
+
+Landed as two commits, test-only. 521 → 664 tests, the growth almost entirely from
+parametrizing what were loops.
+
+- **The corpus was not in step, and the card's diagnosis was one step off.**
+  `qrcode_string/task_dami.txt` is not a task missing two files: it is a
+  *byte-identical duplicate* of `task_dami_route.txt` under a stem no task ever had.
+  Deleted, not backfilled. `tests/corpus.py` now checks integrity at discovery, so a
+  half-added task is a collection error naming the missing file.
+- **One consumer was comparing two fixtures to each other.** The waypoints golden
+  check re-serialized the *source file* and compared that to the expected string —
+  it never ran the encoder. Both shapes go through the library now. (The library was
+  producing the right bytes; nothing was hiding behind it.)
+- **Parametrizing made an existing gap visible rather than creating one.**
+  `test_optimized_never_exceeds_centers` now reports 18 skips of 22: those tasks have
+  a concentric pair, and the old `continue` skipped them silently. The test really
+  covers four tasks, which is worth knowing.
+- **`conftest.py` went from 12 fixtures to 1.** Five were dead, as the card says; two
+  of those (`bevo_task`, `temp_xctsk_file`) were the duplication the tests were
+  suffering from. The `find_xctsk_files` alias died rather than moving to
+  `paths.py` — with one discovery there is nothing for it to do.
+- **`tests/builders.py` is for made-up tasks, `tests/corpus.py` for real ones**, and
+  keeping them apart is the point. The CLI's four byte-identical tasks became one
+  `SAMPLE` plus a parametrized helper (and gained a `--compressed` case, which had
+  none); six geojson colour tests became one parametrization over four roles.
+- **Two coverage gaps the card names are closed**; two are not. `QR_CODE_SUPPORT is
+  False` now has tests on both branches, and the QR nested models reach 100%. The
+  KML goal-line writer was already covered by A's work. `distance/sss.py` is left at
+  19% on purpose: covering code before deciding whether to keep it is the wrong
+  order, and E has not decided.
+- **The suite stops writing to tracked files.** 24 committed PNGs deleted, QR images
+  to `tmp_path`, `VISUAL_OUTPUT_DIR` gone. The CLI's PNG test asserted
+  `st_size > 0`; it decodes the image now.
+
+### Outcome of E, in part
+
+Two of E's four strands are done, on the repo owner's call; the other two are
+deliberately left.
+
+**Done — `show_progress` (`ae3f746`).** Five signatures, nine `print()` branches, never
+passed `True` anywhere. `src/pyxctsk/` now contains no `print()` at all.
+
+**Done — one solver (`cf48f0b`), but not by deleting.** The card proposes removing
+`TaskTurnpoint.optimal_point` and aiming its tests at `plane_optimal_point`. The owner
+chose the other direction: keep it, and make the *projection policy* the thing there
+is one of.
+
+- `LocalPlane` is the plane a route is solved in, built around one turnpoint or a
+  whole task. `optimal_point` takes one, defaulting to its own — so nothing moves —
+  and accepting the task's, so a caller can ask for exactly what the optimizer
+  chooses. That is what the crossing-case tests could not previously reach, and it is
+  the whole of the defect: two answers, one unreachable from the tests.
+- `plane_circle` is now the one statement of what a turnpoint is to the solver,
+  including that a LINE goal is a zero-radius circle at the goal center. The card
+  spots `_find_optimal_goal_line_point` as a 20-line docstring over
+  `return self.center` and proposes deleting it; it is gone, but the *rule* it
+  documented had to move somewhere, and it turned out to be the same rule the
+  optimizer's projection already stated separately.
+- **The loop was not moved.** Delegating each of the ~3400 point updates on a large
+  task to the geographic entry point would add two pyproj transforms apiece and
+  roughly double the optimizer's cost. What is shared is the solver and the geometry;
+  the sweep stays in plane coordinates. Every route point and total is bit-identical
+  across all 22 reference tasks — verified against the previous commit, not argued.
+
+**Done — the dead SSS surface (`c3fdd26`), and it was the whole module.** The card
+lists `calculate_sss_info` and `calculate_optimal_sss_entry_point` as two entries in
+its table; with both gone, the two private helpers that existed only for the first
+have nothing left to serve, so `distance/sss.py` is deleted rather than emptied.
+Coverage rose 94% → 96% by subtraction — the module the card notes at 19% was 19%
+because none of it was reachable. `tests/distance/test_sss.py` survives, asking the
+question that mattered as a query on the computed route: the optimized first leg
+reaches the SSS cylinder's boundary rather than its centre.
+
+**Done — `config.py`, but not by retiring anything (`7af325d`).** Revisited, the
+card's diagnosis is the wrong way round. `CONVERGENCE_EPSILON_M` is not a *failed*
+seam; it was never meant to be one. It carries FAI S7F §7.1.3's ε = 0.1 m, and
+ADR 0004 already settled the question — *"precision is governed by the spec's
+ε = 0.1 m, not by a sampling knob"*. Retiring it would have deleted the citation,
+which is the payload, on exactly the argument `model/rounding.py` rests on.
+
+The real defect is the module's *name*. `config.py` sat a value the spec fixes beside
+one genuinely worth tuning — `DEFAULT_NUM_ITERATIONS`, which is what the public
+`num_iterations` parameter defaults to — and `distance/__init__.py` advertised the
+pair as "the tunable optimization parameters". Both now live in
+`route_optimization.py` beside the loop they govern, each documented as what it is,
+and the module is gone. Both stay exported, so nothing breaks.
+
+### Outcome of H
+
+Landed as `d3bb41d`. The card's two concrete defects are fixed; its proposed
+three-way policy is not, and that is deliberate.
+
+- **The CLI could never validate, exactly as reported.** `main`'s help advertised
+  "strict error handling" while `convert` called `parse_task` with no `strict` and
+  offered no flag. `--strict` exists now, appears in the help, and names the rule
+  that broke. Off by default, matching the library.
+- **"Validate what arrived" turned out to be a small change, not a redesign.** The
+  card frames this as checking the payload *shape*; in practice the four rules read
+  exactly two things — the order of the turnpoint roles, and whether this is a
+  waypoints task — and both formats can answer both without being converted. So
+  `validate_turnpoint_roles` takes those, and each format is an adapter onto it. No
+  rule moved, no message changed, and the QR path invents nothing: a payload with no
+  goal and `version: 2` validates as itself, where converting first would have given
+  it a CYLINDER goal and `version: 1`.
+- **The three-way policy was not built.** The card proposes replacing `strict: bool`
+  with ignore/report/raise. "Report" has no destination in a function that returns a
+  `Task` — it would have to warn — and no caller asked for it; the CLI's need was a
+  flag, which `strict` already expresses. Adding the third state would be config
+  without a user, which this repo's own rule forbids.
+- **The rule set under-covered the spec, and the card's list of what to add is half
+  wrong.** Three of its four are now implemented (`7af325d`); two needed correcting
+  first:
+  - **`radius <= 0` is not a rule.** Zero is legitimate — every XC/Waypoints
+    turnpoint has it, and `plane_circle` reads it as the point itself. The rule
+    implemented is negative-only, and a test pins that zero passes.
+  - **An empty waypoint name is not a rule either.** The key is required, but the
+    GeoJSON writer numbers unnamed turnpoints `TP1`, `TP2`, so empty names are
+    tolerated by design. Not implemented.
+  - **`version`** is real and trivial: each format declares its own, and the rule is
+    stated once with the expected value carried in the structure.
+  - **Extension ordering** is real, and documented twice in `model/task.py` with
+    nothing checking it. Only its checkable half can be enforced — turnpoint
+    extensions carry no `id`, so position is the only thing linking one to a root
+    entry — which is exactly why the spec fixes the order, and gives two rules: more
+    extensions than root entries, and an `id` repeated.
+
+  Widening the rules' input from turnpoint roles to a `TaskStructure` is what let all
+  three reach both formats at once, without either adapter being touched. That is the
+  return on H's shape, and it arrived one commit later rather than being designed for.
+- **The layering guard earned its keep mid-change.** The first attempt reached the
+  private `_FROM_QR_TURNPOINT_TYPE` from `qrcode/task.py`, which would have been a
+  third deferred import. The guard failed, and the fix was better placement rather
+  than a new entry: the adapter belongs in `qrcode/conversion.py`, the module whose
+  whole job is translating between the two vocabularies, which `qrcode/task.py`
+  already reaches through the deferred import it has.
 
 ### Outcome of D
 

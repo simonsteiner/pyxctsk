@@ -18,8 +18,9 @@ Intended for use in parsing, generating, and optimizing XCTrack tasks.
 """
 
 import math
+from dataclasses import dataclass
 from functools import lru_cache
-from typing import Protocol, runtime_checkable
+from typing import Protocol, Sequence, runtime_checkable
 
 from pyproj import CRS, Geod, Transformer
 from scipy.optimize import fminbound
@@ -313,6 +314,109 @@ class TurnpointGeometry(Protocol):
     goal_type: str | None
 
 
+@dataclass(frozen=True)
+class LocalPlane:
+    """The Transverse Mercator plane a route is solved in (S7F §7.1.2).
+
+    The spec places optimal points in a plane "centred on the area of
+    interest", which for a whole task is the mean of its turnpoint centers.
+    That policy used to be written twice: the route optimizer projected onto
+    the task area, while :meth:`TaskTurnpoint.optimal_point` projected onto a
+    plane centred on *that turnpoint*. Same paragraph of the spec, two
+    different answers, and the tests aimed at the one the product does not
+    use — so a crossing-case fix could go green and ship nothing.
+
+    Making the plane a value the caller passes is what lets both go through
+    one solver: the optimizer builds one for the task and reuses it across
+    every sweep, and a caller asking about a single turnpoint gets a plane
+    around that turnpoint unless it says otherwise.
+
+    Attributes:
+        to_plane: Geographic to planar, in (lon, lat) → (x, y) axis order.
+        to_geo: The inverse.
+    """
+
+    to_plane: Transformer
+    to_geo: Transformer
+
+    @classmethod
+    def around(
+        cls, centers: Sequence[tuple[float, float]], earth_model: object = None
+    ) -> "LocalPlane":
+        """Return the plane centred on the mean of these centers.
+
+        Args:
+            centers: (lat, lon) pairs — one turnpoint's, or a whole task's.
+            earth_model: Earth model selector (None means WGS84).
+
+        Returns:
+            LocalPlane: The projection to solve in.
+
+        Raises:
+            ValueError: If no centers are given; there is no area of interest.
+        """
+        if not centers:
+            raise ValueError("a local plane needs at least one center")
+        lat0 = sum(lat for lat, _ in centers) / len(centers)
+        lon0 = sum(lon for _, lon in centers) / len(centers)
+        return cls(*local_tm_transformers(lat0, lon0, earth_model))
+
+    def xy(self, point: tuple[float, float]) -> tuple[float, float]:
+        """Project a (lat, lon) point into the plane.
+
+        Args:
+            point: (lat, lon) in degrees.
+
+        Returns:
+            (x, y) in meters.
+        """
+        x, y = self.to_plane.transform(point[1], point[0])
+        return (x, y)
+
+    def lon_lat(self, xy: tuple[float, float]) -> tuple[float, float]:
+        """Return a planar point in geographic coordinates.
+
+        The axis order is the transformers' own — (lon, lat), not (lat, lon)
+        — because that is what :func:`snap_to_boundary` reads and what every
+        caller here does with the result next. :meth:`xy` takes the other
+        order, as its callers hold turnpoint centers that way.
+
+        Args:
+            xy: (x, y) in meters.
+
+        Returns:
+            (lon, lat) in degrees.
+        """
+        lon, lat = self.to_geo.transform(xy[0], xy[1])
+        return (lon, lat)
+
+
+def plane_circle(
+    turnpoint: "TurnpointGeometry", plane: LocalPlane
+) -> tuple[float, float, float]:
+    """Return a turnpoint as the circle the solver sees: (x, y, radius).
+
+    The one place that says what a turnpoint is to the optimizer, including
+    the rule that **a LINE goal is a zero-radius circle at the goal center**.
+    The goal line is perpendicular to the final approach and centred on the
+    goal (S7F §6.2.3.1), so the shortest crossing from any approach is the
+    center itself — which is on the line by construction, degenerate approach
+    included. That rule was stated twice, once in the optimizer's projection
+    and once as a method whose twenty-line docstring stood over
+    ``return self.center``.
+
+    Args:
+        turnpoint: Anything with a center, a radius and a goal type.
+        plane: The plane to project into.
+
+    Returns:
+        (x, y, radius) with radius in meters; 0 collapses to the center.
+    """
+    x, y = plane.xy(turnpoint.center)
+    radius = 0.0 if turnpoint.goal_type == "LINE" else float(turnpoint.radius)
+    return (x, y, radius)
+
+
 class TaskTurnpoint:
     """Turnpoint class for distance calculations."""
 
@@ -343,61 +447,40 @@ class TaskTurnpoint:
         self,
         prev_point: tuple[float, float],
         next_point: tuple[float, float],
+        plane: LocalPlane | None = None,
     ) -> tuple[float, float]:
         """Find the optimal point on this turnpoint's cylinder or goal line.
 
         The point is placed with the exact planar GetOptPi solution (crossing
         vs. reflection case per Ding, Xie & Jiang) in a local Transverse
-        Mercator plane centred on the cylinder, then snapped back onto the
-        true cylinder boundary at radius ``r`` on the selected earth model.
+        Mercator plane, then snapped back onto the true cylinder boundary at
+        radius ``r`` on the selected earth model.
 
         Args:
             prev_point (Tuple[float, float]): (lat, lon) of previous point in route.
             next_point (Tuple[float, float]): (lat, lon) of next point in route.
+            plane: The plane to solve in. Defaults to one centred on this
+                turnpoint. Pass the task's own plane — the one
+                :func:`~pyxctsk.distance.route_optimization.calculate_iteratively_refined_route`
+                builds — to get the answer the route optimizer would give:
+                the projection is the only thing the two ever differed by.
 
         Returns:
             Tuple[float, float]: (lat, lon) of optimal point on cylinder perimeter or goal line.
         """
-        if self.goal_type == "LINE":
-            return self._find_optimal_goal_line_point(prev_point, next_point)
+        if plane is None:
+            plane = LocalPlane.around([self.center], self.earth_model)
 
-        if self.radius == 0:
+        cx, cy, radius = plane_circle(self, plane)
+        if radius == 0.0:
             return self.center
 
-        to_plane, to_geo = local_tm_transformers(
-            self.center[0], self.center[1], self.earth_model
+        xy = plane_optimal_point(
+            plane.xy(prev_point), plane.xy(next_point), (cx, cy), radius
         )
-        cx, cy = to_plane.transform(self.center[1], self.center[0])
-        p1 = to_plane.transform(prev_point[1], prev_point[0])
-        p2 = to_plane.transform(next_point[1], next_point[0])
-
-        x, y = plane_optimal_point(p1, p2, (cx, cy), float(self.radius))
         return snap_to_boundary(
-            to_geo.transform(x, y), self.center, self.radius, self.earth_model
+            plane.lon_lat(xy), self.center, self.radius, self.earth_model
         )
-
-    def _find_optimal_goal_line_point(
-        self, prev_point: tuple[float, float], next_point: tuple[float, float]
-    ) -> tuple[float, float]:
-        """Find the optimal point on the goal line.
-
-        For a goal line, the optimal crossing point depends on:
-          1. Direction of approach (from prev_point)
-          2. The perpendicular line with the goal line center in the middle
-          3. The semi-circle control zone behind the goal line
-
-        Args:
-            prev_point (Tuple[float, float]): (lat, lon) of previous point in route.
-            next_point (Tuple[float, float]): (lat, lon) of next point in route (may not be used for goal line).
-
-        Returns:
-            Tuple[float, float]: (lat, lon) of optimal point on the goal line or semi-circle control zone.
-        """
-        # The goal line is perpendicular to the approach direction and centred
-        # on the goal center (S7F §6.2.3.1), so the shortest crossing from the
-        # approach point is the goal center itself, which always lies on the
-        # line. Degenerate case included (prev_point at the center).
-        return self.center
 
 
 def distance_through_centers(

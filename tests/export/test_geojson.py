@@ -15,6 +15,8 @@ holds the complementary check — that both formats render the same palette — 
 between them a colour cannot change silently or drift between writers.
 """
 
+import pytest
+
 from pyxctsk import Goal, GoalType, Task, TaskType, Turnpoint, TurnpointType, Waypoint
 from pyxctsk.distance import OptimizedRoute
 from pyxctsk.export.common import TaskDrawing
@@ -24,6 +26,7 @@ from pyxctsk.export.geojson import (
     _create_turnpoint_feature,
     generate_task_geojson,
 )
+from tests.builders import turnpoint
 
 
 def _route(points) -> OptimizedRoute:
@@ -49,19 +52,43 @@ def _drawing_of(turnpoints: list, goal: Goal | None = None) -> TaskDrawing:
 
 
 class TestCreateTurnpointFeature:
-    """Test the _create_turnpoint_feature function."""
+    """One turnpoint rendered as a GeoJSON point feature."""
 
-    def test_create_turnpoint_feature_takeoff(self):
-        """Test creating turnpoint feature for takeoff."""
-        waypoint = Waypoint(name="Takeoff", lat=46.5, lon=8.0, alt_smoothed=1000)
-        waypoint2 = Waypoint(name="Goal", lat=47.0, lon=8.5, alt_smoothed=1500)
-        turnpoint = Turnpoint(
-            radius=1000, waypoint=waypoint, type=TurnpointType.TAKEOFF
-        )
-        turnpoint2 = Turnpoint(radius=400, waypoint=waypoint2, type=TurnpointType.NONE)
-        all_turnpoints = [turnpoint, turnpoint2]
+    @pytest.mark.parametrize(
+        "tp_type, colour",
+        [
+            (TurnpointType.TAKEOFF, "#204d74"),
+            (TurnpointType.SSS, "#ac2925"),
+            (TurnpointType.ESS, "#ff8c00"),
+            (TurnpointType.NONE, "#269abc"),
+        ],
+        ids=["takeoff", "sss", "ess", "ordinary"],
+    )
+    def test_the_colour_follows_the_turnpoint_role(self, tp_type, colour):
+        """Four roles, four palette entries, one task shape."""
+        first = turnpoint("First", 46.5, 8.0, radius=400, type=tp_type)
+        drawing = _drawing_of([first, turnpoint("Goal", 47.0, 8.5, radius=400)])
 
-        feature = _create_turnpoint_feature(_drawing_of(all_turnpoints), turnpoint, 0)
+        feature = _create_turnpoint_feature(drawing, first, 0)
+
+        assert feature["properties"]["color"] == colour
+
+    def test_the_goal_is_red(self):
+        """The last turnpoint of a task that has a goal."""
+        first = turnpoint("Start", 46.5, 8.0, radius=400)
+        goal = turnpoint("Goal", 47.5, 9.0, radius=400)
+        drawing = _drawing_of([first, goal], Goal(type=GoalType.CYLINDER))
+
+        feature = _create_turnpoint_feature(drawing, goal, 1)
+
+        assert feature["properties"]["color"] == "#ff0000"
+
+    def test_the_geometry_is_the_waypoint(self):
+        """A turnpoint feature is a point at its waypoint's position."""
+        first = turnpoint("Takeoff", 46.5, 8.0, radius=1000, type=TurnpointType.TAKEOFF)
+        drawing = _drawing_of([first, turnpoint("Goal", 47.0, 8.5, radius=400)])
+
+        feature = _create_turnpoint_feature(drawing, first, 0)
 
         assert feature["type"] == "Feature"
         assert feature["geometry"]["type"] == "Point"
@@ -69,100 +96,36 @@ class TestCreateTurnpointFeature:
         assert feature["properties"]["name"] == "Takeoff"
         assert feature["properties"]["type"] == "cylinder"
         assert feature["properties"]["radius"] == 1000
-        assert feature["properties"]["color"] == "#204d74"  # takeoff color
 
-    def test_create_turnpoint_feature_sss(self):
-        """Test creating turnpoint feature for SSS."""
-        waypoint = Waypoint(name="Start", lat=46.5, lon=8.0, alt_smoothed=1000)
-        waypoint2 = Waypoint(name="Goal", lat=47.0, lon=8.5, alt_smoothed=1500)
-        turnpoint = Turnpoint(radius=400, waypoint=waypoint, type=TurnpointType.SSS)
-        turnpoint2 = Turnpoint(radius=400, waypoint=waypoint2, type=TurnpointType.NONE)
-        all_turnpoints = [turnpoint, turnpoint2]
+    def test_an_unnamed_turnpoint_is_numbered(self):
+        """A waypoint with no name still has to be labelled on the map."""
+        unnamed = turnpoint("", 46.5, 8.0, radius=400)
+        drawing = _drawing_of([unnamed, turnpoint("Goal", 47.0, 8.5, radius=400)])
 
-        feature = _create_turnpoint_feature(_drawing_of(all_turnpoints), turnpoint, 0)
+        feature = _create_turnpoint_feature(drawing, unnamed, 0)
 
-        assert feature["properties"]["color"] == "#ac2925"  # SSS color
-        assert feature["properties"]["name"] == "Start"
+        assert feature["properties"]["name"] == "TP1"
 
-    def test_create_turnpoint_feature_ess(self):
-        """Test creating turnpoint feature for ESS."""
-        waypoint = Waypoint(name="End", lat=46.5, lon=8.0, alt_smoothed=1000)
-        waypoint2 = Waypoint(name="Goal", lat=47.0, lon=8.5, alt_smoothed=1500)
-        turnpoint = Turnpoint(radius=400, waypoint=waypoint, type=TurnpointType.ESS)
-        turnpoint2 = Turnpoint(radius=400, waypoint=waypoint2, type=TurnpointType.NONE)
-        all_turnpoints = [turnpoint, turnpoint2]
+    def test_the_feature_carries_every_property_the_map_reads(self):
+        """The styling keys are the interface to the rendering library."""
+        first = turnpoint("Test", 46.5, 8.0, radius=500, type=TurnpointType.TAKEOFF)
+        drawing = _drawing_of([first, turnpoint("Goal", 47.0, 8.5, radius=400)])
 
-        feature = _create_turnpoint_feature(_drawing_of(all_turnpoints), turnpoint, 0)
+        props = _create_turnpoint_feature(drawing, first, 0)["properties"]
 
-        assert feature["properties"]["color"] == "#ff8c00"  # ESS color
-
-    def test_create_turnpoint_feature_goal(self):
-        """Test creating turnpoint feature for goal."""
-        waypoint1 = Waypoint(name="Start", lat=46.5, lon=8.0, alt_smoothed=1000)
-        waypoint2 = Waypoint(name="Goal", lat=47.5, lon=9.0, alt_smoothed=1000)
-        turnpoint1 = Turnpoint(radius=400, waypoint=waypoint1, type=TurnpointType.NONE)
-        turnpoint2 = Turnpoint(radius=400, waypoint=waypoint2, type=TurnpointType.NONE)
-        all_turnpoints = [turnpoint1, turnpoint2]
-
-        # A goal must be defined for the last turnpoint to count as the goal.
-        goal = Goal(type=GoalType.CYLINDER)
-
-        feature = _create_turnpoint_feature(
-            _drawing_of(all_turnpoints, goal), turnpoint2, 1
-        )
-
-        assert feature["properties"]["color"] == "#ff0000"  # goal color (red)
-
-    def test_create_turnpoint_feature_default(self):
-        """Test creating turnpoint feature with default type."""
-        waypoint = Waypoint(name="TP1", lat=46.5, lon=8.0, alt_smoothed=1000)
-        waypoint2 = Waypoint(name="Goal", lat=47.0, lon=8.5, alt_smoothed=1500)
-        turnpoint = Turnpoint(radius=400, waypoint=waypoint, type=TurnpointType.NONE)
-        turnpoint2 = Turnpoint(radius=400, waypoint=waypoint2, type=TurnpointType.NONE)
-        all_turnpoints = [turnpoint, turnpoint2]
-
-        feature = _create_turnpoint_feature(_drawing_of(all_turnpoints), turnpoint, 0)
-
-        assert feature["properties"]["color"] == "#269abc"  # default color
-
-    def test_create_turnpoint_feature_no_name(self):
-        """Test creating turnpoint feature without name."""
-        waypoint = Waypoint(name="", lat=46.5, lon=8.0, alt_smoothed=1000)  # Empty name
-        waypoint2 = Waypoint(name="Goal", lat=47.0, lon=8.5, alt_smoothed=1500)
-        turnpoint = Turnpoint(radius=400, waypoint=waypoint, type=TurnpointType.NONE)
-        turnpoint2 = Turnpoint(radius=400, waypoint=waypoint2, type=TurnpointType.NONE)
-        all_turnpoints = [turnpoint, turnpoint2]
-
-        feature = _create_turnpoint_feature(_drawing_of(all_turnpoints), turnpoint, 0)
-
-        assert (
-            feature["properties"]["name"] == "TP1"
-        )  # Auto-generated name (index 0 + 1)
-        assert feature["properties"]["color"] == "#269abc"  # default color
-
-    def test_create_turnpoint_feature_properties(self):
-        """Test that turnpoint feature has all required properties."""
-        waypoint = Waypoint(name="Test", lat=46.5, lon=8.0, alt_smoothed=1000)
-        waypoint2 = Waypoint(name="Goal", lat=47.0, lon=8.5, alt_smoothed=1500)
-        turnpoint = Turnpoint(radius=500, waypoint=waypoint, type=TurnpointType.TAKEOFF)
-        turnpoint2 = Turnpoint(radius=400, waypoint=waypoint2, type=TurnpointType.NONE)
-        all_turnpoints = [turnpoint, turnpoint2]
-
-        feature = _create_turnpoint_feature(_drawing_of(all_turnpoints), turnpoint, 0)
-
-        props = feature["properties"]
-        assert "name" in props
-        assert "type" in props
-        assert "radius" in props
-        assert "description" in props
-        assert "turnpoint_index" in props
-        assert "tp_type" in props
-        assert "color" in props
-        assert "fillColor" in props
-        assert "fillOpacity" in props
-        assert "weight" in props
-        assert "opacity" in props
-
+        assert set(props) >= {
+            "name",
+            "type",
+            "radius",
+            "description",
+            "turnpoint_index",
+            "tp_type",
+            "color",
+            "fillColor",
+            "fillOpacity",
+            "weight",
+            "opacity",
+        }
         assert props["description"] == "Radius: 500m"
         assert props["turnpoint_index"] == 0
 

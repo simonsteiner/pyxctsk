@@ -164,10 +164,11 @@ def run_calculation(
 def get_pyxctsk_result(
     turnpoints: List[TaskTurnpoint], show_progress: bool
 ) -> Dict[str, Any]:
-    """Calculates the optimized distance using the pyxctsk library."""
-    optimized = calculate_iteratively_refined_route(
-        turnpoints, show_progress=show_progress
-    )
+    """Calculates the optimized distance using the pyxctsk library.
+
+    ``show_progress`` is accepted and ignored: the library no longer prints.
+    """
+    optimized = calculate_iteratively_refined_route(turnpoints)
     return {
         "total_distance": optimized.total_m,
         "route_points": list(optimized.points),

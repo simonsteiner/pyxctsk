@@ -6,7 +6,8 @@ Features:
 - Parse XCTrack task files from file or stdin
 - Convert tasks to JSON, KML, PNG QR code, or compact QR string
 - Output to file or stdout
-- Strict error handling and clear messaging
+- Optional strict validation (--strict), off by default so a malformed task
+  can still be read and converted
 
 See project README for usage examples and supported formats.
 """
@@ -23,13 +24,14 @@ from .qrcode.image import generate_qrcode_image
 
 @click.group()
 def main():
-    r"""pyxctsk: Convert task files between formats with strict error handling.
+    r"""pyxctsk: Convert task files between formats.
 
     \b
     Parameter Options:
       --format [json|kml|png|qrcode-json]  Output format (default: json)
       --output, -o FILE                    Output file (default: stdout)
       --compressed, -z                     Emit XCTSKZ: instead of XCTSK:
+      --strict                             Reject a structurally invalid task
       INPUT_FILE                           Input file (optional, uses stdin)
 
     \b
@@ -39,6 +41,7 @@ def main():
       pyxctsk convert --format png < task.xctsk > task.png
       pyxctsk convert task.xctsk --format qrcode-json
       pyxctsk convert task.xctsk --format qrcode-json -z
+      pyxctsk convert task.xctsk --strict
 
     \b
     Formats:
@@ -72,7 +75,15 @@ def main():
     default=False,
     help="Emit the XCTSKZ: (zlib+base64) QR encoding; png and qrcode-json only",
 )
-def convert(input_file, output_format: str, output_file: str, compressed: bool) -> None:
+@click.option(
+    "--strict",
+    is_flag=True,
+    default=False,
+    help="Reject a task that breaks the spec's structural rules",
+)
+def convert(
+    input_file, output_format: str, output_file: str, compressed: bool, strict: bool
+) -> None:
     """Convert XCTrack task files between supported formats.
 
     Reads an XCTrack task from a file or stdin, parses it, and outputs the
@@ -85,6 +96,9 @@ def convert(input_file, output_format: str, output_file: str, compressed: bool) 
         output_format (str): Output format ('json', 'kml', 'png', or 'qrcode-json').
         output_file (str): Output file path, or None to write to stdout.
         compressed (bool): Emit the XCTSKZ: encoding for QR output formats.
+        strict (bool): Reject a structurally invalid task instead of converting
+            it. Off by default, matching the library: reading is lenient so a
+            malformed task can still be inspected and converted.
 
     Returns:
         None
@@ -106,7 +120,7 @@ def convert(input_file, output_format: str, output_file: str, compressed: bool) 
             input_data = sys.stdin.buffer.read()
 
         # Parse the task
-        task = parse_task(input_data)
+        task = parse_task(input_data, strict=strict)
 
         # Convert to requested format
         if output_format == "json":

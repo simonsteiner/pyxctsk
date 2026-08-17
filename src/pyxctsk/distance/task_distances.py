@@ -194,7 +194,6 @@ def task_distances_from_route(task: Task, route: OptimizedRoute) -> dict[str, An
 
 def calculate_task_distances(
     task: Task,
-    show_progress: bool = False,
     num_iterations: int | None = None,
 ) -> dict[str, Any]:
     """Calculate both center and optimized distances for a task.
@@ -205,22 +204,13 @@ def calculate_task_distances(
 
     Args:
         task (Task): Task object.
-        show_progress (bool): Whether to show progress indicators.
         num_iterations (Optional[int]): Maximum number of alternating sweeps.
 
     Returns:
         Dict[str, Any]: Dictionary containing distance calculations and turnpoint details.
     """
-    if show_progress:
-        print("  🎯 Starting optimized calculation...")
-
     route = calculate_iteratively_refined_route(
         task_to_turnpoints(task),
-        show_progress=show_progress,
         num_iterations=num_iterations,
     )
-
-    if show_progress:
-        print(f"  ✅ Optimized distance: {route.total_m / 1000.0:.1f}km")
-
     return task_distances_from_route(task, route)
