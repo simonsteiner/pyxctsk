@@ -1,8 +1,8 @@
 # 2026-08-17 — Deepening candidates after the package split
 
-**Status: A and B applied** (see [Progress](#progress) and the outcome notes below); the
-other six are proposed. Companion visual report was written to a temp file, not the repo;
-this document is the record.
+**Status: A, B and G applied, D half applied** (see [Progress](#progress) and the outcome
+notes below); the other four are proposed. Companion visual report was written to a temp
+file, not the repo; this document is the record.
 
 Reviewed at `5a3c207` (the four-package split, merged as PR #12). Vocabulary follows the
 *deep module* framing: a **module** has an **interface** (everything a caller must know)
@@ -499,19 +499,24 @@ serializable shape) — worth creating lazily when one is taken on.
 
 ## Progress
 
-A and B are applied. Each remaining item is independent; the suggested order for
-the rest is G → C.
+A, B and G are applied, and half of D landed from another thread. Each remaining
+item is independent; C is next, and it wants its own branch.
 
 - [x] A. Optimized route as a value — one run, legs kept, cumulative by `accumulate`
   (`6d5651b` the value object, `7104ad3` the cumulative fix, `608963d` one route shared
   by both writers via `TaskDrawing`, `fb9392f` the table sharing it too)
 - [x] B. `GoalLine.from_task` made total; `should_skip_last_turnpoint` removed; earth
   model honored (`3cf5af1`, `908275d`)
+- [x] G. `_module_level_imports` / `_deferred_imports` collect by "runs at import time"
+  (`03d1e1c`)
 - [ ] C. One field table per serializable shape; `KNOWN_KEYS` derived; cross-format `unknown` quarantined
-- [ ] D. Colour as a value across the export seam; invalid `<color><Style>` fixed
+- [ ] D. **Half applied.** The invalid `<color><Style>` nesting is fixed
+  (`d92cc59`, from the PR #13 review rather than from this card); the palette drift
+  is not. `kml.py:37` still re-declares all five entries as `simplekml.Color`
+  constants and loses three of the five values, with `.get(hex, blue)` degrading a
+  sixth silently. Colour-as-a-value is what remains.
 - [ ] E. One cylinder solver; dead SSS surface, `show_progress` and `config.py` retired
 - [ ] F. `tests/corpus.py` adapter; dead fixtures deleted; inert `@patch`es fixed; PNGs to `tmp_path`
-- [ ] G. `_module_level_imports` / `_deferred_imports` collect by "runs at import time"
 - [ ] H. Validation policy on arrival, wired to a CLI flag
 
 Verification for any of these: `uv run pytest`, `ruff check`, `ruff format`, `mypy`
@@ -588,3 +593,25 @@ and the projection tests, less the four that tested the two deleted functions).
   where it is: the surviving argument is the stronger one, and moving geometry into the
   format package is a layout decision, not a cleanup. The dated layout review is left as
   written, per this directory's convention.
+
+### Outcome of G
+
+Landed as `03d1e1c`, test-only: one classifier walks the tree and splits every relative
+import into "runs at import time" and "deferred", with `_import_time_imports` and
+`_deferred_imports` as its two projections. `_module_level_imports` was renamed because
+"module level" was the wrong name for the question it was asking.
+
+- **The gap was verified by mutation, not by argument.** A `try:`-guarded
+  `from ..distance.turnpoint import …` and a class-body `from ..qrcode.encoding import …`,
+  both added to `model/task.py`, pass every check on the previous collector and are both
+  named with line numbers by the new one. That is the whole claim of the card, reproduced
+  in both directions.
+- **`if TYPE_CHECKING:` needed a distinction the card did not mention.** Only the guarded
+  *body* is type-only — an `else:` on the same `if` is ordinary code that runs on import,
+  so the walker skips `body` and keeps walking `orelse`. Pinned by its own test.
+- **Nothing in `src/` moved.** All 30 modules still pass all four checks; the suite went
+  388 tests with the eight new snippet tests, and the two optional-dependency `try:`
+  blocks the card names remain absolute imports, so they are still correctly invisible.
+- `CLAUDE.md`'s description of the guard was updated to state the import-time rule, since
+  the old wording ("only module-level imports are checked") was the prose the code had
+  been implementing.
