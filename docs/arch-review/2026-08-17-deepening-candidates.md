@@ -1,7 +1,7 @@
 # 2026-08-17 — Deepening candidates after the package split
 
-**Status: A, B, C, D and G applied** (see [Progress](#progress) and the outcome notes
-below); the other three are proposed. Companion visual report was written to a temp file, not the
+**Status: A, B, C, D, F and G applied, E partly** (see [Progress](#progress) and the
+outcome notes below); H is proposed. Companion visual report was written to a temp file, not the
 repo; this document is the record.
 
 Reviewed at `5a3c207` (the four-package split, merged as PR #12). Vocabulary follows the
@@ -499,7 +499,7 @@ serializable shape) — worth creating lazily when one is taken on.
 
 ## Progress
 
-A, B, C, D and G are applied. Each remaining item is independent.
+A, B, C, D, F and G are applied, E partly. H is independent of all of them.
 
 - [x] A. Optimized route as a value — one run, legs kept, cumulative by `accumulate`
   (`6d5651b` the value object, `7104ad3` the cumulative fix, `608963d` one route shared
@@ -514,8 +514,11 @@ A, B, C, D and G are applied. Each remaining item is independent.
 - [x] D. Colour as a value across the export seam; invalid `<color><Style>` fixed
   (`d92cc59` the invalid nesting, from the PR #13 review rather than from this card;
   `f875e50` the palette as `Color` values)
-- [ ] E. One cylinder solver; dead SSS surface, `show_progress` and `config.py` retired
-- [ ] F. `tests/corpus.py` adapter; dead fixtures deleted; inert `@patch`es fixed; PNGs to `tmp_path`
+- [~] E. One cylinder solver and `show_progress` retired (`ae3f746`, `cf48f0b`); the
+  dead SSS surface and `config.py` deliberately left, see below
+- [x] F. `tests/corpus.py` adapter; dead fixtures deleted; PNGs to `tmp_path`
+  (`aa4b742`, `21fd95b`; the inert `@patch`es and the `isinstance(list)` API had
+  already gone with A)
 - [ ] H. Validation policy on arrival, wired to a CLI flag
 
 Verification for any of these: `uv run pytest`, `ruff check`, `ruff format`, `mypy`
@@ -690,6 +693,82 @@ tests.
   format's — *serializable shape*, *field table*, *wire key*, *unknown key* — as a
   glossary, with no implementation in it. No ADR: the trade-off this change makes is
   recorded here, which is what this directory is for.
+
+### Outcome of F
+
+Landed as two commits, test-only. 521 → 664 tests, the growth almost entirely from
+parametrizing what were loops.
+
+- **The corpus was not in step, and the card's diagnosis was one step off.**
+  `qrcode_string/task_dami.txt` is not a task missing two files: it is a
+  *byte-identical duplicate* of `task_dami_route.txt` under a stem no task ever had.
+  Deleted, not backfilled. `tests/corpus.py` now checks integrity at discovery, so a
+  half-added task is a collection error naming the missing file.
+- **One consumer was comparing two fixtures to each other.** The waypoints golden
+  check re-serialized the *source file* and compared that to the expected string —
+  it never ran the encoder. Both shapes go through the library now. (The library was
+  producing the right bytes; nothing was hiding behind it.)
+- **Parametrizing made an existing gap visible rather than creating one.**
+  `test_optimized_never_exceeds_centers` now reports 18 skips of 22: those tasks have
+  a concentric pair, and the old `continue` skipped them silently. The test really
+  covers four tasks, which is worth knowing.
+- **`conftest.py` went from 12 fixtures to 1.** Five were dead, as the card says; two
+  of those (`bevo_task`, `temp_xctsk_file`) were the duplication the tests were
+  suffering from. The `find_xctsk_files` alias died rather than moving to
+  `paths.py` — with one discovery there is nothing for it to do.
+- **`tests/builders.py` is for made-up tasks, `tests/corpus.py` for real ones**, and
+  keeping them apart is the point. The CLI's four byte-identical tasks became one
+  `SAMPLE` plus a parametrized helper (and gained a `--compressed` case, which had
+  none); six geojson colour tests became one parametrization over four roles.
+- **Two coverage gaps the card names are closed**; two are not. `QR_CODE_SUPPORT is
+  False` now has tests on both branches, and the QR nested models reach 100%. The
+  KML goal-line writer was already covered by A's work. `distance/sss.py` is left at
+  19% on purpose: covering code before deciding whether to keep it is the wrong
+  order, and E has not decided.
+- **The suite stops writing to tracked files.** 24 committed PNGs deleted, QR images
+  to `tmp_path`, `VISUAL_OUTPUT_DIR` gone. The CLI's PNG test asserted
+  `st_size > 0`; it decodes the image now.
+
+### Outcome of E, in part
+
+Two of E's four strands are done, on the repo owner's call; the other two are
+deliberately left.
+
+**Done — `show_progress` (`ae3f746`).** Five signatures, nine `print()` branches, never
+passed `True` anywhere. `src/pyxctsk/` now contains no `print()` at all.
+
+**Done — one solver (`cf48f0b`), but not by deleting.** The card proposes removing
+`TaskTurnpoint.optimal_point` and aiming its tests at `plane_optimal_point`. The owner
+chose the other direction: keep it, and make the *projection policy* the thing there
+is one of.
+
+- `LocalPlane` is the plane a route is solved in, built around one turnpoint or a
+  whole task. `optimal_point` takes one, defaulting to its own — so nothing moves —
+  and accepting the task's, so a caller can ask for exactly what the optimizer
+  chooses. That is what the crossing-case tests could not previously reach, and it is
+  the whole of the defect: two answers, one unreachable from the tests.
+- `plane_circle` is now the one statement of what a turnpoint is to the solver,
+  including that a LINE goal is a zero-radius circle at the goal center. The card
+  spots `_find_optimal_goal_line_point` as a 20-line docstring over
+  `return self.center` and proposes deleting it; it is gone, but the *rule* it
+  documented had to move somewhere, and it turned out to be the same rule the
+  optimizer's projection already stated separately.
+- **The loop was not moved.** Delegating each of the ~3400 point updates on a large
+  task to the geographic entry point would add two pyproj transforms apiece and
+  roughly double the optimizer's cost. What is shared is the solver and the geometry;
+  the sweep stays in plane coordinates. Every route point and total is bit-identical
+  across all 22 reference tasks — verified against the previous commit, not argued.
+
+**Left — the dead SSS surface.** `calculate_sss_info` still has zero callers and a
+test body of `assert True`, and `calculate_optimal_sss_entry_point` is a one-line
+pass-through to `optimal_point` with no `src/` caller. Removing them is a separate,
+purely subtractive change and was not part of the option chosen.
+
+**Left — `config.py`.** The card is right that `CONVERGENCE_EPSILON_M` reaches only a
+default on the *private* `_optimize_plane_points` and so is not a seam. It stays, on
+the owner's call. Note `DEFAULT_NUM_ITERATIONS` in the same module *is* load-bearing —
+it is the `num_iterations` default — so deleting the module was never the one-line
+change the card's table implies.
 
 ### Outcome of D
 
