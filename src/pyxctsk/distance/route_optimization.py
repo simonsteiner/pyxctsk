@@ -92,12 +92,16 @@ class OptimizedRoute:
     def cumulative_m(self) -> list[float]:
         """Distance along the route to each point, in meters.
 
-        One entry per point, starting at 0.0 for the takeoff, so the last
-        entry equals :attr:`total_m`.
+        One entry per point, starting at 0.0 for the takeoff, so the last entry
+        equals :attr:`total_m`. A route with no points has no entries — the
+        ``initial=0.0`` seed would otherwise report a distance to a point that
+        does not exist.
 
         Returns:
             Cumulative distances in meters, one per point.
         """
+        if not self.points:
+            return []
         return list(accumulate(self.legs, initial=0.0))
 
 

@@ -59,6 +59,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **`OptimizedRoute.cumulative_m()` keeps its documented invariant.** It promises one entry per point, but a route with no points returned `[0.0]` — `accumulate`'s `initial` seed reporting a distance to a point that does not exist. It returns `[]` now. Callers reading it positionally against `points` were guarded by a length check, so no output changes.
 - **KML no longer emits invalid geometry or styling.** Two defects found in review of PR #13, both in the turnpoint/course-line writer:
   - A task with fewer than two route points still got a `<LineString>`: one turnpoint produced a one-coordinate line, and an *empty* task produced a phantom course line at 0°N 0°E, because simplekml writes an empty coordinate list as a single `0.0,0.0,0.0`. The line is now omitted, which is what GeoJSON already did with the route feature — the two writers agree.
   - Every centre-point placemark set `iconstyle.color` to a whole `simplekml.Style`, nesting a `<Style>` element inside `<color>`. The style is now built once per turnpoint, assigned to its cylinder, and the icon takes that style's colour string, so the centre point matches the cylinder it sits in. (The separate palette *drift* between the two writers — KML maps the shared hex through `simplekml.Color` constants and loses the values — is untouched here; it is candidate D of the 2026-08-17 review.)
