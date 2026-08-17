@@ -23,8 +23,8 @@ import json
 from io import BytesIO
 
 from .exceptions import EmptyInputError, InvalidFormatError, TaskValidationError
-from .qrcode_task import QR_CODE_SCHEME, QR_CODE_SCHEME_COMPRESSED, QRCodeTask
-from .task import Task
+from .model.task import Task
+from .qrcode.task import QR_CODE_SCHEME, QR_CODE_SCHEME_COMPRESSED, QRCodeTask
 
 # Both QR schemes the spec defines. XCTSKZ: is checked first because XCTSK: is
 # not a prefix of it, but keeping them ordered makes the intent obvious.

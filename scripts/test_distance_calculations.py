@@ -32,8 +32,8 @@ from pyxctsk.distance import (
     distance_through_centers,
     optimized_distance,
 )
+from pyxctsk.distance.task_distances import task_to_turnpoints
 from pyxctsk.parser import parse_task
-from pyxctsk.task_distances import _task_to_turnpoints
 
 # Add task_viewer and its subdirectories to path to import AirScore utilities
 task_viewer_path = Path(__file__).parent / "task_viewer"
@@ -242,7 +242,7 @@ def compare_task_distances(
     if verbose:
         print(f"\n🔄 Analyzing task: {task_name}")
 
-    turnpoints = _task_to_turnpoints(task)
+    turnpoints = task_to_turnpoints(task)
     if len(turnpoints) < 2:
         if verbose:
             print(f"  ⚠️ Skipping {task_name}: Task has fewer than 2 turnpoints.")

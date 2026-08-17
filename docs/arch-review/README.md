@@ -5,6 +5,12 @@ implements the [XCTrack Competition Interfaces](https://xctrack.org/Competition_
 specification and FAI Sporting Code S7F. Each file is dated and kept as written —
 superseded reviews stay for history rather than being edited. Newest first.
 
+- [2026-08-17 — Package layout: 27 flat modules into four packages](2026-08-17-package-layout.md)
+  — **applied.** The split into `model/`, `qrcode/`, `distance/` and `export/`, with
+  dependencies running one way and each package's `__init__.py` as its interface.
+  Records the two places the planned layout met a real import cycle, the eight tests
+  deleted for testing only the standard library, and a packaging hazard where a stale
+  `build/` shipped ghost modules. Includes the commit-by-commit progress list.
 - [2026-08-16 — Code-quality review and refactor plan](2026-08-16-code-quality-refactor-plan.md)
   — **closed;** all eleven items applied, see its Outcome section. Structural audit of the
   conformance work itself. Found derived state stored on `Goal`, a dead `polyline` concept

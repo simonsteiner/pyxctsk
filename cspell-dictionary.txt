@@ -10,6 +10,7 @@ bevo
 brentq
 changealphaint
 CIVL
+conftest
 clamptoground
 dami
 darkred
@@ -48,6 +49,7 @@ levelname
 libzbar
 linecontrol
 linestyle
+lonlat
 lons
 lorili
 MATEC

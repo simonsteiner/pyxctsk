@@ -145,17 +145,20 @@ documented tolerances (0.1 %/50 m on well-conditioned tasks, 1 % as regression g
   previous turnpoint center — the pre-2025 rule — which does not affect distances.)
 - **Convergence**: the alternating optimizer converges below ε = 0.1 m within a
   handful of sweeps on all reference tasks; further sweeps change nothing (asserted in
-  `tests/test_distance.py::TestConvergence`).
+  `tests/distance/test_distance.py::TestConvergence`).
 
 ## Reproducing the measurements
+
+*(Import paths and one function name below were updated for the 2026-08-17
+package split so the snippet still runs; the findings are as written.)*
 
 ```bash
 uv run python - <<'EOF'
 import json
 from pathlib import Path
 from pyxctsk.parser import parse_task
-from pyxctsk.task_distances import _task_to_turnpoints
-from pyxctsk.route_optimization import optimized_distance
+from pyxctsk.distance.task_distances import task_to_turnpoints
+from pyxctsk.distance.route_optimization import optimized_distance
 
 xdir = Path('tests/data/reference_tasks/xctsk')
 jdir = Path('tests/data/reference_tasks/json')
@@ -163,7 +166,7 @@ for f in sorted(xdir.glob('*.xctsk')):
     ref = json.load(open(jdir / (f.stem + '.json')))['metadata'].get('distance_optimized_km')
     if not ref:
         continue
-    opt = optimized_distance(_task_to_turnpoints(parse_task(str(f)))) / 1000
+    opt = optimized_distance(task_to_turnpoints(parse_task(str(f)))) / 1000
     print(f"{f.stem:16s} ref {ref:7.1f}km  pyxctsk {opt:8.3f}km  diff {(opt - ref) * 1000:+7.1f}m")
 EOF
 ```

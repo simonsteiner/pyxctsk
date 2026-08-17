@@ -53,7 +53,9 @@ git commit -am "release v$(uv version --short)"
 git tag -a "v$(uv version --short)" -m "Version $(uv version --short)"
 git push --follow-tags origin main      # triggers the Publish workflow
 # or build/upload directly (needs UV_PUBLISH_TOKEN):
-uv build && uv publish
+# rm -rf first: setuptools reuses build/lib, so modules renamed or moved since
+# the last local build are still sitting there and would ship as ghost copies.
+rm -rf build dist && uv build && uv publish
 # create the GitHub Release by hand (needs the gh CLI, authenticated):
 gh release create "v$(uv version --short)" \
   --notes-file <(python3 scripts/changelog_extract.py "$(uv version --short)") \

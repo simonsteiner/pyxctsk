@@ -31,7 +31,7 @@ class TaskValidationError(pyXCTSKError):
     turnpoints it describes are not a well-formed task.
 
     Attributes:
-        issues (list): One :class:`~pyxctsk.validation.ValidationIssue` per
+        issues (list): One :class:`~pyxctsk.model.validation.ValidationIssue` per
             violated rule, each naming the rule it broke. Typed loosely here
             because ``validation`` imports the exceptions, not the reverse.
     """
