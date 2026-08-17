@@ -263,7 +263,7 @@ class TestGoalLine:
         The line is oriented perpendicular to the incoming leg (§6.2.3.1), so
         the perpendicular foot from the incoming point is the center itself.
         """
-        goal = TaskTurnpoint(47.0, 8.0, 0, goal_type="LINE", goal_line_length=400.0)
+        goal = TaskTurnpoint(47.0, 8.0, 0, goal_type="LINE")
         prev_point = (46.9, 7.95)
         finish = goal.optimal_point(prev_point, prev_point)
         assert finish == goal.center

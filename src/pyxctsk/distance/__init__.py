@@ -24,9 +24,11 @@ own. Everything a caller outside the package needs is named here —
 - :mod:`~pyxctsk.distance.config` — convergence epsilon and sweep count
 
 The goal line lives here rather than with the KML and GeoJSON writers that draw
-it because distance calculation needs the same geometry — a LINE goal's
-cylinder is sized from the goal-line length — and the shapes of a task must not
-depend on the formats it is exported to.
+it because the shapes of a task must not depend on the formats it is exported
+to. Note that this is now the *only* reason: the second one — that distance
+calculation needed the goal-line length itself — stopped being true when the
+`TaskTurnpoint.goal_line_length` attribute that carried it turned out to be
+written and never read. `export/` is `goal_line`'s only consumer today.
 
 Submodules import each other directly, never through this file, which is what
 keeps the re-export layer free of the cycles it was split out to break.

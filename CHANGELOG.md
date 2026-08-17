@@ -17,7 +17,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- **Breaking (API): `calculate_iteratively_refined_route` returns an `OptimizedRoute`** instead of a `(distance_m, points)` tuple. The optimizer measures every leg on its way to the total and used to throw them away, leaving callers to reconstruct them; the value it returns now carries `points`, `legs` and the `earth_model` they were measured on, with `total_m` and `cumulative_m()` derived from those. `optimized_distance` and `optimized_route_coordinates` are unchanged projections of it, and the distances themselves are bit-identical — the legs are summed in the same order as before. Callers unpacking the tuple must use `.total_m` / `.points`. `OptimizedRoute` is exported from `pyxctsk.distance`.
+- **Breaking (API): `calculate_iteratively_refined_route` returns an `OptimizedRoute`** instead of a `(distance_m, points)` tuple. The optimizer measures every leg on its way to the total and used to throw them away, leaving callers to reconstruct them; the value it returns now carries `points`, `legs` and the `earth_model` they were measured on, with `total_m` and `cumulative_m()` derived from those. `optimized_distance` is unchanged as the projection for callers wanting only the number, and the distances themselves are bit-identical — the legs are summed in the same order as before. Callers unpacking the tuple must use `.total_m` / `.points`. `OptimizedRoute` is exported from `pyxctsk.distance`.
 - **Breaking (API): the package is split into `model`, `qrcode`, `distance` and `export`.** `src/pyxctsk/` had grown to 27 modules in one flat directory, with prefixes (`qrcode_*`, `task_*`) doing the job a directory should. The public API is unchanged — everything re-exported from `pyxctsk` itself is where it was — but every deep import path moves:
 
   | was | now |
@@ -42,6 +42,7 @@ All notable changes to this project will be documented in this file.
   | `export.common.get_turnpoints_to_render(task)` | `TaskDrawing.from_task(task).turnpoints` |
   | `export.common.is_goal_turnpoint(...)` | `TaskDrawing.is_goal(turnpoint)` |
   | `distance.turnpoint.geod` | `geod_for_earth_model(earth_model)` |
+  | `TaskTurnpoint(..., goal_line_length=...)` | nothing — it was written and never read |
 
   `get_goal_line_data` and `geod` had no callers left at all; the rest had none in `src/`. Output is unchanged — verified byte-identical on `task_bevo`, `task_piga_line` and `task_nohe`.
 - **Breaking (API): the KML and GeoJSON writers take a `TaskDrawing`.** Their private helpers changed shape with it — `_create_turnpoint_feature(drawing, turnpoint, index)` instead of `(turnpoint, index, all_turnpoints, task=None)`, `_create_optimized_route_feature(drawing)` instead of a `Task`-or-`list` union that existed only so tests could inject coordinates, and `_create_goal_line_features(drawing)`. `export.common.get_optimized_route_coordinates` is deleted: it was a two-line pass-through whose only purpose was to be the writers' shared route accessor, which the drawing now is.

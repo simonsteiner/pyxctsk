@@ -11,7 +11,6 @@ This module provides functions to:
 from typing import Any
 
 from ..model.task import Task
-from .goal_line import goal_line_length_from_turnpoints
 from .route_optimization import OptimizedRoute, calculate_iteratively_refined_route
 from .turnpoint import TaskTurnpoint, distance_through_centers, geodesic_distance
 
@@ -20,9 +19,10 @@ def task_to_turnpoints(task: Task) -> list[TaskTurnpoint]:
     """Convert a task's turnpoints into the cylinders distance code works on.
 
     The one place that reads a goal's type off the model and turns it into
-    geometry: a LINE goal becomes a zero-radius point carrying the goal-line
-    length, anything else stays a cylinder, and every turnpoint inherits the
-    task's earth model.
+    geometry: a LINE goal becomes a zero-radius point — the line is centred on
+    the goal and perpendicular to the approach, so its optimal crossing is the
+    goal center — anything else stays a cylinder, and every turnpoint inherits
+    the task's earth model.
 
     Args:
         task (Task): Task object.
@@ -32,15 +32,8 @@ def task_to_turnpoints(task: Task) -> list[TaskTurnpoint]:
     """
     # Determine if there's a goal and its type
     goal_type = None
-    goal_line_length = None  # None unless the goal is a line
-
-    # Process goal if there are turnpoints
     if task.turnpoints and task.goal:
         goal_type = task.goal.type.value if task.goal.type else "CYLINDER"
-
-        # A goal line's length is always twice the last turnpoint's radius.
-        if goal_type == "LINE":
-            goal_line_length = goal_line_length_from_turnpoints(task.turnpoints)
 
     result = []
     earth_model = task.earth_model
@@ -57,7 +50,6 @@ def task_to_turnpoints(task: Task) -> list[TaskTurnpoint]:
                         lon=tp.waypoint.lon,
                         radius=0,  # Goal lines have 0 radius (no cylinder)
                         goal_type=goal_type,
-                        goal_line_length=goal_line_length,
                         earth_model=earth_model,
                     )
                 )

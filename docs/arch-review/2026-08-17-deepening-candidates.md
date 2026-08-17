@@ -567,4 +567,24 @@ and the projection tests, less the four that tested the two deleted functions).
   goal-line endpoint sits `length / 2` from the goal *measured on the declared earth
   model* (fails on the old hardcoded ellipsoid by 58 m on a 40 km line).
 - **Deleted:** `calculate_cumulative_distances` and `should_skip_last_turnpoint`, both
-  public names, both second ways to ask a question that now has one answer.
+  public names, both second ways to ask a question that now has one answer. A follow-up
+  pass took the rest of the surface A and B orphaned, on the repo owner's call that at
+  this stage a second way to ask costs more than backwards compatibility saves:
+  `GoalLine.data()` and `get_goal_line_data()` (the positional 4-tuple both writers
+  unpacked), `calculate_goal_line_endpoints()`, `optimized_route_coordinates()`
+  (it returned exactly `OptimizedRoute.points`), `export.common.get_turnpoints_to_render()`
+  and `is_goal_turnpoint()` (both questions the drawing answers), the
+  `distance.turnpoint.geod` back-compat alias, and `TaskTurnpoint.goal_line_length`.
+  `generate_semicircle_arc` became private. Output stayed byte-identical throughout.
+- **One documented rationale died with the cleanup, and is worth someone's attention.**
+  `TaskTurnpoint.goal_line_length` was written by `task_to_turnpoints` and read nowhere —
+  and that write was the *only* thing making `distance/` import `goal_line.py`. The
+  2026-08-17 package-layout review placed the goal line in `distance/` for two reasons:
+  that `task_distances` sizes a LINE goal's cylinder from the goal-line length (a real
+  import cycle if it lived in `export/`), and that the shapes of a task should not live in
+  the package that knows about file formats. The first is now false — a LINE goal's
+  cylinder is sized by `radius=0`, not by the length — so `export/` is `goal_line.py`'s
+  only consumer and the placement rests on the second reason alone. The module was left
+  where it is: the surviving argument is the stronger one, and moving geometry into the
+  format package is a layout decision, not a cleanup. The dated layout review is left as
+  written, per this directory's convention.
