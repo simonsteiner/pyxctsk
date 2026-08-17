@@ -11,10 +11,8 @@ at a tighter tolerance. The one reference check kept below runs through
 `calculate_task_distances`, so it is testing the wiring, not the algorithm.
 """
 
-import json
 import statistics
-from pathlib import Path
-from typing import Dict, List
+from typing import List
 from unittest.mock import patch
 
 import pytest
@@ -32,7 +30,15 @@ from pyxctsk.distance import (
 from pyxctsk.export import common
 from pyxctsk.export.common import TaskDrawing
 from pyxctsk.export.geojson import drawing_to_geojson
-from pyxctsk.parser import parse_task
+from tests.corpus import reference_task, tasks_with_reference_distance
+
+#: The reference tasks the producer recorded distances for, discovered once.
+WITH_REFERENCE = tasks_with_reference_distance()
+
+#: How far the pipeline's optimized distance may sit from the producer's.
+#: Deliberately looser than ``test_xctrack_accuracy`` allows the optimizer
+#: itself: what is under test here is the wiring above it.
+TOLERANCE = 0.02
 
 
 class TestDistanceComprehensive:
@@ -44,47 +50,6 @@ class TestDistanceComprehensive:
     """
 
     @pytest.fixture(scope="class")
-    def reference_data(
-        self, reference_tasks_dir: Path, reference_json_dir: Path
-    ) -> Dict[str, Dict]:
-        """Load reference task files and their expected JSON results."""
-        if not reference_tasks_dir.exists() or not reference_json_dir.exists():
-            pytest.skip("Reference task directories not found")
-
-        reference_data = {}
-
-        # Load all reference tasks that have both .xctsk and .json files
-        for xctsk_file in reference_tasks_dir.glob("*.xctsk"):
-            task_name = xctsk_file.stem
-            json_file = f"{task_name}.json"
-            json_path = reference_json_dir / json_file
-
-            if not json_path.exists():
-                continue
-
-            try:
-                # Load task
-                task = parse_task(str(xctsk_file))
-
-                # Load reference JSON
-                with open(json_path, "r") as f:
-                    json_data = json.load(f)
-
-                reference_data[task_name] = {
-                    "task": task,
-                    "reference": json_data,
-                    "xctsk_file": xctsk_file.name,
-                }
-
-            except Exception as e:
-                print(f"Warning: Failed to load {task_name}: {e}")
-
-        if not reference_data:
-            pytest.skip("No valid reference task pairs found")
-
-        return reference_data
-
-    @pytest.fixture(scope="class")
     def test_turnpoints(self) -> List[TaskTurnpoint]:
         """Create synthetic test turnpoints for unit tests with significant optimization potential."""
         return [
@@ -94,69 +59,53 @@ class TestDistanceComprehensive:
             TaskTurnpoint(47.25, 8.2, 1000),  # Goal - 1km radius
         ]
 
-    def test_reference_task_validation(self, reference_data: Dict[str, Dict]):
-        """Test distance calculations against reference JSON data.
+    @pytest.mark.parametrize("reference", WITH_REFERENCE, ids=str)
+    def test_center_distance_matches_reference(self, reference):
+        """Distance through centers is geometry, so it must be very close."""
+        ref_km = reference.metadata.get("distance_through_centers_km", 0)
+        if not ref_km:
+            pytest.skip("the producer recorded no center distance")
 
-        This test validates our optimization algorithms against known good results
-        from reference tasks, ensuring accuracy within acceptable tolerances.
+        calc_km = calculate_task_distances(reference.task)["center_distance_km"]
+        difference = abs(calc_km - ref_km) / ref_km
+
+        assert difference < 0.005, (
+            f"{reference.stem}: center distance differs by {difference:.1%} "
+            f"(calc: {calc_km:.1f}km, ref: {ref_km:.1f}km)"
+        )
+
+    @pytest.mark.parametrize("reference", WITH_REFERENCE, ids=str)
+    def test_optimized_distance_matches_reference(self, reference):
+        """The pipeline reproduces the producer's optimized distance.
+
+        A looser bound than ``test_xctrack_accuracy`` uses on the optimizer
+        itself: what is under test here is the wiring above it.
         """
-        results = []
-        tolerance_percent = 0.02  # 2% tolerance for optimization differences
+        ref_km = reference.reference_optimized_km
+        calc_km = calculate_task_distances(reference.task)["optimized_distance_km"]
+        difference = abs(calc_km - ref_km) / ref_km
 
-        for task_name, data in reference_data.items():
-            task = data["task"]
-            ref_meta = data["reference"]["metadata"]
+        assert difference < TOLERANCE, (
+            f"{reference.stem}: optimized distance differs by {difference:.1%} "
+            f"(calc: {calc_km:.1f}km, ref: {ref_km:.1f}km)"
+        )
 
-            # Skip tasks without reference distances
-            if "distance_optimized_km" not in ref_meta:
-                continue
+    def test_the_average_difference_is_well_inside_the_tolerance(self):
+        """Every task passing individually still allows a systematic bias.
 
-            calc_results = calculate_task_distances(task)
-
-            ref_center_km = ref_meta.get("distance_through_centers_km", 0)
-            ref_opt_km = ref_meta.get("distance_optimized_km", 0)
-            calc_center_km = calc_results["center_distance_km"]
-            calc_opt_km = calc_results["optimized_distance_km"]
-
-            # Validate center distances (should be very close)
-            if ref_center_km > 0:
-                center_diff_pct = abs(calc_center_km - ref_center_km) / ref_center_km
-                assert center_diff_pct < 0.005, (  # 0.5% tolerance for center distances
-                    f"{task_name}: Center distance differs by {center_diff_pct:.1%} "
-                    f"(calc: {calc_center_km:.1f}km, ref: {ref_center_km:.1f}km)"
-                )
-
-            # Validate optimized distances (allow more tolerance due to algorithm differences)
-            if ref_opt_km > 0:
-                opt_diff_pct = abs(calc_opt_km - ref_opt_km) / ref_opt_km
-                assert opt_diff_pct < tolerance_percent, (
-                    f"{task_name}: Optimized distance differs by {opt_diff_pct:.1%} "
-                    f"(calc: {calc_opt_km:.1f}km, ref: {ref_opt_km:.1f}km)"
-                )
-
-                results.append(
-                    {
-                        "task": task_name,
-                        "ref_opt": ref_opt_km,
-                        "calc_opt": calc_opt_km,
-                        "diff_pct": opt_diff_pct,
-                    }
-                )
-
-        # Statistical validation across all tasks
-        if results:
-            avg_diff = statistics.mean([r["diff_pct"] for r in results])
-            max_diff = max([r["diff_pct"] for r in results])
-
-            print(f"\nReference validation results ({len(results)} tasks):")
-            print(f"  Average difference: {avg_diff:.2%}")
-            print(f"  Maximum difference: {max_diff:.2%}")
-            print(f"  Tolerance: {tolerance_percent:.1%}")
-
-            # Ensure average difference is well within tolerance
-            assert avg_diff < tolerance_percent / 2, (
-                f"Average difference {avg_diff:.2%} exceeds half tolerance {tolerance_percent / 2:.2%}"
+        A claim about the corpus rather than any one task, so this one stays a
+        loop.
+        """
+        differences = [
+            abs(
+                calculate_task_distances(r.task)["optimized_distance_km"]
+                - r.reference_optimized_km
             )
+            / r.reference_optimized_km
+            for r in WITH_REFERENCE
+        ]
+
+        assert statistics.mean(differences) < TOLERANCE / 2
 
     def test_algorithm_core_functionality(self, test_turnpoints: List[TaskTurnpoint]):
         """Test core algorithm functionality with synthetic data.
@@ -178,9 +127,8 @@ class TestDistanceComprehensive:
             f"Savings {savings_pct:.1%} outside reasonable range [2%-80%]"
         )
 
-    def test_cumulative_optimized_is_a_prefix_of_the_route(
-        self, reference_data: Dict[str, Dict]
-    ):
+    @pytest.mark.parametrize("stem", ["task_bevo", "task_gibe", "task_duna"])
+    def test_cumulative_optimized_is_a_prefix_of_the_route(self, stem):
         """The cumulative column must be measured along the task's own route.
 
         Regression: the column was recomputed per turnpoint by re-optimizing
@@ -192,29 +140,21 @@ class TestDistanceComprehensive:
         the same Task. Only the non-decreasing property was asserted before,
         which both readings satisfy.
         """
-        checked = 0
-        for name in ("task_bevo", "task_gibe", "task_duna"):
-            if name not in reference_data:
-                continue
-            task = reference_data[name]["task"]
+        task = reference_task(stem).task
 
-            results = calculate_task_distances(task)
-            route = calculate_iteratively_refined_route(task_to_turnpoints(task))
+        results = calculate_task_distances(task)
+        route = calculate_iteratively_refined_route(task_to_turnpoints(task))
 
-            expected = [round(m / 1000.0, 1) for m in route.cumulative_m()]
-            actual = [tp["cumulative_optimized_km"] for tp in results["turnpoints"]]
-            assert actual == expected, f"{name}: cumulative column left the route"
+        expected = [round(m / 1000.0, 1) for m in route.cumulative_m()]
+        actual = [tp["cumulative_optimized_km"] for tp in results["turnpoints"]]
+        assert actual == expected, f"{stem}: cumulative column left the route"
 
-            # The last turnpoint's cumulative distance is the task distance.
-            assert actual[-1] == results["optimized_distance_km"]
+        # The last turnpoint's cumulative distance is the task distance.
+        assert actual[-1] == results["optimized_distance_km"]
 
-            # An optimized prefix never exceeds the same prefix through centers.
-            for tp in results["turnpoints"]:
-                assert tp["cumulative_optimized_km"] <= tp["cumulative_center_km"]
-            checked += 1
-
-        if checked == 0:
-            pytest.skip("No reference task with a known route available")
+        # An optimized prefix never exceeds the same prefix through centers.
+        for tp in results["turnpoints"]:
+            assert tp["cumulative_optimized_km"] <= tp["cumulative_center_km"]
 
     def test_edge_cases_and_robustness(self):
         """Test algorithm robustness with edge cases."""
@@ -263,93 +203,66 @@ class TestDistanceComprehensive:
         savings_pct = (center_dist - results[0]) / center_dist
         assert 0.01 < savings_pct < 0.9, f"Savings {savings_pct:.1%} unreasonable"
 
-    def test_task_distances_integration(self, reference_data: Dict[str, Dict]):
+    @pytest.mark.parametrize("task_name", ["task_mega", "task_duna", "task_wovi"])
+    def test_task_distances_integration(self, task_name):
         """Test the full task distance calculation pipeline.
 
         This integration test validates the complete workflow from task parsing
         through distance optimization using a representative reference task.
         """
-        # Use a known task with good optimization potential
-        test_tasks = ["task_mega", "task_duna", "task_wovi"]
+        task = reference_task(task_name).task
 
-        for task_name in test_tasks:
-            if task_name not in reference_data:
-                continue
+        results = calculate_task_distances(task)
 
-            task = reference_data[task_name]["task"]
+        # Validate structure
+        assert "center_distance_km" in results
+        assert "optimized_distance_km" in results
+        assert "turnpoints" in results
+        assert len(results["turnpoints"]) == len(task.turnpoints)
 
-            results = calculate_task_distances(task)
+        # Validate optimization effectiveness
+        center_km = results["center_distance_km"]
+        opt_km = results["optimized_distance_km"]
 
-            # Validate structure
-            assert "center_distance_km" in results
-            assert "optimized_distance_km" in results
-            assert "turnpoints" in results
-            assert len(results["turnpoints"]) == len(task.turnpoints)
+        assert center_km > 0, f"{task_name}: Center distance should be positive"
+        assert opt_km > 0, f"{task_name}: Optimized distance should be positive"
+        assert opt_km < center_km, f"{task_name}: Optimization should reduce distance"
 
-            # Validate optimization effectiveness
-            center_km = results["center_distance_km"]
-            opt_km = results["optimized_distance_km"]
+        # Validate turnpoint data
+        for i, tp_result in enumerate(results["turnpoints"]):
+            assert "cumulative_center_km" in tp_result
+            assert "cumulative_optimized_km" in tp_result
 
-            assert center_km > 0, f"{task_name}: Center distance should be positive"
-            assert opt_km > 0, f"{task_name}: Optimized distance should be positive"
-            assert opt_km < center_km, (
-                f"{task_name}: Optimization should reduce distance"
-            )
-
-            # Validate turnpoint data
-            for i, tp_result in enumerate(results["turnpoints"]):
-                assert "cumulative_center_km" in tp_result
-                assert "cumulative_optimized_km" in tp_result
-
-                # Cumulative distances should be non-decreasing
-                if i > 0:
-                    prev_tp = results["turnpoints"][i - 1]
-                    assert (
-                        tp_result["cumulative_center_km"]
-                        >= prev_tp["cumulative_center_km"]
-                    )
-                    assert (
-                        tp_result["cumulative_optimized_km"]
-                        >= prev_tp["cumulative_optimized_km"]
-                    )
-
-            # Only test first found task to keep test time reasonable
-            break
-
-
-if __name__ == "__main__":
-    # Allow running tests directly
-    pytest.main([__file__, "-v"])
+            # Cumulative distances should be non-decreasing
+            if i > 0:
+                prev_tp = results["turnpoints"][i - 1]
+                assert (
+                    tp_result["cumulative_center_km"] >= prev_tp["cumulative_center_km"]
+                )
+                assert (
+                    tp_result["cumulative_optimized_km"]
+                    >= prev_tp["cumulative_optimized_km"]
+                )
 
 
 class TestProjectionFromARoute:
     """`task_distances_from_route`: the report as a projection of one route."""
 
-    @staticmethod
-    def _task(reference_tasks_dir: Path, name: str = "task_bevo"):
-        """Parse one reference task, skipping if the corpus is absent."""
-        path = reference_tasks_dir / f"{name}.xctsk"
-        if not path.exists():
-            pytest.skip(f"{name}.xctsk not available")
-        return parse_task(str(path))
-
-    def test_agrees_with_optimizing_from_scratch(self, reference_tasks_dir: Path):
+    @pytest.mark.parametrize("stem", ["task_bevo", "task_gibe"])
+    def test_agrees_with_optimizing_from_scratch(self, stem):
         """Handing over a route gives exactly the report as computing one."""
-        for name in ("task_bevo", "task_gibe"):
-            task = self._task(reference_tasks_dir, name)
-            route = calculate_iteratively_refined_route(task_to_turnpoints(task))
+        task = reference_task(stem).task
+        route = calculate_iteratively_refined_route(task_to_turnpoints(task))
 
-            assert task_distances_from_route(task, route) == calculate_task_distances(
-                task
-            )
+        assert task_distances_from_route(task, route) == calculate_task_distances(task)
 
-    def test_a_task_and_its_map_can_share_one_route(self, reference_tasks_dir: Path):
+    def test_a_task_and_its_map_can_share_one_route(self):
         """The distance table and the drawn map cost one optimizer run together.
 
         This is the pairing the task viewer makes on every request: it used to
         optimize the task once for the table and again for the GeoJSON.
         """
-        task = self._task(reference_tasks_dir)
+        task = reference_task("task_bevo").task
 
         calls = []
         real = common.calculate_iteratively_refined_route

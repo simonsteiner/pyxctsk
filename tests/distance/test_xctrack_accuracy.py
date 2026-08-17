@@ -20,9 +20,7 @@ Everything here goes straight at the optimizer. The pipeline that calls it —
 `test_route_optimization.py`.
 """
 
-import json
 import math
-from pathlib import Path
 
 import pytest
 from pyproj import Geod
@@ -35,7 +33,7 @@ from pyxctsk.distance import (
     optimized_distance,
 )
 from pyxctsk.distance.task_distances import task_to_turnpoints
-from pyxctsk.parser import parse_task
+from tests.corpus import reference_task, tasks_with_reference_distance
 
 WGS84 = Geod(ellps="WGS84")
 
@@ -43,18 +41,13 @@ WGS84 = Geod(ellps="WGS84")
 REF_QUANTIZATION_M = 50.0
 
 
-def _load_reference_tasks(xctsk_dir: Path, json_dir: Path):
-    """Yield (name, task, reference-optimized-km) for tasks with reference data."""
-    for xctsk_file in sorted(xctsk_dir.glob("*.xctsk")):
-        json_path = json_dir / f"{xctsk_file.stem}.json"
-        if not json_path.exists():
-            continue
-        with open(json_path) as f:
-            meta = json.load(f)["metadata"]
-        ref_km = meta.get("distance_optimized_km")
-        if not ref_km:
-            continue
-        yield xctsk_file.stem, parse_task(str(xctsk_file)), ref_km
+#: Every task the reference producer recorded an optimized distance for.
+WITH_REFERENCE = tasks_with_reference_distance()
+
+#: Convergence is a property of the algorithm, not of any one task, so it is
+#: checked on a sample rather than all 22 — each case runs the optimizer twice,
+#: the second time to 500 sweeps. The sample is named in the test ids.
+CONVERGENCE_SAMPLE = WITH_REFERENCE[:5]
 
 
 def _has_concentric_pair(turnpoints: list[TaskTurnpoint]) -> bool:
@@ -72,19 +65,18 @@ def _has_concentric_pair(turnpoints: list[TaskTurnpoint]) -> bool:
 class TestReferenceAccuracy:
     """Optimized distances vs. XCTrack's displayed values on real tasks."""
 
-    def test_matches_xctrack_within_50m_on_5_plus_tasks(
-        self, reference_tasks_dir: Path, reference_json_dir: Path
-    ):
+    def test_matches_xctrack_within_50m_on_5_plus_tasks(self):
         """At least 5 real tasks match XCTrack within 0.1% and 50 m.
 
         The reference values are XCTrack's displayed distances rounded to
-        0.1 km, so 50 m of quantization is added to both bounds.
+        0.1 km, so 50 m of quantization is added to both bounds. This one
+        stays a loop rather than a parametrization: the claim is about the
+        corpus as a whole, not about any single task in it.
         """
         matching = []
-        for name, task, ref_km in _load_reference_tasks(
-            reference_tasks_dir, reference_json_dir
-        ):
-            turnpoints = task_to_turnpoints(task)
+        for reference in WITH_REFERENCE:
+            name, ref_km = reference.stem, reference.reference_optimized_km
+            turnpoints = task_to_turnpoints(reference.task)
             calc_m = optimized_distance(turnpoints)
             ref_m = ref_km * 1000.0
             diff_m = abs(calc_m - ref_m)
@@ -98,9 +90,8 @@ class TestReferenceAccuracy:
             f"(+50m display rounding): {matching}"
         )
 
-    def test_all_reference_tasks_within_one_percent(
-        self, reference_tasks_dir: Path, reference_json_dir: Path
-    ):
+    @pytest.mark.parametrize("reference", WITH_REFERENCE, ids=str)
+    def test_all_reference_tasks_within_one_percent(self, reference):
         """Every reference task stays within 1% of XCTrack's displayed value.
 
         XCTrack's own optimizer deviates from the true WGS84 optimum by up to
@@ -108,23 +99,18 @@ class TestReferenceAccuracy:
         against gross regressions while the tighter check above covers the
         well-conditioned tasks.
         """
-        count = 0
-        for name, task, ref_km in _load_reference_tasks(
-            reference_tasks_dir, reference_json_dir
-        ):
-            turnpoints = task_to_turnpoints(task)
-            calc_km = optimized_distance(turnpoints) / 1000.0
-            rel = abs(calc_km - ref_km) / ref_km
-            assert rel < 0.01, (
-                f"{name}: optimized {calc_km:.2f}km differs from XCTrack "
-                f"{ref_km:.1f}km by {rel:.2%}"
-            )
-            count += 1
-        assert count >= 5, "Expected at least 5 reference tasks"
+        name, ref_km = reference.stem, reference.reference_optimized_km
+        turnpoints = task_to_turnpoints(reference.task)
+        calc_km = optimized_distance(turnpoints) / 1000.0
+        rel = abs(calc_km - ref_km) / ref_km
 
-    def test_optimized_never_exceeds_centers(
-        self, reference_tasks_dir: Path, reference_json_dir: Path
-    ):
+        assert rel < 0.01, (
+            f"{name}: optimized {calc_km:.2f}km differs from XCTrack "
+            f"{ref_km:.1f}km by {rel:.2%}"
+        )
+
+    @pytest.mark.parametrize("reference", WITH_REFERENCE, ids=str)
+    def test_optimized_never_exceeds_centers(self, reference):
         """Optimized ≤ through-centers whenever the center polyline is feasible.
 
         For consecutive concentric turnpoints the center polyline never touches
@@ -132,32 +118,26 @@ class TestReferenceAccuracy:
         task_nohe, where XCTrack itself displays optimized 96.3 km > centers
         82.6 km); those tasks are checked in test_concentric_out_and_back.
         """
-        for name, task, _ in _load_reference_tasks(
-            reference_tasks_dir, reference_json_dir
-        ):
-            turnpoints = task_to_turnpoints(task)
-            if _has_concentric_pair(turnpoints):
-                continue
-            opt = optimized_distance(turnpoints)
-            centers = distance_through_centers(turnpoints)
-            assert opt <= centers + 0.01, (
-                f"{name}: optimized {opt / 1000:.2f}km exceeds centers "
-                f"{centers / 1000:.2f}km"
-            )
+        turnpoints = task_to_turnpoints(reference.task)
+        if _has_concentric_pair(turnpoints):
+            pytest.skip("concentric turnpoints force an out-and-back leg")
 
-    def test_concentric_out_and_back(
-        self, reference_tasks_dir: Path, reference_json_dir: Path
-    ):
+        opt = optimized_distance(turnpoints)
+        centers = distance_through_centers(turnpoints)
+
+        assert opt <= centers + 0.01, (
+            f"{reference.stem}: optimized {opt / 1000:.2f}km exceeds centers "
+            f"{centers / 1000:.2f}km"
+        )
+
+    def test_concentric_out_and_back(self):
         """task_nohe (concentric 10km/200m/10km/100m turnpoints) matches XCTrack.
 
         Touching each concentric circle in order forces mandatory out-and-back
         legs; XCTrack displays 96.3 km (> 82.6 km through centers) and the
         optimizer must reproduce that, not shortcut through the interior.
         """
-        task_file = reference_tasks_dir / "task_nohe.xctsk"
-        if not task_file.exists():
-            pytest.skip("task_nohe.xctsk not available")
-        turnpoints = task_to_turnpoints(parse_task(str(task_file)))
+        turnpoints = task_to_turnpoints(reference_task("task_nohe").task)
         opt_km = optimized_distance(turnpoints) / 1000.0
         assert opt_km == pytest.approx(96.3, abs=0.15)
         assert opt_km > distance_through_centers(turnpoints) / 1000.0
@@ -235,14 +215,9 @@ class TestCrossingCase:
 class TestGoalLine:
     """Goal-line finish per S7F §6.2.3.1."""
 
-    def test_goal_line_task_matches_reference(
-        self, reference_tasks_dir: Path, reference_json_dir: Path
-    ):
+    def test_goal_line_task_matches_reference(self):
         """task_piga_line: finish sits on the goal line and distance matches."""
-        task_file = reference_tasks_dir / "task_piga_line.xctsk"
-        if not task_file.exists():
-            pytest.skip("task_piga_line.xctsk not available")
-        task = parse_task(str(task_file))
+        task = reference_task("task_piga_line").task
         turnpoints = task_to_turnpoints(task)
 
         optimized = calculate_iteratively_refined_route(turnpoints)
@@ -272,24 +247,16 @@ class TestGoalLine:
 class TestConvergence:
     """ε = 0.1 m convergence (S7F §7.1.3)."""
 
-    def test_more_iterations_change_nothing(
-        self, reference_tasks_dir: Path, reference_json_dir: Path
-    ):
+    @pytest.mark.parametrize("reference", CONVERGENCE_SAMPLE, ids=str)
+    def test_more_iterations_change_nothing(self, reference):
         """Beyond convergence, more sweeps change the result by < 0.1 m."""
-        checked = 0
-        for name, task, _ in _load_reference_tasks(
-            reference_tasks_dir, reference_json_dir
-        ):
-            turnpoints = task_to_turnpoints(task)
-            base = optimized_distance(turnpoints)
-            more = optimized_distance(turnpoints, num_iterations=500)
-            assert abs(base - more) <= 0.1, (
-                f"{name}: {abs(base - more):.3f} m change after convergence"
-            )
-            checked += 1
-            if checked >= 5:
-                break
-        assert checked >= 5
+        turnpoints = task_to_turnpoints(reference.task)
+        base = optimized_distance(turnpoints)
+        more = optimized_distance(turnpoints, num_iterations=500)
+
+        assert abs(base - more) <= 0.1, (
+            f"{reference.stem}: {abs(base - more):.3f} m change after convergence"
+        )
 
 
 class TestEarthModel:
@@ -320,12 +287,9 @@ class TestEarthModel:
         assert wgs == pytest.approx(110_574.4, abs=10.0)
         assert abs(wgs - sph) > 500.0
 
-    def test_task_earth_model_propagates(self, reference_tasks_dir: Path):
+    def test_task_earth_model_propagates(self):
         """task_to_turnpoints carries the task's earthModel to every turnpoint."""
-        task_file = reference_tasks_dir / "task_bevo.xctsk"
-        if not task_file.exists():
-            pytest.skip("task_bevo.xctsk not available")
-        task = parse_task(str(task_file))
+        task = reference_task("task_bevo").task
         object.__setattr__(task, "earth_model", EarthModel.FAI_SPHERE)
         turnpoints = task_to_turnpoints(task)
         assert all(tp.earth_model == EarthModel.FAI_SPHERE for tp in turnpoints)

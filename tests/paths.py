@@ -10,7 +10,7 @@ from pathlib import Path
 #: The ``tests/`` directory itself.
 TESTS_DIR = Path(__file__).parent
 
-#: Everything the suite reads: reference tasks, and generated visual output.
+#: Everything the suite reads.
 DATA_DIR = TESTS_DIR / "data"
 
 #: Reference corpus, one directory per representation of the same tasks.
@@ -22,6 +22,3 @@ REFERENCE_QRCODE_DIR = REFERENCE_TASKS_DIR / "qrcode_string"
 #: Fixture sets that fill shapes the exported corpus misses; each has a README.
 ESS_GOAL_DIR = REFERENCE_TASKS_DIR / "ess-goal"
 ELEVATED_GOAL_DIR = REFERENCE_TASKS_DIR / "elevated-goal"
-
-#: Generated artifacts (KML, GeoJSON, QR images) written by the visual tests.
-VISUAL_OUTPUT_DIR = DATA_DIR / "visual_output"

@@ -27,12 +27,10 @@ from pyxctsk import (
 )
 from pyxctsk.distance.goal_line import GoalLine, goal_line_length_from_turnpoints
 from pyxctsk.model.validation import ValidationRule
-from tests.paths import REFERENCE_QRCODE_DIR
+from tests.corpus import reference_task, reference_tasks
 
 # Polyline-encoded "z" literals below are opaque tokens, not words.
 # cspell:ignore Fligr
-
-REFERENCE_QR = REFERENCE_QRCODE_DIR
 
 # A spec-valid CLASSIC task, used as the base for targeted mutations.
 BASE_TASK = {
@@ -218,10 +216,14 @@ class TestStructuralValidation:
         """The base fixture is spec-valid."""
         assert Task.from_json(task_json()).validate() == []
 
-    @pytest.mark.parametrize("name", sorted(p.name for p in REFERENCE_QR.glob("*.txt")))
-    def test_every_reference_task_is_valid(self, name):
-        """Real XCTrack tasks must not trip the validator."""
-        assert parse_task(str(REFERENCE_QR / name)).validate() == []
+    @pytest.mark.parametrize("reference", reference_tasks(), ids=str)
+    def test_every_reference_task_is_valid(self, reference):
+        """Real XCTrack tasks must not trip the validator.
+
+        Read from the QR string rather than the `.xctsk`, so this covers the
+        representation the other consumers of the corpus do not.
+        """
+        assert parse_task(reference.qr_string).validate() == []
 
     def test_takeoff_must_be_first(self):
         """Only the first turnpoint may be TAKEOFF."""
@@ -273,7 +275,7 @@ class TestStructuralValidation:
 
     def test_waypoints_tasks_are_exempt_from_speed_section_rules(self):
         """A route "without cylinders" has no speed section to constrain."""
-        task = parse_task(str(REFERENCE_QR / "task_noha_route.txt"))
+        task = parse_task(reference_task("task_noha_route").qr_string)
 
         assert task.task_type == TaskType.WAYPOINTS
         assert task.validate() == []
@@ -368,11 +370,12 @@ class TestCompressedQRScheme:
         assert qr.to_string() == qr.to_string(compressed=False)
         assert not qr.to_string().startswith("XCTSKZ:")
 
-    @pytest.mark.parametrize("name", ["task_bevo.txt", "task_noha_route.txt"])
-    def test_compressed_round_trips_to_the_same_task(self, name):
+    @pytest.mark.parametrize("stem", ["task_bevo", "task_noha_route"])
+    def test_compressed_round_trips_to_the_same_task(self, stem):
         """Compression must be transparent: same task in, same task out."""
-        original = parse_task(str(REFERENCE_QR / name))
-        waypoints = (REFERENCE_QR / name).read_text().startswith('XCTSK:{"T"')
+        reference = reference_task(stem)
+        original = parse_task(reference.qr_string)
+        waypoints = reference.is_waypoints_format
 
         qr = original.to_qr_code_task()
         compressed = (
@@ -385,7 +388,7 @@ class TestCompressedQRScheme:
 
     def test_compression_actually_shrinks_a_real_task(self):
         """The point of the format is fitting more task in a scannable code."""
-        qr = parse_task(str(REFERENCE_QR / "task_bevo.txt")).to_qr_code_task()
+        qr = parse_task(reference_task("task_bevo").qr_string).to_qr_code_task()
 
         assert len(qr.to_string(compressed=True)) < len(qr.to_string())
 
@@ -476,17 +479,17 @@ class TestTaskTypeValue:
     so "WAYPOINTS" is not a value either format defines.
     """
 
-    @pytest.mark.parametrize("name", ["task_noha_route.txt", "task_dami_route.txt"])
-    def test_waypoints_task_serializes_as_the_simplified_format(self, name):
+    @pytest.mark.parametrize("stem", ["task_noha_route", "task_dami_route"])
+    def test_waypoints_task_serializes_as_the_simplified_format(self, stem):
         """to_string() on a waypoints task must produce XCTrack's own form."""
-        expected = (REFERENCE_QR / name).read_text().strip()
-        task = parse_task(str(REFERENCE_QR / name))
+        reference = reference_task(stem)
+        task = parse_task(reference.qr_string)
 
-        assert task.to_qr_code_task().to_string() == expected
+        assert task.to_qr_code_task().to_string() == reference.qr_string
 
     def test_waypoints_value_is_never_emitted(self):
         """The non-spec "WAYPOINTS" value must not appear anywhere."""
-        task = parse_task(str(REFERENCE_QR / "task_noha_route.txt"))
+        task = parse_task(reference_task("task_noha_route").qr_string)
         emitted = json.loads(task.to_qr_code_task().to_json())
 
         assert "taskType" not in emitted
@@ -494,7 +497,7 @@ class TestTaskTypeValue:
 
     def test_classic_still_says_classic(self):
         """The competition format is untouched."""
-        task = parse_task(str(REFERENCE_QR / "task_bevo.txt"))
+        task = parse_task(reference_task("task_bevo").qr_string)
 
         assert json.loads(task.to_qr_code_task().to_json())["taskType"] == "CLASSIC"
 
@@ -521,7 +524,7 @@ class TestTaskTypeValue:
 
     def test_serialized_shape_follows_task_type_alone(self):
         """There is one source of truth for the shape, not a flag beside it."""
-        qr = parse_task(str(REFERENCE_QR / "task_bevo.txt")).to_qr_code_task()
+        qr = parse_task(reference_task("task_bevo").qr_string).to_qr_code_task()
 
         assert json.loads(qr.to_json())["taskType"] == "CLASSIC"
         assert json.loads(qr.as_waypoints().to_json())["T"] == "W"
@@ -535,7 +538,7 @@ class TestTaskTypeValue:
         right either way, but ``.as_waypoints().to_task()`` and
         ``parse_task(.to_waypoints_string())`` described different tasks.
         """
-        qr = parse_task(str(REFERENCE_QR / "task_bevo.txt")).to_qr_code_task()
+        qr = parse_task(reference_task("task_bevo").qr_string).to_qr_code_task()
 
         direct = qr.as_waypoints().to_task()
         round_tripped = parse_task(qr.to_waypoints_string())
@@ -549,7 +552,7 @@ class TestTaskTypeValue:
         """from_task_waypoints() and to_waypoints_string() are one definition."""
         from pyxctsk.qrcode.task import QRCodeTask
 
-        task = parse_task(str(REFERENCE_QR / "task_bevo.txt"))
+        task = parse_task(reference_task("task_bevo").qr_string)
 
         assert (
             QRCodeTask.from_task_waypoints(task).to_string()
@@ -558,7 +561,7 @@ class TestTaskTypeValue:
 
     def test_as_waypoints_does_not_mutate_the_original(self):
         """Downgrading to waypoints returns a copy, so the source is reusable."""
-        qr = parse_task(str(REFERENCE_QR / "task_bevo.txt")).to_qr_code_task()
+        qr = parse_task(reference_task("task_bevo").qr_string).to_qr_code_task()
 
         before = qr.to_json()
         qr.to_waypoints_json()
@@ -992,37 +995,35 @@ class TestWaypointsTaskEncoding:
 
     def test_altitudes_survive_reading(self):
         """A three-number z must yield its altitude, not zero."""
-        task = parse_task(str(REFERENCE_QR / "task_noha_route.txt"))
+        task = parse_task(reference_task("task_noha_route").qr_string)
 
         altitudes = [tp.waypoint.alt_smoothed for tp in task.turnpoints[:4]]
         assert altitudes == [1149, 175, 606, 1450]
 
     def test_no_cylinder_is_invented(self):
         """A route "without cylinders" must not acquire a radius on read."""
-        task = parse_task(str(REFERENCE_QR / "task_noha_route.txt"))
+        task = parse_task(reference_task("task_noha_route").qr_string)
 
         assert all(tp.radius == 0 for tp in task.turnpoints)
 
-    @pytest.mark.parametrize(
-        "name", ["task_noha_route.txt", "task_dami_route.txt", "task_dami.txt"]
-    )
-    def test_roundtrip_is_byte_identical_to_xctrack(self, name):
+    @pytest.mark.parametrize("stem", ["task_noha_route", "task_dami_route"])
+    def test_roundtrip_is_byte_identical_to_xctrack(self, stem):
         """Re-encoding an XCTrack waypoints QR must reproduce it exactly.
 
         These fixtures were decoded from QR codes generated by
         tools.xcontest.org, so they are ground truth rather than our own output.
         """
-        expected = (REFERENCE_QR / name).read_text().strip()
-        task = parse_task(str(REFERENCE_QR / name))
+        reference = reference_task(stem)
+        task = parse_task(reference.qr_string)
 
-        assert task.to_qr_code_task().to_waypoints_string() == expected
+        assert task.to_qr_code_task().to_waypoints_string() == reference.qr_string
 
     def test_competition_z_keeps_its_radius(self):
         """The four-number competition encoding must be left alone."""
-        expected = (REFERENCE_QR / "task_bevo.txt").read_text().strip()
-        task = parse_task(str(REFERENCE_QR / "task_bevo.txt"))
+        reference = reference_task("task_bevo")
+        task = parse_task(reference.qr_string)
 
-        assert task.to_qr_code_task().to_string() == expected
+        assert task.to_qr_code_task().to_string() == reference.qr_string
         assert task.turnpoints[0].radius == 400
 
     def test_z_length_selects_the_format(self):

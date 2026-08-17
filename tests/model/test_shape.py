@@ -13,7 +13,7 @@ from typing import Any
 
 import pytest
 
-from pyxctsk import Task, parse_task
+from pyxctsk import Task
 from pyxctsk.model.shape import (
     DEFAULTED,
     IDENTITY,
@@ -48,7 +48,7 @@ from pyxctsk.qrcode.models import (
     QR_WAYPOINT_TURNPOINT_SHAPE,
 )
 from pyxctsk.qrcode.task import QR_TASK_SHAPE, QR_WAYPOINTS_TASK_SHAPE
-from tests.paths import REFERENCE_XCTSK_DIR
+from tests.corpus import reference_tasks
 
 
 @dataclass
@@ -274,12 +274,10 @@ class TestEveryKeyBelongsToARow:
 
         assert extra <= {shape.ext_key} - {None}, f"{name} declares stray {extra}"
 
-    @pytest.mark.parametrize(
-        "path", sorted(REFERENCE_XCTSK_DIR.glob("*.xctsk")), ids=lambda p: p.stem
-    )
-    def test_nothing_a_reference_task_emits_falls_outside_its_shape(self, path):
+    @pytest.mark.parametrize("reference", reference_tasks(), ids=str)
+    def test_nothing_a_reference_task_emits_falls_outside_its_shape(self, reference):
         """Rendered both ways, every key at every level is a declared one."""
-        task = parse_task(str(path))
+        task = reference.task
 
         assert self._emitted_keys(task, TASK_SHAPE) <= TASK_SHAPE.keys
         for turnpoint in task.turnpoints:

@@ -14,6 +14,7 @@ This test module comprehensively verifies QR code functionality including:
 import json
 import os
 import tempfile
+import unicodedata
 from io import BytesIO
 
 import pytest
@@ -31,208 +32,79 @@ from pyxctsk.qrcode.enums import QRCodeTaskType, QRCodeTurnpointType
 from pyxctsk.qrcode.image import generate_qrcode_image
 from pyxctsk.qrcode.models import QRCodeTurnpoint
 from pyxctsk.qrcode.task import QRCodeTask
-from tests.conftest import find_xctsk_files
+from tests.corpus import reference_tasks
 
 # Use shared QR code test utilities
 from tests.qr_test_utils import QR_CODE_SUPPORT, Image, decode_qr, zxingcpp
 
+REFERENCE_TASKS = reference_tasks()
 
-def test_qr_code_string_generation(qrcode_test_data):
-    """Test QR code string generation from all task files with format detection.
 
-    This test:
-    - Finds all .xctsk files in the test data directory
-    - Detects waypoints vs full format and uses appropriate QR encoding
-    - Validates QR strings start with "XCTSK:" prefix
-    - Compares generated strings against expected results when available
+@pytest.mark.parametrize("reference", REFERENCE_TASKS, ids=str)
+def test_qr_code_string_matches_the_expected_one(reference):
+    """Every reference task encodes to the string the producer wrote.
+
+    Both shapes go through the library. The waypoints ones used to be checked
+    by re-serializing the *source file* and comparing that to the expected
+    string, which compares two fixtures to each other and never runs the
+    encoder at all.
     """
-    xctsk_dir, expected_dir, _ = qrcode_test_data
+    qr = reference.task.to_qr_code_task()
+    emitted = (
+        qr.to_waypoints_string() if reference.is_waypoints_format else qr.to_string()
+    )
 
-    # Find all task files in the reference directory
-    task_files = find_xctsk_files(xctsk_dir)
-    assert task_files, f"No XCTSK files found in {xctsk_dir}"
-
-    # Test that all files can generate QR code strings
-    for task_file in task_files:
-        task_name = task_file.stem
-        try:
-            # Parse the task
-            task = parse_task(str(task_file))
-
-            # Check if original file is in waypoints format by reading it
-            is_waypoints_format = False
-            original_content = None
-            try:
-                with open(task_file, "r", encoding="utf-8") as f:
-                    file_content = f.read().strip()
-                    # Check if it's the simplified waypoints format
-                    if file_content.startswith('{"T":"W"') or file_content.startswith(
-                        '{\n    "T": "W"'
-                    ):
-                        is_waypoints_format = True
-                        original_content = file_content
-            except Exception:
-                pass
-
-            # Generate QR code string using appropriate format
-            if is_waypoints_format and original_content:
-                # For waypoints format, use the original content directly to preserve exact polylines
-                import json
-
-                # Parse and re-serialize to ensure consistent formatting (compact JSON)
-                original_dict = json.loads(original_content)
-                qr_string = "XCTSK:" + json.dumps(
-                    original_dict, separators=(",", ":"), ensure_ascii=False
-                )
-            else:
-                # Use full format serialization
-                qr_task = task.to_qr_code_task()
-                qr_string = qr_task.to_string()
-
-            assert qr_string, f"Failed to generate QR string for {task_name}"
-            assert qr_string.startswith("XCTSK:"), (
-                f"Invalid QR string format for {task_name}"
-            )
-
-            # Compare with expected QR string if available
-            expected_txt = expected_dir / f"{task_name}.txt"
-            if expected_txt.exists():
-                with open(expected_txt, "r") as f:
-                    expected_qr_string = f.read().strip()
-                assert qr_string == expected_qr_string, (
-                    f"QR string mismatch for {task_name}"
-                )
-
-        except Exception as e:
-            pytest.fail(f"Error processing {task_name}: {e}")
+    assert emitted.startswith("XCTSK:")
+    assert emitted == reference.qr_string
 
 
 @pytest.mark.skipif(not QR_CODE_SUPPORT, reason="QR code dependencies not available")
-def test_qr_code_image_generation(qrcode_test_data):
-    """Test comprehensive QR code image generation and parsing for all task files.
+@pytest.mark.parametrize("reference", REFERENCE_TASKS, ids=str)
+def test_qr_code_image_round_trips(reference, tmp_path):
+    """Task → QR string → PNG → decoded string → Task, on every reference task.
 
-    This test performs complete QR code image workflow:
-    - Generates QR code images and saves them to disk
-    - Decodes QR codes using zxing-cpp with Unicode normalization
-    - Validates JSON comparison with detailed error reporting
-    - Tests both file-based and byte-based image parsing
-    - Verifies complete roundtrip: Task → QR string → Image → Decoded string → Task
+    The image goes to ``tmp_path``: the suite used to write 24 tracked PNGs
+    into the source tree on every run.
     """
-    xctsk_dir, expected_dir, output_dir = qrcode_test_data
+    task = reference.task
+    qr_string = task.to_qr_code_task().to_string()
 
-    # Find all task files
-    task_files = find_xctsk_files(xctsk_dir)
-    assert task_files, f"No XCTSK files found in {xctsk_dir}"
+    image = generate_qrcode_image(qr_string, size=512)
+    png = tmp_path / f"{reference.stem}_qr.png"
+    image.save(png, format="PNG")
 
-    # Test that all files can generate parsable QR code images
-    for task_file in task_files:
-        task_name = task_file.stem
-        try:
-            # Parse the task
-            task = parse_task(str(task_file))
+    decoded = decode_qr(Image.open(png))
+    assert decoded, f"failed to decode the QR code for {reference.stem}"
+    assert _normalized(decoded[0]) == _normalized(qr_string)
 
-            # Generate QR code string
-            qr_task = task.to_qr_code_task()
-            qr_string = qr_task.to_string()
+    # And the decoded string parses back to the task it came from.
+    for parsed in (parse_task(decoded[0]), parse_task(png.read_bytes())):
+        assert parsed.task_type == task.task_type
+        assert len(parsed.turnpoints) == len(task.turnpoints)
+        for original, round_tripped in zip(task.turnpoints, parsed.turnpoints):
+            assert original.waypoint.name == round_tripped.waypoint.name
+            assert abs(original.waypoint.lat - round_tripped.waypoint.lat) < 0.001
+            assert abs(original.waypoint.lon - round_tripped.waypoint.lon) < 0.001
 
-            # Generate and save QR code image
-            output_png = output_dir / f"{task_name}_qr.png"
-            qr_image = generate_qrcode_image(qr_string, size=512)
-            qr_image.save(output_png, format="PNG")
 
-            # Test if the generated QR code can be parsed back
-            image = Image.open(output_png)
+def _normalized(qr_string: str):
+    """Return a QR payload as JSON with its strings in Unicode NFC.
 
-            import json
+    Task names carry accents, and a decoder may hand them back decomposed —
+    a difference in the encoding of the same text, not in the task.
+    """
+    payload = json.loads(qr_string[len("XCTSK:") :])
 
-            try:
-                decoded_objects = decode_qr(image)
-                assert decoded_objects, f"Failed to decode QR code for {task_name}"
+    def nfc(value):
+        if isinstance(value, str):
+            return unicodedata.normalize("NFC", value)
+        if isinstance(value, list):
+            return [nfc(item) for item in value]
+        if isinstance(value, dict):
+            return {key: nfc(item) for key, item in value.items()}
+        return value
 
-                decoded_string = decoded_objects[0]
-                # Compare as JSON objects to avoid false negatives due to formatting
-                if decoded_string.startswith("XCTSK:") and qr_string.startswith(
-                    "XCTSK:"
-                ):
-                    import unicodedata
-
-                    def normalize_all_strings(obj):
-                        if isinstance(obj, str):
-                            return unicodedata.normalize("NFC", obj)
-                        elif isinstance(obj, list):
-                            return [normalize_all_strings(x) for x in obj]
-                        elif isinstance(obj, dict):
-                            return {k: normalize_all_strings(v) for k, v in obj.items()}
-                        else:
-                            return obj
-
-                    decoded_json = json.loads(decoded_string[len("XCTSK:") :])
-                    qr_json = json.loads(qr_string[len("XCTSK:") :])
-                    decoded_json_norm = normalize_all_strings(decoded_json)
-                    qr_json_norm = normalize_all_strings(qr_json)
-                    if decoded_json_norm != qr_json_norm:
-                        import pprint
-
-                        print(
-                            "\n--- Decoded JSON ---\n",
-                            pprint.pformat(decoded_json_norm),
-                        )
-                        print(
-                            "\n--- Generated JSON ---\n", pprint.pformat(qr_json_norm)
-                        )
-                        # Optionally, show a key-by-key diff for lists/dicts
-                        try:
-                            from deepdiff import DeepDiff  # type: ignore
-
-                            diff = DeepDiff(
-                                decoded_json_norm, qr_json_norm, significant_digits=8
-                            )
-                            print("\n--- DeepDiff ---\n", diff)
-                        except ImportError:
-                            pass
-                        assert False, (
-                            f"QR code roundtrip failed for {task_name} (JSON mismatch)"
-                        )
-                else:
-                    if decoded_string != qr_string:
-                        print("\n--- Decoded String ---\n", decoded_string)
-                        print("\n--- Generated String ---\n", qr_string)
-                        assert False, (
-                            f"QR code roundtrip failed for {task_name} (raw string)"
-                        )
-            except Exception as e:
-                # If decoding fails unexpectedly, skip rather than fail so a
-                # broken local decoder doesn't block the rest of the suite.
-                pytest.skip(f"QR decode failed: {e}")
-
-            # Test roundtrip: parse the decoded string back to a task
-            roundtrip_task = parse_task(
-                decoded_string if "decoded_string" in locals() else qr_string
-            )
-            assert roundtrip_task, f"Failed to parse decoded QR code for {task_name}"
-
-            # Additional verification: check that parsed task matches original
-            assert roundtrip_task.task_type == task.task_type
-            assert len(roundtrip_task.turnpoints) == len(task.turnpoints)
-
-            # Verify key waypoint data is preserved
-            for orig_tp, parsed_tp in zip(task.turnpoints, roundtrip_task.turnpoints):
-                assert orig_tp.waypoint.name == parsed_tp.waypoint.name
-                assert abs(orig_tp.waypoint.lat - parsed_tp.waypoint.lat) < 0.001
-                assert abs(orig_tp.waypoint.lon - parsed_tp.waypoint.lon) < 0.001
-
-            # Test parsing from image bytes as well
-            image_buffer = BytesIO()
-            qr_image.save(image_buffer, format="PNG")
-            image_bytes = image_buffer.getvalue()
-
-            # Parse from the generated image bytes
-            parsed_task_from_bytes = parse_task(image_bytes)
-            assert parsed_task_from_bytes.task_type == task.task_type
-            assert len(parsed_task_from_bytes.turnpoints) == len(task.turnpoints)
-
-        except Exception as e:
-            pytest.fail(f"Error processing {task_name}: {e}")
+    return nfc(payload)
 
 
 def test_roundtrip_basic():
