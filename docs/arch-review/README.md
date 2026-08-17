@@ -5,6 +5,14 @@ implements the [XCTrack Competition Interfaces](https://xctrack.org/Competition_
 specification and FAI Sporting Code S7F. Each file is dated and kept as written —
 superseded reviews stay for history rather than being edited. Newest first.
 
+- [2026-08-17 — Deepening candidates after the package split](2026-08-17-deepening-candidates.md)
+  — **proposed,** none applied. Eight candidates in *deep module* terms, each reproduced by
+  running the library: cumulative distances that disagree with the drawn route by 5.09 km
+  and cost n optimizer runs, a LINE goal that can vanish from both output formats, a
+  per-field mapping written out twelve times with three live passthrough losses, a colour
+  palette that drifts across the export seam alongside invalid KML, two rival cylinder
+  solvers with the tests aimed at the unused one, a corpus with four discovery
+  implementations and an orphan fixture, and a layering guard narrower than its docstring.
 - [2026-08-17 — Package layout: 27 flat modules into four packages](2026-08-17-package-layout.md)
   — **applied.** The split into `model/`, `qrcode/`, `distance/` and `export/`, with
   dependencies running one way and each package's `__init__.py` as its interface.

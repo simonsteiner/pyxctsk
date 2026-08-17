@@ -56,6 +56,7 @@ MATEC
 matecconf
 minversion
 mmomtchev
+monkeypatch
 motu
 Naviter
 naxe
@@ -78,6 +79,7 @@ optimised
 optype
 outerboundaryis
 parameterizes
+Parametrizing
 pepi
 piga
 Placemark
@@ -96,6 +98,7 @@ seeyou
 simonsteiner
 simplekml
 Soaringlab
+stringly
 SUBDIRS
 subinterval
 svgs
@@ -106,7 +109,9 @@ turnpoint
 turnpointcylinder
 turnpoints
 uncoerced
+unrepresentable
 vali
+validatable
 Vincenty
 vocu
 waku
