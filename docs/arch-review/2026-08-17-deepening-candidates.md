@@ -504,7 +504,7 @@ the rest is G → C.
 
 - [x] A. Optimized route as a value — one run, legs kept, cumulative by `accumulate`
   (`6d5651b` the value object, `7104ad3` the cumulative fix, `608963d` one route shared
-  by both writers via `TaskDrawing`)
+  by both writers via `TaskDrawing`, `fb9392f` the table sharing it too)
 - [x] B. `GoalLine.from_task` made total; `should_skip_last_turnpoint` removed; earth
   model honored (`3cf5af1`, `908275d`)
 - [ ] C. One field table per serializable shape; `KNOWN_KEYS` derived; cross-format `unknown` quarantined
@@ -519,9 +519,9 @@ Verification for any of these: `uv run pytest`, `ruff check`, `ruff format`, `my
 
 ### Outcome of A and B
 
-Both landed as five commits on `docs/arch-review-2026-08-17`, suite green throughout
-(357 → 373 tests; the additions are the regressions below plus `tests/export/test_common.py`,
-less the four that tested the two deleted functions).
+Both landed as six commits on `docs/arch-review-2026-08-17`, suite green throughout
+(357 → 376 tests; the additions are the regressions below plus `tests/export/test_common.py`
+and the projection tests, less the four that tested the two deleted functions).
 
 - **A cost less than the card assumed and paid more.** `calculate_task_distances` is
   now about as expensive as one optimizer run (was 4.1× on `task_gimi`, 14.4× on
@@ -548,13 +548,15 @@ less the four that tested the two deleted functions).
   `_create_optimized_route_feature` labelled *"Old API for testing"* (the drawing is the
   seam it was standing in for), and the four inert `@patch` decorators — `test_common.py`
   patches the name where it is actually looked up and asserts the count is 1.
-- **Still one route more than necessary in the task viewer.**
-  `calculate_task_distances` optimizes its own, and the viewer asks for distances and
-  GeoJSON in one request. Closing that means splitting the projection out
-  (`task_distances_from_route(task, route)` beside the current entry point, the same
-  idiom as `drawing_to_kml`) so a caller can hand over the route it already has. Left
-  alone: it adds a name to `distance/`'s interface for a caller that is a dev script,
-  and it is not the *writers* re-deriving anything.
+- **The task viewer's second route is gone too.** `task_distances_from_route(task, route)`
+  is the projection and `calculate_task_distances(task)` is optimize-then-project — the
+  same split as `drawing_to_kml` beside `task_to_kml`, so nothing gained an optional
+  parameter. The viewer derives one `TaskDrawing` and feeds `drawing.route` to both the
+  table and the map: 2 optimizer runs per request became 1, 6.2 ms → 2.8 ms on
+  `task_gibe`, with the report dict and the GeoJSON byte-identical. Two `show_progress`
+  prints went with it — the ones naming values now computed inside the projection, which
+  should not print; the flag is never passed `True` anywhere in the repo (see candidate E).
+  With this, A's *"one run serves the table, KML and GeoJSON"* is true as written.
 - **B's second defect was worse than reported.** The card said the red goal colour was
   unreachable for a LINE goal; it was unreachable *and* the fix is not a colour change
   but a consequence of the render list — with a goal line present the goal turnpoint is
