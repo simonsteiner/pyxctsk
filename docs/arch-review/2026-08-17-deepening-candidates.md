@@ -1,7 +1,8 @@
 # 2026-08-17 — Deepening candidates after the package split
 
-**Status: proposed.** Eight candidates, none applied. Companion visual report was written to
-a temp file, not the repo; this document is the record.
+**Status: A and B applied** (see [Progress](#progress) and the outcome notes below); the
+other six are proposed. Companion visual report was written to a temp file, not the repo;
+this document is the record.
 
 Reviewed at `5a3c207` (the four-package split, merged as PR #12). Vocabulary follows the
 *deep module* framing: a **module** has an **interface** (everything a caller must know)
@@ -498,10 +499,13 @@ serializable shape) — worth creating lazily when one is taken on.
 
 ## Progress
 
-None applied. Each item is independent; the suggested order is A → B → G → C.
+A and B are applied. Each remaining item is independent; the suggested order for
+the rest is G → C.
 
-- [ ] A. Optimized route as a value — one run, legs kept, cumulative by `accumulate`
-- [ ] B. `GoalLine.from_task` made total; `should_skip_last_turnpoint` removed; earth model honored
+- [x] A. Optimized route as a value — one run, legs kept, cumulative by `accumulate`
+  (`6d5651b` the value object, `7104ad3` the cumulative fix)
+- [x] B. `GoalLine.from_task` made total; `should_skip_last_turnpoint` removed; earth
+  model honored (`3cf5af1`, `908275d`)
 - [ ] C. One field table per serializable shape; `KNOWN_KEYS` derived; cross-format `unknown` quarantined
 - [ ] D. Colour as a value across the export seam; invalid `<color><Style>` fixed
 - [ ] E. One cylinder solver; dead SSS surface, `show_progress` and `config.py` retired
@@ -511,3 +515,37 @@ None applied. Each item is independent; the suggested order is A → B → G →
 
 Verification for any of these: `uv run pytest`, `ruff check`, `ruff format`, `mypy`
 (strict), plus `import pyxctsk.<pkg>` for all four packages in isolation.
+
+### Outcome of A and B
+
+Both landed as four commits on `docs/arch-review-2026-08-17`, suite green throughout
+(357 → 363 tests; the six added are the regressions below, less the four that tested
+the two deleted functions).
+
+- **A cost less than the card assumed and paid more.** `calculate_task_distances` is
+  now about as expensive as one optimizer run (was 4.1× on `task_gimi`, 14.4× on
+  `task_gibe`), and the whole suite went from 6.5 s to 2.8 s — the re-optimization loop
+  was a measurable fraction of every test that touched a reference task. Distances are
+  bit-identical: the legs are summed left to right in the order the old loop accumulated
+  them, so no accuracy assertion moved.
+- **The rounding stays in the report dict.** The card called the pre-rounding to 0.1 km
+  a display artefact inside a computation; it *is* a display artefact, but the dict is
+  the display — it exists for the task viewer. `OptimizedRoute` carries unrounded
+  metres and the dict rounds when it projects, which is the split the card wanted
+  without changing what the viewer reads.
+- **A's cross-writer half is not done.** `task_to_kml` and `generate_task_geojson` each
+  still run the optimizer once, so producing both formats for one task runs it twice.
+  Sharing it needs a task-level geometry value threaded through both writers — a
+  bigger change than the card implied when it said "one run serves the table, KML and
+  GeoJSON", and it belongs with candidate F's `TaskGeometry` sketch rather than here.
+- **B's second defect was worse than reported.** The card said the red goal colour was
+  unreachable for a LINE goal; it was unreachable *and* the fix is not a colour change
+  but a consequence of the render list — with a goal line present the goal turnpoint is
+  legitimately absent, and without one it is now present and red.
+- **Regression tests added:** the cumulative column equals the route's prefixes
+  (fails on the old code at 5.09 km); a coincident-previous-turnpoint LINE task keeps
+  its goal in red while a normal LINE task still has it replaced by the line; and each
+  goal-line endpoint sits `length / 2` from the goal *measured on the declared earth
+  model* (fails on the old hardcoded ellipsoid by 58 m on a 40 km line).
+- **Deleted:** `calculate_cumulative_distances` and `should_skip_last_turnpoint`, both
+  public names, both second ways to ask a question that now has one answer.
