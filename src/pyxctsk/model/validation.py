@@ -12,11 +12,19 @@ Validation is a report, not a gate. Parsing accepts structurally invalid tasks
 so a malformed file can still be read, inspected and converted; pass
 ``strict=True`` to :func:`pyxctsk.parse_task` to turn violations into a
 :class:`~pyxctsk.exceptions.TaskValidationError`.
+
+The rules read exactly two things — the order of the turnpoint roles, and
+whether this is a waypoints task — so :func:`validate_turnpoint_roles` takes
+those and nothing else. That is what lets a QR payload be checked *as it
+arrived*: converting it to a ``Task`` first invents a version, a task type and
+a goal the payload never carried, and validating inventions reports on the
+converter rather than on the input. :func:`validate_task` is the adapter for
+the full format and :meth:`pyxctsk.QRCodeTask.validate` for the compact one.
 """
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Sequence
 
 from .enums import TaskType, TurnpointType
 
@@ -66,8 +74,10 @@ class ValidationIssue:
         return self.message
 
 
-def validate_task(task: "Task") -> list[ValidationIssue]:
-    """Check a task against the spec's structural rules.
+def validate_turnpoint_roles(
+    roles: Sequence[TurnpointType | None], is_waypoints_task: bool
+) -> list[ValidationIssue]:
+    """Check the arrangement of special turnpoints against the spec.
 
     The rules, quoting the spec:
 
@@ -78,13 +88,18 @@ def validate_task(task: "Task") -> list[ValidationIssue]:
     These apply to CLASSIC tasks. An XC/Waypoints task is a plain route with no
     speed section, so the SSS/ESS rules are not checked for it.
 
+    Both task formats can answer what this reads, which is why it takes roles
+    rather than a task: neither format has to be turned into the other, and no
+    default has to be invented, before its structure can be checked.
+
     Args:
-        task: The task to check.
+        roles: The turnpoints' types, in task order. None for an ordinary one.
+        is_waypoints_task: Whether this is an XC/Waypoints task.
 
     Returns:
         list[ValidationIssue]: One issue per violated rule, empty if valid.
     """
-    if not task.turnpoints:
+    if not roles:
         return [ValidationIssue(ValidationRule.NO_TURNPOINTS, "task has no turnpoints")]
 
     issues = [
@@ -92,15 +107,15 @@ def validate_task(task: "Task") -> list[ValidationIssue]:
             ValidationRule.TAKEOFF_NOT_FIRST,
             f"TAKEOFF is only allowed on the first turnpoint, found at index {i}",
         )
-        for i, tp in enumerate(task.turnpoints)
-        if tp.type == TurnpointType.TAKEOFF and i != 0
+        for i, role in enumerate(roles)
+        if role == TurnpointType.TAKEOFF and i != 0
     ]
 
-    if task.task_type == TaskType.WAYPOINTS:
+    if is_waypoints_task:
         return issues
 
     indices = {
-        special: [i for i, tp in enumerate(task.turnpoints) if tp.type == special]
+        special: [i for i, role in enumerate(roles) if role == special]
         for special in (TurnpointType.SSS, TurnpointType.ESS)
     }
     for special, found in indices.items():
@@ -123,3 +138,20 @@ def validate_task(task: "Task") -> list[ValidationIssue]:
         )
 
     return issues
+
+
+def validate_task(task: "Task") -> list[ValidationIssue]:
+    """Check a task against the spec's structural rules.
+
+    The full format's adapter onto :func:`validate_turnpoint_roles`.
+
+    Args:
+        task: The task to check.
+
+    Returns:
+        list[ValidationIssue]: One issue per violated rule, empty if valid.
+    """
+    return validate_turnpoint_roles(
+        [tp.type for tp in task.turnpoints],
+        is_waypoints_task=task.task_type == TaskType.WAYPOINTS,
+    )

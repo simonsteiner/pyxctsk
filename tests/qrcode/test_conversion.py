@@ -38,6 +38,7 @@ from pyxctsk.qrcode.enums import (
     QRCodeSSSType,
     QRCodeTaskType,
 )
+from tests.corpus import reference_task
 
 TABLE_PAIRS = [
     ("task type", _TO_QR_TASK_TYPE, _FROM_QR_TASK_TYPE),
@@ -95,3 +96,77 @@ def test_the_two_obsolete_direction_defaults_agree():
     would export differently depending on which format it arrived in.
     """
     assert _TO_QR_DIRECTION[OBSOLETE_DIRECTION_DEFAULT] == QR_OBSOLETE_DIRECTION_DEFAULT
+
+
+class TestValidatingWhatArrived:
+    """A QR payload can be checked without being converted first.
+
+    Validation used to require a ``Task``, so QR input had to be converted —
+    which invents a ``version``, a ``CLASSIC`` task type and a CYLINDER goal
+    the payload never carried. "Check what actually arrived" was not
+    expressible for the format most tasks are shared in.
+    """
+
+    def _payload(self, *types):
+        """A competition QR task whose turnpoints carry these ``t`` values."""
+        from pyxctsk.qrcode.encoding import encode_competition_turnpoint
+        from pyxctsk.qrcode.task import QRCodeTask
+
+        turnpoints = []
+        for i, tp_type in enumerate(types):
+            tp = {
+                "n": f"TP{i}",
+                "z": encode_competition_turnpoint(8.0 + i, 46.5, 1000, 400),
+            }
+            if tp_type is not None:
+                tp["t"] = tp_type
+            turnpoints.append(tp)
+        return QRCodeTask.from_dict(
+            {
+                "taskType": "CLASSIC",
+                "version": 2,
+                "t": turnpoints,
+                "tc": None,
+                "to": None,
+            }
+        )
+
+    def test_a_valid_payload_reports_nothing(self):
+        """TAKEOFF first, then SSS, then ESS."""
+        assert self._payload(1, 2, 3, None).validate() == []
+
+    def test_the_rules_fire_on_the_payloads_own_turnpoints(self):
+        """Two starts is two starts, in either format."""
+        issues = self._payload(2, 2, 3).validate()
+
+        assert [str(i) for i in issues] == ["SSS must appear exactly once, found 2"]
+
+    def test_takeoff_must_still_be_first(self):
+        """The rule set is the same one; only the adapter differs."""
+        issues = self._payload(2, 1, 3).validate()
+
+        assert any("TAKEOFF is only allowed on the first" in str(i) for i in issues)
+
+    def test_a_waypoints_payload_is_exempt(self):
+        """A route without cylinders has no speed section to constrain."""
+        from pyxctsk.qrcode.task import QRCodeTask
+
+        waypoints = QRCodeTask.from_string(reference_task("task_dami_route").qr_string)
+
+        assert waypoints.task_type is QRCodeTaskType.WAYPOINTS
+        assert waypoints.validate() == []
+
+    def test_nothing_is_invented_to_check_it(self):
+        """Validating must not depend on what conversion would supply.
+
+        The payload declares no goal and no version 1; the converted task has
+        both.
+        """
+        payload = self._payload(1, 2, 3, None)
+
+        assert payload.goal is None
+        assert payload.version == 2
+        assert payload.validate() == []
+        # The converted task does carry those inventions.
+        converted = payload.to_task()
+        assert converted.goal is not None and converted.version == 1

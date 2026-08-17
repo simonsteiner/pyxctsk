@@ -10,9 +10,10 @@ import json
 import pytest
 from click.testing import CliRunner
 
-from pyxctsk import TurnpointType
+from pyxctsk import TurnpointType, parse_task
 from pyxctsk.cli import convert, main
 from tests.builders import task, turnpoint
+from tests.corpus import reference_task
 from tests.qr_test_utils import QR_CODE_SUPPORT, Image, decode_qr
 
 #: One turnpoint at a known position, so every format test converts the same
@@ -120,3 +121,61 @@ class TestCLIConvert:
         assert result.exit_code == 0
         assert "pyxctsk" in result.output
         assert "convert" in result.output
+
+
+class TestStrictValidation:
+    """`--strict`, which the CLI's own docstring used to promise.
+
+    `main`'s help advertised "strict error handling", and `convert` called
+    `parse_task` with no `strict` and offered no flag to set it — so the one
+    interface real users touch could never validate a task.
+    """
+
+    def _valid(self) -> bytes:
+        """Return a real, spec-valid task.
+
+        `SAMPLE` is not one: a single TAKEOFF turnpoint has neither an SSS nor
+        an ESS.
+        """
+        return reference_task("task_bevo").xctsk_path.read_bytes()
+
+    def _invalid(self) -> bytes:
+        """The same task with a TAKEOFF where the spec forbids one."""
+        data = json.loads(self._valid())
+        data["turnpoints"][-1]["type"] = "TAKEOFF"
+        return json.dumps(data).encode()
+
+    def test_the_base_task_really_is_valid(self):
+        """Otherwise the rejection below would prove nothing."""
+        assert parse_task(self._valid()).validate() == []
+
+    def test_an_invalid_task_still_converts_by_default(self):
+        """Reading stays lenient, matching the library."""
+        result = CliRunner().invoke(
+            convert, ["--format", "json"], input=self._invalid()
+        )
+
+        assert result.exit_code == 0
+
+    def test_strict_rejects_it_and_names_the_rule(self):
+        """The message has to say which rule broke, not just "invalid"."""
+        result = CliRunner().invoke(
+            convert, ["--format", "json", "--strict"], input=self._invalid()
+        )
+
+        assert result.exit_code == 1
+        assert "TAKEOFF is only allowed on the first turnpoint" in result.output
+
+    def test_strict_passes_a_valid_task_through(self):
+        """The flag must not reject what the spec allows."""
+        result = CliRunner().invoke(
+            convert, ["--format", "json", "--strict"], input=self._valid()
+        )
+
+        assert result.exit_code == 0
+
+    def test_the_flag_is_documented(self):
+        """A flag the help does not mention is one nobody finds."""
+        result = CliRunner().invoke(main, ["convert", "--help"])
+
+        assert "--strict" in result.output

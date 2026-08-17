@@ -64,6 +64,7 @@ from .models import (
 
 if TYPE_CHECKING:
     from ..model.task import Task
+    from ..model.validation import ValidationIssue
 
 # Constants
 QR_CODE_SCHEME = "XCTSK:"
@@ -340,6 +341,28 @@ class QRCodeTask:
         from .conversion import task_to_qr_code_waypoints
 
         return task_to_qr_code_waypoints(task)
+
+    def validate(self) -> "list[ValidationIssue]":
+        """Check this payload against the spec's structural rules.
+
+        Checked *as it arrived*. Converting to a ``Task`` first would invent a
+        version, a ``CLASSIC`` task type and a CYLINDER goal that the payload
+        never carried, so a report on the converted task is partly a report on
+        the converter.
+
+        The check lives in :mod:`pyxctsk.qrcode.conversion` because it needs
+        both vocabularies — this format's turnpoint types and the rules'. It is
+        reached through a function-local import for the same reason the
+        conversion methods below are: importing that module here at module
+        level would make the two a cycle.
+
+        Returns:
+            list[ValidationIssue]: One issue per violated rule; empty if this
+            payload is structurally valid. Each stringifies to its message.
+        """
+        from .conversion import validate_qr_code_task
+
+        return validate_qr_code_task(self)
 
     def to_task(self) -> "Task":
         """Convert to regular Task format.

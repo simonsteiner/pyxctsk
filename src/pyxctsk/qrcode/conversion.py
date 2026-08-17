@@ -42,6 +42,7 @@ from ..model.task import (
     TurnpointType,
     Waypoint,
 )
+from ..model.validation import ValidationIssue, validate_turnpoint_roles
 from .enums import (
     QRCodeDirection,
     QRCodeEarthModel,
@@ -263,4 +264,29 @@ def qr_code_task_to_task(qr: QRCodeTask) -> Task:
         goal=goal,
         extensions=qr.extensions,
         unknown=strip_foreign_keys(qr.unknown, Task.KNOWN_KEYS),
+    )
+
+
+def validate_qr_code_task(qr: QRCodeTask) -> list[ValidationIssue]:
+    """Check a QR payload against the spec's structural rules, as it arrived.
+
+    The rules are stated once, over turnpoint roles
+    (:func:`~pyxctsk.model.validation.validate_turnpoint_roles`); this is the
+    QR format's adapter onto them, and it lives here because translating
+    between the two vocabularies of turnpoint type is what this module is for.
+
+    Checking the payload rather than its conversion is the point. Converting
+    first invents ``version=1``, a ``CLASSIC`` task type and a CYLINDER goal
+    that the payload never carried, so a report on the converted task is partly
+    a report on this module.
+
+    Args:
+        qr: The QR code task to check.
+
+    Returns:
+        list[ValidationIssue]: One issue per violated rule, empty if valid.
+    """
+    return validate_turnpoint_roles(
+        [_FROM_QR_TURNPOINT_TYPE.get(tp.type) for tp in qr.turnpoints],
+        is_waypoints_task=qr.task_type == QRCodeTaskType.WAYPOINTS,
     )
