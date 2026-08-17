@@ -29,17 +29,38 @@ import base64
 import binascii
 import json
 import zlib
-from collections import OrderedDict
 from dataclasses import dataclass, field, replace
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar, Mapping, MutableMapping
 
-from ..model.passthrough import QR_EXTENSIONS_KEY, read_passthrough, write_passthrough
+from ..model.passthrough import QR_EXTENSIONS_KEY
+from ..model.shape import (
+    DEFAULTED,
+    LENIENT_INT,
+    Codec,
+    Discriminator,
+    Field,
+    Nested,
+    NestedList,
+    Optionality,
+    Shape,
+    Value,
+)
 from .enums import (
     QRCodeEarthModel,
     QRCodeTaskType,
     QRCodeTurnpointType,
 )
-from .models import QRCodeGoal, QRCodeSSS, QRCodeTakeoff, QRCodeTurnpoint
+from .models import (
+    QR_GOAL_SHAPE,
+    QR_SSS_SHAPE,
+    QR_TAKEOFF_SHAPE,
+    QR_TURNPOINT_SHAPE,
+    QR_WAYPOINT_TURNPOINT_SHAPE,
+    QRCodeGoal,
+    QRCodeSSS,
+    QRCodeTakeoff,
+    QRCodeTurnpoint,
+)
 
 if TYPE_CHECKING:
     from ..model.task import Task
@@ -124,17 +145,18 @@ class QRCodeTask:
     extensions: list[dict[str, Any]] = field(default_factory=list)
     unknown: dict[str, Any] = field(default_factory=dict)
 
-    #: Keys the competition shape reads; everything else lands in ``unknown``.
-    COMPETITION_KEYS = frozenset(
-        {"taskType", "version", "t", "s", "g", "e", "to", "tc", "x"}
-    )
+    #: Keys the competition shape reads, derived from
+    #: :data:`QR_TASK_SHAPE`; everything else lands in ``unknown``.
+    COMPETITION_KEYS: ClassVar[frozenset[str]]
 
-    #: Keys the simplified XC/Waypoints shape reads. Deliberately *not* the
-    #: union with :attr:`COMPETITION_KEYS`: a single allow-list spanning both
-    #: shapes told the passthrough that a competition key in a waypoints
-    #: payload was understood, when this shape neither reads nor writes it, so
-    #: ``e``, ``to`` and ``g`` were swallowed instead of carried through.
-    SIMPLIFIED_KEYS = frozenset({"T", "V", "t", "x"})
+    #: Keys the simplified XC/Waypoints shape reads, derived from
+    #: :data:`QR_WAYPOINTS_TASK_SHAPE`. Deliberately *not* the union with
+    #: :attr:`COMPETITION_KEYS`: a single allow-list spanning both shapes told
+    #: the passthrough that a competition key in a waypoints payload was
+    #: understood, when this shape neither reads nor writes it, so ``e``,
+    #: ``to`` and ``g`` were swallowed instead of carried through. With two
+    #: tables there is no one place that union could be written down.
+    SIMPLIFIED_KEYS: ClassVar[frozenset[str]]
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
@@ -151,70 +173,12 @@ class QRCodeTask:
         Returns:
             Dictionary with QR code task format fields
         """
-        if self.task_type == QRCodeTaskType.WAYPOINTS:
-            # XC/Waypoints simplified format
-            simplified_result: OrderedDict[str, Any] = OrderedDict()
-            simplified_result["T"] = "W"  # taskType: Waypoints
-            simplified_result["V"] = self.version  # version: 2
+        return self._shape_for(self.task_type == QRCodeTaskType.WAYPOINTS).write(self)
 
-            # Turnpoints - only include if they exist
-            if self.turnpoints:
-                simplified_result["t"] = [
-                    tp.to_dict(simplified=True) for tp in self.turnpoints
-                ]
-            # Extensions and unknown keys are preserved here for the same
-            # reason as in the full format: from_dict reads them, so dropping
-            # them on the way out would lose data on a round-trip.
-            write_passthrough(
-                simplified_result, self.extensions, self.unknown, QR_EXTENSIONS_KEY
-            )
-
-            return simplified_result
-
-        # Full format - Create an empty dict to start with
-        result: dict[str, Any] = {}
-
-        # To match the expected output exactly, we need to build the dictionary
-        # in the precise order seen in the expected output
-
-        # 1. Goal (if exists)
-        if self.goal:
-            result["g"] = self.goal.to_dict()
-
-        # 2. SSS (if exists)
-        if self.sss:
-            result["s"] = self.sss.to_dict()
-
-        # 3. Turnpoints (if exist)
-        if self.turnpoints:
-            result["t"] = [tp.to_dict() for tp in self.turnpoints]
-
-        # 4. Task type - CLASSIC is the only value this format defines;
-        #    WAYPOINTS took the branch above.
-        if self.task_type is not None:
-            result["taskType"] = "CLASSIC"
-
-        # 5. Takeoff fields - always include them as null if not set
-        # This is important to match the expected test output exactly
-        if self.takeoff:
-            takeoff_dict = self.takeoff.to_dict()
-            result["tc"] = takeoff_dict.get("c", None)
-            result["to"] = takeoff_dict.get("o", None)
-        else:
-            result["tc"] = None
-            result["to"] = None
-
-        # 6. Earth model - only include if not default (WGS84 = 0)
-        if self.earth_model is not None and self.earth_model != QRCodeEarthModel.WGS84:
-            result["e"] = self.earth_model.value
-
-        # 7. Version
-        result["version"] = self.version
-
-        # 8. Extensions and unknown keys last
-        write_passthrough(result, self.extensions, self.unknown, QR_EXTENSIONS_KEY)
-
-        return result
+    @staticmethod
+    def _shape_for(simplified: bool) -> "Shape[QRCodeTask]":
+        """Return the table for one of this format's two shapes."""
+        return QR_WAYPOINTS_TASK_SHAPE if simplified else QR_TASK_SHAPE
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "QRCodeTask":
@@ -234,84 +198,7 @@ class QRCodeTask:
         waypoints payload is unknown here, and is carried through rather than
         silently dropped.
         """
-        is_simplified = "T" in data
-        known_keys = cls.SIMPLIFIED_KEYS if is_simplified else cls.COMPETITION_KEYS
-        extensions, unknown = read_passthrough(data, known_keys, QR_EXTENSIONS_KEY)
-
-        if is_simplified:
-            # Simplified XC/Waypoints format
-            version = data.get("V", QR_CODE_TASK_VERSION)
-
-            # Task type is always WAYPOINTS in simplified format
-            simplified_task_type = QRCodeTaskType.WAYPOINTS
-
-            turnpoints = []
-            if "t" in data:
-                turnpoints = [QRCodeTurnpoint.from_dict(tp) for tp in data["t"]]
-
-            return cls(
-                version=version,
-                task_type=simplified_task_type,
-                earth_model=None,  # Default to WGS84
-                turnpoints=turnpoints,
-                takeoff=None,
-                sss=None,
-                goal=None,
-                extensions=extensions,
-                unknown=unknown,
-            )
-
-        # Full format
-        version_raw = data.get("version", QR_CODE_TASK_VERSION)
-        version = version_raw if isinstance(version_raw, int) else int(str(version_raw))
-
-        task_type: QRCodeTaskType | None = None
-        if "taskType" in data:
-            if data["taskType"] == "CLASSIC":
-                task_type = QRCodeTaskType.CLASSIC
-            elif data["taskType"] == "WAYPOINTS" or data["taskType"] == "W":
-                task_type = QRCodeTaskType.WAYPOINTS
-
-        earth_model: QRCodeEarthModel | None = None
-        if "e" in data:
-            e_val = data["e"]
-            e_int = e_val if isinstance(e_val, int) else int(str(e_val))
-            earth_model = QRCodeEarthModel(e_int)
-
-        turnpoints = []
-        if "t" in data and isinstance(data["t"], list):
-            turnpoints = [QRCodeTurnpoint.from_dict(tp) for tp in data["t"]]
-
-        takeoff = None
-        if ("to" in data and data["to"] is not None) or (
-            "tc" in data and data["tc"] is not None
-        ):
-            takeoff_data = {}
-            if "to" in data:
-                takeoff_data["o"] = data["to"]
-            if "tc" in data:
-                takeoff_data["c"] = data["tc"]
-            takeoff = QRCodeTakeoff.from_dict(takeoff_data)
-
-        sss = None
-        if "s" in data and isinstance(data["s"], dict):
-            sss = QRCodeSSS.from_dict(data["s"])
-
-        goal = None
-        if "g" in data and isinstance(data["g"], dict):
-            goal = QRCodeGoal.from_dict(data["g"])
-
-        return cls(
-            version=version,
-            task_type=task_type,
-            earth_model=earth_model,
-            turnpoints=turnpoints,
-            takeoff=takeoff,
-            sss=sss,
-            goal=goal,
-            extensions=extensions,
-            unknown=unknown,
-        )
+        return cls._shape_for("T" in data).read(data)
 
     def to_json(self) -> str:
         """Convert to JSON string.
@@ -463,3 +350,121 @@ class QRCodeTask:
         from .conversion import qr_code_task_to_task
 
         return qr_code_task_to_task(self)
+
+
+@dataclass(frozen=True)
+class _CompetitionTaskType(Field):
+    """``taskType``, which this shape reads more spellings than it writes.
+
+    ``CLASSIC`` is the only value the competition shape defines — a WAYPOINTS
+    task is the *other* shape, named by ``T``. So the key is read leniently,
+    because older payloads did spell the waypoints type here (as ``WAYPOINTS``
+    or ``W``), and written as the one constant this shape means.
+    """
+
+    @property
+    def keys(self) -> tuple[str, ...]:
+        """The competition shape's task-type key."""
+        return ("taskType",)
+
+    def read(self, data: Mapping[str, Any]) -> dict[str, Any]:
+        """Accept either spelling of either type, or neither."""
+        raw = data.get("taskType")
+        if raw == "CLASSIC":
+            return {"task_type": QRCodeTaskType.CLASSIC}
+        if raw in ("WAYPOINTS", "W"):
+            return {"task_type": QRCodeTaskType.WAYPOINTS}
+        return {}
+
+    def write(self, obj: Any, result: MutableMapping[str, Any]) -> None:
+        """Write the only value this shape defines."""
+        if obj.task_type is not None:
+            result["taskType"] = "CLASSIC"
+
+
+@dataclass(frozen=True)
+class _TakeoffTimes(Field):
+    """The takeoff window, which this format keeps at the root.
+
+    Two keys and one attribute: ``to`` and ``tc`` are root keys rather than an
+    object, and both are written even when there is no takeoff — as explicit
+    nulls, which is what the reference producer emits and what the golden
+    strings carry. A row owning two keys is what keeps that a row rather than a
+    special case bolted onto the task's writer.
+    """
+
+    @property
+    def keys(self) -> tuple[str, ...]:
+        """Both root keys, in the order this format writes them."""
+        return ("tc", "to")
+
+    def read(self, data: Mapping[str, Any]) -> dict[str, Any]:
+        """Rebuild the takeoff object from the two root keys."""
+        times = {
+            key: value
+            for key, value in (("o", data.get("to")), ("c", data.get("tc")))
+            if value is not None
+        }
+        if not times:
+            return {}
+        return {"takeoff": QR_TAKEOFF_SHAPE.read(times)}
+
+    def write(self, obj: Any, result: MutableMapping[str, Any]) -> None:
+        """Flatten the takeoff object back onto the root, nulls included."""
+        rendered = QR_TAKEOFF_SHAPE.write(obj.takeoff) if obj.takeoff else {}
+        result["tc"] = rendered.get("c")
+        result["to"] = rendered.get("o")
+
+
+#: WGS84 is the default, so the format omits it rather than spelling it out.
+_NON_DEFAULT_EARTH_MODEL = Optionality(
+    absent=lambda raw: raw is None,
+    omit=lambda value: value is None or value == QRCodeEarthModel.WGS84,
+)
+
+#: The nested sections are objects or they are not there. A value of the wrong
+#: shape is not read rather than raising: it lands in ``unknown`` and travels
+#: back out untouched, which is what this library does with anything it cannot
+#: interpret.
+_A_DICT_OR_NOTHING = Optionality(
+    absent=lambda raw: not isinstance(raw, dict),
+    omit=lambda value: value is None,
+)
+_A_LIST_OR_NOTHING = Optionality(
+    absent=lambda raw: not isinstance(raw, list),
+    omit=lambda value: not value,
+)
+
+#: ``e`` is an integer a producer may have written as a string.
+_EARTH_MODEL = Codec(
+    lambda model: model.value,
+    lambda raw: QRCodeEarthModel(LENIENT_INT.from_wire(raw)),
+)
+
+#: The competition shape, in the key order tools.xcontest.org emits.
+QR_TASK_SHAPE = Shape(
+    QRCodeTask,
+    (
+        Nested("goal", "g", QR_GOAL_SHAPE, _A_DICT_OR_NOTHING),
+        Nested("sss", "s", QR_SSS_SHAPE, _A_DICT_OR_NOTHING),
+        NestedList("turnpoints", "t", QR_TURNPOINT_SHAPE, _A_LIST_OR_NOTHING),
+        _CompetitionTaskType(),
+        _TakeoffTimes(),
+        Value("earth_model", "e", _EARTH_MODEL, _NON_DEFAULT_EARTH_MODEL),
+        Value("version", "version", LENIENT_INT, DEFAULTED),
+    ),
+    ext_key=QR_EXTENSIONS_KEY,
+)
+QRCodeTask.COMPETITION_KEYS = QR_TASK_SHAPE.keys
+
+#: The simplified XC/Waypoints shape: a task type, a version, and a route.
+QR_WAYPOINTS_TASK_SHAPE = Shape(
+    QRCodeTask,
+    (
+        Discriminator("T", "W", "task_type", QRCodeTaskType.WAYPOINTS),
+        Value("version", "V", LENIENT_INT, DEFAULTED),
+        NestedList("turnpoints", "t", QR_WAYPOINT_TURNPOINT_SHAPE, _A_LIST_OR_NOTHING),
+    ),
+    ext_key=QR_EXTENSIONS_KEY,
+)
+QRCodeTask.SIMPLIFIED_KEYS = QR_WAYPOINTS_TASK_SHAPE.keys

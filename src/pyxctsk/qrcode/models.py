@@ -6,16 +6,29 @@ This module defines immutable dataclasses representing the main components of an
 - QRCodeTakeoff: Takeoff open/close times
 - QRCodeTurnpoint: Turnpoint with compressed coordinate encoding
 
-Each class provides methods for serialization to and from the compact JSON format used in QR codes,
-including custom polyline encoding for turnpoint coordinates. These models are used for parsing,
-generating, and manipulating XCTrack-compatible QR code tasks.
+Each class declares its wire mapping as a field table — see
+:mod:`pyxctsk.model.shape` — and its ``to_dict`` / ``from_dict`` are the two
+traversals of it. The turnpoint has two tables rather than one, because the
+competition format and the simplified XC/Waypoints one are two shapes of the
+same class and each reads exactly what it writes.
 """
 
-from collections import OrderedDict
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, ClassVar, Mapping, MutableMapping
 
-from ..model.passthrough import QR_EXTENSIONS_KEY, read_passthrough, write_passthrough
+from ..model.passthrough import QR_EXTENSIONS_KEY
+from ..model.shape import (
+    DEFAULTED,
+    OPTIONAL_EMPTY,
+    REQUIRED,
+    TIME_OF_DAY,
+    Field,
+    Optionality,
+    Shape,
+    Value,
+    enum_codec,
+    list_codec,
+)
 from ..model.time_of_day import TimeOfDay
 from .encoding import (
     decode_nums,
@@ -49,47 +62,34 @@ class QRCodeGoal:
     finish_altitude: float | None = None
     unknown: dict[str, Any] = field(default_factory=dict)
 
-    #: Keys this class understands; everything else lands in ``unknown``.
-    KNOWN_KEYS = frozenset({"d", "fa", "t"})
+    #: Keys this class understands, derived from :data:`QR_GOAL_SHAPE`;
+    #: everything else lands in ``unknown``.
+    KNOWN_KEYS: ClassVar[frozenset[str]]
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
 
         Keys are emitted in the order tools.xcontest.org uses — ``d``, ``fa``,
-        ``t`` — so output stays byte-identical to the reference producer.
+        ``t`` — so output stays byte-identical to the reference producer. That
+        order is the table's row order.
         """
-        result: dict[str, Any] = {}
-        if self.deadline:
-            result["d"] = self.deadline.to_json_string()
-        if self.finish_altitude is not None:
-            result["fa"] = self.finish_altitude
-        if self.type is not None:
-            result["t"] = self.type.value
-        write_passthrough(result, [], self.unknown, None)
-        return result
+        return QR_GOAL_SHAPE.write(self)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "QRCodeGoal":
         """Create from dictionary."""
-        deadline = None
-        if "d" in data:
-            deadline = TimeOfDay.from_json_string(data["d"])
+        return QR_GOAL_SHAPE.read(data)
 
-        goal_type = None
-        if "t" in data:
-            goal_type = QRCodeGoalType(data["t"])
 
-        finish_altitude = None
-        if data.get("fa") is not None:
-            finish_altitude = data["fa"]
-
-        _, unknown = read_passthrough(data, cls.KNOWN_KEYS, None)
-        return cls(
-            deadline=deadline,
-            type=goal_type,
-            finish_altitude=finish_altitude,
-            unknown=unknown,
-        )
+QR_GOAL_SHAPE = Shape(
+    QRCodeGoal,
+    (
+        Value("deadline", "d", TIME_OF_DAY),
+        Value("finish_altitude", "fa"),
+        Value("type", "t", enum_codec(QRCodeGoalType)),
+    ),
+)
+QRCodeGoal.KNOWN_KEYS = QR_GOAL_SHAPE.keys
 
 
 @dataclass
@@ -99,54 +99,44 @@ class QRCodeSSS:
     Represents start timing and type information for QR code format.
 
     Fields correspond to JSON format:
-    - direction: OBSOLETE field kept for backwards compatibility (ignored when reading)
     - type: Start type - RACE (1) or ELAPSED_TIME (2)
+    - direction: OBSOLETE field kept for backwards compatibility (ignored when
+      reading, so it carries the same default as the full format's ``SSS``)
     - time_gates: Array of time gates for start timing
     - unknown: Keys this format does not define, preserved verbatim
     """
 
-    direction: QRCodeDirection
     type: QRCodeSSSType
+    direction: QRCodeDirection = QR_OBSOLETE_DIRECTION_DEFAULT
     time_gates: list["TimeOfDay"] = field(default_factory=list)
     unknown: dict[str, Any] = field(default_factory=dict)
 
-    #: Keys this class understands; everything else lands in ``unknown``.
-    KNOWN_KEYS = frozenset({"d", "g", "t"})
+    #: Keys this class understands, derived from :data:`QR_SSS_SHAPE`;
+    #: everything else lands in ``unknown``.
+    KNOWN_KEYS: ClassVar[frozenset[str]]
 
-    def to_dict(self) -> OrderedDict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
-        # Create an ordered dict to ensure field order
-        result: OrderedDict[str, Any] = OrderedDict()
-        # Add direction first - OBSOLETE but kept for backwards compatibility
-        result["d"] = self.direction.value
-        # Add time_gates in the middle if they exist
-        if self.time_gates:
-            result["g"] = [gate.to_json_string() for gate in self.time_gates]
-        # Add type last
-        result["t"] = self.type.value
-        write_passthrough(result, [], self.unknown, None)
-        return result
+        return QR_SSS_SHAPE.write(self)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "QRCodeSSS":
         """Create from dictionary."""
-        time_gates = []
-        if "g" in data:
-            time_gates = [TimeOfDay.from_json_string(gate) for gate in data["g"]]
+        return QR_SSS_SHAPE.read(data)
 
-        # Direction field is OBSOLETE and should be ignored when reading.
-        direction = QR_OBSOLETE_DIRECTION_DEFAULT
-        if data.get("d") is not None:
-            # For backwards compatibility, still read it if present
-            direction = QRCodeDirection(data["d"])
 
-        _, unknown = read_passthrough(data, cls.KNOWN_KEYS, None)
-        return cls(
-            direction=direction,
-            type=QRCodeSSSType(data["t"]),
-            time_gates=time_gates,
-            unknown=unknown,
-        )
+QR_SSS_SHAPE = Shape(
+    QRCodeSSS,
+    (
+        # ``d`` is OBSOLETE: ignored on read, still written so older devices
+        # keep working. It comes first, and the type last, to match the order
+        # the reference producer emits.
+        Value("direction", "d", enum_codec(QRCodeDirection), DEFAULTED),
+        Value("time_gates", "g", list_codec(TIME_OF_DAY), OPTIONAL_EMPTY),
+        Value("type", "t", enum_codec(QRCodeSSSType), REQUIRED),
+    ),
+)
+QRCodeSSS.KNOWN_KEYS = QR_SSS_SHAPE.keys
 
 
 @dataclass
@@ -172,25 +162,22 @@ class QRCodeTakeoff:
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
-        result: dict[str, Any] = {}
-        if self.time_open:
-            result["o"] = self.time_open.to_json_string()
-        if self.time_close:
-            result["c"] = self.time_close.to_json_string()
-        return result
+        return QR_TAKEOFF_SHAPE.write(self)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "QRCodeTakeoff":
         """Create from dictionary."""
-        time_open = None
-        time_close = None
+        return QR_TAKEOFF_SHAPE.read(data)
 
-        if "o" in data and data["o"] is not None:
-            time_open = TimeOfDay.from_json_string(data["o"])
-        if "c" in data and data["c"] is not None:
-            time_close = TimeOfDay.from_json_string(data["c"])
 
-        return cls(time_open=time_open, time_close=time_close)
+QR_TAKEOFF_SHAPE = Shape(
+    QRCodeTakeoff,
+    (
+        Value("time_open", "o", TIME_OF_DAY),
+        Value("time_close", "c", TIME_OF_DAY),
+    ),
+    carries_unknown=False,
+)
 
 
 @dataclass
@@ -222,10 +209,17 @@ class QRCodeTurnpoint:
     extensions: list[dict[str, Any]] = field(default_factory=list)
     unknown: dict[str, Any] = field(default_factory=dict)
 
-    #: Keys this class understands; everything else lands in ``unknown``.
-    KNOWN_KEYS = frozenset({"z", "n", "d", "t", "x"})
+    #: Keys the competition shape understands, derived from
+    #: :data:`QR_TURNPOINT_SHAPE`; everything else lands in ``unknown``.
+    KNOWN_KEYS: ClassVar[frozenset[str]]
 
-    def to_dict(self, simplified: bool = False) -> OrderedDict[str, Any]:
+    #: Keys the simplified XC/Waypoints shape understands, derived from
+    #: :data:`QR_WAYPOINT_TURNPOINT_SHAPE`. A description or a type in such a
+    #: payload is a key that shape does not define, so it is carried verbatim
+    #: rather than read into an attribute the shape would never write back.
+    SIMPLIFIED_KEYS: ClassVar[frozenset[str]]
+
+    def to_dict(self, simplified: bool = False) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
 
         Uses custom polyline encoding for turnpoint coordinates (lon, lat, alt, radius)
@@ -239,61 +233,20 @@ class QRCodeTurnpoint:
             Dictionary with fields: d (description), n (name), t (type), z (encoded coords)
             For simplified format: only n (name) and z (encoded coords)
         """
-        if simplified:
-            # XC/Waypoints simplified format - name and encoded coordinates.
-            # Its "z" carries three numbers; the radius belongs to the
-            # competition format only.
-            simplified_result: OrderedDict[str, Any] = OrderedDict(
-                [
-                    ("n", self.name),
-                    (
-                        "z",
-                        encode_waypoint_turnpoint(
-                            self.lon, self.lat, self.alt_smoothed
-                        ),
-                    ),
-                ]
-            )
-            # from_dict reads "x" and unknown keys for these payloads too, so
-            # they have to be written back or a round-trip loses them.
-            write_passthrough(
-                simplified_result, self.extensions, self.unknown, QR_EXTENSIONS_KEY
-            )
-            return simplified_result
-
-        # Use the XCTrack custom encoding
-        encoded = encode_competition_turnpoint(
-            self.lon, self.lat, self.alt_smoothed, self.radius
-        )
-
-        # Full format - Create result dictionary with exact order to match expected output
-        result: OrderedDict[str, Any] = OrderedDict()
-
-        # Only include description if it has a non-empty value
-        if self.description:
-            result["d"] = self.description
-
-        result["n"] = self.name
-
-        # Add type field before z - only for SSS (2) and ESS (3)
-        # TAKEOFF (1) should not have the "t" field in QR code format
-        if self.type == QRCodeTurnpointType.SSS or self.type == QRCodeTurnpointType.ESS:
-            result["t"] = self.type.value
-
-        result["z"] = encoded
-
-        write_passthrough(result, self.extensions, self.unknown, QR_EXTENSIONS_KEY)
-
-        return result
+        shape = QR_WAYPOINT_TURNPOINT_SHAPE if simplified else QR_TURNPOINT_SHAPE
+        return shape.write(self)
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "QRCodeTurnpoint":
+    def from_dict(
+        cls, data: dict[str, Any], simplified: bool = False
+    ) -> "QRCodeTurnpoint":
         """Create from dictionary.
 
         The ``z`` field is the only source of coordinates, and its length says
         which format it is: four numbers for a competition turnpoint
         (lon, lat, altitude, radius), three for an XC/Waypoints one
         (lon, lat, altitude — a route "without cylinders", hence radius 0).
+        That dispatch is on the value, so it is the same in both shapes.
 
         Both formats require ``z``, so a payload without one is malformed
         rather than a turnpoint at 0°N 0°E — inventing coordinates would put
@@ -301,6 +254,9 @@ class QRCodeTurnpoint:
 
         Args:
             data: Dictionary with turnpoint data
+            simplified: If True, read the simplified XC/Waypoints shape, which
+                defines only ``n`` and ``z``. Mirrors :meth:`to_dict`, so what
+                each shape reads is exactly what it writes.
 
         Returns:
             QRCodeTurnpoint instance
@@ -309,6 +265,36 @@ class QRCodeTurnpoint:
             KeyError: If ``z`` or ``n`` is missing.
             ValueError: If ``z`` does not decode to three or four numbers.
         """
+        shape = QR_WAYPOINT_TURNPOINT_SHAPE if simplified else QR_TURNPOINT_SHAPE
+        return shape.read(data)
+
+
+@dataclass(frozen=True)
+class _PolylineCoordinates(Field):
+    """The one key that carries four numbers, or three.
+
+    ``z`` is the turnpoint's whole geometry — longitude, latitude, altitude and
+    (in the competition format) radius — polyline-encoded into a single string.
+    One row over four attributes, which is why a field owns keys rather than a
+    key owning a field.
+
+    Reading does not depend on which shape asked: the number count says which
+    encoding it is, so a three-number ``z`` in a competition payload is a
+    waypoint turnpoint with radius 0 rather than an error.
+
+    Attributes:
+        with_radius: Whether this shape's ``z`` carries the fourth number.
+    """
+
+    with_radius: bool
+
+    @property
+    def keys(self) -> tuple[str, ...]:
+        """The coordinate key."""
+        return ("z",)
+
+    def read(self, data: Mapping[str, Any]) -> dict[str, Any]:
+        """Decode ``z`` into the four coordinate attributes."""
         nums = decode_nums(data["z"])
         if len(nums) == 4:
             lon, lat, alt_smoothed, radius = (
@@ -324,22 +310,49 @@ class QRCodeTurnpoint:
             raise ValueError(
                 f'turnpoint "z" must hold 3 or 4 numbers, got {len(nums)}: {data["z"]!r}'
             )
+        return {
+            "lon": lon,
+            "lat": lat,
+            "alt_smoothed": alt_smoothed,
+            "radius": radius,
+        }
 
-        turnpoint_type = QRCodeTurnpointType.NONE
-        if "t" in data:
-            turnpoint_type = QRCodeTurnpointType(data["t"])
+    def write(self, obj: Any, result: MutableMapping[str, Any]) -> None:
+        """Encode the four coordinate attributes into ``z``."""
+        if self.with_radius:
+            result["z"] = encode_competition_turnpoint(
+                obj.lon, obj.lat, obj.alt_smoothed, obj.radius
+            )
+        else:
+            result["z"] = encode_waypoint_turnpoint(obj.lon, obj.lat, obj.alt_smoothed)
 
-        description = data.get("d")
 
-        extensions, unknown = read_passthrough(data, cls.KNOWN_KEYS, QR_EXTENSIONS_KEY)
-        return cls(
-            lat=lat,
-            lon=lon,
-            radius=radius,
-            name=data["n"],
-            alt_smoothed=alt_smoothed,
-            type=turnpoint_type,
-            description=description,
-            extensions=extensions,
-            unknown=unknown,
-        )
+#: TAKEOFF is a type this format knows but does not spell: only SSS and ESS
+#: carry a ``t``, and a turnpoint without one is an ordinary turnpoint.
+_SPEED_SECTION_ONLY = Optionality(
+    absent=lambda raw: raw is None,
+    omit=lambda value: value not in (QRCodeTurnpointType.SSS, QRCodeTurnpointType.ESS),
+)
+
+QR_TURNPOINT_SHAPE = Shape(
+    QRCodeTurnpoint,
+    (
+        Value("description", "d", optionality=OPTIONAL_EMPTY),
+        Value("name", "n", optionality=REQUIRED),
+        Value("type", "t", enum_codec(QRCodeTurnpointType), _SPEED_SECTION_ONLY),
+        _PolylineCoordinates(with_radius=True),
+    ),
+    ext_key=QR_EXTENSIONS_KEY,
+)
+QRCodeTurnpoint.KNOWN_KEYS = QR_TURNPOINT_SHAPE.keys
+
+#: "A simple route from waypoints without cylinders": a name and a position.
+QR_WAYPOINT_TURNPOINT_SHAPE = Shape(
+    QRCodeTurnpoint,
+    (
+        Value("name", "n", optionality=REQUIRED),
+        _PolylineCoordinates(with_radius=False),
+    ),
+    ext_key=QR_EXTENSIONS_KEY,
+)
+QRCodeTurnpoint.SIMPLIFIED_KEYS = QR_WAYPOINT_TURNPOINT_SHAPE.keys

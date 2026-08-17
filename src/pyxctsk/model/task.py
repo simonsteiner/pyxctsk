@@ -18,7 +18,7 @@ Neighbouring modules hold what this one deliberately does not:
 
 import json
 from dataclasses import dataclass, field, replace
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 # The enums are re-exported: they are part of task.py's public surface and
 # callers import them from here. They live in their own module so validation.py
@@ -32,8 +32,21 @@ from .enums import (  # noqa: F401
     TaskType,
     TurnpointType,
 )
-from .passthrough import EXTENSIONS_KEY, read_passthrough, write_passthrough
-from .rounding import round_half_up
+from .passthrough import EXTENSIONS_KEY
+from .shape import (
+    DEFAULTED,
+    OPTIONAL_EMPTY,
+    REQUIRED,
+    ROUNDED_INT,
+    TIME_OF_DAY,
+    Nested,
+    NestedList,
+    Optionality,
+    Shape,
+    Value,
+    enum_codec,
+    list_codec,
+)
 from .time_of_day import TimeOfDay
 from .validation import ValidationIssue, validate_task
 
@@ -62,8 +75,9 @@ class Waypoint:
     description: str | None = None
     unknown: dict[str, Any] = field(default_factory=dict)
 
-    #: Keys this class understands; everything else lands in ``unknown``.
-    KNOWN_KEYS = frozenset({"name", "lat", "lon", "altSmoothed", "description"})
+    #: Keys this class understands, derived from :data:`WAYPOINT_SHAPE`;
+    #: everything else lands in ``unknown``.
+    KNOWN_KEYS: ClassVar[frozenset[str]]
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
@@ -71,16 +85,7 @@ class Waypoint:
         Returns:
             Dict[str, Any]: Dictionary representation for JSON.
         """
-        result: dict[str, Any] = {
-            "name": self.name,
-            "lat": self.lat,
-            "lon": self.lon,
-            "altSmoothed": self.alt_smoothed,
-        }
-        if self.description:
-            result["description"] = self.description
-        write_passthrough(result, [], self.unknown, None)
-        return result
+        return WAYPOINT_SHAPE.write(self)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Waypoint":
@@ -96,15 +101,20 @@ class Waypoint:
         Returns:
             Waypoint: Parsed Waypoint object.
         """
-        _, unknown = read_passthrough(data, cls.KNOWN_KEYS, None)
-        return cls(
-            name=data["name"],
-            lat=data["lat"],
-            lon=data["lon"],
-            alt_smoothed=round_half_up(data["altSmoothed"]),
-            description=data.get("description"),
-            unknown=unknown,
-        )
+        return WAYPOINT_SHAPE.read(data)
+
+
+WAYPOINT_SHAPE = Shape(
+    Waypoint,
+    (
+        Value("name", "name", optionality=REQUIRED),
+        Value("lat", "lat", optionality=REQUIRED),
+        Value("lon", "lon", optionality=REQUIRED),
+        Value("alt_smoothed", "altSmoothed", ROUNDED_INT, REQUIRED),
+        Value("description", "description", optionality=OPTIONAL_EMPTY),
+    ),
+)
+Waypoint.KNOWN_KEYS = WAYPOINT_SHAPE.keys
 
 
 @dataclass
@@ -128,8 +138,9 @@ class Turnpoint:
     extensions: list[dict[str, Any]] = field(default_factory=list)
     unknown: dict[str, Any] = field(default_factory=dict)
 
-    #: Keys this class understands; everything else lands in ``unknown``.
-    KNOWN_KEYS = frozenset({"radius", "waypoint", "type", "extensions"})
+    #: Keys this class understands, derived from :data:`TURNPOINT_SHAPE`;
+    #: everything else lands in ``unknown``.
+    KNOWN_KEYS: ClassVar[frozenset[str]]
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
@@ -137,14 +148,7 @@ class Turnpoint:
         Returns:
             Dict[str, Any]: Dictionary representation for JSON.
         """
-        result: dict[str, Any] = {
-            "radius": self.radius,
-            "waypoint": self.waypoint.to_dict(),
-        }
-        if self.type and self.type != TurnpointType.NONE:
-            result["type"] = self.type.value
-        write_passthrough(result, self.extensions, self.unknown, EXTENSIONS_KEY)
-        return result
+        return TURNPOINT_SHAPE.write(self)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Turnpoint":
@@ -160,18 +164,21 @@ class Turnpoint:
         Returns:
             Turnpoint: Parsed Turnpoint object.
         """
-        turnpoint_type = None
-        if "type" in data and data["type"]:
-            turnpoint_type = TurnpointType(data["type"])
+        return TURNPOINT_SHAPE.read(data)
 
-        extensions, unknown = read_passthrough(data, cls.KNOWN_KEYS, EXTENSIONS_KEY)
-        return cls(
-            radius=round_half_up(data["radius"]),
-            waypoint=Waypoint.from_dict(data["waypoint"]),
-            type=turnpoint_type,
-            extensions=extensions,
-            unknown=unknown,
-        )
+
+TURNPOINT_SHAPE = Shape(
+    Turnpoint,
+    (
+        Value("radius", "radius", ROUNDED_INT, REQUIRED),
+        Nested("waypoint", "waypoint", WAYPOINT_SHAPE, REQUIRED),
+        # ``TurnpointType.NONE`` is the empty string, so "no type" and "the
+        # type that means none" are the same absence to OPTIONAL_EMPTY.
+        Value("type", "type", enum_codec(TurnpointType), OPTIONAL_EMPTY),
+    ),
+    ext_key=EXTENSIONS_KEY,
+)
+Turnpoint.KNOWN_KEYS = TURNPOINT_SHAPE.keys
 
 
 @dataclass
@@ -189,8 +196,9 @@ class Takeoff:
     time_close: TimeOfDay | None = None
     unknown: dict[str, Any] = field(default_factory=dict)
 
-    #: Keys this class understands; everything else lands in ``unknown``.
-    KNOWN_KEYS = frozenset({"timeOpen", "timeClose"})
+    #: Keys this class understands, derived from :data:`TAKEOFF_SHAPE`;
+    #: everything else lands in ``unknown``.
+    KNOWN_KEYS: ClassVar[frozenset[str]]
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
@@ -198,13 +206,7 @@ class Takeoff:
         Returns:
             Dict[str, Any]: Dictionary representation for JSON.
         """
-        result: dict[str, Any] = {}
-        if self.time_open:
-            result["timeOpen"] = self.time_open.to_json_string()
-        if self.time_close:
-            result["timeClose"] = self.time_close.to_json_string()
-        write_passthrough(result, [], self.unknown, None)
-        return result
+        return TAKEOFF_SHAPE.write(self)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Takeoff":
@@ -216,16 +218,17 @@ class Takeoff:
         Returns:
             Takeoff: Parsed Takeoff object.
         """
-        time_open = None
-        time_close = None
+        return TAKEOFF_SHAPE.read(data)
 
-        if "timeOpen" in data:
-            time_open = TimeOfDay.from_json_string(data["timeOpen"])
-        if "timeClose" in data:
-            time_close = TimeOfDay.from_json_string(data["timeClose"])
 
-        _, unknown = read_passthrough(data, cls.KNOWN_KEYS, None)
-        return cls(time_open=time_open, time_close=time_close, unknown=unknown)
+TAKEOFF_SHAPE = Shape(
+    Takeoff,
+    (
+        Value("time_open", "timeOpen", TIME_OF_DAY),
+        Value("time_close", "timeClose", TIME_OF_DAY),
+    ),
+)
+Takeoff.KNOWN_KEYS = TAKEOFF_SHAPE.keys
 
 
 @dataclass
@@ -248,8 +251,9 @@ class SSS:
     time_close: TimeOfDay | None = None
     unknown: dict[str, Any] = field(default_factory=dict)
 
-    #: Keys this class understands; everything else lands in ``unknown``.
-    KNOWN_KEYS = frozenset({"type", "direction", "timeGates", "timeClose"})
+    #: Keys this class understands, derived from :data:`SSS_SHAPE`;
+    #: everything else lands in ``unknown``.
+    KNOWN_KEYS: ClassVar[frozenset[str]]
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
@@ -257,15 +261,7 @@ class SSS:
         Returns:
             Dict[str, Any]: Dictionary representation for JSON.
         """
-        result: dict[str, Any] = {
-            "type": self.type.value,
-            "direction": self.direction.value,
-            "timeGates": [gate.to_json_string() for gate in self.time_gates],
-        }
-        if self.time_close:
-            result["timeClose"] = self.time_close.to_json_string()
-        write_passthrough(result, [], self.unknown, None)
-        return result
+        return SSS_SHAPE.write(self)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "SSS":
@@ -281,28 +277,25 @@ class SSS:
         Returns:
             SSS: Parsed SSS object.
         """
-        time_gates = []
-        if "timeGates" in data:
-            time_gates = [
-                TimeOfDay.from_json_string(gate) for gate in data["timeGates"]
-            ]
+        return SSS_SHAPE.read(data)
 
-        time_close = None
-        if "timeClose" in data:
-            time_close = TimeOfDay.from_json_string(data["timeClose"])
 
-        direction = OBSOLETE_DIRECTION_DEFAULT
-        if data.get("direction"):
-            direction = Direction(data["direction"])
+#: ``sss.direction`` is obsolete: the spec has readers ignore it and writers
+#: still emit *some* value. A present-but-empty one is therefore as absent as a
+#: missing key, and the field is written either way.
+_OBSOLETE = Optionality(absent=lambda raw: not raw, omit=lambda value: False)
 
-        _, unknown = read_passthrough(data, cls.KNOWN_KEYS, None)
-        return cls(
-            type=SSSType(data["type"]),
-            direction=direction,
-            time_gates=time_gates,
-            time_close=time_close,
-            unknown=unknown,
-        )
+SSS_SHAPE = Shape(
+    SSS,
+    (
+        Value("type", "type", enum_codec(SSSType), REQUIRED),
+        Value("direction", "direction", enum_codec(Direction), _OBSOLETE),
+        # Written even when empty: the spec's sss object always has the key.
+        Value("time_gates", "timeGates", list_codec(TIME_OF_DAY), DEFAULTED),
+        Value("time_close", "timeClose", TIME_OF_DAY),
+    ),
+)
+SSS.KNOWN_KEYS = SSS_SHAPE.keys
 
 
 @dataclass
@@ -338,8 +331,9 @@ class Goal:
     #: omission.
     IGNORED_KEYS = frozenset({"lineLength"})
 
-    #: Keys this class understands; everything else lands in ``unknown``.
-    KNOWN_KEYS = frozenset({"type", "deadline", "finishAltitude"}) | IGNORED_KEYS
+    #: Keys this class understands, derived from :data:`GOAL_SHAPE`;
+    #: everything else lands in ``unknown``.
+    KNOWN_KEYS: ClassVar[frozenset[str]]
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
@@ -353,15 +347,7 @@ class Goal:
         Returns:
             Dict[str, Any]: Dictionary representation for JSON.
         """
-        result: dict[str, Any] = {}
-        if self.type:
-            result["type"] = self.type.value
-        if self.deadline:
-            result["deadline"] = self.deadline.to_json_string()
-        if self.finish_altitude is not None:
-            result["finishAltitude"] = self.finish_altitude
-        write_passthrough(result, [], self.unknown, None)
-        return result
+        return GOAL_SHAPE.write(self)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Goal":
@@ -379,24 +365,19 @@ class Goal:
         Returns:
             Goal: Parsed Goal object.
         """
-        goal_type = None
-        deadline = None
-        finish_altitude = None
+        return GOAL_SHAPE.read(data)
 
-        if "type" in data:
-            goal_type = GoalType(data["type"])
-        if "deadline" in data:
-            deadline = TimeOfDay.from_json_string(data["deadline"])
-        if data.get("finishAltitude") is not None:
-            finish_altitude = data["finishAltitude"]
 
-        _, unknown = read_passthrough(data, cls.KNOWN_KEYS, None)
-        return cls(
-            type=goal_type,
-            deadline=deadline,
-            finish_altitude=finish_altitude,
-            unknown=unknown,
-        )
+GOAL_SHAPE = Shape(
+    Goal,
+    (
+        Value("type", "type", enum_codec(GoalType)),
+        Value("deadline", "deadline", TIME_OF_DAY),
+        Value("finish_altitude", "finishAltitude"),
+    ),
+    ignored_keys=Goal.IGNORED_KEYS,
+)
+Goal.KNOWN_KEYS = GOAL_SHAPE.keys
 
 
 @dataclass
@@ -435,19 +416,9 @@ class Task:
     extensions: list[dict[str, Any]] = field(default_factory=list)
     unknown: dict[str, Any] = field(default_factory=dict)
 
-    #: Keys this class understands; everything else lands in ``unknown``.
-    KNOWN_KEYS = frozenset(
-        {
-            "taskType",
-            "version",
-            "earthModel",
-            "turnpoints",
-            "takeoff",
-            "sss",
-            "goal",
-            "extensions",
-        }
-    )
+    #: Keys this class understands, derived from :data:`TASK_SHAPE`;
+    #: everything else lands in ``unknown``.
+    KNOWN_KEYS: ClassVar[frozenset[str]]
 
     def __post_init__(self) -> None:
         """Post-initialization processing.
@@ -499,23 +470,7 @@ class Task:
         Returns:
             Dict[str, Any]: Dictionary representation for JSON.
         """
-        result: dict[str, Any] = {
-            "taskType": self.task_type.value,
-            "version": self.version,
-            "turnpoints": [tp.to_dict() for tp in self.turnpoints],
-        }
-
-        if self.earth_model:
-            result["earthModel"] = self.earth_model.value
-        if self.takeoff:
-            result["takeoff"] = self.takeoff.to_dict()
-        if self.sss:
-            result["sss"] = self.sss.to_dict()
-        if self.goal:
-            result["goal"] = self.goal.to_dict()
-        write_passthrough(result, self.extensions, self.unknown, EXTENSIONS_KEY)
-
-        return result
+        return TASK_SHAPE.write(self)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Task":
@@ -527,38 +482,9 @@ class Task:
         Returns:
             Task: Parsed Task object.
         """
-        turnpoints = [Turnpoint.from_dict(tp) for tp in data["turnpoints"]]
-
-        earth_model = None
-        if "earthModel" in data:
-            earth_model = EarthModel(data["earthModel"])
-
-        takeoff = None
-        if "takeoff" in data:
-            takeoff = Takeoff.from_dict(data["takeoff"])
-
-        sss = None
-        if "sss" in data:
-            sss = SSS.from_dict(data["sss"])
-
-        goal = None
-        if "goal" in data:
-            goal = Goal.from_dict(data["goal"])
-
-        extensions, unknown = read_passthrough(data, cls.KNOWN_KEYS, EXTENSIONS_KEY)
         # Goal defaults are derived once in Task.__post_init__; no need to
         # repeat the rules here.
-        return cls(
-            task_type=TaskType(data["taskType"]),
-            version=data["version"],
-            turnpoints=turnpoints,
-            earth_model=earth_model,
-            takeoff=takeoff,
-            sss=sss,
-            goal=goal,
-            extensions=extensions,
-            unknown=unknown,
-        )
+        return TASK_SHAPE.read(data)
 
     def to_json(self) -> str:
         """Convert to JSON string.
@@ -642,3 +568,19 @@ class Task:
             return False
 
         return ess_tp == self.turnpoints[-1]
+
+
+TASK_SHAPE = Shape(
+    Task,
+    (
+        Value("task_type", "taskType", enum_codec(TaskType), REQUIRED),
+        Value("version", "version", optionality=REQUIRED),
+        NestedList("turnpoints", "turnpoints", TURNPOINT_SHAPE, REQUIRED),
+        Value("earth_model", "earthModel", enum_codec(EarthModel)),
+        Nested("takeoff", "takeoff", TAKEOFF_SHAPE),
+        Nested("sss", "sss", SSS_SHAPE),
+        Nested("goal", "goal", GOAL_SHAPE),
+    ),
+    ext_key=EXTENSIONS_KEY,
+)
+Task.KNOWN_KEYS = TASK_SHAPE.keys
