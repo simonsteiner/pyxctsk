@@ -13,7 +13,19 @@ This module covers:
 
 from unittest.mock import Mock
 
-from pyxctsk import Goal, GoalType, Task, TaskType, Turnpoint, TurnpointType, Waypoint
+import pytest
+
+from pyxctsk import (
+    EarthModel,
+    Goal,
+    GoalType,
+    Task,
+    TaskType,
+    Turnpoint,
+    TurnpointType,
+    Waypoint,
+)
+from pyxctsk.distance import geodesic_distance
 from pyxctsk.distance.goal_line import (
     GoalLine,
     _find_previous_turnpoint,
@@ -24,7 +36,7 @@ from pyxctsk.distance.goal_line import (
 from pyxctsk.export.geojson import _create_goal_line_features
 
 
-def _line_goal_task(prev_radius=400, goal_radius=400):
+def _line_goal_task(prev_radius: int = 400, goal_radius: int = 400) -> Task:
     """Build a two-turnpoint LINE-goal task for goal-line tests."""
     tp1 = Turnpoint(
         radius=prev_radius,
@@ -465,3 +477,50 @@ class TestGoalLinePresence:
         task.turnpoints[0].waypoint.lat = task.turnpoints[-1].waypoint.lat
         task.turnpoints[0].waypoint.lon = task.turnpoints[-1].waypoint.lon
         assert GoalLine.from_task(task) is None
+
+
+class TestGoalLineEarthModel:
+    """The goal line is measured on the task's declared earth model (ADR 0003).
+
+    It used to be measured on a hardcoded WGS84 ellipsoid, so a task declaring
+    the FAI sphere had its route and distances on the sphere while the goal line
+    and its control zone sat on the ellipsoid — two earth models in one
+    exported document.
+    """
+
+    @staticmethod
+    def _task(earth_model) -> Task:
+        """A LINE-goal task with a 40 km goal line on the given earth model."""
+        task = _line_goal_task(goal_radius=20_000)
+        task.earth_model = earth_model
+        return task
+
+    def test_from_task_carries_the_model(self):
+        """The model travels with the goal line, not with the caller."""
+        assert GoalLine.from_task(self._task(EarthModel.FAI_SPHERE)).earth_model == (
+            EarthModel.FAI_SPHERE
+        )
+        assert GoalLine.from_task(self._task(None)).earth_model is None
+
+    def test_endpoints_are_half_the_length_from_the_center_on_that_model(self):
+        """Each endpoint sits length / 2 from the goal, measured on the model.
+
+        This is what a hardcoded ellipsoid broke: half of 40 km along the
+        ellipsoid is not half of 40 km along the FAI sphere.
+        """
+        for earth_model in (None, EarthModel.FAI_SPHERE):
+            goal_line = GoalLine.from_task(self._task(earth_model))
+            (lon1, lat1), (lon2, lat2), _ = goal_line.endpoints()
+            for lon, lat in ((lon1, lat1), (lon2, lat2)):
+                measured = geodesic_distance(goal_line.center, (lat, lon), earth_model)
+                assert measured == pytest.approx(goal_line.length / 2, abs=0.01), (
+                    f"{earth_model}: endpoint is not half the line from the goal"
+                )
+
+    def test_the_two_models_disagree_enough_to_matter(self):
+        """The models place the endpoints tens of metres apart on a long line."""
+        wgs84 = GoalLine.from_task(self._task(None)).endpoints()[0]
+        sphere = GoalLine.from_task(self._task(EarthModel.FAI_SPHERE)).endpoints()[0]
+
+        apart = geodesic_distance((wgs84[1], wgs84[0]), (sphere[1], sphere[0]))
+        assert apart > 10.0, "otherwise this test could not detect the wrong model"

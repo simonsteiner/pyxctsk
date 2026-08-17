@@ -21,12 +21,8 @@ same core, retained for backwards compatibility.
 
 from dataclasses import dataclass
 
-from pyproj import Geod
-
 from ..model.task import GoalType, Task
-
-# Initialize WGS84 ellipsoid for geographical calculations
-geod = Geod(ellps="WGS84")
+from .turnpoint import geod_for_earth_model
 
 # Constants for goal line visualization
 GOAL_LINE_NUM_POINTS = 20
@@ -77,13 +73,17 @@ def _endpoints_from_coords(
     prev_lat: float,
     prev_lon: float,
     goal_line_length: float,
+    earth_model: object = None,
 ) -> tuple[tuple[float, float], tuple[float, float], float]:
     """Core endpoint math operating on raw coordinates.
 
     Returns ((lon1, lat1), (lon2, lat2), forward_azimuth). The goal line is
     perpendicular to the approach direction from the previous point to the
-    goal center, centred on the goal center.
+    goal center, centred on the goal center, and measured on ``earth_model``
+    (None = WGS84) so it agrees with the distances the same task reports.
     """
+    geod = geod_for_earth_model(earth_model)
+
     # Calculate bearing from previous point to goal center
     forward_azimuth, _, _ = geod.inv(prev_lon, prev_lat, center_lon, center_lat)
 
@@ -104,7 +104,7 @@ def _endpoints_from_coords(
 
 
 def calculate_goal_line_endpoints(
-    last_tp, prev_tp, goal_line_length: float
+    last_tp, prev_tp, goal_line_length: float, earth_model: object = None
 ) -> tuple[tuple[float, float], tuple[float, float], float]:
     """Calculate the endpoints of the goal line and return the forward azimuth.
 
@@ -114,6 +114,8 @@ def calculate_goal_line_endpoints(
         last_tp: The last turnpoint (goal center)
         prev_tp: The previous turnpoint to determine approach direction
         goal_line_length: Length of the goal line in meters
+        earth_model: Earth model selector (``EarthModel`` member, its string
+            value, or None for WGS84)
 
     Returns:
         Tuple of ((lon1, lat1), (lon2, lat2), forward_azimuth)
@@ -124,6 +126,7 @@ def calculate_goal_line_endpoints(
         prev_tp.waypoint.lat,
         prev_tp.waypoint.lon,
         goal_line_length,
+        earth_model,
     )
 
 
@@ -134,6 +137,7 @@ def generate_semicircle_arc(
     end_azimuth: float,
     through_azimuth: float,
     radius: float,
+    earth_model: object = None,
 ) -> list[tuple[float, float]]:
     """Generate arc points for a semi-circle.
 
@@ -144,10 +148,13 @@ def generate_semicircle_arc(
         end_azimuth: Ending azimuth in degrees
         through_azimuth: Intermediate azimuth to pass through
         radius: Radius in meters
+        earth_model: Earth model selector (``EarthModel`` member, its string
+            value, or None for WGS84)
 
     Returns:
         List of (lon, lat) coordinate tuples representing the arc
     """
+    geod = geod_for_earth_model(earth_model)
     arc_points = []
     for i in range(GOAL_LINE_NUM_POINTS + 1):  # include endpoint
         if i <= GOAL_LINE_NUM_POINTS // 2:
@@ -184,11 +191,16 @@ class GoalLine:
         center: (lat, lon) of the goal (last turnpoint).
         approach_from: (lat, lon) of the previous turnpoint defining the approach.
         length: Total goal-line length in meters.
+        earth_model: The model the geometry is measured on (an ``EarthModel``
+            member, its string value, or None for WGS84), per ADR 0003. A task
+            declaring the FAI sphere used to get its route measured on the
+            sphere and its goal line on the ellipsoid, in one document.
     """
 
     center: tuple[float, float]
     approach_from: tuple[float, float]
     length: float
+    earth_model: object = None
 
     @classmethod
     def from_task(cls, task: Task) -> "GoalLine | None":
@@ -221,6 +233,7 @@ class GoalLine:
             center=(last_tp.waypoint.lat, last_tp.waypoint.lon),
             approach_from=(prev_tp.waypoint.lat, prev_tp.waypoint.lon),
             length=length,
+            earth_model=task.earth_model,
         )
 
     def endpoints(self) -> tuple[tuple[float, float], tuple[float, float], float]:
@@ -231,6 +244,7 @@ class GoalLine:
             self.approach_from[0],
             self.approach_from[1],
             self.length,
+            self.earth_model,
         )
 
     def control_zone(self) -> list[tuple[float, float]]:
@@ -248,6 +262,7 @@ class GoalLine:
             perpendicular_azimuth_1,
             forward_azimuth,
             control_zone_radius,
+            self.earth_model,
         )
 
         # Closed polygon: endpoint2 -> front arc -> endpoint1 -> endpoint2
