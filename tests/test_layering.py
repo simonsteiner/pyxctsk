@@ -10,10 +10,14 @@ each — the second one broke `import pyxctsk` outright:
    package's `__init__`, so a partially-initialized package cannot fail an
    import halfway through.
 
-Only *module-level* imports are checked against those two rules. Imports under
-``if TYPE_CHECKING:`` and inside function bodies are the deliberate escape
-hatches — a conversion method on the model has to reach the QR format somehow —
-and the point is that they stay rare and visible, not that they never happen.
+Both rules are about what happens when a module is imported, so the imports
+checked against them are the ones that *run at import time* — wherever they sit
+in the file. A relative import inside a module-level ``try:/except
+ImportError:``, inside any other module-level ``if``, or directly in a class
+body all run on import and are all checked. Imports under ``if TYPE_CHECKING:``
+and inside function bodies are the deliberate escape hatches — a conversion
+method on the model has to reach the QR format somehow — and the point is that
+they stay rare and visible, not that they never happen.
 The two function-local ones that exist today are pinned by name in
 :data:`EXPECTED_DEFERRED_IMPORTS`, so adding a third is a decision someone has
 to make on purpose. Both break a cycle; only one of them crosses a package
@@ -23,6 +27,7 @@ than cross-package ones.
 
 import ast
 from pathlib import Path
+from textwrap import dedent
 
 import pytest
 
@@ -96,28 +101,68 @@ def _target_package(node: ast.ImportFrom, module_path: Path) -> str | None:
     return target.split(".")[0] if target else None
 
 
-def _module_level_imports(tree: ast.Module) -> list[ast.ImportFrom]:
-    """Relative imports that run at import time, in statement order.
+def _is_type_checking_guard(node: ast.AST) -> bool:
+    """Whether this is an `if TYPE_CHECKING:` / `if typing.TYPE_CHECKING:`.
 
-    Skips anything inside a function or class body, and anything guarded by
-    `if TYPE_CHECKING:` — neither runs when the module is imported.
+    Only the guarded body is type-only; an `else:` branch on the same `if` runs
+    normally, so the caller skips the body and keeps walking `orelse`.
     """
-    found = []
-    for node in tree.body:
+    if not isinstance(node, ast.If):
+        return False
+    if isinstance(node.test, ast.Name):
+        return node.test.id == "TYPE_CHECKING"
+    if isinstance(node.test, ast.Attribute):
+        return node.test.attr == "TYPE_CHECKING"
+    return False
+
+
+def _classify_imports(
+    tree: ast.Module,
+) -> tuple[list[ast.ImportFrom], list[ast.ImportFrom]]:
+    """Split a module's `from ... import`s by whether they run on import.
+
+    The question both layer rules ask is "does this execute when the module is
+    imported", which is not the same as "is this a direct child of the module".
+    A `try:/except ImportError:` at module level, a module-level `if`, and a
+    class body all run on import; only a function body defers, and only
+    `if TYPE_CHECKING:` never runs at all.
+
+    Args:
+        tree: The parsed module.
+
+    Returns:
+        `(at_import_time, deferred)`, each in statement order. Bodies guarded by
+        `if TYPE_CHECKING:` appear in neither.
+    """
+    at_import_time: list[ast.ImportFrom] = []
+    deferred: list[ast.ImportFrom] = []
+
+    def visit(node: ast.AST, in_function: bool) -> None:
         if isinstance(node, ast.ImportFrom):
-            found.append(node)
-    return found
+            (deferred if in_function else at_import_time).append(node)
+            return
+        if _is_type_checking_guard(node):
+            assert isinstance(node, ast.If)  # narrowed by the guard predicate
+            for statement in node.orelse:
+                visit(statement, in_function)
+            return
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            in_function = True
+        for child in ast.iter_child_nodes(node):
+            visit(child, in_function)
+
+    visit(tree, False)
+    return at_import_time, deferred
+
+
+def _import_time_imports(tree: ast.Module) -> list[ast.ImportFrom]:
+    """Relative imports that run when the module is imported."""
+    return _classify_imports(tree)[0]
 
 
 def _deferred_imports(tree: ast.Module) -> list[ast.ImportFrom]:
-    """Relative imports inside function bodies."""
-    found = []
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            for inner in ast.walk(node):
-                if isinstance(inner, ast.ImportFrom):
-                    found.append(inner)
-    return found
+    """Relative imports inside function bodies, which run only when called."""
+    return _classify_imports(tree)[1]
 
 
 @pytest.fixture(scope="module")
@@ -134,7 +179,7 @@ def test_dependencies_run_one_way(parsed):
         package = path.relative_to(SRC).parts[0]
         if package not in ALLOWED:  # top-level module: may import anything
             continue
-        for node in _module_level_imports(tree):
+        for node in _import_time_imports(tree):
             target = _target_package(node, path)
             if target in (None, package) or target in LEAVES:
                 continue
@@ -157,7 +202,7 @@ def test_no_module_imports_its_own_package_init(parsed):
         package = path.relative_to(SRC).parts[0]
         if package not in ALLOWED:
             continue
-        for node in _module_level_imports(tree):
+        for node in _import_time_imports(tree):
             # `from . import x` — the package's own __init__ by definition.
             bare_own_package = node.level == 1 and node.module is None
             # `from ..export import x` / `from ..export.common import x` from
@@ -181,7 +226,7 @@ def test_leaf_modules_are_leaves(parsed):
     for path, tree in parsed:
         if path.parent != SRC or path.stem not in LEAVES:
             continue
-        for node in _module_level_imports(tree):
+        for node in _import_time_imports(tree):
             target = _target_package(node, path)
             assert target is None, (
                 f"{_rel(path)}:{node.lineno} is treated as a leaf by every "
@@ -209,3 +254,120 @@ def test_deferred_imports_are_the_known_cycle_breakers(parsed):
         "Each one breaks a cycle; add it to EXPECTED_DEFERRED_IMPORTS with a "
         "reason, or find a way not to need it."
     )
+
+
+def _classified(source: str) -> tuple[list[str], list[str]]:
+    """Classify a source snippet, as the module names in each category.
+
+    Args:
+        source: Module source, indented for readability and dedented here.
+
+    Returns:
+        `(at_import_time, deferred)` as the dotted module each import names.
+    """
+    at_import_time, deferred = _classify_imports(ast.parse(dedent(source)))
+    return (
+        [node.module or "" for node in at_import_time],
+        [node.module or "" for node in deferred],
+    )
+
+
+class TestImportsAreCollectedByWhetherTheyRun:
+    """The collector's rule is "runs at import time", not "sits at module level".
+
+    Iterating `tree.body` was a proxy for the first, and the two differ exactly
+    where this codebase already lives: `parser.py` and `qrcode/image.py` guard
+    their optional dependencies with `try: import … except ImportError:`, so a
+    relative import written in that shape used to escape all three layer checks
+    while looking checked. A class-body import escaped both collectors at once —
+    too nested for the layer checks, not in a function body for the deferred
+    check — though it runs on import like any other.
+    """
+
+    def test_a_module_level_try_runs_on_import(self):
+        """The optional-dependency shape the codebase already uses."""
+        assert _classified("""
+            try:
+                from .qrcode.image import decode
+            except ImportError:
+                from .exceptions import QRCodeError as decode
+        """) == (["qrcode.image", "exceptions"], [])
+
+    def test_any_module_level_branch_runs_on_import(self):
+        """`if`/`else` at module level is not a deferral either."""
+        assert _classified("""
+            import sys
+
+            if sys.version_info >= (3, 12):
+                from .model.task import Task
+            else:
+                from .model.enums import TaskType
+        """) == (["model.task", "model.enums"], [])
+
+    def test_a_class_body_runs_on_import(self):
+        """A class body executes on import, so its imports are checked."""
+        assert _classified("""
+            class Codec:
+                from .model.rounding import round_half_up
+        """) == (["model.rounding"], [])
+
+    def test_type_checking_bodies_run_never(self):
+        """Both spellings of the guard, and neither list gets the import."""
+        assert _classified("""
+            if TYPE_CHECKING:
+                from .model.task import Task
+
+            if typing.TYPE_CHECKING:
+                from .distance.turnpoint import TaskTurnpoint
+        """) == ([], [])
+
+    def test_the_else_of_a_type_checking_guard_still_runs(self):
+        """Only the guarded body is type-only; `orelse` is ordinary code."""
+        assert _classified("""
+            if TYPE_CHECKING:
+                from .model.task import Task
+            else:
+                from .model.enums import TaskType
+        """) == (["model.enums"], [])
+
+    def test_a_type_checking_guard_inside_a_function_runs_never(self):
+        """The guard wins over the function body, in either order of nesting."""
+        assert _classified("""
+            def build():
+                if TYPE_CHECKING:
+                    from .model.task import Task
+                from .qrcode.conversion import task_to_qr_code_task
+        """) == ([], ["qrcode.conversion"])
+
+    def test_function_and_method_bodies_defer(self):
+        """Including a method, which is how both pinned cycle-breakers look."""
+        assert _classified("""
+            from .model.enums import TaskType
+
+
+            def convert():
+                from .qrcode.conversion import task_to_qr_code_task
+
+
+            class Task:
+                def to_qr_code_task(self):
+                    from .qrcode.conversion import task_to_qr_code_task
+
+                async def later(self):
+                    from .distance.turnpoint import TaskTurnpoint
+        """) == (
+            ["model.enums"],
+            ["qrcode.conversion", "qrcode.conversion", "distance.turnpoint"],
+        )
+
+    def test_import_time_imports_keep_statement_order(self):
+        """The layer checks report line numbers, so order has to hold."""
+        at_import_time, _ = _classified("""
+            from .model.task import Task
+            try:
+                from .qrcode.image import decode
+            except ImportError:
+                pass
+            from .export.common import TaskDrawing
+        """)
+        assert at_import_time == ["model.task", "qrcode.image", "export.common"]
