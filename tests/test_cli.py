@@ -107,7 +107,9 @@ class TestCLIConvert:
             assert result.exit_code == 0
             assert "<?xml version=" in result.output
             assert "<kml xmlns=" in result.output
-            assert "8.0,46.5,0.0" in result.output
+            # The single turnpoint is drawn at the task altitude. It used to be
+            # asserted at ",0.0" — the degenerate one-point course line.
+            assert "8.0,46.5,5000" in result.output
 
         finally:
             Path(tmp_path).unlink()

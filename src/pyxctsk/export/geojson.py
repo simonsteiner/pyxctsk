@@ -12,31 +12,21 @@ All features include geometry and properties suitable for web map display, inclu
 Intended for use in web-based or desktop mapping tools to visualize XCTrack competition tasks.
 """
 
-from ..distance.goal_line import get_goal_line_data
-from .common import (
-    get_optimized_route_coordinates,
-    get_turnpoint_color_hex,
-    get_turnpoints_to_render,
-    is_goal_turnpoint,
-)
+from .common import TaskDrawing, get_turnpoint_color_hex
 
 
-def _create_turnpoint_feature(
-    turnpoint, index: int, all_turnpoints: list, task=None
-) -> dict:
+def _create_turnpoint_feature(drawing: TaskDrawing, turnpoint, index: int) -> dict:
     """Create a GeoJSON feature for a turnpoint.
 
     Args:
+        drawing: The task drawing, which knows which turnpoint is the goal.
         turnpoint: The turnpoint object to create a feature for.
         index: The index of the turnpoint in the task.
-        all_turnpoints: List of all turnpoints in the task.
-        task: Optional Task object to check if it has a goal defined.
 
     Returns:
         GeoJSON feature dictionary for the turnpoint.
     """
-    is_goal = is_goal_turnpoint(turnpoint, all_turnpoints, task)
-    color = get_turnpoint_color_hex(turnpoint.type, is_goal)
+    color = get_turnpoint_color_hex(turnpoint.type, drawing.is_goal(turnpoint))
 
     return {
         "type": "Feature",
@@ -60,17 +50,17 @@ def _create_turnpoint_feature(
     }
 
 
-def _create_optimized_route_feature(task_or_coords) -> dict | None:
-    """Create a GeoJSON feature for the optimized route."""
-    # Handle both old API (list of coordinates) and new API (Task object)
-    if isinstance(task_or_coords, list):
-        # Old API for testing - coords is a list of (lat, lon) tuples
-        opt_coords = task_or_coords  # type: list[tuple[float, float]] | None
-    else:
-        # New API - task_or_coords is a Task object
-        opt_coords = get_optimized_route_coordinates(task_or_coords)
+def _create_optimized_route_feature(drawing: TaskDrawing) -> dict | None:
+    """Create a GeoJSON feature for the optimized route.
 
-    if not opt_coords or len(opt_coords) < 2:
+    Args:
+        drawing: The task drawing, carrying the route.
+
+    Returns:
+        The route feature, or None when there is no line to draw.
+    """
+    opt_coords = drawing.route_coordinates()
+    if opt_coords is None:
         return None
 
     # Convert from (lat, lon) to [lon, lat] format for GeoJSON
@@ -96,13 +86,21 @@ def _create_optimized_route_feature(task_or_coords) -> dict | None:
     }
 
 
-def _create_goal_line_features(task) -> list[dict]:
-    """Create goal line and control zone features for LINE type goals."""
-    goal_data = get_goal_line_data(task)
-    if goal_data is None:
+def _create_goal_line_features(drawing: TaskDrawing) -> list[dict]:
+    """Create goal line and control zone features for LINE type goals.
+
+    Args:
+        drawing: The task drawing, carrying the goal line if there is one.
+
+    Returns:
+        The goal-line and control-zone features, or an empty list.
+    """
+    goal_line = drawing.goal_line
+    if goal_line is None:
         return []
 
-    (lon1, lat1), (lon2, lat2), goal_line_length, control_zone_coords = goal_data
+    (lon1, lat1), (lon2, lat2), _ = goal_line.endpoints()
+    goal_line_length = goal_line.length
     features = []
 
     # Create goal line feature
@@ -128,9 +126,7 @@ def _create_goal_line_features(task) -> list[dict]:
     control_zone_radius = goal_line_length / 2
 
     # Convert control zone coordinates to GeoJSON format [lon, lat]
-    control_zone_geojson_coords = [
-        [coord[0], coord[1]] for coord in control_zone_coords
-    ]
+    control_zone_geojson_coords = [[lon, lat] for lon, lat in goal_line.control_zone()]
 
     control_zone_feature = {
         "type": "Feature",
@@ -156,24 +152,42 @@ def _create_goal_line_features(task) -> list[dict]:
 
 
 def generate_task_geojson(task) -> dict:
-    """Generate GeoJSON data from pyxctsk task object."""
+    """Generate GeoJSON data from pyxctsk task object.
+
+    Args:
+        task: The Task object to render.
+
+    Returns:
+        A GeoJSON FeatureCollection.
+    """
+    return drawing_to_geojson(TaskDrawing.from_task(task))
+
+
+def drawing_to_geojson(drawing: TaskDrawing) -> dict:
+    """Generate GeoJSON from an already-derived task drawing.
+
+    Use this to render one drawing in both formats without optimizing the route
+    twice — see :func:`pyxctsk.export.kml.drawing_to_kml`.
+
+    Args:
+        drawing: The task drawing to render.
+
+    Returns:
+        A GeoJSON FeatureCollection.
+    """
     features = []
 
-    # Add turnpoints as point features with cylinders
-    # Skip the last turnpoint if it's a LINE type goal (goal line replaces it)
-    turnpoints_to_render = get_turnpoints_to_render(task)
-
-    # Create turnpoint features
-    for i, tp in enumerate(turnpoints_to_render):
-        features.append(_create_turnpoint_feature(tp, i, task.turnpoints, task))
+    # Create turnpoint features. The drawing has already dropped the last
+    # turnpoint if a goal line replaces it.
+    for i, tp in enumerate(drawing.turnpoints):
+        features.append(_create_turnpoint_feature(drawing, tp, i))
 
     # Add optimized route if available
-    opt_route_feature = _create_optimized_route_feature(task)
+    opt_route_feature = _create_optimized_route_feature(drawing)
     if opt_route_feature:
         features.append(opt_route_feature)
 
     # Add goal line features for LINE type goals
-    goal_features = _create_goal_line_features(task)
-    features.extend(goal_features)
+    features.extend(_create_goal_line_features(drawing))
 
     return {"type": "FeatureCollection", "features": features}

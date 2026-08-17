@@ -16,16 +16,19 @@ own. Everything a caller outside the package needs is named here —
   local Transverse Mercator projection and the planar optimal point
 - :mod:`~pyxctsk.distance.route_optimization` — the shortest path through the
   cylinders
-- :mod:`~pyxctsk.distance.task_distances` — per-leg and cumulative distances
+- :mod:`~pyxctsk.distance.task_distances` — per-leg and cumulative distances,
+  projected from one optimized route
 - :mod:`~pyxctsk.distance.sss` — Start-of-Speed-Section entry point and info
 - :mod:`~pyxctsk.distance.goal_line` — the ``GoalLine`` deep module: length,
   endpoints and semicircular control zone, in one place
 - :mod:`~pyxctsk.distance.config` — convergence epsilon and sweep count
 
 The goal line lives here rather than with the KML and GeoJSON writers that draw
-it because distance calculation needs the same geometry — a LINE goal's
-cylinder is sized from the goal-line length — and the shapes of a task must not
-depend on the formats it is exported to.
+it because the shapes of a task must not depend on the formats it is exported
+to. Note that this is now the *only* reason: the second one — that distance
+calculation needed the goal-line length itself — stopped being true when the
+`TaskTurnpoint.goal_line_length` attribute that carried it turned out to be
+written and never read. `export/` is `goal_line`'s only consumer today.
 
 Submodules import each other directly, never through this file, which is what
 keeps the re-export layer free of the cycles it was split out to break.
@@ -35,21 +38,16 @@ from .config import (
     CONVERGENCE_EPSILON_M,
     DEFAULT_NUM_ITERATIONS,
 )
-from .goal_line import (
-    GoalLine,
-    get_goal_line_data,
-    goal_line_length_from_turnpoints,
-    should_skip_last_turnpoint,
-)
+from .goal_line import GoalLine, goal_line_length_from_turnpoints
 from .route_optimization import (
+    OptimizedRoute,
     calculate_iteratively_refined_route,
     optimized_distance,
-    optimized_route_coordinates,
 )
 from .sss import calculate_optimal_sss_entry_point, calculate_sss_info
 from .task_distances import (
-    calculate_cumulative_distances,
     calculate_task_distances,
+    task_distances_from_route,
     task_to_turnpoints,
 )
 from .turnpoint import (
@@ -64,17 +62,15 @@ __all__ = [
     # Core classes
     "TaskTurnpoint",
     "GoalLine",
+    "OptimizedRoute",
     # Goal-line geometry
-    "get_goal_line_data",
     "goal_line_length_from_turnpoints",
-    "should_skip_last_turnpoint",
     # Main distance calculation functions
     "optimized_distance",
-    "optimized_route_coordinates",
     "distance_through_centers",
     "geodesic_distance",
     "calculate_task_distances",
-    "calculate_cumulative_distances",
+    "task_distances_from_route",
     "task_to_turnpoints",
     # SSS specific functions
     "calculate_sss_info",

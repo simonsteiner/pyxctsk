@@ -26,12 +26,17 @@ must be touched on its boundary, matching XCTrack's displayed optimized
 distance (including mandatory "out and back" legs between concentric
 cylinders of different radii).
 
-The main entry point is `calculate_iteratively_refined_route`; `optimized_distance`
-and `optimized_route_coordinates` are thin wrappers over it.
+The main entry point is `calculate_iteratively_refined_route`, which returns an
+`OptimizedRoute` carrying the points *and* the per-leg distances it measured.
+`optimized_distance` is kept beside it for the common case of wanting only the
+number; anything else — the points, the legs, a cumulative distance — is a field
+or method on the route rather than another function here.
 """
 
 import math
 from collections.abc import Sequence
+from dataclasses import dataclass
+from itertools import accumulate
 
 from pyproj import Transformer
 
@@ -52,6 +57,52 @@ PlaneCircle = tuple[float, float, float]
 #: coordinates, so this only guards against float noise, not real geometry —
 #: concentric cylinders of *different* radii stay distinct (see ADR 0002).
 _SAME_CIRCLE_TOLERANCE_M = 1e-6
+
+
+@dataclass(frozen=True)
+class OptimizedRoute:
+    """The optimized route through a task's turnpoints, with its legs kept.
+
+    The optimizer measures every leg on its way to the total, so the route it
+    found is the only thing that can answer "how far along the route is
+    turnpoint i". Keeping the legs is what makes
+    :meth:`cumulative_m` a projection of the route rather than a second
+    optimization over a truncated task — the two do not agree, and re-deriving
+    the answer once cost n optimizer runs per task.
+
+    Attributes:
+        points: One (lat, lon) per turnpoint, in task order: the takeoff
+            center, then each subsequent point snapped onto its cylinder
+            boundary (§7.1.7).
+        legs: Geodesic length of each leg in meters, ``len(points) - 1``
+            entries, measured on ``earth_model``.
+        earth_model: The model the legs were measured on (an ``EarthModel``
+            member, its string value, or None for WGS84).
+    """
+
+    points: tuple[tuple[float, float], ...]
+    legs: tuple[float, ...]
+    earth_model: object = None
+
+    @property
+    def total_m(self) -> float:
+        """Total optimized distance in meters."""
+        return float(sum(self.legs))
+
+    def cumulative_m(self) -> list[float]:
+        """Distance along the route to each point, in meters.
+
+        One entry per point, starting at 0.0 for the takeoff, so the last entry
+        equals :attr:`total_m`. A route with no points has no entries — the
+        ``initial=0.0`` seed would otherwise report a distance to a point that
+        does not exist.
+
+        Returns:
+            Cumulative distances in meters, one per point.
+        """
+        if not self.points:
+            return []
+        return list(accumulate(self.legs, initial=0.0))
 
 
 def _plane_circles(
@@ -234,12 +285,12 @@ def calculate_iteratively_refined_route(
     num_iterations: int | None = None,
     show_progress: bool = False,
     earth_model: object = None,
-) -> tuple[float, list[tuple[float, float]]]:
+) -> OptimizedRoute:
     """Calculate the optimized route with the alternating point-circle-point method.
 
     Optimization runs in a local Transverse Mercator plane (§7.1.2) until the
     total length converges below ε = 0.1 m (§7.1.3); the resulting points are
-    snapped onto the true cylinder boundaries (§7.1.7) and the legs summed
+    snapped onto the true cylinder boundaries (§7.1.7) and the legs measured
     geodesically on the task's earth model.
 
     Args:
@@ -251,16 +302,21 @@ def calculate_iteratively_refined_route(
             ``earth_model`` attribute, defaulting to WGS84.
 
     Returns:
-        Tuple[float, List[Tuple[float, float]]]: Tuple of (optimized_distance_meters, route_coordinates).
+        OptimizedRoute: The route points, its per-leg distances, and the earth
+        model they were measured on.
     """
     max_sweeps = (
         num_iterations if num_iterations is not None else DEFAULT_NUM_ITERATIONS
     )
-    if len(turnpoints) < 2:
-        return 0.0, [(tp.center[0], tp.center[1]) for tp in turnpoints]
-
-    if earth_model is None:
+    if earth_model is None and turnpoints:
         earth_model = getattr(turnpoints[0], "earth_model", None)
+
+    if len(turnpoints) < 2:
+        return OptimizedRoute(
+            points=tuple((tp.center[0], tp.center[1]) for tp in turnpoints),
+            legs=(),
+            earth_model=earth_model,
+        )
 
     if show_progress and turnpoints[-1].goal_type == "LINE":
         print("    🏁 Task has a goal line finish")
@@ -288,15 +344,19 @@ def calculate_iteratively_refined_route(
             snap_to_boundary(to_geo.transform(x, y), tp.center, radius, earth_model)
         )
 
-    distance = 0.0
+    legs = []
     for i in range(len(route) - 1):
         _, _, leg = g.inv(route[i][1], route[i][0], route[i + 1][1], route[i + 1][0])
-        distance += float(leg)
+        legs.append(float(leg))
+
+    optimized = OptimizedRoute(
+        points=tuple(route), legs=tuple(legs), earth_model=earth_model
+    )
 
     if show_progress:
-        print(f"    ✅ Optimized route: {distance / 1000.0:.3f}km")
+        print(f"    ✅ Optimized route: {optimized.total_m / 1000.0:.3f}km")
 
-    return distance, route
+    return optimized
 
 
 def optimized_distance(
@@ -321,35 +381,9 @@ def optimized_distance(
     Returns:
         Optimized distance in meters.
     """
-    distance, _ = calculate_iteratively_refined_route(
+    return calculate_iteratively_refined_route(
         turnpoints,
         num_iterations=num_iterations,
         show_progress=show_progress,
         earth_model=earth_model,
-    )
-    return distance
-
-
-def optimized_route_coordinates(
-    turnpoints: Sequence[TurnpointGeometry],
-    num_iterations: int | None = None,
-    earth_model: object = None,
-) -> list[tuple[float, float]]:
-    """Compute the fully optimized route coordinates through the turnpoints.
-
-    Args:
-        turnpoints: The task turnpoints.
-        num_iterations: Maximum number of alternating sweeps.
-        earth_model: Earth model selector (None uses the turnpoints' model,
-            defaulting to WGS84).
-
-    Returns:
-        List of (lat, lon) tuples representing the optimized route coordinates.
-    """
-    _, route_coordinates = calculate_iteratively_refined_route(
-        turnpoints,
-        num_iterations=num_iterations,
-        show_progress=False,
-        earth_model=earth_model,
-    )
-    return route_coordinates
+    ).total_m

@@ -6,19 +6,24 @@ its endpoints sit, and the shape of its semicircular control zone. The
 KML generation, distance calculation) go through, so the goal-line rules live
 in exactly one place.
 
-The free functions kept here (``calculate_goal_line_endpoints``,
-``generate_semicircle_arc``, ``get_goal_line_data``, ``should_skip_last_turnpoint``)
-are thin adapters over the same core, retained for backwards compatibility.
+:meth:`GoalLine.from_task` is the only answer to *"does this task have a goal
+line?"*, and everything else derives from it — including which turnpoints a
+writer should draw, since the goal line's presence is the whole reason to drop
+the last one. Asking that question a second way is how the two answers came to
+disagree: a LINE goal whose previous turnpoint sits at the same coordinates has
+no approach direction and so no goal line, but a separate predicate dropped the
+turnpoint anyway and the goal vanished from the output entirely.
+
+Everything else here is :class:`GoalLine`'s own implementation. Callers use the
+object: ``length``, ``endpoints()`` and ``control_zone()``. There is deliberately
+no tuple-shaped accessor beside them — the writers used to unpack a positional
+4-tuple that carried exactly those three answers.
 """
 
 from dataclasses import dataclass
 
-from pyproj import Geod
-
 from ..model.task import GoalType, Task
-
-# Initialize WGS84 ellipsoid for geographical calculations
-geod = Geod(ellps="WGS84")
+from .turnpoint import geod_for_earth_model
 
 # Constants for goal line visualization
 GOAL_LINE_NUM_POINTS = 20
@@ -69,13 +74,17 @@ def _endpoints_from_coords(
     prev_lat: float,
     prev_lon: float,
     goal_line_length: float,
+    earth_model: object = None,
 ) -> tuple[tuple[float, float], tuple[float, float], float]:
     """Core endpoint math operating on raw coordinates.
 
     Returns ((lon1, lat1), (lon2, lat2), forward_azimuth). The goal line is
     perpendicular to the approach direction from the previous point to the
-    goal center, centred on the goal center.
+    goal center, centred on the goal center, and measured on ``earth_model``
+    (None = WGS84) so it agrees with the distances the same task reports.
     """
+    geod = geod_for_earth_model(earth_model)
+
     # Calculate bearing from previous point to goal center
     forward_azimuth, _, _ = geod.inv(prev_lon, prev_lat, center_lon, center_lat)
 
@@ -95,37 +104,14 @@ def _endpoints_from_coords(
     return (lon1, lat1), (lon2, lat2), forward_azimuth
 
 
-def calculate_goal_line_endpoints(
-    last_tp, prev_tp, goal_line_length: float
-) -> tuple[tuple[float, float], tuple[float, float], float]:
-    """Calculate the endpoints of the goal line and return the forward azimuth.
-
-    Object adapter over :func:`_endpoints_from_coords`.
-
-    Args:
-        last_tp: The last turnpoint (goal center)
-        prev_tp: The previous turnpoint to determine approach direction
-        goal_line_length: Length of the goal line in meters
-
-    Returns:
-        Tuple of ((lon1, lat1), (lon2, lat2), forward_azimuth)
-    """
-    return _endpoints_from_coords(
-        last_tp.waypoint.lat,
-        last_tp.waypoint.lon,
-        prev_tp.waypoint.lat,
-        prev_tp.waypoint.lon,
-        goal_line_length,
-    )
-
-
-def generate_semicircle_arc(
+def _generate_semicircle_arc(
     center_lon: float,
     center_lat: float,
     start_azimuth: float,
     end_azimuth: float,
     through_azimuth: float,
     radius: float,
+    earth_model: object = None,
 ) -> list[tuple[float, float]]:
     """Generate arc points for a semi-circle.
 
@@ -136,10 +122,13 @@ def generate_semicircle_arc(
         end_azimuth: Ending azimuth in degrees
         through_azimuth: Intermediate azimuth to pass through
         radius: Radius in meters
+        earth_model: Earth model selector (``EarthModel`` member, its string
+            value, or None for WGS84)
 
     Returns:
         List of (lon, lat) coordinate tuples representing the arc
     """
+    geod = geod_for_earth_model(earth_model)
     arc_points = []
     for i in range(GOAL_LINE_NUM_POINTS + 1):  # include endpoint
         if i <= GOAL_LINE_NUM_POINTS // 2:
@@ -176,11 +165,16 @@ class GoalLine:
         center: (lat, lon) of the goal (last turnpoint).
         approach_from: (lat, lon) of the previous turnpoint defining the approach.
         length: Total goal-line length in meters.
+        earth_model: The model the geometry is measured on (an ``EarthModel``
+            member, its string value, or None for WGS84), per ADR 0003. A task
+            declaring the FAI sphere used to get its route measured on the
+            sphere and its goal line on the ellipsoid, in one document.
     """
 
     center: tuple[float, float]
     approach_from: tuple[float, float]
     length: float
+    earth_model: object = None
 
     @classmethod
     def from_task(cls, task: Task) -> "GoalLine | None":
@@ -213,6 +207,7 @@ class GoalLine:
             center=(last_tp.waypoint.lat, last_tp.waypoint.lon),
             approach_from=(prev_tp.waypoint.lat, prev_tp.waypoint.lon),
             length=length,
+            earth_model=task.earth_model,
         )
 
     def endpoints(self) -> tuple[tuple[float, float], tuple[float, float], float]:
@@ -223,6 +218,7 @@ class GoalLine:
             self.approach_from[0],
             self.approach_from[1],
             self.length,
+            self.earth_model,
         )
 
     def control_zone(self) -> list[tuple[float, float]]:
@@ -233,63 +229,15 @@ class GoalLine:
         perpendicular_azimuth_1 = (forward_azimuth + 90) % 360
         perpendicular_azimuth_2 = (forward_azimuth - 90) % 360
 
-        front_arc_points = generate_semicircle_arc(
+        front_arc_points = _generate_semicircle_arc(
             self.center[1],
             self.center[0],
             perpendicular_azimuth_2,
             perpendicular_azimuth_1,
             forward_azimuth,
             control_zone_radius,
+            self.earth_model,
         )
 
         # Closed polygon: endpoint2 -> front arc -> endpoint1 -> endpoint2
         return [(lon2, lat2)] + front_arc_points + [(lon1, lat1), (lon2, lat2)]
-
-    def data(
-        self,
-    ) -> tuple[
-        tuple[float, float], tuple[float, float], float, list[tuple[float, float]]
-    ]:
-        """Return (start, end, length, control_zone_coords) for rendering."""
-        (lon1, lat1), (lon2, lat2), _ = self.endpoints()
-        return (lon1, lat1), (lon2, lat2), self.length, self.control_zone()
-
-
-def get_goal_line_data(
-    task: Task,
-) -> (
-    tuple[tuple[float, float], tuple[float, float], float, list[tuple[float, float]]]
-    | None
-):
-    """Get goal line data for LINE type goals.
-
-    Thin adapter over :meth:`GoalLine.from_task` / :meth:`GoalLine.data`.
-
-    Args:
-        task: The task object
-
-    Returns:
-        Tuple of (goal_line_start, goal_line_end, goal_line_length, control_zone_coords)
-        or None if not a LINE type goal or insufficient data
-    """
-    goal_line = GoalLine.from_task(task)
-    if goal_line is None:
-        return None
-    return goal_line.data()
-
-
-def should_skip_last_turnpoint(task: Task) -> bool:
-    """Check if the last turnpoint should be skipped for LINE type goals.
-
-    Args:
-        task: The task object
-
-    Returns:
-        True if the last turnpoint should be skipped (for LINE goals)
-    """
-    return bool(
-        task.goal
-        and task.goal.type == GoalType.LINE
-        and task.turnpoints
-        and len(task.turnpoints) >= 2
-    )

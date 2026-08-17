@@ -32,9 +32,6 @@ FAI_SPHERE_RADIUS_M = 6_371_000.0
 _WGS84_GEOD = Geod(ellps="WGS84")
 _FAI_SPHERE_GEOD = Geod(a=FAI_SPHERE_RADIUS_M, b=FAI_SPHERE_RADIUS_M)
 
-# Retained module-level name for backwards compatibility (WGS84 ellipsoid).
-geod = _WGS84_GEOD
-
 
 def _is_fai_sphere(earth_model: object) -> bool:
     """Return True if the given earth model designates the FAI sphere.
@@ -325,7 +322,6 @@ class TaskTurnpoint:
         lon: float,
         radius: float = 0,
         goal_type: str | None = None,
-        goal_line_length: float | None = None,
         earth_model: object = None,
     ):
         """Initialize a task turnpoint.
@@ -335,14 +331,12 @@ class TaskTurnpoint:
             lon (float): Longitude in degrees.
             radius (float): Cylinder radius in meters.
             goal_type (Optional[str]): Type of goal (None, "CYLINDER", or "LINE").
-            goal_line_length (Optional[float]): Length of goal line in meters (None means calculate from radius).
             earth_model: Earth model the turnpoint's task uses (``EarthModel``
                 member, its string value, or None for the WGS84 default).
         """
         self.center = (lat, lon)
         self.radius = radius
         self.goal_type = goal_type
-        self.goal_line_length = goal_line_length
         self.earth_model = earth_model
 
     def optimal_point(

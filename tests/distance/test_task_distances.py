@@ -15,16 +15,23 @@ import json
 import statistics
 from pathlib import Path
 from typing import Dict, List
+from unittest.mock import patch
 
 import pytest
 
+from pyxctsk import Task, TaskType
 from pyxctsk.distance import (
     TaskTurnpoint,
-    calculate_cumulative_distances,
+    calculate_iteratively_refined_route,
     calculate_task_distances,
     distance_through_centers,
     optimized_distance,
+    task_distances_from_route,
+    task_to_turnpoints,
 )
+from pyxctsk.export import common
+from pyxctsk.export.common import TaskDrawing
+from pyxctsk.export.geojson import drawing_to_geojson
 from pyxctsk.parser import parse_task
 
 
@@ -171,33 +178,43 @@ class TestDistanceComprehensive:
             f"Savings {savings_pct:.1%} outside reasonable range [2%-80%]"
         )
 
-    def test_cumulative_distance_calculations(
-        self, test_turnpoints: List[TaskTurnpoint]
+    def test_cumulative_optimized_is_a_prefix_of_the_route(
+        self, reference_data: Dict[str, Dict]
     ):
-        """Test cumulative distance calculations through turnpoint sequence."""
-        # Test cumulative calculations for different endpoints
-        for target_idx in range(1, len(test_turnpoints)):
-            center_cum, opt_cum = calculate_cumulative_distances(
-                test_turnpoints, target_idx
-            )
+        """The cumulative column must be measured along the task's own route.
 
-            assert center_cum > 0, (
-                f"Cumulative center distance to {target_idx} should be positive"
-            )
-            assert opt_cum > 0, (
-                f"Cumulative optimized distance to {target_idx} should be positive"
-            )
-            assert opt_cum <= center_cum, (
-                "Cumulative optimization should not exceed center distance"
-            )
+        Regression: the column was recomputed per turnpoint by re-optimizing
+        ``turnpoints[:i + 1]``. The optimizer treats the last circle it is
+        handed as the finish, so each of those runs bent the route towards
+        turnpoint i instead of passing through it — the numbers were optima of
+        truncated tasks, not distances along the route drawn beside them.
+        On task_bevo turnpoint 7 the two were 5.09 km apart, both derived from
+        the same Task. Only the non-decreasing property was asserted before,
+        which both readings satisfy.
+        """
+        checked = 0
+        for name in ("task_bevo", "task_gibe", "task_duna"):
+            if name not in reference_data:
+                continue
+            task = reference_data[name]["task"]
 
-            # Cumulative distances should increase with more turnpoints
-            if target_idx > 1:
-                prev_center, prev_opt = calculate_cumulative_distances(
-                    test_turnpoints, target_idx - 1
-                )
-                assert center_cum > prev_center, "Center cumulative should increase"
-                assert opt_cum > prev_opt, "Optimized cumulative should increase"
+            results = calculate_task_distances(task)
+            route = calculate_iteratively_refined_route(task_to_turnpoints(task))
+
+            expected = [round(m / 1000.0, 1) for m in route.cumulative_m()]
+            actual = [tp["cumulative_optimized_km"] for tp in results["turnpoints"]]
+            assert actual == expected, f"{name}: cumulative column left the route"
+
+            # The last turnpoint's cumulative distance is the task distance.
+            assert actual[-1] == results["optimized_distance_km"]
+
+            # An optimized prefix never exceeds the same prefix through centers.
+            for tp in results["turnpoints"]:
+                assert tp["cumulative_optimized_km"] <= tp["cumulative_center_km"]
+            checked += 1
+
+        if checked == 0:
+            pytest.skip("No reference task with a known route available")
 
     def test_edge_cases_and_robustness(self):
         """Test algorithm robustness with edge cases."""
@@ -303,3 +320,66 @@ class TestDistanceComprehensive:
 if __name__ == "__main__":
     # Allow running tests directly
     pytest.main([__file__, "-v"])
+
+
+class TestProjectionFromARoute:
+    """`task_distances_from_route`: the report as a projection of one route."""
+
+    @staticmethod
+    def _task(reference_tasks_dir: Path, name: str = "task_bevo"):
+        """Parse one reference task, skipping if the corpus is absent."""
+        path = reference_tasks_dir / f"{name}.xctsk"
+        if not path.exists():
+            pytest.skip(f"{name}.xctsk not available")
+        return parse_task(str(path))
+
+    def test_agrees_with_optimizing_from_scratch(self, reference_tasks_dir: Path):
+        """Handing over a route gives exactly the report as computing one."""
+        for name in ("task_bevo", "task_gibe"):
+            task = self._task(reference_tasks_dir, name)
+            route = calculate_iteratively_refined_route(task_to_turnpoints(task))
+
+            assert task_distances_from_route(task, route) == calculate_task_distances(
+                task
+            )
+
+    def test_a_task_and_its_map_can_share_one_route(self, reference_tasks_dir: Path):
+        """The distance table and the drawn map cost one optimizer run together.
+
+        This is the pairing the task viewer makes on every request: it used to
+        optimize the task once for the table and again for the GeoJSON.
+        """
+        task = self._task(reference_tasks_dir)
+
+        calls = []
+        real = common.calculate_iteratively_refined_route
+
+        def counting(*args, **kwargs):
+            calls.append(args)
+            return real(*args, **kwargs)
+
+        with patch.object(common, "calculate_iteratively_refined_route", counting):
+            drawing = TaskDrawing.from_task(task)
+            table = task_distances_from_route(task, drawing.route)
+            geojson = drawing_to_geojson(drawing)
+
+        assert len(calls) == 1
+        # The table's total and the drawn line describe the same route.
+        assert table["optimized_distance_km"] == round(drawing.route.total_m / 1000, 1)
+        (line,) = [
+            f
+            for f in geojson["features"]
+            if f["properties"]["type"] == "optimized_route"
+        ]
+        assert len(line["geometry"]["coordinates"]) == len(drawing.route.points)
+
+    def test_degenerate_task_projects_to_zeros(self):
+        """A task with fewer than two turnpoints reports zeros, not an error."""
+        task = Task(task_type=TaskType.CLASSIC, version=1, turnpoints=[])
+        route = calculate_iteratively_refined_route([])
+
+        result = task_distances_from_route(task, route)
+
+        assert result["center_distance_km"] == 0.0
+        assert result["optimized_distance_km"] == 0.0
+        assert result["turnpoints"] == []

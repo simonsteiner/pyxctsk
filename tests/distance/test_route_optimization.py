@@ -10,6 +10,7 @@ from dataclasses import dataclass
 
 import pytest
 
+from pyxctsk.distance import OptimizedRoute
 from pyxctsk.distance.route_optimization import (
     _closest_circle_point,
     _optimize_plane_points,
@@ -166,16 +167,43 @@ def test_route_through_fake_turnpoints():
         FakeTurnpoint((47.0, 8.1), radius=1_000.0),
         FakeTurnpoint((47.0, 8.2)),
     ]
-    distance, route = calculate_iteratively_refined_route(turnpoints)
-    assert distance > 0
-    assert len(route) == 3
-    assert route[0] == (47.0, 8.0)
-    assert route[-1] == (47.0, 8.2)
+    optimized = calculate_iteratively_refined_route(turnpoints)
+    assert optimized.total_m > 0
+    assert len(optimized.points) == 3
+    assert optimized.points[0] == (47.0, 8.0)
+    assert optimized.points[-1] == (47.0, 8.2)
+    # The legs are kept, and they are what the total is made of.
+    assert len(optimized.legs) == 2
+    assert optimized.cumulative_m()[-1] == optimized.total_m
 
 
 def test_short_input_handling():
     """Fewer than two turnpoints yields a zero distance and pass-through path."""
-    assert calculate_iteratively_refined_route([]) == (0.0, [])
-    distance, route = calculate_iteratively_refined_route([FakeTurnpoint((1.0, 2.0))])
-    assert distance == 0.0
-    assert route == [(1.0, 2.0)]
+    empty = calculate_iteratively_refined_route([])
+    assert empty.total_m == 0.0
+    assert empty.points == ()
+    assert empty.legs == ()
+    # One entry per point means none at all here: accumulate's initial=0.0 seed
+    # would otherwise report a distance to a point that does not exist.
+    assert empty.cumulative_m() == []
+    single = calculate_iteratively_refined_route([FakeTurnpoint((1.0, 2.0))])
+    assert single.total_m == 0.0
+    assert single.points == ((1.0, 2.0),)
+    assert single.cumulative_m() == [0.0]
+
+
+def test_cumulative_m_has_one_entry_per_point():
+    """The documented invariant, across every route length."""
+    for points, legs in (
+        ((), ()),
+        (((1.0, 2.0),), ()),
+        (((1.0, 2.0), (1.1, 2.1)), (100.0,)),
+        (((1.0, 2.0), (1.1, 2.1), (1.2, 2.2)), (100.0, 200.0)),
+    ):
+        route = OptimizedRoute(points=points, legs=legs)
+        cumulative = route.cumulative_m()
+
+        assert len(cumulative) == len(route.points), f"{len(points)} points"
+        if cumulative:
+            assert cumulative[0] == 0.0
+            assert cumulative[-1] == route.total_m

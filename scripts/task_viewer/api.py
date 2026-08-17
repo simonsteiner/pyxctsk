@@ -7,10 +7,11 @@ from flask import Blueprint, Response, abort, jsonify, make_response
 
 try:
     from pyxctsk import (
-        calculate_task_distances,
+        TaskDrawing,
+        drawing_to_geojson,
         generate_qrcode_image,
-        generate_task_geojson,
         parse_task,
+        task_distances_from_route,
         task_to_kml,
     )
 
@@ -183,8 +184,10 @@ def compare_task_api(task_name: str) -> Response | tuple[Response, int]:
 
     try:
         task = parse_task(str(xctsk_path))  # type: ignore
-        distance_results = calculate_task_distances(task, show_progress=False)  # type: ignore
-        xctrack_geojson = generate_task_geojson(task)  # type: ignore
+        # One drawing: the table and the map share a single optimized route.
+        drawing = TaskDrawing.from_task(task)  # type: ignore
+        distance_results = task_distances_from_route(task, drawing.route)  # type: ignore
+        xctrack_geojson = drawing_to_geojson(drawing)  # type: ignore
         comparison_data = prepare_comparison_data(json_data, distance_results, task)
 
         return jsonify(

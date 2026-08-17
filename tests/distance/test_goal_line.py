@@ -5,26 +5,36 @@ Unit tests for goal line generation and calculation logic in pyxctsk.
 This module covers:
 - Goal line endpoint calculations based on approach direction
 - Semicircle arc generation for goal control zones
-- Goal line feature creation for GeoJSON output
-- Logic for determining when to skip last turnpoint for LINE goals
+- Whether a task has a goal line at all, which is what decides whether the
+  last turnpoint is drawn as a cylinder or replaced by the line
 - Helper functions for finding previous turnpoints with valid coordinates
 """
 
 from unittest.mock import Mock
 
-from pyxctsk import Goal, GoalType, Task, TaskType, Turnpoint, TurnpointType, Waypoint
+import pytest
+
+from pyxctsk import (
+    EarthModel,
+    Goal,
+    GoalType,
+    Task,
+    TaskType,
+    Turnpoint,
+    TurnpointType,
+    Waypoint,
+)
+from pyxctsk.distance import geodesic_distance
 from pyxctsk.distance.goal_line import (
     GoalLine,
+    _endpoints_from_coords,
     _find_previous_turnpoint,
-    calculate_goal_line_endpoints,
-    generate_semicircle_arc,
+    _generate_semicircle_arc,
     goal_line_length_from_turnpoints,
-    should_skip_last_turnpoint,
 )
-from pyxctsk.export.geojson import _create_goal_line_features
 
 
-def _line_goal_task(prev_radius=400, goal_radius=400):
+def _line_goal_task(prev_radius: int = 400, goal_radius: int = 400) -> Task:
     """Build a two-turnpoint LINE-goal task for goal-line tests."""
     tp1 = Turnpoint(
         radius=prev_radius,
@@ -175,77 +185,36 @@ class TestFindPreviousTurnpoint:
         assert result is None  # Should be treated as same coordinates
 
 
-class TestCalculateGoalLineEndpoints:
-    """Test the calculate_goal_line_endpoints function."""
+class TestEndpointsFromCoords:
+    """The endpoint math, on raw coordinates.
 
-    def test_calculate_goal_line_endpoints_basic(self):
-        """Test basic goal line endpoint calculation."""
-        last_tp = Mock()
-        last_tp.waypoint = Mock()
-        last_tp.waypoint.lat = 47.0
-        last_tp.waypoint.lon = 8.0
+    These used to build Mock turnpoints to reach it through a back-compat
+    adapter (`calculate_goal_line_endpoints`); the core takes coordinates.
+    """
 
-        prev_tp = Mock()
-        prev_tp.waypoint = Mock()
-        prev_tp.waypoint.lat = 46.0
-        prev_tp.waypoint.lon = 8.0
-
-        goal_line_length = 400.0
-
-        (lon1, lat1), (lon2, lat2), forward_azimuth = calculate_goal_line_endpoints(
-            last_tp, prev_tp, goal_line_length
+    def test_approach_from_the_south_runs_the_line_east_west(self):
+        """Approaching due north, the forward azimuth is 0 and the line is E-W."""
+        (lon1, lat1), (lon2, lat2), forward_azimuth = _endpoints_from_coords(
+            47.0, 8.0, 46.0, 8.0, 400.0
         )
 
-        # Both endpoints should be valid coordinates
-        assert isinstance(lon1, float)
-        assert isinstance(lat1, float)
-        assert isinstance(lon2, float)
-        assert isinstance(lat2, float)
-        assert isinstance(forward_azimuth, float)
-
-        # Forward azimuth should be approximately 0 (north) for this setup
         assert abs(forward_azimuth) < 1.0 or abs(forward_azimuth - 360) < 1.0
+        # The endpoints straddle the goal in longitude, at the goal's latitude.
+        assert lon1 > 8.0 > lon2
+        assert abs(lat1 - 47.0) < 1e-4 and abs(lat2 - 47.0) < 1e-4
 
-    def test_calculate_goal_line_endpoints_east_west(self):
-        """Test goal line endpoints for east-west approach."""
-        last_tp = Mock()
-        last_tp.waypoint = Mock()
-        last_tp.waypoint.lat = 47.0
-        last_tp.waypoint.lon = 8.0
+    def test_approach_from_the_west_runs_the_line_north_south(self):
+        """Approaching due east, the forward azimuth is 90."""
+        _, _, forward_azimuth = _endpoints_from_coords(47.0, 8.0, 47.0, 7.0, 400.0)
 
-        prev_tp = Mock()
-        prev_tp.waypoint = Mock()
-        prev_tp.waypoint.lat = 47.0
-        prev_tp.waypoint.lon = 7.0  # West of goal
-
-        goal_line_length = 400.0
-
-        (lon1, lat1), (lon2, lat2), forward_azimuth = calculate_goal_line_endpoints(
-            last_tp, prev_tp, goal_line_length
-        )
-
-        # Forward azimuth should be approximately 90 (east)
         assert abs(forward_azimuth - 90) < 1.0
 
-    def test_calculate_goal_line_endpoints_zero_length(self):
-        """Test goal line endpoints with zero length."""
-        last_tp = Mock()
-        last_tp.waypoint = Mock()
-        last_tp.waypoint.lat = 47.0
-        last_tp.waypoint.lon = 8.0
-
-        prev_tp = Mock()
-        prev_tp.waypoint = Mock()
-        prev_tp.waypoint.lat = 46.0
-        prev_tp.waypoint.lon = 8.0
-
-        goal_line_length = 0.0
-
-        (lon1, lat1), (lon2, lat2), forward_azimuth = calculate_goal_line_endpoints(
-            last_tp, prev_tp, goal_line_length
+    def test_zero_length_puts_both_endpoints_on_the_goal(self):
+        """A zero-length line degenerates to the goal center."""
+        (lon1, lat1), (lon2, lat2), _ = _endpoints_from_coords(
+            47.0, 8.0, 46.0, 8.0, 0.0
         )
 
-        # Both endpoints should be at the goal center
         assert abs(lon1 - 8.0) < 1e-10
         assert abs(lat1 - 47.0) < 1e-10
         assert abs(lon2 - 8.0) < 1e-10
@@ -253,7 +222,7 @@ class TestCalculateGoalLineEndpoints:
 
 
 class TestGenerateSemicircleArc:
-    """Test the generate_semicircle_arc function."""
+    """Test the semicircle arc generator."""
 
     def test_generate_semicircle_arc_basic(self):
         """Test basic semicircle arc generation."""
@@ -264,7 +233,7 @@ class TestGenerateSemicircleArc:
         through_azimuth = 0.0  # North
         radius = 200.0
 
-        arc_points = generate_semicircle_arc(
+        arc_points = _generate_semicircle_arc(
             center_lon, center_lat, start_azimuth, end_azimuth, through_azimuth, radius
         )
 
@@ -288,7 +257,7 @@ class TestGenerateSemicircleArc:
         through_azimuth = 0.0
         radius = 0.0
 
-        arc_points = generate_semicircle_arc(
+        arc_points = _generate_semicircle_arc(
             center_lon, center_lat, start_azimuth, end_azimuth, through_azimuth, radius
         )
 
@@ -298,185 +267,99 @@ class TestGenerateSemicircleArc:
             assert abs(point[1] - center_lat) < 1e-10
 
 
-class TestCreateGoalLineFeatures:
-    """Test the _create_goal_line_features function."""
+class TestGoalLinePresence:
+    """Whether a task has a goal line — the one question, asked once.
 
-    def test_create_goal_line_features_valid_line_goal(self):
-        """Test creating goal line features for valid LINE goal."""
-        # Create a task with LINE goal
-        waypoint1 = Waypoint(name="TP1", lat=46.0, lon=8.0, alt_smoothed=1000)
-        waypoint2 = Waypoint(name="Goal", lat=47.0, lon=8.0, alt_smoothed=500)
+    ``GoalLine.from_task`` used to be shadowed by ``should_skip_last_turnpoint``,
+    which answered the same question with one clause fewer. The renderers asked
+    both, so the two could disagree; the last case below is where they did.
+    """
 
-        tp1 = Turnpoint(radius=400, waypoint=waypoint1, type=TurnpointType.TAKEOFF)
-        tp2 = Turnpoint(radius=400, waypoint=waypoint2, type=TurnpointType.NONE)
+    def test_line_goal_has_a_goal_line(self):
+        """A LINE goal with a distinct previous turnpoint has a goal line."""
+        assert GoalLine.from_task(_line_goal_task()) is not None
 
-        goal = Goal(type=GoalType.LINE)
-        task = Task(
-            task_type=TaskType.CLASSIC, version=1, turnpoints=[tp1, tp2], goal=goal
-        )
+    def test_cylinder_goal_has_none(self):
+        """A CYLINDER goal has no goal line."""
+        task = _line_goal_task()
+        task.goal = Goal(type=GoalType.CYLINDER)
+        assert GoalLine.from_task(task) is None
 
-        features = _create_goal_line_features(task)
-
-        assert len(features) == 2  # Goal line + control zone
-
-        # Check goal line feature
-        goal_line = features[0]
-        assert goal_line["type"] == "Feature"
-        assert goal_line["geometry"]["type"] == "LineString"
-        assert goal_line["properties"]["type"] == "goal_line"
-        # The goal-line length is twice the last radius (400 * 2 = 800).
-        assert goal_line["properties"]["length"] == 800.0
-
-        # Check control zone feature
-        control_zone = features[1]
-        assert control_zone["type"] == "Feature"
-        assert control_zone["geometry"]["type"] == "Polygon"
-        assert control_zone["properties"]["type"] == "goal_control_zone"
-
-    def test_create_goal_line_features_length_tracks_goal_radius(self):
-        """The goal-line length follows the goal turnpoint's radius, not the previous one."""
-        waypoint1 = Waypoint(name="TP1", lat=46.0, lon=8.0, alt_smoothed=1000)
-        waypoint2 = Waypoint(name="Goal", lat=47.0, lon=8.0, alt_smoothed=500)
-
-        tp1 = Turnpoint(radius=400, waypoint=waypoint1, type=TurnpointType.TAKEOFF)
-        tp2 = Turnpoint(radius=200, waypoint=waypoint2, type=TurnpointType.NONE)
-
-        goal = Goal(type=GoalType.LINE)
-        task = Task(
-            task_type=TaskType.CLASSIC, version=1, turnpoints=[tp1, tp2], goal=goal
-        )
-
-        features = _create_goal_line_features(task)
-
-        assert len(features) == 2
-        # Should use 2 * radius as line length
-        assert features[0]["properties"]["length"] == 400.0  # 2 * 200
-
-    def test_create_goal_line_features_cylinder_goal(self):
-        """Test creating goal line features for CYLINDER goal."""
-        waypoint1 = Waypoint(name="TP1", lat=46.0, lon=8.0, alt_smoothed=1000)
-        waypoint2 = Waypoint(name="Goal", lat=47.0, lon=8.0, alt_smoothed=500)
-
-        tp1 = Turnpoint(radius=400, waypoint=waypoint1, type=TurnpointType.TAKEOFF)
-        tp2 = Turnpoint(radius=400, waypoint=waypoint2, type=TurnpointType.NONE)
-
-        goal = Goal(type=GoalType.CYLINDER)  # Not LINE type
-        task = Task(
-            task_type=TaskType.CLASSIC, version=1, turnpoints=[tp1, tp2], goal=goal
-        )
-
-        features = _create_goal_line_features(task)
-
-        assert len(features) == 0  # No features for CYLINDER goal
-
-    def test_create_goal_line_features_no_goal(self):
-        """Test creating goal line features when no goal."""
+    def test_no_goal_has_none(self):
+        """A task with no goal has no goal line."""
         waypoint1 = Waypoint(name="TP1", lat=46.0, lon=8.0, alt_smoothed=1000)
         tp1 = Turnpoint(radius=400, waypoint=waypoint1, type=TurnpointType.TAKEOFF)
-
         task = Task(task_type=TaskType.CLASSIC, version=1, turnpoints=[tp1], goal=None)
+        assert GoalLine.from_task(task) is None
 
-        features = _create_goal_line_features(task)
-
-        assert len(features) == 0
-
-    def test_create_goal_line_features_insufficient_turnpoints(self):
-        """Test creating goal line features with insufficient turnpoints."""
+    def test_single_turnpoint_has_none(self):
+        """One turnpoint cannot define an approach direction."""
         waypoint1 = Waypoint(name="TP1", lat=46.0, lon=8.0, alt_smoothed=1000)
         tp1 = Turnpoint(radius=400, waypoint=waypoint1, type=TurnpointType.TAKEOFF)
-
-        goal = Goal(type=GoalType.LINE)
         task = Task(
             task_type=TaskType.CLASSIC,
             version=1,
-            turnpoints=[tp1],  # Only one turnpoint
-            goal=goal,
+            turnpoints=[tp1],
+            goal=Goal(type=GoalType.LINE),
         )
+        assert GoalLine.from_task(task) is None
 
-        features = _create_goal_line_features(task)
+    def test_coincident_previous_turnpoint_has_none(self):
+        """A previous turnpoint at the goal's own coordinates gives no line.
 
-        assert len(features) == 0
+        This is the case the two predicates disagreed on: there is no approach
+        azimuth to be perpendicular to, so no line can be drawn — and the goal
+        turnpoint must therefore stay in the rendered output. See
+        ``tests/export/test_geojson.py`` for the writer-side regression.
+        """
+        task = _line_goal_task()
+        task.turnpoints[0].waypoint.lat = task.turnpoints[-1].waypoint.lat
+        task.turnpoints[0].waypoint.lon = task.turnpoints[-1].waypoint.lon
+        assert GoalLine.from_task(task) is None
 
-    def test_create_goal_line_features_no_previous_turnpoint(self):
-        """Test creating goal line features when no valid previous turnpoint."""
-        # Create turnpoints with same coordinates
-        waypoint1 = Waypoint(name="TP1", lat=47.0, lon=8.0, alt_smoothed=1000)
-        waypoint2 = Waypoint(name="Goal", lat=47.0, lon=8.0, alt_smoothed=500)
 
-        tp1 = Turnpoint(radius=400, waypoint=waypoint1, type=TurnpointType.TAKEOFF)
-        tp2 = Turnpoint(radius=400, waypoint=waypoint2, type=TurnpointType.NONE)
+class TestGoalLineEarthModel:
+    """The goal line is measured on the task's declared earth model (ADR 0003).
 
-        goal = Goal(type=GoalType.LINE)
-        task = Task(
-            task_type=TaskType.CLASSIC, version=1, turnpoints=[tp1, tp2], goal=goal
+    It used to be measured on a hardcoded WGS84 ellipsoid, so a task declaring
+    the FAI sphere had its route and distances on the sphere while the goal line
+    and its control zone sat on the ellipsoid — two earth models in one
+    exported document.
+    """
+
+    @staticmethod
+    def _task(earth_model) -> Task:
+        """A LINE-goal task with a 40 km goal line on the given earth model."""
+        task = _line_goal_task(goal_radius=20_000)
+        task.earth_model = earth_model
+        return task
+
+    def test_from_task_carries_the_model(self):
+        """The model travels with the goal line, not with the caller."""
+        assert GoalLine.from_task(self._task(EarthModel.FAI_SPHERE)).earth_model == (
+            EarthModel.FAI_SPHERE
         )
+        assert GoalLine.from_task(self._task(None)).earth_model is None
 
-        features = _create_goal_line_features(task)
+    def test_endpoints_are_half_the_length_from_the_center_on_that_model(self):
+        """Each endpoint sits length / 2 from the goal, measured on the model.
 
-        assert len(features) == 0  # No features when no valid previous TP
+        This is what a hardcoded ellipsoid broke: half of 40 km along the
+        ellipsoid is not half of 40 km along the FAI sphere.
+        """
+        for earth_model in (None, EarthModel.FAI_SPHERE):
+            goal_line = GoalLine.from_task(self._task(earth_model))
+            (lon1, lat1), (lon2, lat2), _ = goal_line.endpoints()
+            for lon, lat in ((lon1, lat1), (lon2, lat2)):
+                measured = geodesic_distance(goal_line.center, (lat, lon), earth_model)
+                assert measured == pytest.approx(goal_line.length / 2, abs=0.01), (
+                    f"{earth_model}: endpoint is not half the line from the goal"
+                )
 
+    def test_the_two_models_disagree_enough_to_matter(self):
+        """The models place the endpoints tens of metres apart on a long line."""
+        wgs84 = GoalLine.from_task(self._task(None)).endpoints()[0]
+        sphere = GoalLine.from_task(self._task(EarthModel.FAI_SPHERE)).endpoints()[0]
 
-class TestShouldSkipLastTurnpoint:
-    """Test the should_skip_last_turnpoint function."""
-
-    def test_should_skip_last_turnpoint_line_goal(self):
-        """Test skipping last turnpoint for LINE goal."""
-        waypoint1 = Waypoint(name="TP1", lat=46.0, lon=8.0, alt_smoothed=1000)
-        waypoint2 = Waypoint(name="Goal", lat=47.0, lon=8.0, alt_smoothed=500)
-
-        tp1 = Turnpoint(radius=400, waypoint=waypoint1, type=TurnpointType.TAKEOFF)
-        tp2 = Turnpoint(radius=400, waypoint=waypoint2, type=TurnpointType.NONE)
-
-        goal = Goal(type=GoalType.LINE)
-        task = Task(
-            task_type=TaskType.CLASSIC, version=1, turnpoints=[tp1, tp2], goal=goal
-        )
-
-        result = should_skip_last_turnpoint(task)
-
-        assert result is True
-
-    def test_should_skip_last_turnpoint_cylinder_goal(self):
-        """Test not skipping last turnpoint for CYLINDER goal."""
-        waypoint1 = Waypoint(name="TP1", lat=46.0, lon=8.0, alt_smoothed=1000)
-        waypoint2 = Waypoint(name="Goal", lat=47.0, lon=8.0, alt_smoothed=500)
-
-        tp1 = Turnpoint(radius=400, waypoint=waypoint1, type=TurnpointType.TAKEOFF)
-        tp2 = Turnpoint(radius=400, waypoint=waypoint2, type=TurnpointType.NONE)
-
-        goal = Goal(type=GoalType.CYLINDER)
-        task = Task(
-            task_type=TaskType.CLASSIC, version=1, turnpoints=[tp1, tp2], goal=goal
-        )
-
-        result = should_skip_last_turnpoint(task)
-
-        assert result is False
-
-    def test_should_skip_last_turnpoint_no_goal(self):
-        """Test not skipping last turnpoint when no goal."""
-        waypoint1 = Waypoint(name="TP1", lat=46.0, lon=8.0, alt_smoothed=1000)
-        tp1 = Turnpoint(radius=400, waypoint=waypoint1, type=TurnpointType.TAKEOFF)
-
-        task = Task(task_type=TaskType.CLASSIC, version=1, turnpoints=[tp1], goal=None)
-
-        result = should_skip_last_turnpoint(task)
-
-        assert result is False
-
-    def test_should_skip_last_turnpoint_insufficient_turnpoints(self):
-        """Test not skipping when insufficient turnpoints."""
-        waypoint1 = Waypoint(name="TP1", lat=46.0, lon=8.0, alt_smoothed=1000)
-        tp1 = Turnpoint(radius=400, waypoint=waypoint1, type=TurnpointType.TAKEOFF)
-
-        goal = Goal(type=GoalType.LINE)
-        task = Task(
-            task_type=TaskType.CLASSIC,
-            version=1,
-            turnpoints=[tp1],  # Only one turnpoint
-            goal=goal,
-        )
-
-        result = should_skip_last_turnpoint(task)
-
-        assert result is False
+        apart = geodesic_distance((wgs84[1], wgs84[0]), (sphere[1], sphere[0]))
+        assert apart > 10.0, "otherwise this test could not detect the wrong model"
