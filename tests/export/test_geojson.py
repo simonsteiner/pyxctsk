@@ -328,3 +328,59 @@ class TestRepeatedTurnpoint:
 
         assert goal_feature["properties"]["color"] == "#ff0000"  # goal red
         assert middle_feature["properties"]["color"] == "#269abc"  # default blue
+
+
+class TestLineGoalWithoutAnApproach:
+    """A LINE goal that cannot produce a line still has to be drawn.
+
+    The last turnpoint is dropped because a goal line replaces it. When the
+    previous turnpoint sits at the goal's own coordinates there is no approach
+    azimuth, so there is no line — and the goal used to be dropped anyway,
+    leaving nothing in either output to represent it.
+    """
+
+    @staticmethod
+    def _task(goal_lat: float) -> Task:
+        """Build a LINE-goal task whose first turnpoint is at ``goal_lat``."""
+        return Task(
+            task_type=TaskType.CLASSIC,
+            version=1,
+            turnpoints=[
+                Turnpoint(
+                    radius=1000,
+                    waypoint=Waypoint(name="A", lat=goal_lat, lon=8.0, alt_smoothed=0),
+                    type=TurnpointType.TAKEOFF,
+                ),
+                Turnpoint(
+                    radius=400,
+                    waypoint=Waypoint(name="Goal", lat=47.0, lon=8.0, alt_smoothed=0),
+                    type=TurnpointType.NONE,
+                ),
+            ],
+            goal=Goal(type=GoalType.LINE),
+        )
+
+    def test_coincident_previous_turnpoint_keeps_the_goal(self):
+        """No goal line means the goal turnpoint is rendered, in goal red."""
+        geojson = generate_task_geojson(self._task(goal_lat=47.0))
+        by_type = [f["properties"]["type"] for f in geojson["features"]]
+
+        assert "goal_line" not in by_type, "precondition: no line can be drawn"
+        goals = [
+            f
+            for f in geojson["features"]
+            if f["properties"].get("name") == "Goal"
+            and f["properties"]["type"] == "cylinder"
+        ]
+        assert len(goals) == 1, "the goal must survive in some form"
+        assert goals[0]["properties"]["color"] == "#ff0000"
+
+    def test_distinct_previous_turnpoint_replaces_the_goal_with_the_line(self):
+        """With an approach direction, the line stands in for the turnpoint."""
+        geojson = generate_task_geojson(self._task(goal_lat=46.0))
+        by_type = [f["properties"]["type"] for f in geojson["features"]]
+
+        assert "goal_line" in by_type
+        assert "goal_control_zone" in by_type
+        names = [f["properties"].get("name") for f in geojson["features"]]
+        assert "Goal" not in names, "the goal line replaces the goal cylinder"

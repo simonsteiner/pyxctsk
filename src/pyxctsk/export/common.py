@@ -14,7 +14,7 @@ this module must not grow a second opinion about task geometry.
 
 import math
 
-from ..distance.goal_line import should_skip_last_turnpoint
+from ..distance.goal_line import GoalLine
 from ..distance.route_optimization import optimized_route_coordinates
 from ..distance.task_distances import task_to_turnpoints
 from ..model.task import Task, Turnpoint, TurnpointType
@@ -27,7 +27,11 @@ METERS_PER_DEGREE = 111320.0  # 1 degree ≈ 111.32 km at equator
 def get_turnpoints_to_render(task: Task) -> list[Turnpoint]:
     """Get the list of turnpoints that should be rendered for visualization.
 
-    Skips the last turnpoint if it's a LINE type goal (goal line replaces it).
+    Derived from the one answer to whether the task has a goal line: a goal
+    line replaces the last turnpoint, so the turnpoint is dropped exactly when
+    there is a line to draw in its place. Deciding this independently is what
+    let a LINE goal with no usable approach direction lose its goal from the
+    output — dropped here, and not drawn as a line either.
 
     Args:
         task: The Task object containing turnpoints.
@@ -35,7 +39,7 @@ def get_turnpoints_to_render(task: Task) -> list[Turnpoint]:
     Returns:
         List of turnpoints to render.
     """
-    if should_skip_last_turnpoint(task):
+    if GoalLine.from_task(task) is not None:
         return task.turnpoints[:-1]
     return task.turnpoints
 

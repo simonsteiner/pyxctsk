@@ -6,9 +6,17 @@ its endpoints sit, and the shape of its semicircular control zone. The
 KML generation, distance calculation) go through, so the goal-line rules live
 in exactly one place.
 
+:meth:`GoalLine.from_task` is the only answer to *"does this task have a goal
+line?"*, and everything else derives from it — including which turnpoints a
+writer should draw, since the goal line's presence is the whole reason to drop
+the last one. Asking that question a second way is how the two answers came to
+disagree: a LINE goal whose previous turnpoint sits at the same coordinates has
+no approach direction and so no goal line, but a separate predicate dropped the
+turnpoint anyway and the goal vanished from the output entirely.
+
 The free functions kept here (``calculate_goal_line_endpoints``,
-``generate_semicircle_arc``, ``get_goal_line_data``, ``should_skip_last_turnpoint``)
-are thin adapters over the same core, retained for backwards compatibility.
+``generate_semicircle_arc``, ``get_goal_line_data``) are thin adapters over the
+same core, retained for backwards compatibility.
 """
 
 from dataclasses import dataclass
@@ -276,20 +284,3 @@ def get_goal_line_data(
     if goal_line is None:
         return None
     return goal_line.data()
-
-
-def should_skip_last_turnpoint(task: Task) -> bool:
-    """Check if the last turnpoint should be skipped for LINE type goals.
-
-    Args:
-        task: The task object
-
-    Returns:
-        True if the last turnpoint should be skipped (for LINE goals)
-    """
-    return bool(
-        task.goal
-        and task.goal.type == GoalType.LINE
-        and task.turnpoints
-        and len(task.turnpoints) >= 2
-    )

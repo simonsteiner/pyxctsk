@@ -6,7 +6,8 @@ This module covers:
 - Goal line endpoint calculations based on approach direction
 - Semicircle arc generation for goal control zones
 - Goal line feature creation for GeoJSON output
-- Logic for determining when to skip last turnpoint for LINE goals
+- Whether a task has a goal line at all, which is what decides whether the
+  last turnpoint is drawn as a cylinder or replaced by the line
 - Helper functions for finding previous turnpoints with valid coordinates
 """
 
@@ -19,7 +20,6 @@ from pyxctsk.distance.goal_line import (
     calculate_goal_line_endpoints,
     generate_semicircle_arc,
     goal_line_length_from_turnpoints,
-    should_skip_last_turnpoint,
 )
 from pyxctsk.export.geojson import _create_goal_line_features
 
@@ -416,67 +416,52 @@ class TestCreateGoalLineFeatures:
         assert len(features) == 0  # No features when no valid previous TP
 
 
-class TestShouldSkipLastTurnpoint:
-    """Test the should_skip_last_turnpoint function."""
+class TestGoalLinePresence:
+    """Whether a task has a goal line — the one question, asked once.
 
-    def test_should_skip_last_turnpoint_line_goal(self):
-        """Test skipping last turnpoint for LINE goal."""
-        waypoint1 = Waypoint(name="TP1", lat=46.0, lon=8.0, alt_smoothed=1000)
-        waypoint2 = Waypoint(name="Goal", lat=47.0, lon=8.0, alt_smoothed=500)
+    ``GoalLine.from_task`` used to be shadowed by ``should_skip_last_turnpoint``,
+    which answered the same question with one clause fewer. The renderers asked
+    both, so the two could disagree; the last case below is where they did.
+    """
 
-        tp1 = Turnpoint(radius=400, waypoint=waypoint1, type=TurnpointType.TAKEOFF)
-        tp2 = Turnpoint(radius=400, waypoint=waypoint2, type=TurnpointType.NONE)
+    def test_line_goal_has_a_goal_line(self):
+        """A LINE goal with a distinct previous turnpoint has a goal line."""
+        assert GoalLine.from_task(_line_goal_task()) is not None
 
-        goal = Goal(type=GoalType.LINE)
-        task = Task(
-            task_type=TaskType.CLASSIC, version=1, turnpoints=[tp1, tp2], goal=goal
-        )
+    def test_cylinder_goal_has_none(self):
+        """A CYLINDER goal has no goal line."""
+        task = _line_goal_task()
+        task.goal = Goal(type=GoalType.CYLINDER)
+        assert GoalLine.from_task(task) is None
 
-        result = should_skip_last_turnpoint(task)
-
-        assert result is True
-
-    def test_should_skip_last_turnpoint_cylinder_goal(self):
-        """Test not skipping last turnpoint for CYLINDER goal."""
-        waypoint1 = Waypoint(name="TP1", lat=46.0, lon=8.0, alt_smoothed=1000)
-        waypoint2 = Waypoint(name="Goal", lat=47.0, lon=8.0, alt_smoothed=500)
-
-        tp1 = Turnpoint(radius=400, waypoint=waypoint1, type=TurnpointType.TAKEOFF)
-        tp2 = Turnpoint(radius=400, waypoint=waypoint2, type=TurnpointType.NONE)
-
-        goal = Goal(type=GoalType.CYLINDER)
-        task = Task(
-            task_type=TaskType.CLASSIC, version=1, turnpoints=[tp1, tp2], goal=goal
-        )
-
-        result = should_skip_last_turnpoint(task)
-
-        assert result is False
-
-    def test_should_skip_last_turnpoint_no_goal(self):
-        """Test not skipping last turnpoint when no goal."""
+    def test_no_goal_has_none(self):
+        """A task with no goal has no goal line."""
         waypoint1 = Waypoint(name="TP1", lat=46.0, lon=8.0, alt_smoothed=1000)
         tp1 = Turnpoint(radius=400, waypoint=waypoint1, type=TurnpointType.TAKEOFF)
-
         task = Task(task_type=TaskType.CLASSIC, version=1, turnpoints=[tp1], goal=None)
+        assert GoalLine.from_task(task) is None
 
-        result = should_skip_last_turnpoint(task)
-
-        assert result is False
-
-    def test_should_skip_last_turnpoint_insufficient_turnpoints(self):
-        """Test not skipping when insufficient turnpoints."""
+    def test_single_turnpoint_has_none(self):
+        """One turnpoint cannot define an approach direction."""
         waypoint1 = Waypoint(name="TP1", lat=46.0, lon=8.0, alt_smoothed=1000)
         tp1 = Turnpoint(radius=400, waypoint=waypoint1, type=TurnpointType.TAKEOFF)
-
-        goal = Goal(type=GoalType.LINE)
         task = Task(
             task_type=TaskType.CLASSIC,
             version=1,
-            turnpoints=[tp1],  # Only one turnpoint
-            goal=goal,
+            turnpoints=[tp1],
+            goal=Goal(type=GoalType.LINE),
         )
+        assert GoalLine.from_task(task) is None
 
-        result = should_skip_last_turnpoint(task)
+    def test_coincident_previous_turnpoint_has_none(self):
+        """A previous turnpoint at the goal's own coordinates gives no line.
 
-        assert result is False
+        This is the case the two predicates disagreed on: there is no approach
+        azimuth to be perpendicular to, so no line can be drawn — and the goal
+        turnpoint must therefore stay in the rendered output. See
+        ``tests/export/test_geojson.py`` for the writer-side regression.
+        """
+        task = _line_goal_task()
+        task.turnpoints[0].waypoint.lat = task.turnpoints[-1].waypoint.lat
+        task.turnpoints[0].waypoint.lon = task.turnpoints[-1].waypoint.lon
+        assert GoalLine.from_task(task) is None

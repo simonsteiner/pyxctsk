@@ -39,7 +39,6 @@ from .goal_line import (
     GoalLine,
     get_goal_line_data,
     goal_line_length_from_turnpoints,
-    should_skip_last_turnpoint,
 )
 from .route_optimization import (
     OptimizedRoute,
@@ -68,7 +67,6 @@ __all__ = [
     # Goal-line geometry
     "get_goal_line_data",
     "goal_line_length_from_turnpoints",
-    "should_skip_last_turnpoint",
     # Main distance calculation functions
     "optimized_distance",
     "optimized_route_coordinates",
