@@ -11,8 +11,13 @@ from enum import IntEnum
 class QRCodeDirection(IntEnum):
     """QR code direction enumeration (OBSOLETE).
 
-    This field is kept for backwards compatibility with older QR code tasks,
-    but is ignored when reading tasks in the current format.
+    Kept for backwards compatibility with older QR code tasks. The spec has
+    readers "ignore this field", which this library takes to mean *do not act
+    on it* rather than *discard it*: the value is read, carried across the
+    format seam and written back out, and nothing anywhere behaves differently
+    for ENTER or EXIT. ``tests/conformance`` pins both halves — that an
+    explicit direction survives a round-trip, and that an absent or empty one
+    falls back rather than raising.
     """
 
     ENTER = 1

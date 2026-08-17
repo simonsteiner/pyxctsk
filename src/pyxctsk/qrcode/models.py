@@ -100,8 +100,9 @@ class QRCodeSSS:
 
     Fields correspond to JSON format:
     - type: Start type - RACE (1) or ELAPSED_TIME (2)
-    - direction: OBSOLETE field kept for backwards compatibility (ignored when
-      reading, so it carries the same default as the full format's ``SSS``)
+    - direction: OBSOLETE. Read and carried so a round-trip does not lose it,
+      but never interpreted — nothing behaves differently for ENTER or EXIT.
+      Absent, it falls back to the same value the full format's ``SSS`` uses.
     - time_gates: Array of time gates for start timing
     - unknown: Keys this format does not define, preserved verbatim
     """
@@ -128,9 +129,9 @@ class QRCodeSSS:
 QR_SSS_SHAPE = Shape(
     QRCodeSSS,
     (
-        # ``d`` is OBSOLETE: ignored on read, still written so older devices
-        # keep working. It comes first, and the type last, to match the order
-        # the reference producer emits.
+        # ``d`` is OBSOLETE: read and carried unchanged, never interpreted,
+        # and always written so older devices keep working. It comes first,
+        # and the type last, to match the order the reference producer emits.
         Value("direction", "d", enum_codec(QRCodeDirection), DEFAULTED),
         Value("time_gates", "g", list_codec(TIME_OF_DAY), OPTIONAL_EMPTY),
         Value("type", "t", enum_codec(QRCodeSSSType), REQUIRED),

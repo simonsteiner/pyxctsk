@@ -237,8 +237,9 @@ class SSS:
 
     Attributes:
         type (SSSType): SSS type.
-        direction (Direction): SSS direction. Obsolete — ignored on read, still
-            written so older devices keep working.
+        direction (Direction): SSS direction. Obsolete: read and carried so a
+            round-trip does not lose it, never interpreted, and always written
+            so older devices keep working.
         time_gates (List[TimeOfDay]): List of time gates.
         time_close (Optional[TimeOfDay]): Optional closing time.
         unknown (dict): Keys the spec does not define, preserved verbatim.
@@ -267,8 +268,10 @@ class SSS:
     def from_dict(cls, data: dict[str, Any]) -> "SSS":
         """Create from dictionary.
 
-        ``direction`` is obsolete. The spec requires readers to ignore it, so a
-        task that omits it parses fine and falls back to
+        ``direction`` is obsolete. The spec has readers ignore it, which here
+        means nothing acts on the value — not that it is discarded: a task
+        carrying one keeps it through a round-trip, and one that omits it, or
+        leaves it null or empty, falls back to
         :data:`OBSOLETE_DIRECTION_DEFAULT`.
 
         Args:
