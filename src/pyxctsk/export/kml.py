@@ -54,7 +54,7 @@ def _create_turnpoint_elements(
     kml: simplekml.Kml,
     drawing: TaskDrawing,
     task_altitude: int,
-) -> list[tuple[float, float, int]]:
+) -> None:
     """Create turnpoint circles and center points in the KML.
 
     Args:
@@ -62,15 +62,9 @@ def _create_turnpoint_elements(
         drawing: The task drawing, which knows both which turnpoints to draw
             and which of them is the goal.
         task_altitude: Unified altitude for the task.
-
-    Returns:
-        List of coordinates for the turnpoints.
     """
-    coordinates = []
-
     for i, turnpoint in enumerate(drawing.turnpoints):
         coord = (turnpoint.waypoint.lon, turnpoint.waypoint.lat, task_altitude)
-        coordinates.append(coord)
 
         # Generate circle coordinates
         circle_coords = generate_circle_coordinates_3d(
@@ -92,41 +86,36 @@ def _create_turnpoint_elements(
         # Determine if this is the goal turnpoint
         is_goal = drawing.is_goal(turnpoint)
         turnpoint_type = turnpoint.type or TurnpointType.NONE
-        circle_polygon.style = _create_turnpoint_style(turnpoint_type, is_goal)
+        style = _create_turnpoint_style(turnpoint_type, is_goal)
+        circle_polygon.style = style
 
-        # Add turnpoint center point
+        # Add turnpoint center point, in the same colour as its cylinder.
         center_point = kml.newpoint(
             name=f"{turnpoint.waypoint.name or f'TP{i + 1}'} Center",
             coords=[coord],
         )
         center_point.style.iconstyle.scale = 0.5
-        center_point.style.iconstyle.color = _create_turnpoint_style(
-            turnpoint_type, is_goal
-        )
-
-    return coordinates
+        center_point.style.iconstyle.color = style.linestyle.color
 
 
-def _create_course_line(
-    kml: simplekml.Kml,
-    drawing: TaskDrawing,
-    coordinates: list[tuple[float, float, int]],
-) -> None:
-    """Create the course line connecting all turnpoints.
+def _create_course_line(kml: simplekml.Kml, drawing: TaskDrawing) -> None:
+    """Create the course line along the optimized route, if there is one.
+
+    Fewer than two points is not a line: a task with one turnpoint used to emit
+    a one-coordinate ``<LineString>``, and an empty task a phantom one at
+    0°N 0°E, because simplekml writes an empty coordinate list as a single zero
+    point. GeoJSON omits the route feature in that case and KML now agrees.
 
     Args:
         kml: The KML document to add elements to.
         drawing: The task drawing, carrying the optimized route.
-        coordinates: Fallback coordinates if optimized route is not available.
     """
     opt_route_coords = drawing.route_coordinates()
+    if opt_route_coords is None:
+        return
 
-    # Use optimized route if available, otherwise fallback to direct coordinates
-    if opt_route_coords is not None:
-        # Convert from (lat, lon) to (lon, lat) format (no altitude)
-        route_coordinates = [(lon, lat) for lat, lon in opt_route_coords]
-    else:
-        route_coordinates = [(lon, lat) for (lon, lat, _alt) in coordinates]
+    # Convert from (lat, lon) to (lon, lat) format (no altitude)
+    route_coordinates = [(lon, lat) for lat, lon in opt_route_coords]
 
     # Create the course line
     course_line = kml.newlinestring(
@@ -228,12 +217,12 @@ def drawing_to_kml(drawing: TaskDrawing) -> str:
     kml = simplekml.Kml()
     altitude = DEFAULT_ALTITUDE  # Default altitude for KML elements
 
-    # Create turnpoint elements and get coordinates
-    coordinates = _create_turnpoint_elements(kml, drawing, altitude)
+    # Create turnpoint elements
+    _create_turnpoint_elements(kml, drawing, altitude)
 
     # Create course line
     # line is created with clampToGround mode
-    _create_course_line(kml, drawing, coordinates)
+    _create_course_line(kml, drawing)
 
     # Create goal line elements if applicable
     # goal line elements are created 500m above the ground
