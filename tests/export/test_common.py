@@ -29,7 +29,7 @@ from pyxctsk.export.common import (
     turnpoint_color,
 )
 from pyxctsk.export.geojson import drawing_to_geojson, generate_task_geojson
-from pyxctsk.export.kml import ALPHA_TRANSPARENCY, ROUTE_ALPHA, drawing_to_kml
+from pyxctsk.export.kml import FILL_ALPHA, ROUTE_ALPHA, drawing_to_kml
 
 
 def _task(goal_type: GoalType | None = None, prev_lat: float = 46.0) -> Task:
@@ -213,14 +213,11 @@ class TestOnePalette:
     them, so a drift cannot pass again.
     """
 
-    #: The whole palette a task can show, as (turnpoint type, is_goal).
-    ROLES = [
-        (TurnpointType.TAKEOFF, False),
-        (TurnpointType.SSS, False),
-        (TurnpointType.ESS, False),
-        (TurnpointType.NONE, False),
-        (TurnpointType.NONE, True),
-    ]
+    #: Every role a turnpoint can be drawn in, as (turnpoint type, is_goal).
+    #: Derived from the enum, not hand-listed: a new ``TurnpointType`` has to
+    #: arrive here, and therefore in the palette, rather than being defaulted
+    #: into the ordinary-turnpoint colour by a test that never noticed it.
+    ROLES = [(t, False) for t in TurnpointType] + [(TurnpointType.NONE, True)]
 
     @staticmethod
     def _placemark_style(kml: str, name: str) -> str:
@@ -288,9 +285,22 @@ class TestOnePalette:
             ],
         )
 
+    @pytest.mark.parametrize("turnpoint_type", list(TurnpointType))
+    def test_every_turnpoint_type_has_a_colour(self, turnpoint_type):
+        """The palette is total over the enum, so nothing degrades silently.
+
+        Card D's complaint about the deleted KML dict was its `.get(hex, blue)`
+        default: an entry it did not know about rendered as blue rather than
+        failing. A lookup with a default one level up would have kept exactly
+        that failure mode for a newly added `TurnpointType`, so the table is
+        spelled out per member and this test is what makes adding one a CI
+        failure rather than a colour nobody chose.
+        """
+        assert turnpoint_color(turnpoint_type) in common._TURNPOINT_COLORS.values()
+
     @pytest.mark.parametrize(("turnpoint_type", "is_goal"), ROLES)
     def test_every_role_has_a_colour_of_its_own(self, turnpoint_type, is_goal):
-        """Five roles, five distinct colours, no default standing in for one."""
+        """One colour per role, no two roles sharing and no default standing in."""
         color = turnpoint_color(turnpoint_type, is_goal)
 
         others = [
@@ -304,12 +314,25 @@ class TestOnePalette:
         """A goal that is also the ESS is drawn as the goal."""
         assert turnpoint_color(TurnpointType.ESS, is_goal=True) == GOAL_COLOR
 
+    def test_a_turnpoint_with_no_type_is_an_ordinary_one(self):
+        """`type=None` is legal on the model, and the drawing normalizes it.
+
+        The two writers used to normalize it differently — KML to
+        `TurnpointType.NONE`, GeoJSON not at all — and agreed only because both
+        lookups fell through to the same default. `color_of` is the one answer.
+        """
+        task = _task(GoalType.CYLINDER)
+        task.turnpoints[0].type = None
+        drawing = TaskDrawing.from_task(task)
+
+        assert drawing.color_of(drawing.turnpoints[0]) == turnpoint_color(
+            TurnpointType.NONE
+        )
+
     def test_both_writers_draw_the_turnpoints_in_the_palette_colours(self):
         """The regression: KML's colours are the shared ones, not a remapping."""
         drawing = TaskDrawing.from_task(self._task_of_every_role())
-        expected = [
-            turnpoint_color(tp.type, drawing.is_goal(tp)) for tp in drawing.turnpoints
-        ]
+        expected = [drawing.color_of(tp) for tp in drawing.turnpoints]
 
         geojson = drawing_to_geojson(drawing)
         from_geojson = [
@@ -375,7 +398,7 @@ class TestOnePalette:
         )
         assert self._placemark_color(
             kml, name, "PolyStyle"
-        ) == CONTROL_ZONE_FILL_COLOR.kml(ALPHA_TRANSPARENCY), "the zone's fill"
+        ) == CONTROL_ZONE_FILL_COLOR.kml(FILL_ALPHA), "the zone's fill"
 
     def test_neither_writer_declares_a_colour_of_its_own(self):
         """The structural half: a colour literal in a writer is the drift itself.
@@ -385,14 +408,24 @@ class TestOnePalette:
         typed by hand. The palette is the only place those may appear, so a new
         one appearing in a writer fails here rather than in a map three months
         from now.
+
+        The `aabbggrr` rule is by shape, so any quoted 8-hex-digit literal in a
+        writer trips it, colour or not. That is deliberate: nothing else in these
+        two modules has wanted one, and the failure is a prompt to move a colour
+        into the palette or to narrow this check on purpose — the same kind of
+        review gate as `EXPECTED_DEFERRED_IMPORTS` in test_layering.py.
         """
+        moved_to = "move it into common.py's palette, or narrow this check"
         package = Path(common.__file__).parent
         for writer in ("kml.py", "geojson.py"):
             source = (package / writer).read_text()
             assert not re.search(r"#[0-9a-fA-F]{6}\b", source), (
-                f"{writer}: a hex colour"
+                f"{writer} spells out a #rrggbb colour: {moved_to}"
             )
-            assert "simplekml.Color" not in source, f"{writer}: a simplekml constant"
+            assert "simplekml.Color" not in source, (
+                f"{writer} uses a simplekml.Color constant: {moved_to}"
+            )
             assert not re.search(r"""["'][0-9a-fA-F]{8}["']""", source), (
-                f"{writer}: a hand-written KML colour"
+                f"{writer} has a quoted 8-hex-digit literal, which is how a KML "
+                f"colour gets hand-written: {moved_to}"
             )

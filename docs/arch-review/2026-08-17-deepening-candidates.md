@@ -607,6 +607,13 @@ import into "runs at import time" and "deferred", with `_import_time_imports` an
 - **`if TYPE_CHECKING:` needed a distinction the card did not mention.** Only the guarded
   *body* is type-only — an `else:` on the same `if` is ordinary code that runs on import,
   so the walker skips `body` and keeps walking `orelse`. Pinned by its own test.
+- **The card contradicts itself about class bodies, and the Problem paragraph is right.**
+  G's **Solution** says to exclude "function, class and `if TYPE_CHECKING:` bodies", but
+  its **Problem** says "a class-body import also runs at import time" — which it does, so
+  excluding class bodies would have re-created the blind spot one level down. The
+  implementation follows the Problem: a class-body import is collected as import-time and
+  checked like any other, and only function bodies defer. The Solution's wording is the
+  error, left as written per this directory's convention.
 - **Nothing in `src/` moved.** All 30 modules still pass all four checks; the suite went
   388 tests with the eight new snippet tests, and the two optional-dependency `try:`
   blocks the card names remain absolute imports, so they are still correctly invisible.

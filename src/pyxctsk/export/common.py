@@ -10,7 +10,8 @@ goal with no usable approach direction lost its goal from both outputs. There is
 no free function beside the drawing that answers any of those a second way.
 
 Also here: the palette, as :class:`Color` values that each writer renders with a
-total function of its own format, and the polygon that approximates a cylinder. That circle is planar — a fixed metres-per-degree constant, not a
+total function of its own format, and the polygon that approximates a cylinder.
+That circle is planar — a fixed metres-per-degree constant, not a
 geodesic — because it draws a decorative outline, not a measured shape. Anything
 a distance depends on is computed properly in
 :mod:`pyxctsk.distance.turnpoint` and :mod:`pyxctsk.distance.goal_line`, and
@@ -98,6 +99,27 @@ class TaskDrawing:
             return False
         return bool(self.task.turnpoints) and turnpoint is self.task.turnpoints[-1]
 
+    def color_of(self, turnpoint: Turnpoint) -> "Color":
+        """The colour this turnpoint is drawn in, in either format.
+
+        Both writers used to compose this themselves out of :meth:`is_goal` and
+        the turnpoint's type, and they spelled the type differently: KML
+        normalized a missing one to ``TurnpointType.NONE`` while GeoJSON passed
+        ``None`` into a parameter annotated ``TurnpointType``. They agreed only
+        by falling through to the same default, which is the shape this module
+        exists to remove — a question both writers must answer identically is a
+        method on the drawing, not something each of them assembles.
+
+        Args:
+            turnpoint: One of the turnpoints being drawn.
+
+        Returns:
+            The colour for that turnpoint, the goal's red included.
+        """
+        return turnpoint_color(
+            turnpoint.type or TurnpointType.NONE, self.is_goal(turnpoint)
+        )
+
     def route_coordinates(self) -> list[tuple[float, float]] | None:
         """The optimized route as (lat, lon) points, or None if there is no line.
 
@@ -119,11 +141,11 @@ class Color:
     The palette used to be shared as ``#rrggbb`` strings, which meant the KML
     writer needed a hand-written dict mapping each of those strings back to a
     ``simplekml.Color`` constant. That dict re-declared the whole palette and
-    lost three of its five values — a TAKEOFF turnpoint was ``#204d74`` in
-    GeoJSON and ``#00008b`` in KML — and its ``.get(hex, blue)`` default meant a
-    sixth entry would have degraded to blue rather than failing. A colour value
-    with one total renderer per format has nothing to look up and nothing to
-    default to.
+    lost four of its five turnpoint values — a TAKEOFF turnpoint was ``#204d74``
+    in GeoJSON and ``#00008b`` in KML, and only the goal's red survived — and its
+    ``.get(hex, blue)`` default meant a sixth entry would have degraded to blue
+    rather than failing. A colour value with one total renderer per format has
+    nothing to look up and nothing to default to.
 
     Attributes:
         red: Red channel, 0-255.
@@ -168,7 +190,13 @@ GOAL_LINE_COLOR = Color(0x00, 0xFF, 0x00)
 CONTROL_ZONE_EDGE_COLOR = Color(0x00, 0xBC, 0xD4)
 CONTROL_ZONE_FILL_COLOR = Color(0x4E, 0xCD, 0xC4)
 
-_SPECIAL_TURNPOINT_COLORS = {
+#: Every :class:`TurnpointType`, spelled out rather than defaulted. A lookup with
+#: a default is what the old KML writer had, and it meant a palette entry it did
+#: not know about rendered as an ordinary turnpoint with nothing failing. This
+#: table is total over the enum, `test_every_turnpoint_type_has_a_colour` says so,
+#: and a new member therefore fails the suite instead of quietly turning blue.
+_TURNPOINT_COLORS = {
+    TurnpointType.NONE: TURNPOINT_COLOR,
     TurnpointType.TAKEOFF: TAKEOFF_COLOR,
     TurnpointType.SSS: SSS_COLOR,
     TurnpointType.ESS: ESS_COLOR,
@@ -185,10 +213,14 @@ def turnpoint_color(turnpoint_type: TurnpointType, is_goal: bool = False) -> Col
 
     Returns:
         The turnpoint's colour.
+
+    Raises:
+        KeyError: If the type has no palette entry, which the test over the enum
+            makes a CI failure rather than something a map can hit.
     """
     if is_goal:
         return GOAL_COLOR
-    return _SPECIAL_TURNPOINT_COLORS.get(turnpoint_type, TURNPOINT_COLOR)
+    return _TURNPOINT_COLORS[turnpoint_type]
 
 
 def generate_circle_coordinates_2d(

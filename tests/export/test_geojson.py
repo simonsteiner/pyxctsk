@@ -6,6 +6,13 @@ This module covers:
 - Creation of GeoJSON features for turnpoints and optimized routes
 - Validation of feature properties, geometry, and color coding
 - Task-level GeoJSON output for various goal types and task structures
+
+The hex colours asserted below are written out on purpose rather than read from
+`export.common`'s palette: they are golden values, and pinning the actual bytes
+is what makes a change to a palette constant show up as a failing test instead
+of a test that agrees with whatever the constant now says. `test_common.py`
+holds the complementary check — that both formats render the same palette — so
+between them a colour cannot change silently or drift between writers.
 """
 
 from pyxctsk import Goal, GoalType, Task, TaskType, Turnpoint, TurnpointType, Waypoint

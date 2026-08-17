@@ -2,42 +2,38 @@
 
 import simplekml  # type: ignore
 
-from ..model.task import Task, TurnpointType
+from ..model.task import Task
 from .common import (
     CONTROL_ZONE_EDGE_COLOR,
     CONTROL_ZONE_FILL_COLOR,
     GOAL_LINE_COLOR,
     ROUTE_COLOR,
+    Color,
     TaskDrawing,
     generate_circle_coordinates_3d,
-    turnpoint_color,
 )
 
-# Constants
-ALPHA_TRANSPARENCY = 100  # Cylinder and control-zone fills, 0-255
+# Constants. Both alphas are opacity bytes, 0x00 transparent to 0xFF opaque, in
+# one radix so they can be compared at a glance.
+FILL_ALPHA = 0x64  # Cylinder and control-zone fills, 39% opaque
 ROUTE_ALPHA = 0xE6  # Course line, 90% opaque
 DEFAULT_ALTITUDE = 5000  # Default altitude for KML elements
 
 
-def _create_turnpoint_style(
-    turnpoint_type: TurnpointType, is_goal: bool = False
-) -> simplekml.Style:
-    """Create style for turnpoint based on its type.
+def _create_turnpoint_style(color: Color) -> simplekml.Style:
+    """Create the style for a turnpoint cylinder in the given colour.
 
     Args:
-        turnpoint_type: The type of turnpoint.
-        is_goal: Whether this is the goal (last) turnpoint.
+        color: The turnpoint's colour, from :meth:`TaskDrawing.color_of`.
 
     Returns:
         A configured simplekml.Style object.
     """
-    color = turnpoint_color(turnpoint_type, is_goal)
-
     style = simplekml.Style()
     style.linestyle.width = 4
     style.polystyle.outline = 1
     style.linestyle.color = color.kml()
-    style.polystyle.color = color.kml(ALPHA_TRANSPARENCY)
+    style.polystyle.color = color.kml(FILL_ALPHA)
 
     return style
 
@@ -75,10 +71,8 @@ def _create_turnpoint_elements(
             altitudemode=simplekml.AltitudeMode.relativetoground,
         )
 
-        # Determine if this is the goal turnpoint
-        is_goal = drawing.is_goal(turnpoint)
-        turnpoint_type = turnpoint.type or TurnpointType.NONE
-        style = _create_turnpoint_style(turnpoint_type, is_goal)
+        # The drawing answers what colour this turnpoint is, goal included.
+        style = _create_turnpoint_style(drawing.color_of(turnpoint))
         circle_polygon.style = style
 
         # Add turnpoint center point, in the same colour as its cylinder.
@@ -166,7 +160,7 @@ def _create_goal_line_elements(
     )
     control_zone.style.linestyle.color = CONTROL_ZONE_EDGE_COLOR.kml()
     control_zone.style.linestyle.width = 2
-    control_zone.style.polystyle.color = CONTROL_ZONE_FILL_COLOR.kml(ALPHA_TRANSPARENCY)
+    control_zone.style.polystyle.color = CONTROL_ZONE_FILL_COLOR.kml(FILL_ALPHA)
     control_zone.style.polystyle.outline = 1
 
 

@@ -18,7 +18,6 @@ from .common import (
     GOAL_LINE_COLOR,
     ROUTE_COLOR,
     TaskDrawing,
-    turnpoint_color,
 )
 
 
@@ -33,7 +32,7 @@ def _create_turnpoint_feature(drawing: TaskDrawing, turnpoint, index: int) -> di
     Returns:
         GeoJSON feature dictionary for the turnpoint.
     """
-    color = turnpoint_color(turnpoint.type, drawing.is_goal(turnpoint)).hex
+    color = drawing.color_of(turnpoint).hex
 
     return {
         "type": "Feature",
