@@ -124,10 +124,17 @@ class QRCodeTask:
     extensions: list[dict[str, Any]] = field(default_factory=list)
     unknown: dict[str, Any] = field(default_factory=dict)
 
-    #: Keys this class understands; everything else lands in ``unknown``.
-    KNOWN_KEYS = frozenset(
-        {"taskType", "version", "T", "V", "t", "s", "g", "e", "to", "tc", "x"}
+    #: Keys the competition shape reads; everything else lands in ``unknown``.
+    COMPETITION_KEYS = frozenset(
+        {"taskType", "version", "t", "s", "g", "e", "to", "tc", "x"}
     )
+
+    #: Keys the simplified XC/Waypoints shape reads. Deliberately *not* the
+    #: union with :attr:`COMPETITION_KEYS`: a single allow-list spanning both
+    #: shapes told the passthrough that a competition key in a waypoints
+    #: payload was understood, when this shape neither reads nor writes it, so
+    #: ``e``, ``to`` and ``g`` were swallowed instead of carried through.
+    SIMPLIFIED_KEYS = frozenset({"T", "V", "t", "x"})
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
@@ -221,9 +228,15 @@ class QRCodeTask:
         is not part of the discriminator — a payload missing ``V`` is still
         plainly a waypoints task, and treating it as a competition one left the
         task type unset and swallowed ``T`` as an unknown key.
+
+        The same discriminator picks the passthrough allow-list, so each shape
+        is measured against the keys it actually reads: a competition key in a
+        waypoints payload is unknown here, and is carried through rather than
+        silently dropped.
         """
         is_simplified = "T" in data
-        extensions, unknown = read_passthrough(data, cls.KNOWN_KEYS, QR_EXTENSIONS_KEY)
+        known_keys = cls.SIMPLIFIED_KEYS if is_simplified else cls.COMPETITION_KEYS
+        extensions, unknown = read_passthrough(data, known_keys, QR_EXTENSIONS_KEY)
 
         if is_simplified:
             # Simplified XC/Waypoints format

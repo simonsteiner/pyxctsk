@@ -758,6 +758,56 @@ class TestWaypointsFormatPreservesExtras:
         assert emitted == plain
 
 
+class TestEachQRShapeIsMeasuredAgainstItsOwnKeys:
+    """A key one QR shape defines is unknown to the other, not understood.
+
+    ``QRCodeTask`` used to carry a single allow-list spanning both shapes, so a
+    competition key in a waypoints payload passed for a key this class reads.
+    It was neither read into an attribute nor captured as unknown: ``from_dict``
+    dropped it and ``to_dict`` had nothing to write back.
+    """
+
+    SOURCE = {
+        "T": "W",
+        "V": 2,
+        "t": [{"n": "WPT1", "z": "|dz~FligrB?"}],
+        "e": 1,
+        "to": "09:00:00Z",
+        "g": {"t": 2},
+    }
+
+    def _parsed(self):
+        from pyxctsk.qrcode.task import QRCodeTask
+
+        return QRCodeTask.from_dict(json.loads(json.dumps(self.SOURCE)))
+
+    def test_competition_keys_are_unknown_to_the_waypoints_shape(self):
+        """This shape reads none of them, so all three are carried."""
+        assert self._parsed().unknown == {"e": 1, "to": "09:00:00Z", "g": {"t": 2}}
+
+    def test_they_are_not_read_into_attributes(self):
+        """Being unknown is the point — nothing may interpret them either."""
+        parsed = self._parsed()
+
+        assert (parsed.earth_model, parsed.takeoff, parsed.goal) == (None, None, None)
+
+    def test_the_waypoints_roundtrip_keeps_them(self):
+        """The whole payload comes back, which it did not before."""
+        emitted = json.loads(self._parsed().to_waypoints_json())
+
+        assert emitted == self.SOURCE
+
+    def test_the_waypoints_keys_stay_unknown_to_the_competition_shape(self):
+        """The rule runs the other way too: ``V`` is not the competition key."""
+        from pyxctsk.qrcode.task import QRCodeTask
+
+        source = {"taskType": "CLASSIC", "version": 2, "t": [], "V": 9}
+        parsed = QRCodeTask.from_dict(source)
+
+        assert parsed.version == 2
+        assert parsed.unknown == {"V": 9}
+
+
 class TestWaypointsTaskEncoding:
     """Findings 7 and 8 — the XC/Waypoints ``z`` carries three numbers.
 
