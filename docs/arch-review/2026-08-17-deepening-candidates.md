@@ -503,7 +503,8 @@ A and B are applied. Each remaining item is independent; the suggested order for
 the rest is G → C.
 
 - [x] A. Optimized route as a value — one run, legs kept, cumulative by `accumulate`
-  (`6d5651b` the value object, `7104ad3` the cumulative fix)
+  (`6d5651b` the value object, `7104ad3` the cumulative fix, `608963d` one route shared
+  by both writers via `TaskDrawing`)
 - [x] B. `GoalLine.from_task` made total; `should_skip_last_turnpoint` removed; earth
   model honored (`3cf5af1`, `908275d`)
 - [ ] C. One field table per serializable shape; `KNOWN_KEYS` derived; cross-format `unknown` quarantined
@@ -518,9 +519,9 @@ Verification for any of these: `uv run pytest`, `ruff check`, `ruff format`, `my
 
 ### Outcome of A and B
 
-Both landed as four commits on `docs/arch-review-2026-08-17`, suite green throughout
-(357 → 363 tests; the six added are the regressions below, less the four that tested
-the two deleted functions).
+Both landed as five commits on `docs/arch-review-2026-08-17`, suite green throughout
+(357 → 373 tests; the additions are the regressions below plus `tests/export/test_common.py`,
+less the four that tested the two deleted functions).
 
 - **A cost less than the card assumed and paid more.** `calculate_task_distances` is
   now about as expensive as one optimizer run (was 4.1× on `task_gimi`, 14.4× on
@@ -533,11 +534,27 @@ the two deleted functions).
   the display — it exists for the task viewer. `OptimizedRoute` carries unrounded
   metres and the dict rounds when it projects, which is the split the card wanted
   without changing what the viewer reads.
-- **A's cross-writer half is not done.** `task_to_kml` and `generate_task_geojson` each
-  still run the optimizer once, so producing both formats for one task runs it twice.
-  Sharing it needs a task-level geometry value threaded through both writers — a
-  bigger change than the card implied when it said "one run serves the table, KML and
-  GeoJSON", and it belongs with candidate F's `TaskGeometry` sketch rather than here.
+- **A's cross-writer half took a value object, and paid for itself twice over.**
+  `TaskDrawing.from_task` now derives what a task looks like once — turnpoints to draw,
+  goal line, optimized route — and both writers render that value; `task_to_kml` and
+  `generate_task_geojson` are one-liners over `drawing_to_kml` / `drawing_to_geojson`.
+  Output is byte-identical (checked against the previous commit in a worktree, with
+  simplekml's document-global ids normalized). The route halving is the small part. The
+  larger part is that the four questions both writers were each answering separately —
+  which turnpoints, which is the goal, where the route runs, is there a goal line — are
+  now answered in one place, which is the shape B's defect needed in order to exist.
+  Three things fell out of it rather than being pursued: the duplicated
+  `original_turnpoints` + `task` parameters, the `isinstance(list)` union in
+  `_create_optimized_route_feature` labelled *"Old API for testing"* (the drawing is the
+  seam it was standing in for), and the four inert `@patch` decorators — `test_common.py`
+  patches the name where it is actually looked up and asserts the count is 1.
+- **Still one route more than necessary in the task viewer.**
+  `calculate_task_distances` optimizes its own, and the viewer asks for distances and
+  GeoJSON in one request. Closing that means splitting the projection out
+  (`task_distances_from_route(task, route)` beside the current entry point, the same
+  idiom as `drawing_to_kml`) so a caller can hand over the route it already has. Left
+  alone: it adds a name to `distance/`'s interface for a caller that is a dev script,
+  and it is not the *writers* re-deriving anything.
 - **B's second defect was worse than reported.** The card said the red goal colour was
   unreachable for a LINE goal; it was unreachable *and* the fix is not a colour change
   but a consequence of the render list — with a goal line present the goal turnpoint is

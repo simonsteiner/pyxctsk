@@ -115,6 +115,7 @@ validatable
 Vincenty
 vocu
 waku
+worktree
 wovi
 xcontest
 xctrack
