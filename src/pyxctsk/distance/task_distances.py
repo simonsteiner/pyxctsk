@@ -159,22 +159,23 @@ def _create_turnpoint_details(
     return turnpoint_details
 
 
-def calculate_task_distances(
-    task: Task,
-    show_progress: bool = False,
-    num_iterations: int | None = None,
-) -> dict[str, Any]:
-    """Calculate both center and optimized distances for a task.
+def task_distances_from_route(task: Task, route: OptimizedRoute) -> dict[str, Any]:
+    """Project an already-optimized route into the distance report.
+
+    Every optimized number in the report comes from ``route``, so a caller that
+    already has one — the export package's ``TaskDrawing``, say — can produce
+    the table beside the map without optimizing the task a second time.
+
+    Distances are rounded to 0.1 km here because this dictionary is a report
+    for display; ``route`` itself carries unrounded meters.
 
     Args:
-        task (Task): Task object.
-        show_progress (bool): Whether to show progress indicators.
-        num_iterations (Optional[int]): Maximum number of alternating sweeps.
+        task (Task): Task object. Must be the task ``route`` was optimized for.
+        route (OptimizedRoute): The task's optimized route.
 
     Returns:
         Dict[str, Any]: Dictionary containing distance calculations and turnpoint details.
     """
-    # Convert to TaskTurnpoint objects
     turnpoints = task_to_turnpoints(task)
 
     if len(turnpoints) < 2:
@@ -186,58 +187,48 @@ def calculate_task_distances(
             "turnpoints": [],
         }
 
-    # For distance calculations, use all turnpoints in sequence
-    # SSS turnpoints are treated like any other turnpoint
-    distance_turnpoints = turnpoints.copy()
-
-    if show_progress:
-        print("  📏 Calculating center distance...")
-
-    # Calculate distances using all turnpoints
-    center_dist = distance_through_centers(distance_turnpoints)
-
-    if show_progress:
-        print(f"  ✅ Center distance: {center_dist / 1000.0:.1f}km")
-        print("  🎯 Starting optimized calculation...")
-
-    # One optimizer run for the whole task; the per-turnpoint column below is a
-    # projection of this route, not a second optimization per prefix.
-    route = calculate_iteratively_refined_route(
-        distance_turnpoints,
-        show_progress=show_progress,
-        num_iterations=num_iterations,
-    )
-    opt_dist = route.total_m
-
-    if show_progress:
-        print(f"  ✅ Optimized distance: {opt_dist / 1000.0:.1f}km")
-
-    # Convert to kilometers
-    center_km = center_dist / 1000.0
-    opt_km = opt_dist / 1000.0
-
-    # Calculate savings
+    center_km = distance_through_centers(turnpoints) / 1000.0
+    opt_km = route.total_m / 1000.0
     savings_km, savings_percent = _calculate_savings(center_km, opt_km)
-
-    if show_progress:
-        print(
-            f"  📊 Calculating cumulative distances for {len(turnpoints)} turnpoints..."
-        )
-
-    # Calculate turnpoint details
-    turnpoint_details = _create_turnpoint_details(
-        task.turnpoints,
-        turnpoints,
-        route,
-    )
-
-    if show_progress:
-        print("  ✅ All calculations complete")
 
     return {
         "center_distance_km": round(center_km, 1),
         "optimized_distance_km": round(opt_km, 1),
         "savings_km": round(savings_km, 1),
         "savings_percent": round(savings_percent, 1),
-        "turnpoints": turnpoint_details,
+        "turnpoints": _create_turnpoint_details(task.turnpoints, turnpoints, route),
     }
+
+
+def calculate_task_distances(
+    task: Task,
+    show_progress: bool = False,
+    num_iterations: int | None = None,
+) -> dict[str, Any]:
+    """Calculate both center and optimized distances for a task.
+
+    Optimizes the task's route once and projects it with
+    :func:`task_distances_from_route`. Pass the route yourself through that
+    function instead if you already have one.
+
+    Args:
+        task (Task): Task object.
+        show_progress (bool): Whether to show progress indicators.
+        num_iterations (Optional[int]): Maximum number of alternating sweeps.
+
+    Returns:
+        Dict[str, Any]: Dictionary containing distance calculations and turnpoint details.
+    """
+    if show_progress:
+        print("  🎯 Starting optimized calculation...")
+
+    route = calculate_iteratively_refined_route(
+        task_to_turnpoints(task),
+        show_progress=show_progress,
+        num_iterations=num_iterations,
+    )
+
+    if show_progress:
+        print(f"  ✅ Optimized distance: {route.total_m / 1000.0:.1f}km")
+
+    return task_distances_from_route(task, route)

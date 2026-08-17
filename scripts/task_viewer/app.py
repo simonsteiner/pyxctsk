@@ -27,14 +27,18 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 # Initialize function variables with proper typing
 parse_task: Optional[Callable[[Union[bytes, str]], Any]] = None
-calculate_task_distances: Optional[Callable[..., Dict[str, Any]]] = None
+task_distances_from_route: Optional[Callable[..., Dict[str, Any]]] = None
 generate_task_geojson: Optional[Callable[[Any], Dict[Any, Any]]] = None
+drawing_to_geojson: Optional[Callable[[Any], Dict[Any, Any]]] = None
+TaskDrawing: Optional[Any] = None
 
 try:
     from pyxctsk import (
-        calculate_task_distances,
+        TaskDrawing,
+        drawing_to_geojson,
         generate_task_geojson,
         parse_task,
+        task_distances_from_route,
     )
 
     XCTRACK_AVAILABLE = True
@@ -160,11 +164,10 @@ def compare_task(task_name: str):
         # Parse task using xctrack
         task = parse_task(str(xctsk_path))  # type: ignore
 
-        # Calculate distances using xctrack
-        distance_results = calculate_task_distances(task, show_progress=False)  # type: ignore
-
-        # Generate XCTrack GeoJSON data
-        xctrack_geojson = generate_task_geojson(task)  # type: ignore
+        # One drawing: the table and the map share a single optimized route.
+        drawing = TaskDrawing.from_task(task)  # type: ignore
+        distance_results = task_distances_from_route(task, drawing.route)  # type: ignore
+        xctrack_geojson = drawing_to_geojson(drawing)  # type: ignore
 
         # Prepare comparison data
         comparison_data = prepare_comparison_data(json_data, distance_results, task)

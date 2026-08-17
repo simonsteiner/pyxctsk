@@ -16,7 +16,8 @@ own. Everything a caller outside the package needs is named here —
   local Transverse Mercator projection and the planar optimal point
 - :mod:`~pyxctsk.distance.route_optimization` — the shortest path through the
   cylinders
-- :mod:`~pyxctsk.distance.task_distances` — per-leg and cumulative distances
+- :mod:`~pyxctsk.distance.task_distances` — per-leg and cumulative distances,
+  projected from one optimized route
 - :mod:`~pyxctsk.distance.sss` — Start-of-Speed-Section entry point and info
 - :mod:`~pyxctsk.distance.goal_line` — the ``GoalLine`` deep module: length,
   endpoints and semicircular control zone, in one place
@@ -49,6 +50,7 @@ from .route_optimization import (
 from .sss import calculate_optimal_sss_entry_point, calculate_sss_info
 from .task_distances import (
     calculate_task_distances,
+    task_distances_from_route,
     task_to_turnpoints,
 )
 from .turnpoint import (
@@ -73,6 +75,7 @@ __all__ = [
     "distance_through_centers",
     "geodesic_distance",
     "calculate_task_distances",
+    "task_distances_from_route",
     "task_to_turnpoints",
     # SSS specific functions
     "calculate_sss_info",

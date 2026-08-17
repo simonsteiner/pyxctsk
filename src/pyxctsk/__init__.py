@@ -9,10 +9,12 @@ See http://xctrack.org/ and http://xctrack.org/Competition_Interfaces.html
 from importlib.metadata import version
 
 from .distance import (
+    OptimizedRoute,
     TaskTurnpoint,
     calculate_task_distances,
     distance_through_centers,
     optimized_distance,
+    task_distances_from_route,
 )
 from .exceptions import (
     EmptyInputError,
@@ -20,8 +22,9 @@ from .exceptions import (
     InvalidTimeOfDayError,
     TaskValidationError,
 )
-from .export.geojson import generate_task_geojson
-from .export.kml import task_to_kml
+from .export.common import TaskDrawing
+from .export.geojson import drawing_to_geojson, generate_task_geojson
+from .export.kml import drawing_to_kml, task_to_kml
 from .model.task import (
     SSS,
     Direction,
@@ -54,6 +57,8 @@ __all__ = [
     "calculate_task_distances",
     "Direction",
     "distance_through_centers",
+    "drawing_to_geojson",
+    "drawing_to_kml",
     "EarthModel",
     "EmptyInputError",
     "EXTENSION",
@@ -65,13 +70,16 @@ __all__ = [
     "InvalidTimeOfDayError",
     "MIME_TYPE",
     "optimized_distance",
+    "OptimizedRoute",
     "parse_task",
     "QRCodeTask",
     "SSS",
     "SSSType",
     "Takeoff",
+    "task_distances_from_route",
     "task_to_kml",
     "Task",
+    "TaskDrawing",
     "TaskTurnpoint",
     "TaskType",
     "TaskValidationError",

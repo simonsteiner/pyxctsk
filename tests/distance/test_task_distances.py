@@ -15,17 +15,23 @@ import json
 import statistics
 from pathlib import Path
 from typing import Dict, List
+from unittest.mock import patch
 
 import pytest
 
+from pyxctsk import Task, TaskType
 from pyxctsk.distance import (
     TaskTurnpoint,
     calculate_iteratively_refined_route,
     calculate_task_distances,
     distance_through_centers,
     optimized_distance,
+    task_distances_from_route,
     task_to_turnpoints,
 )
+from pyxctsk.export import common
+from pyxctsk.export.common import TaskDrawing
+from pyxctsk.export.geojson import drawing_to_geojson
 from pyxctsk.parser import parse_task
 
 
@@ -314,3 +320,66 @@ class TestDistanceComprehensive:
 if __name__ == "__main__":
     # Allow running tests directly
     pytest.main([__file__, "-v"])
+
+
+class TestProjectionFromARoute:
+    """`task_distances_from_route`: the report as a projection of one route."""
+
+    @staticmethod
+    def _task(reference_tasks_dir: Path, name: str = "task_bevo"):
+        """Parse one reference task, skipping if the corpus is absent."""
+        path = reference_tasks_dir / f"{name}.xctsk"
+        if not path.exists():
+            pytest.skip(f"{name}.xctsk not available")
+        return parse_task(str(path))
+
+    def test_agrees_with_optimizing_from_scratch(self, reference_tasks_dir: Path):
+        """Handing over a route gives exactly the report as computing one."""
+        for name in ("task_bevo", "task_gibe"):
+            task = self._task(reference_tasks_dir, name)
+            route = calculate_iteratively_refined_route(task_to_turnpoints(task))
+
+            assert task_distances_from_route(task, route) == calculate_task_distances(
+                task
+            )
+
+    def test_a_task_and_its_map_can_share_one_route(self, reference_tasks_dir: Path):
+        """The distance table and the drawn map cost one optimizer run together.
+
+        This is the pairing the task viewer makes on every request: it used to
+        optimize the task once for the table and again for the GeoJSON.
+        """
+        task = self._task(reference_tasks_dir)
+
+        calls = []
+        real = common.calculate_iteratively_refined_route
+
+        def counting(*args, **kwargs):
+            calls.append(args)
+            return real(*args, **kwargs)
+
+        with patch.object(common, "calculate_iteratively_refined_route", counting):
+            drawing = TaskDrawing.from_task(task)
+            table = task_distances_from_route(task, drawing.route)
+            geojson = drawing_to_geojson(drawing)
+
+        assert len(calls) == 1
+        # The table's total and the drawn line describe the same route.
+        assert table["optimized_distance_km"] == round(drawing.route.total_m / 1000, 1)
+        (line,) = [
+            f
+            for f in geojson["features"]
+            if f["properties"]["type"] == "optimized_route"
+        ]
+        assert len(line["geometry"]["coordinates"]) == len(drawing.route.points)
+
+    def test_degenerate_task_projects_to_zeros(self):
+        """A task with fewer than two turnpoints reports zeros, not an error."""
+        task = Task(task_type=TaskType.CLASSIC, version=1, turnpoints=[])
+        route = calculate_iteratively_refined_route([])
+
+        result = task_distances_from_route(task, route)
+
+        assert result["center_distance_km"] == 0.0
+        assert result["optimized_distance_km"] == 0.0
+        assert result["turnpoints"] == []
