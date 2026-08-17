@@ -662,6 +662,75 @@ class TestManufacturerExtensions:
         assert turnpoint.extensions == [{"k": "v"}]
 
 
+class TestUnknownKeysNeverCrossIntoAForeignSlot:
+    """A carried key may not occupy a key the other format defines.
+
+    ``unknown`` means "a key the format it arrived in does not define", so it
+    only means anything relative to that format. Copied across the seam it kept
+    its spelling but changed namespace: a full-format turnpoint's ``t`` — a key
+    that format spells ``type`` — landed in the QR format's *type* slot, and
+    the payload written from it could not be read back at all.
+
+    ``write_passthrough``'s never-shadow rule cannot catch this. ``t`` is
+    emitted for SSS and ESS turnpoints only, so on a plain turnpoint the slot
+    is free and the foreign key wins.
+    """
+
+    #: The goal turnpoint of BASE_TASK, which has no type — so no ``t``.
+    PLAIN = 2
+
+    def _task_with(self, **extras) -> Task:
+        data = json.loads(task_json())
+        data["turnpoints"][self.PLAIN].update(extras)
+        return Task.from_json(json.dumps(data))
+
+    def test_the_foreign_key_is_still_read_as_unknown(self):
+        """Nothing changes in the format the key arrived in.
+
+        ``t`` is not a key the full format defines, so it is carried there
+        exactly as before.
+        """
+        task = self._task_with(t=99)
+
+        assert task.turnpoints[self.PLAIN].unknown == {"t": 99}
+        assert json.loads(task.to_json())["turnpoints"][self.PLAIN]["t"] == 99
+
+    def test_it_does_not_reach_the_qr_payload(self):
+        """The QR turnpoint defines ``t``, so the crossing drops it."""
+        emitted = json.loads(self._task_with(t=99).to_qr_code_task().to_json())
+
+        assert "t" not in emitted["t"][self.PLAIN]
+
+    def test_the_qr_payload_can_be_read_back(self):
+        """The point of the rule: what we emit, we can parse."""
+        qr_string = self._task_with(t=99).to_qr_code_task().to_string()
+
+        assert parse_task(qr_string).turnpoints[self.PLAIN].type is None
+
+    def test_a_key_neither_format_defines_still_crosses(self):
+        """Only colliding keys are dropped — SeeYou's extras must survive."""
+        emitted = json.loads(self._task_with(zz="kept").to_qr_code_task().to_json())
+
+        assert emitted["t"][self.PLAIN]["zz"] == "kept"
+
+    def test_the_rule_runs_in_the_other_direction_too(self):
+        """``takeoff`` is a QR unknown key and a full-format spec field.
+
+        The full format writes ``takeoff`` only when the task has one, so on a
+        task without one the slot is free and a carried ``takeoff`` would be
+        emitted as the takeoff object — a string where the spec says object.
+        """
+        from pyxctsk.qrcode.task import QRCodeTask
+
+        source = json.loads(Task.from_json(task_json()).to_qr_code_task().to_json())
+        source["takeoff"] = "rogue"
+
+        task = QRCodeTask.from_dict(source).to_task()
+
+        assert task.unknown == {}
+        assert "takeoff" not in json.loads(task.to_json())
+
+
 class TestNestedShapesCarryUnknownKeys:
     """Passthrough belongs to every serializable shape, not just the outer two.
 
@@ -727,6 +796,26 @@ class TestNestedShapesCarryUnknownKeys:
         assert qr.sss.unknown == {"zz": "sss-extra"}
         assert qr.goal.unknown == {"zz": "goal-extra"}
         assert json.loads(qr.to_json()) == source
+
+    def test_the_shapes_with_a_counterpart_carry_them_across_formats(self):
+        """``sss`` and ``goal`` are objects in both formats, so extras travel."""
+        emitted = json.loads(self._task().to_qr_code_task().to_json())
+
+        assert emitted["s"]["zz"] == "sss-extra"
+        assert emitted["g"]["zz"] == "goal-extra"
+
+    def test_the_shapes_without_one_keep_them_in_the_full_format(self):
+        """A waypoint and a takeoff have no QR object to carry them into.
+
+        The QR format flattens the waypoint into its turnpoint and the takeoff
+        into root ``to``/``tc``, so there is no dict on the other side that
+        these keys belong to — and merging them upwards would leave nothing to
+        split them apart by on the way back.
+        """
+        emitted = json.loads(self._task().to_qr_code_task().to_json())
+
+        assert "zz" not in emitted["t"][0]
+        assert "zz" not in emitted
 
     def test_line_length_stays_dropped(self):
         """The one key read and deliberately discarded rather than carried.

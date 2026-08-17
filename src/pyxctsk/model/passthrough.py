@@ -54,6 +54,39 @@ def read_passthrough(
     return extensions, unknown
 
 
+def strip_foreign_keys(
+    unknown: dict[str, Any], reserved: frozenset[str]
+) -> dict[str, Any]:
+    """Drop the unknown keys a shape in another format has already claimed.
+
+    An unknown key means nothing on its own — only "a key the format it arrived
+    in does not define". Carried across the seam between the full JSON format
+    and the compact QR one it keeps its spelling but changes namespace, so a
+    key the *target* shape defines lands in a slot that already means something
+    else. A full-format turnpoint carrying ``{"t": 99}`` becomes the QR
+    format's turnpoint *type*, and the payload written from it cannot be read
+    back at all: ``99 is not a valid QRCodeTurnpointType``.
+
+    ``write_passthrough``'s never-shadow rule cannot catch this, because it
+    only protects keys already written: ``t`` is emitted for SSS and ESS
+    turnpoints alone, so for a plain one the slot is free and the foreign key
+    wins. The invariant needed here is over *every* key the target shape
+    defines, not the ones a particular payload happened to use.
+
+    The colliding key is dropped rather than raised on: the task it came from
+    is legal, readable and unchanged in its own format, and only this one
+    rendering of it has nowhere to put the key.
+
+    Args:
+        unknown: Carried-through keys, in the format they arrived in.
+        reserved: Every key the target shape defines, across all its shapes.
+
+    Returns:
+        A fresh dict holding the keys that survive the crossing.
+    """
+    return {k: v for k, v in unknown.items() if k not in reserved}
+
+
 def write_passthrough(
     result: MutableMapping[str, Any],
     extensions: list[dict[str, Any]],

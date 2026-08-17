@@ -11,8 +11,23 @@ translation table below, with the reverse direction derived from it, so a value
 added to one side cannot silently go unmapped on the other. The *defaults* are
 not symmetric and stay at the call sites: an unrecognized turnpoint type is
 ``NONE`` going out and ``None`` coming back, for instance.
+
+Unknown keys cross here too, and this is the one place that can tell whether
+they may: a key is unknown only relative to the format it arrived in, and this
+is where the namespace changes. Every crossing runs through
+:func:`~pyxctsk.model.passthrough.strip_foreign_keys` against the target
+shape's own key set, so a carried key can never occupy a slot the other format
+defines.
+
+Only the four shapes with a counterpart carry them: ``Task``, ``Turnpoint``,
+``SSS`` and ``Goal``. A ``Waypoint``'s unknown keys stay in the full format,
+because the QR format has no waypoint object to put them in — it flattens the
+waypoint into its turnpoint, and merging the two dicts would leave nothing to
+split them back apart by. ``Takeoff`` is the same story: root ``to`` and ``tc``
+in the QR format, no object of its own.
 """
 
+from ..model.passthrough import strip_foreign_keys
 from ..model.task import (
     SSS,
     Direction,
@@ -40,6 +55,11 @@ from .task import QR_CODE_TASK_VERSION, QRCodeTask
 
 #: The task version the full JSON format carries.
 TASK_VERSION = 1
+
+#: What a carried unknown key may not occupy on the QR side. The QR task
+#: renders as either of its two shapes and keeps its unknown keys through
+#: ``as_waypoints()``, so both shapes' keys are reserved for it.
+_QR_TASK_KEYS = QRCodeTask.COMPETITION_KEYS | QRCodeTask.SIMPLIFIED_KEYS
 
 # Several of the fields these translate are optional on one or both sides, so
 # the key types admit None: an absent value maps to nothing, and the call site
@@ -120,7 +140,7 @@ def task_to_qr_code_task(task: Task) -> QRCodeTask:
             type=_TO_QR_TURNPOINT_TYPE.get(tp.type, QRCodeTurnpointType.NONE),
             description=tp.waypoint.description,
             extensions=tp.extensions,
-            unknown=tp.unknown,
+            unknown=strip_foreign_keys(tp.unknown, QRCodeTurnpoint.KNOWN_KEYS),
         )
         for tp in task.turnpoints
     ]
@@ -138,6 +158,7 @@ def task_to_qr_code_task(task: Task) -> QRCodeTask:
             direction=_TO_QR_DIRECTION.get(task.sss.direction, QRCodeDirection.EXIT),
             type=_TO_QR_SSS_TYPE.get(task.sss.type, QRCodeSSSType.ELAPSED_TIME),
             time_gates=task.sss.time_gates,
+            unknown=strip_foreign_keys(task.sss.unknown, QRCodeSSS.KNOWN_KEYS),
         )
 
     qr_goal = None
@@ -146,6 +167,7 @@ def task_to_qr_code_task(task: Task) -> QRCodeTask:
             deadline=task.goal.deadline,
             type=_TO_QR_GOAL_TYPE.get(task.goal.type),
             finish_altitude=task.goal.finish_altitude,
+            unknown=strip_foreign_keys(task.goal.unknown, QRCodeGoal.KNOWN_KEYS),
         )
 
     return QRCodeTask(
@@ -157,7 +179,7 @@ def task_to_qr_code_task(task: Task) -> QRCodeTask:
         sss=qr_sss,
         goal=qr_goal,
         extensions=task.extensions,
-        unknown=task.unknown,
+        unknown=strip_foreign_keys(task.unknown, _QR_TASK_KEYS),
     )
 
 
@@ -200,7 +222,7 @@ def qr_code_task_to_task(qr: QRCodeTask) -> Task:
             ),
             type=_FROM_QR_TURNPOINT_TYPE.get(qr_tp.type),
             extensions=qr_tp.extensions,
-            unknown=qr_tp.unknown,
+            unknown=strip_foreign_keys(qr_tp.unknown, Turnpoint.KNOWN_KEYS),
         )
         for qr_tp in qr.turnpoints
     ]
@@ -219,6 +241,7 @@ def qr_code_task_to_task(qr: QRCodeTask) -> Task:
             direction=_FROM_QR_DIRECTION.get(qr.sss.direction, Direction.EXIT),
             time_gates=qr.sss.time_gates,
             time_close=None,  # QR code format doesn't include time_close
+            unknown=strip_foreign_keys(qr.sss.unknown, SSS.KNOWN_KEYS),
         )
 
     goal = None
@@ -227,6 +250,7 @@ def qr_code_task_to_task(qr: QRCodeTask) -> Task:
             type=_FROM_QR_GOAL_TYPE.get(qr.goal.type),
             deadline=qr.goal.deadline,
             finish_altitude=qr.goal.finish_altitude,
+            unknown=strip_foreign_keys(qr.goal.unknown, Goal.KNOWN_KEYS),
         )
 
     return Task(
@@ -238,5 +262,5 @@ def qr_code_task_to_task(qr: QRCodeTask) -> Task:
         sss=sss,
         goal=goal,
         extensions=qr.extensions,
-        unknown=qr.unknown,
+        unknown=strip_foreign_keys(qr.unknown, Task.KNOWN_KEYS),
     )
