@@ -52,14 +52,18 @@ from .task_distances import (
 )
 from .turnpoint import (
     FAI_SPHERE_RADIUS_M,
+    LocalPlane,
     TaskTurnpoint,
     distance_through_centers,
     geodesic_distance,
+    plane_circle,
 )
 
 # Export all the main public functions and classes
 __all__ = [
     # Core classes
+    "LocalPlane",
+    "plane_circle",
     "TaskTurnpoint",
     "GoalLine",
     "OptimizedRoute",

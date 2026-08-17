@@ -33,6 +33,7 @@ from pyxctsk.distance import (
     optimized_distance,
 )
 from pyxctsk.distance.task_distances import task_to_turnpoints
+from pyxctsk.distance.turnpoint import LocalPlane, plane_circle
 from tests.corpus import reference_task, tasks_with_reference_distance
 
 WGS84 = Geod(ellps="WGS84")
@@ -141,6 +142,70 @@ class TestReferenceAccuracy:
         opt_km = optimized_distance(turnpoints) / 1000.0
         assert opt_km == pytest.approx(96.3, abs=0.15)
         assert opt_km > distance_through_centers(turnpoints) / 1000.0
+
+
+class TestOneSolverOneProjection:
+    """The point on a cylinder has one answer, whoever asks.
+
+    ``TaskTurnpoint.optimal_point`` used to project onto a plane centred on
+    *that turnpoint*, while the route optimizer projected onto the plane of
+    the whole task area. Same paragraph of the spec (S7F §7.1.2), two
+    different answers — and every crossing-case test below aimed at the one
+    the product does not use, so a fix made there could go green and ship
+    nothing. The plane is now an argument, and these check that handing over
+    the task's own plane reproduces what the optimizer chose.
+    """
+
+    def test_optimal_point_reproduces_the_optimizers_choice(self):
+        """Given the task's plane, the two agree to the metre."""
+        takeoff = TaskTurnpoint(47.0, 8.0)
+        middle = TaskTurnpoint(47.2, 8.1, 5_000.0)
+        goal = TaskTurnpoint(47.4, 8.0, 400.0)
+        turnpoints = [takeoff, middle, goal]
+
+        route = calculate_iteratively_refined_route(turnpoints)
+        plane = LocalPlane.around([tp.center for tp in turnpoints])
+
+        asked = middle.optimal_point(route.points[0], route.points[2], plane)
+
+        _, _, apart = WGS84.inv(
+            asked[1], asked[0], route.points[1][1], route.points[1][0]
+        )
+        assert apart < 1.0, f"the two answers are {apart:.2f} m apart"
+
+    def test_the_projection_is_the_only_difference(self):
+        """Without the task's plane the answer moves, which is the point.
+
+        Not a defect — a plane centred on one turnpoint is a legitimate
+        reading of §7.1.2. What was wrong was having no way to ask for the
+        other one, so the tests could not reach the shipped policy.
+        """
+        turnpoints = [
+            TaskTurnpoint(47.0, 8.0),
+            TaskTurnpoint(47.2, 8.1, 5_000.0),
+            TaskTurnpoint(47.4, 8.0, 400.0),
+        ]
+        prev_point, next_point = (47.0, 8.0), (47.4, 8.0)
+
+        own = turnpoints[1].optimal_point(prev_point, next_point)
+        task = turnpoints[1].optimal_point(
+            prev_point,
+            next_point,
+            LocalPlane.around([tp.center for tp in turnpoints]),
+        )
+
+        # Both sit exactly on the boundary; they are different points on it.
+        for point in (own, task):
+            _, _, radius = WGS84.inv(point[1], point[0], 8.1, 47.2)
+            assert radius == pytest.approx(5_000.0, abs=0.01)
+
+    def test_a_line_goal_is_a_zero_radius_circle(self):
+        """One statement of the rule, reached from either direction."""
+        goal = TaskTurnpoint(47.0, 8.0, 400.0, goal_type="LINE")
+        plane = LocalPlane.around([goal.center])
+
+        assert plane_circle(goal, plane)[2] == 0.0
+        assert goal.optimal_point((46.5, 8.0), (46.5, 8.0), plane) == goal.center
 
 
 class TestCrossingCase:

@@ -38,13 +38,12 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from itertools import accumulate
 
-from pyproj import Transformer
-
 from .config import CONVERGENCE_EPSILON_M, DEFAULT_NUM_ITERATIONS
 from .turnpoint import (
+    LocalPlane,
     TurnpointGeometry,
     geod_for_earth_model,
-    local_tm_transformers,
+    plane_circle,
     plane_optimal_point,
     snap_to_boundary,
 )
@@ -107,32 +106,24 @@ class OptimizedRoute:
 
 def _plane_circles(
     turnpoints: Sequence[TurnpointGeometry], earth_model: object
-) -> tuple[list[PlaneCircle], Transformer]:
-    """Project turnpoint cylinders into a local Transverse Mercator plane.
+) -> tuple[list[PlaneCircle], LocalPlane]:
+    """Project turnpoint cylinders into the plane of the task area.
 
-    The plane is centred on the mean of the turnpoint centers (the task area,
-    §7.1.2). A LINE goal contributes a zero-radius circle: the goal line is
-    perpendicular to the final approach and centred on the goal, so its
-    optimal crossing point is the goal center itself.
+    The plane is centred on the mean of the turnpoint centers (§7.1.2), and
+    each turnpoint becomes a circle through :func:`plane_circle` — the same
+    function :meth:`TaskTurnpoint.optimal_point` goes through, so what a
+    turnpoint *is* to the solver is said once. That is also where the rule
+    lives that a LINE goal is a zero-radius circle at the goal center.
 
     Args:
         turnpoints (Sequence[TurnpointGeometry]): The task turnpoints.
         earth_model: Earth model selector (None means WGS84).
 
     Returns:
-        Tuple of (planar circles, inverse transformer back to geographic
-        coordinates).
+        Tuple of (planar circles, the plane they were projected into).
     """
-    lat0 = sum(tp.center[0] for tp in turnpoints) / len(turnpoints)
-    lon0 = sum(tp.center[1] for tp in turnpoints) / len(turnpoints)
-    to_plane, to_geo = local_tm_transformers(lat0, lon0, earth_model)
-
-    circles: list[PlaneCircle] = []
-    for tp in turnpoints:
-        x, y = to_plane.transform(tp.center[1], tp.center[0])
-        radius = 0.0 if tp.goal_type == "LINE" else float(tp.radius)
-        circles.append((x, y, radius))
-    return circles, to_geo
+    plane = LocalPlane.around([tp.center for tp in turnpoints], earth_model)
+    return [plane_circle(tp, plane) for tp in turnpoints], plane
 
 
 def _closest_circle_point(
@@ -312,7 +303,7 @@ def calculate_iteratively_refined_route(
             earth_model=earth_model,
         )
 
-    circles, to_geo = _plane_circles(turnpoints, earth_model)
+    circles, plane = _plane_circles(turnpoints, earth_model)
     plane_points = _optimize_plane_points(circles, max_sweeps=max_sweeps)
 
     g = geod_for_earth_model(earth_model)
@@ -328,7 +319,7 @@ def calculate_iteratively_refined_route(
         # ProjectionCorrection (§7.1.7): re-place the planar solution at
         # exactly radius r on the earth model along the center→point azimuth.
         route.append(
-            snap_to_boundary(to_geo.transform(x, y), tp.center, radius, earth_model)
+            snap_to_boundary(plane.lon_lat((x, y)), tp.center, radius, earth_model)
         )
 
     legs = []
