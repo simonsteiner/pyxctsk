@@ -1,7 +1,7 @@
 # 2026-08-17 — Deepening candidates after the package split
 
-**Status: A, B, D and G applied** (see [Progress](#progress) and the outcome notes below);
-the other four are proposed. Companion visual report was written to a temp file, not the
+**Status: A, B, C, D and G applied** (see [Progress](#progress) and the outcome notes
+below); the other three are proposed. Companion visual report was written to a temp file, not the
 repo; this document is the record.
 
 Reviewed at `5a3c207` (the four-package split, merged as PR #12). Vocabulary follows the
@@ -499,8 +499,7 @@ serializable shape) — worth creating lazily when one is taken on.
 
 ## Progress
 
-A, B, D and G are applied. Each remaining item is independent; C is next, and it
-wants its own branch.
+A, B, C, D and G are applied. Each remaining item is independent.
 
 - [x] A. Optimized route as a value — one run, legs kept, cumulative by `accumulate`
   (`6d5651b` the value object, `7104ad3` the cumulative fix, `608963d` one route shared
@@ -509,7 +508,9 @@ wants its own branch.
   model honored (`3cf5af1`, `908275d`)
 - [x] G. `_module_level_imports` / `_deferred_imports` collect by "runs at import time"
   (`03d1e1c`)
-- [ ] C. One field table per serializable shape; `KNOWN_KEYS` derived; cross-format `unknown` quarantined
+- [x] C. One field table per serializable shape; `KNOWN_KEYS` derived; cross-format
+  `unknown` quarantined (`f06119a` the per-shape key sets, `1f5f0ce` passthrough for
+  the nested shapes, `3fa8389` the quarantine, `447e294` the tables)
 - [x] D. Colour as a value across the export seam; invalid `<color><Style>` fixed
   (`d92cc59` the invalid nesting, from the PR #13 review rather than from this card;
   `f875e50` the palette as `Color` values)
@@ -620,6 +621,75 @@ import into "runs at import time" and "deferred", with `_import_time_imports` an
 - `CLAUDE.md`'s description of the guard was updated to state the import-time rule, since
   the old wording ("only module-level imports are checked") was the prose the code had
   been implementing.
+
+### Outcome of C
+
+Landed as four commits on `refactor/one-field-table-per-shape`, staged deliberately:
+the three defects first, one commit each with the suite green between them, then the
+tables on top. Output is byte-identical to `main` across all 65 reference inputs
+rendered four ways each — full JSON, `XCTSK:`, waypoints `XCTSK:`, `XCTSKZ:` — checked
+by hash against a worktree, with the import path asserted on both sides. 407 → 521
+tests.
+
+- **The card's three defects all reproduced, and one was worse than reported.** The
+  QR union allow-list, the four-of-eleven passthrough coverage and the cross-format
+  `unknown` collision were each fixed with a regression test that fails on `fc03dc3`.
+  The union defect had a *second* instance one level down that the card does not
+  name: `QRCodeTurnpoint` also read `d` and `t` in a payload of the simplified shape,
+  which `as_waypoints()` then strips — so a description in a waypoints payload was
+  read into an attribute and dropped on the way out. Two turnpoint tables fix it the
+  same way two task tables fix the first.
+- **The design turns on one thing the card does not say: a field owns *keys*,
+  plural.** The card proposes rows of `(attr, wire_key, codec, optionality)`, which
+  covers 32 of the 36 rows and cannot express the other four at all — `z` is four
+  attributes in one key, the QR takeoff is one attribute across `to` and `tc`,
+  `taskType` reads three spellings and writes one, and `T` names a shape rather than
+  carrying data. Letting a row own a *set* of keys makes the table total, which is
+  what makes `Shape.keys` derivable; the four irregular rows are `Field` subclasses
+  declared beside the shape that needs them. Without that the table would have had to
+  keep a hand-written escape hatch, and the escape hatch is where all three defects
+  lived.
+- **Optionality had to be one decision, not two.** Reading and writing each have
+  their own notion of absence — a null direction falls back on read while the field
+  is still always written; an empty description is absent both ways; a TAKEOFF
+  turnpoint's type is read but never written. Those were the answers written in two
+  places that stopped matching. They are now one `Optionality` per row, four named
+  constants covering 30 rows and five bespoke ones named where their reason lives
+  (`_OBSOLETE`, `_SPEED_SECTION_ONLY`, `_NON_DEFAULT_EARTH_MODEL`,
+  `_A_DICT_OR_NOTHING`, `_A_LIST_OR_NOTHING`).
+- **The derived key sets equal the hand-written ones exactly.** That is the evidence
+  the tables describe the format rather than a new reading of it, and it is asserted
+  rather than eyeballed.
+- **Two clauses of the card were not followed.** It proposes `conversion.py` map
+  "table to table"; that was dropped, because `Turnpoint` nests a `Waypoint` where
+  `QRCodeTurnpoint` is flat, so there is no attribute copy to derive, and the six
+  enum tables already exist and are already pinned as mutual inverses. And it counts
+  eleven shapes wanting passthrough where the answer is ten: `QRCodeTakeoff` is not
+  an object on the wire — the task flattens it to root `to`/`tc` and rebuilds it to
+  read back — so an `unknown` there could never hold anything. Both are recorded
+  here rather than edited into the card, per this directory's convention.
+- **One key is read and deliberately discarded**, and that needed naming. The goal's
+  non-spec `lineLength` was dropped before this change only because `Goal` had no
+  passthrough at all; giving it one would have started echoing back a value that is
+  always twice the last turnpoint's radius and that a task can contradict.
+  `Goal.IGNORED_KEYS` and `Shape.ignored_keys` make the drop a decision with a test,
+  rather than the `p`-key bug (`tests/conformance/test_spec_conformance.py`) in
+  reverse.
+- **Leniency was unified where it had drifted.** Four shapes disagreed about whether
+  an explicit null meant "absent" or "invalid" — `Goal.from_dict` would have raised on
+  `{"type": null}` where `SSS.from_dict` fell back. Null now means absent everywhere,
+  which is the more lenient of the two behaviours and consistent with a reader
+  documented as lenient.
+- **Breaking:** `QRCodeTask.KNOWN_KEYS` is gone (replaced by the two shapes' sets);
+  `QRCodeSSS` takes `type` first with `direction` defaulted, matching the full
+  format's `SSS`, which it had not; `QRCodeTurnpoint.from_dict` takes a `simplified`
+  flag mirroring `to_dict`; and two `to_dict`s return `dict` rather than
+  `OrderedDict`, insertion order having been the language guarantee since 3.7.
+- **`CONTEXT.md` was created**, which the card suggests doing lazily when a candidate
+  names a concept worth recording. It holds the competition's vocabulary and the
+  format's — *serializable shape*, *field table*, *wire key*, *unknown key* — as a
+  glossary, with no implementation in it. No ADR: the trade-off this change makes is
+  recorded here, which is what this directory is for.
 
 ### Outcome of D
 
