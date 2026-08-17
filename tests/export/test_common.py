@@ -12,20 +12,24 @@ introduce could have been caught.
 """
 
 import re
+from pathlib import Path
 
 import pytest
 
 from pyxctsk import Goal, GoalType, Task, TaskType, Turnpoint, TurnpointType, Waypoint
 from pyxctsk.export import common
 from pyxctsk.export.common import (
+    CONTROL_ZONE_EDGE_COLOR,
+    CONTROL_ZONE_FILL_COLOR,
     GOAL_COLOR,
+    GOAL_LINE_COLOR,
     ROUTE_COLOR,
     Color,
     TaskDrawing,
     turnpoint_color,
 )
 from pyxctsk.export.geojson import drawing_to_geojson, generate_task_geojson
-from pyxctsk.export.kml import ROUTE_ALPHA, drawing_to_kml
+from pyxctsk.export.kml import ALPHA_TRANSPARENCY, ROUTE_ALPHA, drawing_to_kml
 
 
 def _task(goal_type: GoalType | None = None, prev_lat: float = 46.0) -> Task:
@@ -219,8 +223,8 @@ class TestOnePalette:
     ]
 
     @staticmethod
-    def _placemark_color(kml: str, name: str) -> str:
-        """The line colour of the named placemark, followed through its styleUrl.
+    def _placemark_style(kml: str, name: str) -> str:
+        """The named placemark's style block, followed through its styleUrl.
 
         simplekml hoists styles into the document and references them by id, so
         reading a placemark's colour means resolving that reference rather than
@@ -231,7 +235,7 @@ class TestOnePalette:
             name: The placemark's ``<name>``.
 
         Returns:
-            The placemark's LineStyle colour as KML's ``aabbggrr``.
+            The `<Style>` element the placemark points at.
         """
         placemark = re.search(
             rf"<Placemark[^>]*>\s*<name>{re.escape(name)}</name>.*?</Placemark>",
@@ -243,10 +247,25 @@ class TestOnePalette:
         assert reference, f"placemark {name!r} has no styleUrl"
         style = re.search(rf'<Style id="{reference.group(1)}">.*?</Style>', kml, re.S)
         assert style, f"style #{reference.group(1)} is not in the document"
+        return style.group(0)
+
+    @classmethod
+    def _placemark_color(cls, kml: str, name: str, element: str = "LineStyle") -> str:
+        """One colour out of the named placemark's style.
+
+        Args:
+            kml: The rendered document.
+            name: The placemark's ``<name>``.
+            element: The style element to read, ``LineStyle`` or ``PolyStyle``.
+
+        Returns:
+            That element's colour as KML's ``aabbggrr``.
+        """
+        style = cls._placemark_style(kml, name)
         color = re.search(
-            r"<LineStyle[^>]*>\s*<color>([0-9a-f]{8})</color>", style.group(0)
+            rf"<{element}[^>]*>\s*<color>([0-9a-f]{{8}})</color>", style, re.S
         )
-        assert color, f"style #{reference.group(1)} has no line colour"
+        assert color, f"{name!r} has no {element} colour:\n{style}"
         return color.group(1)
 
     @staticmethod
@@ -321,3 +340,59 @@ class TestOnePalette:
 
         kml = drawing_to_kml(drawing)
         assert self._placemark_color(kml, "Course Line") == ROUTE_COLOR.kml(ROUTE_ALPHA)
+
+    def test_both_writers_draw_the_goal_line_in_one_colour(self):
+        """It was red in KML and green in GeoJSON — the same shape, two colours."""
+        drawing = TaskDrawing.from_task(_task(GoalType.LINE))
+        assert drawing.goal_line is not None, "this task has a goal line to draw"
+
+        geojson = drawing_to_geojson(drawing)
+        (goal_line,) = [
+            f for f in geojson["features"] if f["properties"]["type"] == "goal_line"
+        ]
+        assert goal_line["properties"]["stroke"] == GOAL_LINE_COLOR.hex
+
+        kml = drawing_to_kml(drawing)
+        assert self._placemark_color(kml, "Goal Line") == GOAL_LINE_COLOR.kml()
+
+    def test_both_writers_draw_the_control_zone_in_one_pair_of_colours(self):
+        """Edge and fill differ from each other, but not between formats."""
+        drawing = TaskDrawing.from_task(_task(GoalType.LINE))
+
+        geojson = drawing_to_geojson(drawing)
+        (zone,) = [
+            f
+            for f in geojson["features"]
+            if f["properties"]["type"] == "goal_control_zone"
+        ]
+        assert zone["properties"]["stroke"] == CONTROL_ZONE_EDGE_COLOR.hex
+        assert zone["properties"]["fill"] == CONTROL_ZONE_FILL_COLOR.hex
+
+        kml = drawing_to_kml(drawing)
+        name = "Goal Control Zone"
+        assert self._placemark_color(kml, name) == CONTROL_ZONE_EDGE_COLOR.kml(), (
+            "the zone's edge"
+        )
+        assert self._placemark_color(
+            kml, name, "PolyStyle"
+        ) == CONTROL_ZONE_FILL_COLOR.kml(ALPHA_TRANSPARENCY), "the zone's fill"
+
+    def test_neither_writer_declares_a_colour_of_its_own(self):
+        """The structural half: a colour literal in a writer is the drift itself.
+
+        Every defect this class covers was a colour spelled out in a writer —
+        a `simplekml.Color` constant, a `#rrggbb` string, or an `aabbggrr` one
+        typed by hand. The palette is the only place those may appear, so a new
+        one appearing in a writer fails here rather than in a map three months
+        from now.
+        """
+        package = Path(common.__file__).parent
+        for writer in ("kml.py", "geojson.py"):
+            source = (package / writer).read_text()
+            assert not re.search(r"#[0-9a-fA-F]{6}\b", source), (
+                f"{writer}: a hex colour"
+            )
+            assert "simplekml.Color" not in source, f"{writer}: a simplekml constant"
+            assert not re.search(r"""["'][0-9a-fA-F]{8}["']""", source), (
+                f"{writer}: a hand-written KML colour"
+            )

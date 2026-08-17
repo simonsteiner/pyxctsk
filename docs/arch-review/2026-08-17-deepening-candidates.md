@@ -1,8 +1,8 @@
 # 2026-08-17 — Deepening candidates after the package split
 
-**Status: A, B and G applied, D half applied** (see [Progress](#progress) and the outcome
-notes below); the other four are proposed. Companion visual report was written to a temp
-file, not the repo; this document is the record.
+**Status: A, B, D and G applied** (see [Progress](#progress) and the outcome notes below);
+the other four are proposed. Companion visual report was written to a temp file, not the
+repo; this document is the record.
 
 Reviewed at `5a3c207` (the four-package split, merged as PR #12). Vocabulary follows the
 *deep module* framing: a **module** has an **interface** (everything a caller must know)
@@ -499,8 +499,8 @@ serializable shape) — worth creating lazily when one is taken on.
 
 ## Progress
 
-A, B and G are applied, and half of D landed from another thread. Each remaining
-item is independent; C is next, and it wants its own branch.
+A, B, D and G are applied. Each remaining item is independent; C is next, and it
+wants its own branch.
 
 - [x] A. Optimized route as a value — one run, legs kept, cumulative by `accumulate`
   (`6d5651b` the value object, `7104ad3` the cumulative fix, `608963d` one route shared
@@ -510,11 +510,9 @@ item is independent; C is next, and it wants its own branch.
 - [x] G. `_module_level_imports` / `_deferred_imports` collect by "runs at import time"
   (`03d1e1c`)
 - [ ] C. One field table per serializable shape; `KNOWN_KEYS` derived; cross-format `unknown` quarantined
-- [ ] D. **Half applied.** The invalid `<color><Style>` nesting is fixed
-  (`d92cc59`, from the PR #13 review rather than from this card); the palette drift
-  is not. `kml.py:37` still re-declares all five entries as `simplekml.Color`
-  constants and loses three of the five values, with `.get(hex, blue)` degrading a
-  sixth silently. Colour-as-a-value is what remains.
+- [x] D. Colour as a value across the export seam; invalid `<color><Style>` fixed
+  (`d92cc59` the invalid nesting, from the PR #13 review rather than from this card;
+  `f875e50` the palette as `Color` values)
 - [ ] E. One cylinder solver; dead SSS surface, `show_progress` and `config.py` retired
 - [ ] F. `tests/corpus.py` adapter; dead fixtures deleted; inert `@patch`es fixed; PNGs to `tmp_path`
 - [ ] H. Validation policy on arrival, wired to a CLI flag
@@ -615,3 +613,44 @@ import into "runs at import time" and "deferred", with `_import_time_imports` an
 - `CLAUDE.md`'s description of the guard was updated to state the import-time rule, since
   the old wording ("only module-level imports are checked") was the prose the code had
   been implementing.
+
+### Outcome of D
+
+The invalid `<color><Style>` nesting was fixed first, in `d92cc59`, out of the PR #13
+review thread. The palette landed as `f875e50`: `Color` values, and one total renderer per
+format — `.hex` for GeoJSON, `.kml(alpha)` for KML.
+
+- **The drift was worse than the card counted.** It reports three of five entries lost;
+  four of the five turnpoint roles were, with only the goal's red surviving the round trip
+  through `simplekml.Color`:
+
+  | role | GeoJSON | KML before | KML after |
+  | --- | --- | --- | --- |
+  | TAKEOFF | `#204d74` | `#00008b` | `#204d74` |
+  | SSS | `#ac2925` | `#8b0000` | `#ac2925` |
+  | ESS | `#ff8c00` | `#ffa500` | `#ff8c00` |
+  | ordinary | `#269abc` | `#0000ff` | `#269abc` |
+  | goal | `#ff0000` | `#ff0000` | `#ff0000` |
+  | route | `#ff4136` | `#ff3641` | `#ff4136` |
+
+- **The course line was a second instance of the same cause.** Not the lookup this time:
+  its colour was hand-written as `E64136ff`, the digits of `#ff4136` in CSS order after
+  the alpha, which KML reads as `aabbggrr` and draws as `#ff3641`. `Color.kml(alpha)` is
+  the only place those bytes get ordered now.
+- **Three colours the card did not name were not shared at all.** The goal line and the
+  control zone's edge and fill were declared separately in each writer and disagreed
+  outright — the goal line was red in KML and *green* in GeoJSON. They are palette entries
+  now, on the GeoJSON values (repo owner's call): those are a chosen hex family, matching
+  the turnpoint palette, where KML's red and cyan were stock `simplekml` constants — the
+  same "whatever the library had" choice that produced the drift in the first place. KML's
+  goal line becomes green and its control zone teal; GeoJSON output is unchanged
+  throughout.
+- **The tests had to change shape, not just grow.** `get_turnpoint_color_hex` was pure and
+  fully covered while both defects lived in the caller adapting its output, so the new
+  tests read the colour back out of *both* rendered documents and compare them — resolving
+  KML's `styleUrl` references rather than counting occurrences. Verified by restoring the
+  old mapping underneath them: both regressions fail. One further test is structural — no
+  `#rrggbb`, `aabbggrr` or `simplekml.Color` literal may appear in either writer, so the
+  next colour spelled out in a writer fails in the suite rather than in a map.
+- **Deleted:** `get_turnpoint_color_hex`, replaced by `turnpoint_color` returning the
+  value. It was never re-exported from the package.

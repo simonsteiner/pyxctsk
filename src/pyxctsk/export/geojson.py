@@ -12,7 +12,14 @@ All features include geometry and properties suitable for web map display, inclu
 Intended for use in web-based or desktop mapping tools to visualize XCTrack competition tasks.
 """
 
-from .common import ROUTE_COLOR, TaskDrawing, turnpoint_color
+from .common import (
+    CONTROL_ZONE_EDGE_COLOR,
+    CONTROL_ZONE_FILL_COLOR,
+    GOAL_LINE_COLOR,
+    ROUTE_COLOR,
+    TaskDrawing,
+    turnpoint_color,
+)
 
 
 def _create_turnpoint_feature(drawing: TaskDrawing, turnpoint, index: int) -> dict:
@@ -115,7 +122,7 @@ def _create_goal_line_features(drawing: TaskDrawing) -> list[dict]:
             "type": "goal_line",
             "length": goal_line_length,
             "description": f"Goal line length: {goal_line_length:.0f}m",
-            "stroke": "#00ff00",
+            "stroke": GOAL_LINE_COLOR.hex,
             "stroke-width": 4,
             "stroke-opacity": 1.0,
         },
@@ -139,9 +146,9 @@ def _create_goal_line_features(drawing: TaskDrawing) -> list[dict]:
             "type": "goal_control_zone",
             "radius": control_zone_radius,
             "description": f"Goal control zone radius: {control_zone_radius:.0f}m",
-            "fill": "#4ecdc4",
+            "fill": CONTROL_ZONE_FILL_COLOR.hex,
             "fill-opacity": 0.3,
-            "stroke": "#00bcd4",
+            "stroke": CONTROL_ZONE_EDGE_COLOR.hex,
             "stroke-width": 2,
             "stroke-opacity": 0.8,
         },

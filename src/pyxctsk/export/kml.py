@@ -4,6 +4,9 @@ import simplekml  # type: ignore
 
 from ..model.task import Task, TurnpointType
 from .common import (
+    CONTROL_ZONE_EDGE_COLOR,
+    CONTROL_ZONE_FILL_COLOR,
+    GOAL_LINE_COLOR,
     ROUTE_COLOR,
     TaskDrawing,
     generate_circle_coordinates_3d,
@@ -146,7 +149,7 @@ def _create_goal_line_elements(
         extrude=1,
         altitudemode=simplekml.AltitudeMode.relativetoground,
     )
-    goal_line_placemark.style.linestyle.color = simplekml.Color.red
+    goal_line_placemark.style.linestyle.color = GOAL_LINE_COLOR.kml()
     goal_line_placemark.style.linestyle.width = 5
 
     # Create control zone polygon
@@ -161,11 +164,9 @@ def _create_goal_line_elements(
         extrude=1,
         altitudemode=simplekml.AltitudeMode.relativetoground,
     )
-    control_zone.style.linestyle.color = simplekml.Color.cyan
+    control_zone.style.linestyle.color = CONTROL_ZONE_EDGE_COLOR.kml()
     control_zone.style.linestyle.width = 2
-    control_zone.style.polystyle.color = simplekml.Color.changealphaint(
-        ALPHA_TRANSPARENCY, simplekml.Color.cyan
-    )
+    control_zone.style.polystyle.color = CONTROL_ZONE_FILL_COLOR.kml(ALPHA_TRANSPARENCY)
     control_zone.style.polystyle.outline = 1
 
 
