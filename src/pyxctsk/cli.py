@@ -22,7 +22,7 @@ from typing import BinaryIO
 
 import click
 
-from .distance.report import DistanceReport, TooFewTurnpointsError
+from .distance.report import DistanceReport, TooFewTurnpointsError, pyxctsk_version
 from .exceptions import pyXCTSKError
 from .export.kml import task_to_kml
 from .parser import parse_task
@@ -30,6 +30,11 @@ from .qrcode.image import generate_qrcode_image
 
 
 @click.group()
+@click.version_option(
+    version=pyxctsk_version(),
+    prog_name="pyxctsk",
+    message="%(prog)s %(version)s",
+)
 def main() -> None:
     r"""pyxctsk: Convert task files between formats.
 
@@ -39,6 +44,7 @@ def main() -> None:
       --output, -o FILE                    Output file (default: stdout)
       --compressed, -z                     Emit XCTSKZ: instead of XCTSK:
       --strict                             Reject a structurally invalid task
+      --version                            Print the version and exit
       INPUT_FILE                           Input file (optional, uses stdin)
 
     \b

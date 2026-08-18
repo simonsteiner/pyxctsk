@@ -121,13 +121,17 @@ class MeasuredTask:
     route: OptimizedRoute
 
     @classmethod
-    def from_task(cls, task: Task, num_iterations: int | None = None) -> "MeasuredTask":
+    def from_task(cls, task: Task) -> "MeasuredTask":
         """Measure a task, optimizing its route once.
+
+        The sweep limit is deliberately not a parameter here. It is a knob on
+        the optimizer — reach for ``calculate_iteratively_refined_route`` if
+        you need it — and threading it up through every layer that merely
+        forwards it is the shape ADR 0004 removed for ``angle_step`` and
+        ``beam_width``. Nothing but one convergence test has ever set it.
 
         Args:
             task: The task to measure.
-            num_iterations: Maximum number of alternating sweeps, or None for
-                the default.
 
         Returns:
             The measured task.
@@ -136,10 +140,7 @@ class MeasuredTask:
         return cls(
             task=task,
             turnpoints=tuple(turnpoints),
-            route=calculate_iteratively_refined_route(
-                turnpoints,
-                num_iterations=num_iterations,
-            ),
+            route=calculate_iteratively_refined_route(turnpoints),
         )
 
     @property

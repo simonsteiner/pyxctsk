@@ -132,10 +132,7 @@ def task_distances_from(measured: MeasuredTask) -> dict[str, Any]:
     }
 
 
-def calculate_task_distances(
-    task: Task,
-    num_iterations: int | None = None,
-) -> dict[str, Any]:
+def calculate_task_distances(task: Task) -> dict[str, Any]:
     """Calculate both center and optimized distances for a task.
 
     Measures the task once and projects it with :func:`task_distances_from`.
@@ -144,9 +141,8 @@ def calculate_task_distances(
 
     Args:
         task (Task): Task object.
-        num_iterations (Optional[int]): Maximum number of alternating sweeps.
 
     Returns:
         Dict[str, Any]: Dictionary containing distance calculations and turnpoint details.
     """
-    return task_distances_from(MeasuredTask.from_task(task, num_iterations))
+    return task_distances_from(MeasuredTask.from_task(task))
