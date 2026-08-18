@@ -1286,7 +1286,9 @@ class TestElevatedGoal:
         )
 
         assert [i.rule for i in issues] == [ValidationRule.ELEVATED_GOAL_IS_NOT_ESS]
-        assert "turnpoint 1 of 2" in str(issues[0])
+        # Both numbers are 0-based indices, and the message says so: "1 of 2"
+        # read as a count, which on a three-turnpoint task is simply wrong.
+        assert "turnpoint index 1, not at the goal (index 2)" in str(issues[0])
 
     def test_the_reference_elevated_goal_task_stays_valid(self):
         """The real task this rule was written against must not now fail."""

@@ -319,7 +319,8 @@ def _elevated_goal_issues(structure: TaskStructure) -> list[ValidationIssue]:
             ValidationIssue(
                 ValidationRule.ELEVATED_GOAL_IS_NOT_ESS,
                 f"an elevated goal is itself the ESS, but the task marks ESS "
-                f"at turnpoint {ess[0]} of {last}",
+                f"at turnpoint index {ess[0]}, not at the goal "
+                f"(index {last})",
             )
         )
 
