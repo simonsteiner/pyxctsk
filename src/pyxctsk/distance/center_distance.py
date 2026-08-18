@@ -40,7 +40,9 @@ property of that choice, not a separate convention.
 
 from enum import Enum
 
-from ..model.task import Task, TurnpointType
+from ..model.task import Task
+from .measured_task import task_to_turnpoints
+from .speed_section import speed_section_indices
 from .turnpoint import geodesic_distance
 
 
@@ -52,11 +54,15 @@ class CenterDistanceReading(str, Enum):
     Attributes:
         LAUNCH_TO_GOAL (str): Every turnpoint centre, launch through goal. The
             naive polyline, and :data:`PROPOSED_READING`.
-        LAUNCH_TO_GOAL_BOUNDARY (str): The same, less the goal's radius, so the
-            number ends where the *optimized* distance ends — on the goal
-            cylinder's boundary rather than at its centre. Defensible on the
-            grounds that the two published numbers should measure to the same
-            place.
+        LAUNCH_TO_GOAL_BOUNDARY (str): The same, less the goal's *effective*
+            radius, so the number ends where the optimized distance ends — on
+            the goal cylinder's boundary rather than at its centre. Defensible
+            on the grounds that the two published numbers should measure to the
+            same place. Effective, because a LINE goal is a zero-radius point
+            to the optimizer, whose route therefore ends at the goal centre:
+            subtracting the turnpoint's radius there would put this reading
+            100 m short of its own definition on ``task_fobe_line``, and a
+            whole half-line short on a wide one.
         START_TO_GOAL (str): From the SSS centre rather than from launch,
             excluding the pre-start leg the way §7.2's speed section distance
             does. Undefined — and so None — for a task with no SSS.
@@ -77,6 +83,24 @@ def _polyline(points: list[tuple[float, float]], earth_model: object) -> float:
         geodesic_distance(points[i], points[i + 1], earth_model)
         for i in range(len(points) - 1)
     )
+
+
+def _goal_radius(task: Task) -> float:
+    """The radius the optimized route actually ends on, in metres.
+
+    A LINE goal is a zero-radius point to the optimizer — the line is centred
+    on the goal, so its optimal crossing is the goal centre — which is stated
+    once, in ``task_to_turnpoints``. Reading it from there is what keeps this
+    reading measuring to the same place the optimized distance does.
+
+    Args:
+        task: The task whose goal to size.
+
+    Returns:
+        The goal cylinder's radius in metres, or 0.0 for a LINE goal.
+    """
+    cylinders = task_to_turnpoints(task)
+    return float(cylinders[-1].radius) if cylinders else 0.0
 
 
 def center_distance(
@@ -104,20 +128,19 @@ def center_distance(
         return None
 
     if reading is CenterDistanceReading.START_TO_GOAL:
-        start = next(
-            (i for i, tp in enumerate(turnpoints) if tp.type == TurnpointType.SSS),
-            None,
-        )
-        if start is None or len(turnpoints) - start < 2:
+        # Where the speed section starts is one question with one owner, so
+        # this reading cannot obey turnpoint roles that SpeedSection ignores.
+        indices = speed_section_indices(task)
+        if indices is None or len(turnpoints) - indices[0] < 2:
             return None
-        turnpoints = turnpoints[start:]
+        turnpoints = turnpoints[indices[0] :]
 
     total = _polyline(
         [(tp.waypoint.lat, tp.waypoint.lon) for tp in turnpoints], task.earth_model
     )
 
     if reading is CenterDistanceReading.LAUNCH_TO_GOAL_BOUNDARY:
-        return total - task.turnpoints[-1].radius
+        return total - _goal_radius(task)
     if reading in (
         CenterDistanceReading.LAUNCH_TO_GOAL,
         CenterDistanceReading.START_TO_GOAL,

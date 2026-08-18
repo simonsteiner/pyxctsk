@@ -6,10 +6,11 @@ diagnosis really are different answers. See `docs/s7f-distance-reference.md`.
 
 import pytest
 
-from pyxctsk import EarthModel, GoalType, TurnpointType
+from pyxctsk import EarthModel, GoalType, Task, TurnpointType
 from pyxctsk.distance import (
     PROPOSED_READING,
     CenterDistanceReading,
+    SpeedSection,
     center_distance,
     center_distance_readings,
     distance_through_centers,
@@ -169,3 +170,89 @@ class TestAgainstThePublishedValues:
         """Including the route tasks, which have no speed section."""
         for reference in reference_tasks():
             assert center_distance(reference.task) is not None, reference.stem
+
+
+class TestTheBoundaryReadingEndsWhereTheRouteEnds:
+    """Its whole justification is measuring to the same place §7.2 does."""
+
+    def test_a_cylinder_goal_subtracts_its_radius(self):
+        """The ordinary case, and the one the reading was written for."""
+        built = _race_task()
+
+        boundary = center_distance(built, CenterDistanceReading.LAUNCH_TO_GOAL_BOUNDARY)
+
+        assert boundary == pytest.approx(center_distance(built) - 2000)
+
+    def test_a_line_goal_subtracts_nothing(self):
+        """A LINE goal is a zero-radius point, so the route ends at its centre.
+
+        Subtracting the turnpoint's radius put this reading 100 m short of its
+        own definition on every LINE-goal task in the corpus — the reading
+        claims to end where the optimized distance ends, and the optimized
+        distance ends at the goal centre.
+        """
+        built = task(
+            turnpoint("A", 46.0, 8.0, radius=400, type=TurnpointType.TAKEOFF),
+            turnpoint("S", 46.3, 8.2, radius=5000, type=TurnpointType.SSS),
+            turnpoint("G", 46.9, 8.3, radius=2000, type=TurnpointType.ESS),
+            goal=GoalType.LINE,
+        )
+
+        assert center_distance(
+            built, CenterDistanceReading.LAUNCH_TO_GOAL_BOUNDARY
+        ) == pytest.approx(center_distance(built))
+
+    @pytest.mark.parametrize(
+        "stem",
+        ["task_fobe_line", "task_motu_line", "task_piga_line", "task_quno_line"],
+    )
+    def test_the_line_goal_corpus_tasks_agree(self, stem):
+        """Every LINE-goal reference task, not just a built one."""
+        built = reference_task(stem).task
+
+        assert center_distance(
+            built, CenterDistanceReading.LAUNCH_TO_GOAL_BOUNDARY
+        ) == pytest.approx(center_distance(built))
+
+    def test_the_proposed_reading_is_untouched_by_this(self):
+        """The number pyxctsk publishes measures to the centre either way."""
+        for reference in reference_tasks():
+            assert center_distance(reference.task) == center_distance(
+                reference.task, CenterDistanceReading.LAUNCH_TO_GOAL
+            )
+
+
+class TestTheTaskTypeDecides:
+    """An XC/Waypoints task has no speed section, so it has no start to measure from."""
+
+    def _waypoints_task_with_stray_roles(self):
+        """A waypoints task carrying SSS/ESS annotations nothing validated."""
+        built = reference_task("task_bevo").task
+        data = built.to_dict()
+        data["taskType"] = "W"
+        return Task.from_dict(data)
+
+    def test_start_to_goal_is_none_for_a_waypoints_task(self):
+        """The roles are unchecked on this task type, so they are not obeyed."""
+        built = self._waypoints_task_with_stray_roles()
+
+        assert center_distance(built, CenterDistanceReading.START_TO_GOAL) is None
+
+    def test_it_agrees_with_the_speed_section(self):
+        """One report cannot say both "no speed section" and "here is its start".
+
+        `9749a93` gave SpeedSection the task-type guard; this reading scanned
+        for the same annotation itself and did not get it, so one CLI JSON
+        document said both things at once.
+        """
+        built = self._waypoints_task_with_stray_roles()
+
+        assert SpeedSection.from_task(built) is None
+        assert center_distance(built, CenterDistanceReading.START_TO_GOAL) is None
+
+    def test_a_classic_task_still_reports_it(self):
+        """The guard is about the task type, not about removing the reading."""
+        built = reference_task("task_bevo").task
+
+        assert SpeedSection.from_task(built) is not None
+        assert center_distance(built, CenterDistanceReading.START_TO_GOAL) is not None

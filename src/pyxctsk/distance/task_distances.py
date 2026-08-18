@@ -14,8 +14,9 @@ the distance *report*.
 from typing import Any
 
 from ..model.task import Task
+from .center_distance import center_distance
 from .measured_task import MeasuredTask
-from .turnpoint import distance_through_centers, geodesic_distance
+from .turnpoint import geodesic_distance
 
 
 def _calculate_savings(center_km: float, opt_km: float) -> tuple[float, float]:
@@ -112,7 +113,13 @@ def task_distances_from(measured: MeasuredTask) -> dict[str, Any]:
             "turnpoints": [],
         }
 
-    center_km = distance_through_centers(list(measured.turnpoints)) / 1000.0
+    # Ask the module that owns the convention, not the primitive underneath
+    # it. This used to call distance_through_centers directly and publish the
+    # result as center_distance_km with no caveat, while the CLI honoured
+    # PROPOSED_READING — two spellings of one convention that agreed only
+    # because the proposed reading happens to be LAUNCH_TO_GOAL.
+    center_m = center_distance(measured.task)
+    center_km = (center_m or 0.0) / 1000.0
     opt_km = measured.total_m / 1000.0
     savings_km, savings_percent = _calculate_savings(center_km, opt_km)
 

@@ -34,6 +34,41 @@ from .route_optimization import OptimizedRoute, calculate_iteratively_refined_ro
 from .turnpoint import TaskTurnpoint
 
 
+def speed_section_indices(task: Task) -> tuple[int, int] | None:
+    """Where a task's speed section starts and ends, or None if it has none.
+
+    The one answer to *"does this task have a speed section?"*, so every reader
+    of that question agrees. It is not only about the SSS and ESS annotations:
+    the **task type** decides first. An XC/Waypoints task is "a simple route
+    from waypoints without cylinders", and ``model/validation.py`` exempts it
+    from the SSS/ESS rules on exactly that ground — so its annotations go
+    unchecked, and a reader that obeyed them would let unvalidated data
+    override the declared type.
+
+    That rule reached ``SpeedSection`` in ``9749a93`` and not
+    ``center_distance``'s ``START_TO_GOAL`` reading, which scanned for the same
+    annotation itself. One report then said both "this task has no speed
+    section" and "here is the distance from its start".
+
+    Args:
+        task: The task to search.
+
+    Returns:
+        ``(start, end)`` turnpoint indices, or None when the task is an
+        XC/Waypoints one, is missing either role, or has its ESS before its
+        SSS — the last being a task :meth:`~pyxctsk.Task.validate` already
+        reports as invalid (``SSS_AFTER_ESS``).
+    """
+    if task.task_type == TaskType.WAYPOINTS:
+        return None
+
+    start = _role_index(task, TurnpointType.SSS)
+    end = _role_index(task, TurnpointType.ESS)
+    if start is None or end is None or start > end:
+        return None
+    return start, end
+
+
 def _role_index(task: Task, role: TurnpointType) -> int | None:
     """Return the index of the first turnpoint with this role, or None.
 
@@ -110,13 +145,10 @@ class SpeedSection:
         cls, task: Task, task_turnpoints: list[TaskTurnpoint]
     ) -> "SpeedSection | None":
         """Find the speed section in a task whose cylinders are already derived."""
-        if task.task_type == TaskType.WAYPOINTS:
+        indices = speed_section_indices(task)
+        if indices is None:
             return None
-
-        start = _role_index(task, TurnpointType.SSS)
-        end = _role_index(task, TurnpointType.ESS)
-        if start is None or end is None or start > end:
-            return None
+        start, end = indices
 
         # Slicing the task's own turnpoints keeps the goal handling: when the
         # ESS *is* the goal, the last entry carries the goal's type, so a LINE
