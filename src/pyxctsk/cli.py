@@ -21,7 +21,8 @@ from io import BytesIO
 
 import click
 
-from .distance.report import DistanceReport
+from .distance.report import DistanceReport, TooFewTurnpointsError
+from .exceptions import pyXCTSKError
 from .export.kml import task_to_kml
 from .parser import parse_task
 from .qrcode.image import generate_qrcode_image
@@ -57,6 +58,63 @@ def main():
 
     See README for more examples and details.
     """
+
+
+def _read_input(input_file) -> bytes:
+    """Read the task payload from a file argument or stdin.
+
+    Args:
+        input_file: A binary file object from click, or None for stdin.
+
+    Returns:
+        The raw payload.
+
+    Raises:
+        SystemExit: If no input was given and stdin is a terminal.
+    """
+    if input_file:
+        data: bytes = input_file.read()
+        return data
+    if sys.stdin.isatty():
+        click.echo(
+            "Error: No input provided. Please provide an input file or pipe input.",
+            err=True,
+        )
+        sys.exit(1)
+    return sys.stdin.buffer.read()
+
+
+def _write_output(output_file: str | None, payload: str | bytes) -> None:
+    """Write the converted payload to a file or stdout.
+
+    The one place that knows output is UTF-8. None of the four write blocks
+    this replaces passed ``encoding=``, so they used the locale's — while the
+    data is UTF-8 and the KML even declares ``encoding="UTF-8"``. On a
+    non-UTF-8 locale that raised (the text distance report contains ``§``, so
+    it failed for every task); on Windows, whose default is cp1252, it wrote a
+    mis-encoded file and said nothing.
+
+    It is also the one place that knows a text file ends with a newline, which
+    ``convert`` and ``distances`` had answered differently by accident, and
+    that a PNG goes to ``sys.stdout.buffer`` rather than through ``click.echo``.
+
+    Args:
+        output_file: Path to write to, or None for stdout.
+        payload: Text to write, or bytes for a binary format.
+    """
+    if isinstance(payload, bytes):
+        if output_file:
+            with open(output_file, "wb") as f:
+                f.write(payload)
+        else:
+            sys.stdout.buffer.write(payload)
+        return
+
+    if output_file:
+        with open(output_file, "w", encoding="utf-8", newline="\n") as f:
+            f.write(payload if payload.endswith("\n") else payload + "\n")
+    else:
+        click.echo(payload)
 
 
 @main.command()
@@ -114,61 +172,22 @@ def convert(
         SystemExit: If input is missing or an error occurs during parsing or conversion.
     """
     try:
-        # Read input data
-        if input_file:
-            input_data = input_file.read()
-        else:
-            if sys.stdin.isatty():
-                click.echo(
-                    "Error: No input provided. Please provide an input file or pipe input.",
-                    err=True,
-                )
-                sys.exit(1)
-            input_data = sys.stdin.buffer.read()
+        task = parse_task(_read_input(input_file), strict=strict)
 
-        # Parse the task
-        task = parse_task(input_data, strict=strict)
-
-        # Convert to requested format
         if output_format == "json":
-            output = task.to_json()
-            if output_file:
-                with open(output_file, "w") as f:
-                    f.write(output)
-            else:
-                click.echo(output)
-
+            _write_output(output_file, task.to_json())
         elif output_format == "kml":
-            output = task_to_kml(task)
-            if output_file:
-                with open(output_file, "w") as f:
-                    f.write(output)
-            else:
-                click.echo(output)
-
-        elif output_format == "png":
-            qr_task = task.to_qr_code_task()
-            qr_string = qr_task.to_string(compressed=compressed)
-            qr_image = generate_qrcode_image(qr_string, size=1024)
-
-            if output_file:
-                qr_image.save(output_file, format="PNG")
-            else:
-                # Write PNG to stdout
-                buffer = BytesIO()
-                qr_image.save(buffer, format="PNG")
-                sys.stdout.buffer.write(buffer.getvalue())
-
+            _write_output(output_file, task_to_kml(task))
         elif output_format == "qrcode-json":
-            qr_task = task.to_qr_code_task()
-            qr_string = qr_task.to_string(compressed=compressed)
-            if output_file:
-                with open(output_file, "w") as f:
-                    f.write(qr_string)
-            else:
-                click.echo(qr_string)
+            qr_string = task.to_qr_code_task().to_string(compressed=compressed)
+            _write_output(output_file, qr_string)
+        elif output_format == "png":
+            qr_string = task.to_qr_code_task().to_string(compressed=compressed)
+            buffer = BytesIO()
+            generate_qrcode_image(qr_string, size=1024).save(buffer, format="PNG")
+            _write_output(output_file, buffer.getvalue())
 
-    except Exception as e:
+    except (pyXCTSKError, OSError) as e:
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
 
@@ -228,33 +247,17 @@ def distances(input_file, output_format: str, output_file: str, strict: bool) ->
             too few turnpoints to have a distance at all.
     """
     try:
-        if input_file:
-            input_data = input_file.read()
-        else:
-            if sys.stdin.isatty():
-                click.echo(
-                    "Error: No input provided. Please provide an input file or pipe input.",
-                    err=True,
-                )
-                sys.exit(1)
-            input_data = sys.stdin.buffer.read()
+        input_data = _read_input(input_file)
 
         report = DistanceReport.from_task(parse_task(input_data, strict=strict))
-        output = (
+        _write_output(
+            output_file,
             json.dumps(report.as_dict(), indent=2)
             if output_format == "json"
-            else report.as_text()
+            else report.as_text(),
         )
 
-        if output_file:
-            with open(output_file, "w") as f:
-                f.write(output + "\n")
-        else:
-            click.echo(output)
-
-    except SystemExit:
-        raise
-    except Exception as e:
+    except (pyXCTSKError, OSError, TooFewTurnpointsError) as e:
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
 

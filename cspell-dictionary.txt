@@ -48,6 +48,7 @@ jsonify
 Jörg
 Karney
 KHTML
+Küçük
 LANCZOS
 latlng
 lefthook
@@ -130,6 +131,7 @@ unrecognised
 unreportable
 unrepresentable
 unvalidated
+unwritable
 vali
 validatable
 Vincenty

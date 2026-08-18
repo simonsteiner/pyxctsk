@@ -284,3 +284,106 @@ class TestCLIDistances:
 
         assert "distances" in top.output
         assert "--format" in own.output and "--strict" in own.output
+
+
+class TestWritingOutput:
+    """The read/write seam: one place that knows encoding, newlines and bytes.
+
+    Reading and writing were spelled out six times across the two commands, so
+    encoding, trailing newline, text-vs-bytes and stdout-vs-file were each
+    decided independently — and two of them had been decided inconsistently.
+    """
+
+    #: A task whose waypoint names are outside ASCII. No corpus task has any,
+    #: which is why the encoding defect survived: `grep -lP "[^\x00-\x7F]"`
+    #: over the reference tasks matches nothing.
+    def _non_ascii_task(self):
+        built = parse_task(reference_task("task_bevo").xctsk_path.read_bytes())
+        built.turnpoints[0].waypoint.name = "Küçük"
+        return built
+
+    @pytest.mark.parametrize("fmt", ["json", "kml"])
+    def test_a_non_ascii_task_survives_a_round_trip_through_a_file(self, fmt, tmp_path):
+        """None of the four writes passed `encoding=`, so all used the locale's."""
+        out = tmp_path / f"out.{fmt}"
+        payload = self._non_ascii_task().to_json().encode()
+
+        result = CliRunner().invoke(
+            convert, ["--format", fmt, "-o", str(out)], input=payload
+        )
+
+        assert result.exit_code == 0, result.output
+        assert out.read_bytes().decode("utf-8")
+        if fmt == "json":
+            assert parse_task(out.read_bytes()).turnpoints[0].waypoint.name == "Küçük"
+        else:
+            assert "Küçük" in out.read_text(encoding="utf-8")
+
+    def test_the_distance_report_is_writable_as_a_file(self, tmp_path):
+        """Its text rendering contains §, so a non-UTF-8 locale used to refuse."""
+        out = tmp_path / "report.txt"
+
+        result = CliRunner().invoke(
+            distances,
+            [
+                str(reference_task("task_bevo").xctsk_path),
+                "--format",
+                "text",
+                "-o",
+                str(out),
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert "§7.2" in out.read_text(encoding="utf-8")
+
+    @pytest.mark.parametrize(
+        "command, options",
+        [
+            ("convert", ["--format", "json"]),
+            ("convert", ["--format", "kml"]),
+            ("convert", ["--format", "qrcode-json"]),
+            ("distances", []),
+            ("distances", ["--format", "text"]),
+        ],
+    )
+    def test_every_text_file_ends_with_a_newline(self, command, options, tmp_path):
+        """`convert` wrote none and `distances` wrote one — nobody chose that."""
+        out = tmp_path / "out"
+        cmd = convert if command == "convert" else distances
+
+        result = CliRunner().invoke(
+            cmd, [str(reference_task("task_bevo").xctsk_path), *options, "-o", str(out)]
+        )
+
+        assert result.exit_code == 0, result.output
+        assert out.read_bytes().endswith(b"\n")
+
+    def test_a_png_is_written_as_bytes_not_text(self, tmp_path):
+        """The one format whose payload is binary, through the same seam."""
+        out = tmp_path / "qr.png"
+
+        result = CliRunner().invoke(
+            convert,
+            ["--format", "png", "-o", str(out)],
+            input=SAMPLE.to_json().encode(),
+        )
+
+        assert result.exit_code == 0, result.output
+        assert out.read_bytes().startswith(b"\x89PNG")
+
+    def test_an_unwritable_path_is_reported_not_raised(self, tmp_path):
+        """OSError is caught alongside the library's own errors."""
+        result = CliRunner().invoke(
+            convert,
+            [
+                "--format",
+                "json",
+                "-o",
+                str(tmp_path / "no" / "such" / "dir" / "o.json"),
+            ],
+            input=SAMPLE.to_json().encode(),
+        )
+
+        assert result.exit_code == 1
+        assert "Error:" in result.output
