@@ -36,6 +36,7 @@ from pyxctsk.distance.task_distances import task_to_turnpoints
 from pyxctsk.distance.turnpoint import geod_for_earth_model
 from pyxctsk.model.validation import ValidationRule
 from tests.corpus import reference_task, reference_tasks
+from tests.paths import ELEVATED_GOAL_DIR
 
 # Polyline-encoded "z" literals below are opaque tokens, not words.
 # cspell:ignore Fligr
@@ -330,6 +331,8 @@ class TestStructuralValidation:
                 d.update(extensions=[{"id": "ACME"}]),
                 d["turnpoints"][2].update(extensions=[{"id": "ACME", "a": "1"}]),
             ),
+            lambda d: d["goal"].update(finishAltitude=5000),
+            lambda d: d["goal"].update(finishAltitude=300),
         ):
             emitted |= {issue.rule for issue in self._mutated(mutate)}
         emitted |= {
@@ -1227,3 +1230,89 @@ class TestGoalLineFollowsTheOptimizedRoute:
         after = calculate_iteratively_refined_route(task_to_turnpoints(task)).total_m
 
         assert before == after
+
+
+class TestElevatedGoal:
+    """S7F-06 and S7F-07: the bounds FAI S7F 2026 §6.2.3.2 puts on an elevated goal.
+
+    The XCTrack interface spec defines ``goal.finishAltitude`` but constrains
+    nothing about it, so these two rules are the only ones in
+    ``model/validation.py`` sourced from the scoring code.
+    """
+
+    def _validate(self, goal, **overrides):
+        """Validate BASE_TASK with a replaced goal."""
+        return Task.from_json(task_json(goal=goal, **overrides)).validate()
+
+    @pytest.mark.parametrize("altitude", [0, 300, 1000])
+    def test_an_altitude_in_range_is_accepted(self, altitude):
+        """Zero to 1000 m above the goal waypoint, inclusive.
+
+        BASE_TASK marks ESS at turnpoint 1, so the goal is moved onto the ESS
+        here — otherwise the *other* rule fires and this one proves nothing.
+        """
+        issues = self._validate(
+            {"type": "CYLINDER", "deadline": "18:00:00Z", "finishAltitude": altitude},
+            turnpoints=_turnpoints_with_ess_last(),
+        )
+
+        assert issues == []
+
+    @pytest.mark.parametrize("altitude", [-1, 1001, 5000])
+    def test_an_altitude_out_of_range_is_reported(self, altitude):
+        """Spec: "by default 300 m but can be increased up to 1000 m"."""
+        issues = self._validate(
+            {"type": "CYLINDER", "deadline": "18:00:00Z", "finishAltitude": altitude},
+            turnpoints=_turnpoints_with_ess_last(),
+        )
+
+        assert [i.rule for i in issues] == [ValidationRule.FINISH_ALTITUDE_OUT_OF_RANGE]
+
+    def test_a_ground_level_goal_is_not_checked(self):
+        """No elevated goal, no elevated-goal rules — BASE_TASK has ESS early."""
+        assert Task.from_json(task_json()).validate() == []
+
+    def test_an_elevated_goal_elsewhere_than_the_ess_is_reported(self):
+        """Spec: an elevated goal "implicitly also serves as the ESS"."""
+        issues = self._validate(
+            {"type": "CYLINDER", "deadline": "18:00:00Z", "finishAltitude": 300}
+        )
+
+        assert [i.rule for i in issues] == [ValidationRule.ELEVATED_GOAL_IS_NOT_ESS]
+        assert "turnpoint 1 of 2" in str(issues[0])
+
+    def test_the_reference_elevated_goal_task_stays_valid(self):
+        """The real task this rule was written against must not now fail."""
+        task = parse_task(
+            ELEVATED_GOAL_DIR.joinpath("xcontest-conformant.xctsk").read_text()
+        )
+
+        assert task.goal is not None
+        assert task.goal.finish_altitude == 300
+        assert task.validate() == []
+
+    def test_the_qr_format_is_checked_too(self):
+        """``g.fa`` reaches the same rule as ``goal.finishAltitude``."""
+        task = Task.from_json(
+            task_json(
+                goal={
+                    "type": "CYLINDER",
+                    "deadline": "18:00:00Z",
+                    "finishAltitude": 5000,
+                }
+            )
+        )
+
+        qr = task.to_qr_code_task()
+        assert qr.goal is not None and qr.goal.finish_altitude == 5000
+        assert ValidationRule.FINISH_ALTITUDE_OUT_OF_RANGE in {
+            issue.rule for issue in qr.validate()
+        }
+
+
+def _turnpoints_with_ess_last():
+    """BASE_TASK's turnpoints with ESS moved onto the goal."""
+    turnpoints = json.loads(json.dumps(BASE_TASK["turnpoints"]))
+    del turnpoints[1]["type"]
+    turnpoints[-1]["type"] = "ESS"
+    return turnpoints

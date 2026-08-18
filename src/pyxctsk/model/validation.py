@@ -34,6 +34,12 @@ if TYPE_CHECKING:
 #: The version the full JSON task format declares. The QR format says 2.
 FULL_FORMAT_VERSION = 1
 
+#: How far above the goal waypoint an elevated goal may sit, in metres.
+#: FAI S7F 2026 §6.2.3.2: "The elevation above goal is by default 300 m but can
+#: be increased up to 1000 m for each task." Zero is the floor because the
+#: field is a height *above* the goal; a ground-level goal omits it entirely.
+MAX_FINISH_ALTITUDE_M = 1000.0
+
 
 class ValidationRule(str, Enum):
     """The structural rules a task can break.
@@ -58,6 +64,11 @@ class ValidationRule(str, Enum):
             the root list has entries has some that correspond to nothing.
         EXTENSION_REPEATS_ID (str): A turnpoint extension repeats the ``id``
             key, which the spec says belongs to the root entry alone.
+        FINISH_ALTITUDE_OUT_OF_RANGE (str): An elevated goal sits further above
+            the goal waypoint than FAI S7F 2026 §6.2.3.2 allows.
+        ELEVATED_GOAL_IS_NOT_ESS (str): The task declares an elevated goal *and*
+            an ESS somewhere other than the goal, which §6.2.3.2 says cannot
+            both be true.
     """
 
     NO_TURNPOINTS = "NO_TURNPOINTS"
@@ -68,6 +79,8 @@ class ValidationRule(str, Enum):
     UNKNOWN_VERSION = "UNKNOWN_VERSION"
     EXTENSION_WITHOUT_ROOT = "EXTENSION_WITHOUT_ROOT"
     EXTENSION_REPEATS_ID = "EXTENSION_REPEATS_ID"
+    FINISH_ALTITUDE_OUT_OF_RANGE = "FINISH_ALTITUDE_OUT_OF_RANGE"
+    ELEVATED_GOAL_IS_NOT_ESS = "ELEVATED_GOAL_IS_NOT_ESS"
 
 
 @dataclass(frozen=True)
@@ -114,6 +127,9 @@ class TaskStructure:
             rule is stated once for both.
         is_waypoints_task: Whether this is an XC/Waypoints task, which has no
             speed section to constrain.
+        finish_altitude: The elevated goal's height above the goal waypoint in
+            metres, or None for a ground-level goal. Both formats carry it —
+            ``goal.finishAltitude`` in the full one, ``g.fa`` in the QR one.
     """
 
     roles: Sequence[TurnpointType | None]
@@ -123,6 +139,7 @@ class TaskStructure:
     version: int
     expected_version: int
     is_waypoints_task: bool
+    finish_altitude: float | None = None
 
 
 def validate_structure(structure: TaskStructure) -> list[ValidationIssue]:
@@ -134,7 +151,12 @@ def validate_structure(structure: TaskStructure) -> list[ValidationIssue]:
     - ``SSS`` and ``ESS`` "must appear exactly once";
     - ``SSS`` "must appear before ESS";
     - turnpoint extensions are "in the same order as the root extensions" with
-      the ``id`` "not repeated".
+      the ``id`` "not repeated";
+    - an elevated goal sits at most 1000 m above the goal waypoint, and
+      "implicitly also serves as the End of Speed Section" (FAI S7F 2026
+      §6.2.3.2 — the only rule here that comes from the scoring code rather
+      than the interface spec, because it is the only one the interface spec
+      leaves unconstrained).
 
     The speed-section rules apply to CLASSIC tasks only; an XC/Waypoints task
     is a plain route without one.
@@ -152,6 +174,7 @@ def validate_structure(structure: TaskStructure) -> list[ValidationIssue]:
     issues += _radius_issues(structure)
     issues += _version_issues(structure)
     issues += _extension_issues(structure)
+    issues += _elevated_goal_issues(structure)
     return issues
 
 
@@ -255,6 +278,54 @@ def _extension_issues(structure: TaskStructure) -> list[ValidationIssue]:
     return issues
 
 
+def _elevated_goal_issues(structure: TaskStructure) -> list[ValidationIssue]:
+    """Return issues about an elevated goal (FAI S7F 2026 §6.2.3.2).
+
+    Two rules, both about a field the XCTrack interface spec defines but puts
+    no bounds on — the bounds are the scoring code's:
+
+    - the elevation is a height above the goal waypoint between 0 and
+      :data:`MAX_FINISH_ALTITUDE_M`;
+    - an elevated goal "implicitly also serves as the End of Speed Section",
+      so a task that also marks an *earlier* turnpoint as ESS says two
+      different things about where race time is taken.
+
+    The second is reported rather than resolved. Deciding that the elevated
+    goal wins would make :meth:`Task.is_ess_goal` disagree with the ``ESS``
+    the file actually carries, and this module's job is to report what
+    arrived, not to pick a reading of it.
+    """
+    if structure.finish_altitude is None:
+        return []
+
+    issues = []
+    if not 0.0 <= structure.finish_altitude <= MAX_FINISH_ALTITUDE_M:
+        issues.append(
+            ValidationIssue(
+                ValidationRule.FINISH_ALTITUDE_OUT_OF_RANGE,
+                f"an elevated goal may sit 0 to {MAX_FINISH_ALTITUDE_M:.0f} m "
+                f"above the goal waypoint, the task declares "
+                f"{structure.finish_altitude}",
+            )
+        )
+
+    if structure.is_waypoints_task:
+        return issues
+
+    last = len(structure.roles) - 1
+    ess = [i for i, role in enumerate(structure.roles) if role == TurnpointType.ESS]
+    if ess and ess != [last]:
+        issues.append(
+            ValidationIssue(
+                ValidationRule.ELEVATED_GOAL_IS_NOT_ESS,
+                f"an elevated goal is itself the ESS, but the task marks ESS "
+                f"at turnpoint {ess[0]} of {last}",
+            )
+        )
+
+    return issues
+
+
 def validate_task(task: "Task") -> list[ValidationIssue]:
     """Check a task against the spec's structural rules.
 
@@ -275,5 +346,6 @@ def validate_task(task: "Task") -> list[ValidationIssue]:
             version=task.version,
             expected_version=FULL_FORMAT_VERSION,
             is_waypoints_task=task.task_type == TaskType.WAYPOINTS,
+            finish_altitude=task.goal.finish_altitude if task.goal else None,
         )
     )

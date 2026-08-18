@@ -295,5 +295,6 @@ def validate_qr_code_task(qr: QRCodeTask) -> list[ValidationIssue]:
             version=qr.version,
             expected_version=QR_CODE_TASK_VERSION,
             is_waypoints_task=qr.task_type == QRCodeTaskType.WAYPOINTS,
+            finish_altitude=qr.goal.finish_altitude if qr.goal else None,
         )
     )
