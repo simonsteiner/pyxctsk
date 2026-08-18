@@ -66,5 +66,9 @@ def decode_qr(image) -> list[str]:
     Returns:
         The decoded text of each QR code found, in detection order.
     """
-    results = zxingcpp.read_barcodes(image, formats=zxingcpp.BarcodeFormat.QRCode)
+    # BarcodeFormats, not BarcodeFormat: the two are interchangeable at
+    # runtime but zxing-cpp's own types distinguish them, and mypy follows this
+    # module in from test_cli.py.
+    formats = zxingcpp.BarcodeFormats(zxingcpp.BarcodeFormat.QRCode)
+    results = zxingcpp.read_barcodes(image, formats=formats)
     return [barcode.text for barcode in results]

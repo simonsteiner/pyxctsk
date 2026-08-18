@@ -559,7 +559,14 @@ class TaskTurnpoint:
 def distance_through_centers(
     turnpoints: list[TaskTurnpoint], earth_model: object = None
 ) -> float:
-    """Calculate distance through turnpoint centers.
+    """Sum the geodesic legs between consecutive turnpoint centers.
+
+    The primitive, not the published number. **S7F defines no "distance
+    through centres"**, so which points to include and where to stop is a
+    convention — see :mod:`~pyxctsk.distance.center_distance`, which owns that
+    decision and calls this. A caller producing a figure for a task board
+    wants ``center_distance(task)``; a caller who already knows exactly which
+    turnpoints it means wants this.
 
     Args:
         turnpoints (List[TaskTurnpoint]): List of TaskTurnpoint objects.

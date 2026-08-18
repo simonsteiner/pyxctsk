@@ -61,10 +61,16 @@ sphere rather than the WGS84 ellipsoid, and whether consecutive duplicate turnpo
 contribute a leg.
 
 pyxctsk implements the first reading — every centre, launch to goal, geodesic on the
-task's declared earth model. On the 22 reference tasks that carry a published value it
-agrees to within **49 m**, which is inside the 0.1 km display rounding. That agreement is
-by convention, not by specification, and it is exactly the kind of agreement that breaks
-silently when a new vendor arrives.
+task's declared earth model, with consecutive duplicate turnpoints contributing their
+(zero-length) leg like any other. On the 22 reference tasks that carry a published value
+it agrees to within **49 m**, which is inside the 0.1 km display rounding. That agreement
+is by convention, not by specification, and it is exactly the kind of agreement that
+breaks silently when a new vendor arrives.
+
+The reading is now stated in one place — `src/pyxctsk/distance/center_distance.py` — and
+the alternatives are kept beside it and reported by `pyxctsk distances`, for exactly one
+purpose: **if your board disagrees with ours, you can tell in one command whether the
+cause is a different reading or a different bug.**
 
 **What we would ask of CIVL and of vendors:** either S7F should define this number, or
 task boards should stop publishing it as though it were defined. If it is to be defined,
@@ -180,7 +186,7 @@ So that disagreements can be attributed rather than guessed at.
 | §6.2.1 control-zone altitude limits | ❌ | XCTrack's task format has no keys for them |
 | §6.2.2 general line control zones | ❌ | same; only the goal line exists in the format |
 | §8, §9 tracklog evaluation; §10–16 scoring | ❌ | out of scope — pyxctsk reads no tracklogs and awards no points |
-| "distance through centres" | ⚠️ | implemented as a convention; **S7F does not define it** |
+| "distance through centres" | ⚠️ | **S7F does not define it.** One stated convention, with the alternatives kept for diagnosis — `distance/center_distance.py` |
 
 Two deliberate divergences worth naming:
 
@@ -205,18 +211,44 @@ uv sync --all-extras
 uv run pytest                       # the conformance suite, including the assertions cited above
 ```
 
-The numbers in Finding 2:
+**One command gives you everything in this document for your own task file:**
+
+```console
+$ pyxctsk distances your-task.xctsk --format text
+pyxctsk 0.5.0  |  FAI S7F 2026 V1.0  |  earth model: WGS84
+
+  task distance (§7.2)            92.002 km
+  speed section (§7.2)            86.761 km
+  through centres                321.440 km   [LAUNCH_TO_GOAL]
+
+  'through centres' is NOT defined by S7F. Other readings of it:
+    LAUNCH_TO_GOAL                321.440 km
+    LAUNCH_TO_GOAL_BOUNDARY       321.240 km
+    START_TO_GOAL                 281.568 km
+
+  optimized route:
+     0 D01        TAKEOFF  r=     0 m    4.476050  -76.153519     0.000 km
+     1 X09        SSS      r= 37000 m    4.502847  -76.137677     3.446 km
+     ...
+     8 G02                 r=   200 m    4.589699  -75.967881    92.002 km
+```
+
+Drop `--format text` for JSON, which is what to exchange: it carries the library
+version, the S7F edition, the earth model, every reading of the centre distance, and
+**the optimized crossing point for every turnpoint**. Reads stdin, writes with `-o`, so a
+whole corpus goes through it in a loop.
+
+From Python, if you prefer:
 
 ```python
 from pathlib import Path
 from pyxctsk import parse_task
-from pyxctsk.distance import optimized_distance, distance_through_centers, task_to_turnpoints, SpeedSection
+from pyxctsk.distance import optimized_distance, center_distance, task_to_turnpoints, SpeedSection
 
 task = parse_task(Path("your-task.xctsk").read_text())
-turnpoints = task_to_turnpoints(task)
-print(optimized_distance(turnpoints))          # S7F §7.2 task distance, metres
-print(distance_through_centers(turnpoints))    # the convention S7F does not define
-print(SpeedSection.from_task(task).distance_m) # S7F §7.2 speed section distance
+print(optimized_distance(task_to_turnpoints(task)))  # S7F §7.2 task distance, metres
+print(center_distance(task))                         # the convention S7F does not define
+print(SpeedSection.from_task(task).distance_m)       # S7F §7.2 speed section distance
 ```
 
 The 22 tasks are in `tests/data/reference_tasks/`, each as a `.xctsk` alongside the
@@ -227,8 +259,8 @@ published values it is compared against. They are real competition tasks.
 ## What would help
 
 1. **Route points, not totals.** A total tells us two implementations disagree; the
-   crossing coordinates tell us why, in one diff. pyxctsk's are available from
-   `calculate_iteratively_refined_route(...).points`.
+   crossing coordinates tell us why, in one diff. `pyxctsk distances task.xctsk` prints
+   ours, alongside the numbers, in a form built to be diffed.
 2. **A definition of "distance through centres", or its retirement from task boards.**
    Finding 1 is the one that can put 39.9 km between two vendors, and it is entirely a
    documentation problem.

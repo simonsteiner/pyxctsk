@@ -25,6 +25,10 @@ own. Everything a caller outside the package needs is named here —
   task distance. It is *not* a prefix of the task route: the optimizer
   treats the last circle it is handed as the finish, so S7F optimizes a
   separate ``taskToESS`` route and so does this
+- :mod:`~pyxctsk.distance.center_distance` — the "distance through centres"
+  a task board publishes, which **S7F does not define**. The module states
+  the reading pyxctsk proposes and keeps the alternatives so a vendor whose
+  board disagrees can tell a convention apart from a bug
 
 The goal line lives here rather than with the KML and GeoJSON writers that draw
 it because the shapes of a task must not depend on the formats it is exported
@@ -54,6 +58,12 @@ the divergence at 200–300 m on a 50 km cylinder. This is deliberately not a
 validation rule: the field is valid in the format being validated.
 """
 
+from .center_distance import (
+    PROPOSED_READING,
+    CenterDistanceReading,
+    center_distance,
+    center_distance_readings,
+)
 from .goal_line import (
     GoalLine,
     GoalLineOrientation,
@@ -89,6 +99,7 @@ __all__ = [
     "TaskTurnpoint",
     "GoalLine",
     "GoalLineOrientation",
+    "CenterDistanceReading",
     "OptimizedRoute",
     "SpeedSection",
     # Goal-line geometry
@@ -96,6 +107,9 @@ __all__ = [
     # Main distance calculation functions
     "optimized_distance",
     "distance_through_centers",
+    "center_distance",
+    "center_distance_readings",
+    "PROPOSED_READING",
     "geodesic_distance",
     "calculate_task_distances",
     "task_distances_from_route",
