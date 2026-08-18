@@ -13,9 +13,14 @@ from pyproj import CRS, Transformer
 
 from pyxctsk.distance import OptimizedRoute
 from pyxctsk.distance.route_optimization import (
+    _INITIAL_PLACEMENTS,
     _closest_circle_point,
     _optimize_plane_points,
+    _place_at_centers,
+    _place_chained_backward,
+    _place_chained_forward,
     _polyline_length,
+    _sweep_to_convergence,
     calculate_iteratively_refined_route,
 )
 from pyxctsk.distance.turnpoint import (
@@ -292,3 +297,91 @@ class TestTaskAreaCenter:
     def test_wide_but_not_wrapping_span_uses_the_plain_box(self):
         """A gap under 180° leaves the box unwrapped."""
         assert task_area_center([(0.0, -80.0), (0.0, 40.0)]) == (0.0, -20.0)
+
+
+class TestInitialPlacements:
+    """The starting configurations the alternating sweep is run from."""
+
+    CIRCLES = [
+        (0.0, 0.0, 0.0),
+        (10_000.0, 3_000.0, 2_000.0),
+        (20_000.0, -4_000.0, 5_000.0),
+        (30_000.0, 0.0, 400.0),
+    ]
+
+    @pytest.mark.parametrize("place", _INITIAL_PLACEMENTS, ids=lambda f: f.__name__)
+    def test_one_point_per_circle(self, place):
+        """Every placement must seed the sweep with a full route."""
+        assert len(place(self.CIRCLES)) == len(self.CIRCLES)
+
+    @pytest.mark.parametrize("place", _INITIAL_PLACEMENTS, ids=lambda f: f.__name__)
+    def test_the_start_point_is_the_takeoff_centre(self, place):
+        """Index 0 is the launch point, never a boundary point."""
+        assert place(self.CIRCLES)[0] == (0.0, 0.0)
+
+    def _on_boundary(self, point, circle):
+        """Planar distance from the circle's centre, for boundary assertions."""
+        cx, cy, radius = circle
+        return math.hypot(point[0] - cx, point[1] - cy) == pytest.approx(radius)
+
+    def test_forward_chain_lands_every_later_point_on_its_boundary(self):
+        """Chaining from the launch puts each point where the answer lives.
+
+        The centres never can be an answer for a non-zero radius, which is why
+        seeding there alone left the sweep in the wrong basin.
+        """
+        points = _place_chained_forward(self.CIRCLES)
+
+        for point, circle in zip(points[1:], self.CIRCLES[1:]):
+            assert self._on_boundary(point, circle)
+
+    def test_backward_chain_seeds_from_the_last_centre(self):
+        """It has to start somewhere: the final circle's centre is that seed.
+
+        Every point it then derives — walking back toward the launch — is on a
+        boundary; only the seed itself is not.
+        """
+        points = _place_chained_backward(self.CIRCLES)
+
+        assert points[-1] == (self.CIRCLES[-1][0], self.CIRCLES[-1][1])
+        for point, circle in zip(points[1:-1], self.CIRCLES[1:-1]):
+            assert self._on_boundary(point, circle)
+
+    def test_centres_placement_is_the_centres(self):
+        """The original starting configuration, kept as one of the three."""
+        assert _place_at_centers(self.CIRCLES) == [(c[0], c[1]) for c in self.CIRCLES]
+
+    def test_a_zero_radius_circle_collapses_in_every_placement(self):
+        """A LINE goal has one possible point wherever it is seeded from."""
+        circles = [(0.0, 0.0, 0.0), (10_000.0, 0.0, 1_000.0), (20_000.0, 0.0, 0.0)]
+        for place in _INITIAL_PLACEMENTS:
+            assert place(circles)[2] == (20_000.0, 0.0)
+
+
+class TestMultiStart:
+    """S7F-04: one start finds *a* local optimum, not the shortest path."""
+
+    #: Two big cylinders either side of the direct line, which is what gives
+    #: the sweep more than one basin to fall into.
+    CIRCLES = [
+        (0.0, 0.0, 0.0),
+        (20_000.0, 18_000.0, 17_000.0),
+        (40_000.0, -18_000.0, 17_000.0),
+        (60_000.0, 0.0, 400.0),
+    ]
+
+    def test_the_result_is_the_shortest_of_the_placements(self):
+        """Whatever the sweep is seeded with, the shortest survives."""
+        shipped = _polyline_length(_optimize_plane_points(self.CIRCLES, max_sweeps=100))
+
+        for place in _INITIAL_PLACEMENTS:
+            single = _sweep_to_convergence(
+                list(self.CIRCLES), place(self.CIRCLES), 100, 0.1
+            )
+            assert shipped <= _polyline_length(single) + 1e-9
+
+    def test_placements_are_deterministic_and_ordered(self):
+        """The same task must always produce the same route."""
+        first = _optimize_plane_points(self.CIRCLES, max_sweeps=100)
+
+        assert _optimize_plane_points(self.CIRCLES, max_sweeps=100) == first

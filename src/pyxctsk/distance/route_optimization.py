@@ -10,14 +10,20 @@ The implementation:
 
 - projects all turnpoint centers into a local Transverse Mercator plane centred
   on the task area (§7.1.2),
-- initializes one route point per turnpoint and then alternately fixes the
-  odd- and even-indexed points, updating each free point with the exact planar
-  GetOptPi solution (crossing vs. reflection case) between its two neighbours,
+- initializes one route point per turnpoint — from each of three deterministic
+  placements, keeping the shortest, because the alternating method finds a
+  *local* optimum and the starting configuration decides which one — and then
+  alternately fixes the odd- and even-indexed points, updating each free point
+  with the exact planar GetOptPi solution (crossing vs. reflection case)
+  between its two neighbours,
 - iterates until a full sweep changes the total path length by less than
   ε = 0.1 m (§7.1.3) or the sweep limit is reached,
 - converts the points back to geographic coordinates and snaps each onto the
   true cylinder boundary at radius r on the selected earth model
   ("ProjectionCorrection", §7.1.7),
+- runs all of that twice (§7.1.6): the first pass centres its plane on the
+  turnpoints' bounding box, the second on the bounding box of the corrected
+  path the first found, which is the taskAreaCentre the spec defines,
 - sums the leg distances geodesically (WGS84 ellipsoid by default, great
   circles on the FAI sphere R = 6 371 000 m when the task specifies it).
 
@@ -121,28 +127,6 @@ class OptimizedRoute:
         return list(accumulate(self.legs, initial=0.0))
 
 
-def _plane_circles(
-    turnpoints: Sequence[TurnpointGeometry], earth_model: object
-) -> tuple[list[PlaneCircle], LocalPlane]:
-    """Project turnpoint cylinders into the plane of the task area.
-
-    The plane is centred on the mean of the turnpoint centers (§7.1.2), and
-    each turnpoint becomes a circle through :func:`plane_circle` — the same
-    function :meth:`TaskTurnpoint.optimal_point` goes through, so what a
-    turnpoint *is* to the solver is said once. That is also where the rule
-    lives that a LINE goal is a zero-radius circle at the goal center.
-
-    Args:
-        turnpoints (Sequence[TurnpointGeometry]): The task turnpoints.
-        earth_model: Earth model selector (None means WGS84).
-
-    Returns:
-        Tuple of (planar circles, the plane they were projected into).
-    """
-    plane = LocalPlane.around([tp.center for tp in turnpoints], earth_model)
-    return [plane_circle(tp, plane) for tp in turnpoints], plane
-
-
 def _closest_circle_point(
     point: tuple[float, float], circle: PlaneCircle
 ) -> tuple[float, float]:
@@ -226,45 +210,92 @@ def _polyline_length(points: Sequence[tuple[float, float]]) -> float:
     )
 
 
-def _optimize_plane_points(
-    circles: Sequence[PlaneCircle],
-    max_sweeps: int,
-    epsilon: float = CONVERGENCE_EPSILON_M,
-) -> list[tuple[float, float]]:
-    """Run the Ding–Xie–Jiang alternating optimization in the plane.
+def _boundary_toward(
+    circle: PlaneCircle, target: tuple[float, float]
+) -> tuple[float, float]:
+    """Return the point of ``circle`` nearest ``target``, in the plane."""
+    cx, cy, radius = circle
+    if radius <= 0.0:
+        return (cx, cy)
+    dx, dy = target[0] - cx, target[1] - cy
+    distance = math.hypot(dx, dy)
+    if distance == 0.0:
+        return (cx + radius, cy)
+    return (cx + radius * dx / distance, cy + radius * dy / distance)
 
-    One route point is kept per circle, initialized at the circle centers.
+
+def _place_at_centers(circles: Sequence[PlaneCircle]) -> list[tuple[float, float]]:
+    """Start every point at its circle's center."""
+    return [(c[0], c[1]) for c in circles]
+
+
+def _place_chained_forward(
+    circles: Sequence[PlaneCircle],
+) -> list[tuple[float, float]]:
+    """Start each point at the boundary nearest its predecessor."""
+    points = [(circles[0][0], circles[0][1])]
+    for circle in circles[1:]:
+        points.append(_boundary_toward(circle, points[-1]))
+    return points
+
+
+def _place_chained_backward(
+    circles: Sequence[PlaneCircle],
+) -> list[tuple[float, float]]:
+    """Start each point at the boundary nearest its successor."""
+    points: list[tuple[float, float]] = [(0.0, 0.0)] * len(circles)
+    points[-1] = (circles[-1][0], circles[-1][1])
+    for i in range(len(circles) - 2, -1, -1):
+        points[i] = _boundary_toward(circles[i], points[i + 1])
+    points[0] = (circles[0][0], circles[0][1])
+    return points
+
+
+#: The starting configurations every optimization is run from, shortest wins.
+#:
+#: The alternating method converges to a *local* optimum — Ding et al. say so —
+#: and which one depends entirely on where the points start. Starting at the
+#: circle centers alone left ``task_bevo`` 98.6 m above a route that touches
+#: every one of its cylinders just as legitimately, so a single start does not
+#: deliver the shortest path §7 asks for. The two chained placements are what
+#: reach it: they begin on the boundaries, where the answer lives, rather than
+#: at the centers, where it never does.
+#:
+#: Deterministic and ordered, so the same task always yields the same route.
+#: Adding a placement costs one planar sweep and cannot make the result longer.
+_INITIAL_PLACEMENTS = (
+    _place_at_centers,
+    _place_chained_forward,
+    _place_chained_backward,
+)
+
+
+def _sweep_to_convergence(
+    circles: Sequence[PlaneCircle],
+    points: list[tuple[float, float]],
+    max_sweeps: int,
+    epsilon: float,
+) -> list[tuple[float, float]]:
+    """Alternate odd/even sweeps from ``points`` until the length settles.
+
     Each sweep first updates all odd-indexed points (even ones fixed), then
     all even-indexed points (odd ones fixed); every update places the point
     with the exact GetOptPi solution between its two neighbours. The start
     point (index 0, the takeoff center) stays fixed; the final point, having
-    no successor, is the boundary point nearest its predecessor. Sweeps stop
-    once the total path length changes by less than ``epsilon``.
-
-    Consecutive identical circles are optimized as one point and duplicated
-    back afterwards (see :func:`_collapse_duplicate_circles`), so the returned
-    list always has one point per input circle.
+    no successor, is the boundary point nearest its predecessor.
 
     Args:
-        circles: Planar circles (x, y, radius) in turnpoint order.
+        circles: Planar circles (x, y, radius), already deduplicated.
+        points: One starting point per circle; mutated in place.
         max_sweeps: Upper bound on alternating sweeps.
         epsilon: Convergence threshold on total length change, in meters.
 
     Returns:
-        The optimized (x, y) route points, one per input circle.
+        The settled points — the same list that was passed in.
     """
-    if not circles:
-        return []
-
-    circles, index_of = _collapse_duplicate_circles(circles)
-
     n = len(circles)
-    points: list[tuple[float, float]] = [(c[0], c[1]) for c in circles]
-    if n < 2:
-        return [points[j] for j in index_of]
-
     previous_length = _polyline_length(points)
-    for sweep in range(max_sweeps):
+    for _ in range(max_sweeps):
         for parity in (1, 0):
             for i in range(1, n):
                 if i % 2 != parity:
@@ -280,8 +311,99 @@ def _optimize_plane_points(
         if abs(previous_length - current_length) < epsilon:
             break
         previous_length = current_length
+    return points
 
-    return [points[j] for j in index_of]
+
+def _optimize_plane_points(
+    circles: Sequence[PlaneCircle],
+    max_sweeps: int,
+    epsilon: float = CONVERGENCE_EPSILON_M,
+) -> list[tuple[float, float]]:
+    """Run the Ding–Xie–Jiang alternating optimization in the plane.
+
+    One route point is kept per circle. The sweep runs once from each of
+    :data:`_INITIAL_PLACEMENTS` and the shortest result wins, because the
+    method finds a local optimum and the starting configuration decides which
+    one. Sweeps stop once the total path length changes by less than
+    ``epsilon``.
+
+    The winner is chosen on *planar* length, which is where the choice belongs:
+    §7.1.3's PathFinder selects a path in Cartesian space and §7.1.8 only then
+    measures it on the ellipsoid. Picking here also means the snapping and the
+    geodesic legs are paid for once rather than once per placement.
+
+    Consecutive identical circles are optimized as one point and duplicated
+    back afterwards (see :func:`_collapse_duplicate_circles`), so the returned
+    list always has one point per input circle.
+
+    Args:
+        circles: Planar circles (x, y, radius) in turnpoint order.
+        max_sweeps: Upper bound on alternating sweeps, per placement.
+        epsilon: Convergence threshold on total length change, in meters.
+
+    Returns:
+        The optimized (x, y) route points, one per input circle.
+    """
+    if not circles:
+        return []
+
+    circles, index_of = _collapse_duplicate_circles(circles)
+
+    if len(circles) < 2:
+        return [_place_at_centers(circles)[j] for j in index_of]
+
+    best: list[tuple[float, float]] | None = None
+    best_length = math.inf
+    for place in _INITIAL_PLACEMENTS:
+        points = _sweep_to_convergence(circles, place(circles), max_sweeps, epsilon)
+        length = _polyline_length(points)
+        if length < best_length:
+            best, best_length = points, length
+
+    assert best is not None  # _INITIAL_PLACEMENTS is never empty
+    return [best[j] for j in index_of]
+
+
+def _corrected_path(
+    turnpoints: Sequence[TurnpointGeometry],
+    plane: LocalPlane,
+    earth_model: object,
+    max_sweeps: int,
+) -> list[tuple[float, float]]:
+    """Optimize in ``plane`` and correct the result back onto the boundaries.
+
+    One turn of the §7.1.8 RouteOptimizer crank: project, run the alternating
+    sweep, convert back, and apply ProjectionCorrection (§7.1.7). Separated out
+    because §7.1.6 turns it twice — once to find the task area centre, once to
+    use it.
+
+    Args:
+        turnpoints: The task turnpoints.
+        plane: The projection to solve in.
+        earth_model: Earth model selector (None means WGS84).
+        max_sweeps: Upper bound on alternating sweeps, per placement.
+
+    Returns:
+        One (lat, lon) per turnpoint, each on its cylinder boundary.
+    """
+    circles = [plane_circle(tp, plane) for tp in turnpoints]
+    plane_points = _optimize_plane_points(circles, max_sweeps=max_sweeps)
+
+    path: list[tuple[float, float]] = []
+    for i, ((x, y), (_, _, radius), tp) in enumerate(
+        zip(plane_points, circles, turnpoints)
+    ):
+        if i == 0 or radius <= 0.0:
+            # Takeoff start point and zero-radius circles (including LINE
+            # goals) sit exactly on the turnpoint center.
+            path.append((tp.center[0], tp.center[1]))
+            continue
+        # ProjectionCorrection (§7.1.7): re-place the planar solution at
+        # exactly radius r on the earth model along the center→point azimuth.
+        path.append(
+            snap_to_boundary(plane.lon_lat((x, y)), tp.center, radius, earth_model)
+        )
+    return path
 
 
 def calculate_iteratively_refined_route(
@@ -320,25 +442,19 @@ def calculate_iteratively_refined_route(
             earth_model=earth_model,
         )
 
-    circles, plane = _plane_circles(turnpoints, earth_model)
-    plane_points = _optimize_plane_points(circles, max_sweeps=max_sweeps)
+    # §7.1.6 runs the whole thing twice. The first pass centres its plane on
+    # the bounding box of the *turnpoints*; the second re-centres on the
+    # bounding box of the corrected path the first produced, and that centre
+    # is the taskAreaCentre the spec says to keep. The corrected path is a
+    # tighter box than the turnpoint centers — its points sit on cylinder
+    # boundaries, not at their middles — so the two differ whenever a large
+    # cylinder pulls the turnpoint box wider than the route ever goes.
+    plane = LocalPlane.around([tp.center for tp in turnpoints], earth_model)
+    route = _corrected_path(turnpoints, plane, earth_model, max_sweeps)
+    plane = LocalPlane.around(route, earth_model)
+    route = _corrected_path(turnpoints, plane, earth_model, max_sweeps)
 
     g = geod_for_earth_model(earth_model)
-    route: list[tuple[float, float]] = []
-    for i, ((x, y), (_, _, radius), tp) in enumerate(
-        zip(plane_points, circles, turnpoints)
-    ):
-        if i == 0 or radius <= 0.0:
-            # Takeoff start point and zero-radius circles (including LINE
-            # goals) sit exactly on the turnpoint center.
-            route.append((tp.center[0], tp.center[1]))
-            continue
-        # ProjectionCorrection (§7.1.7): re-place the planar solution at
-        # exactly radius r on the earth model along the center→point azimuth.
-        route.append(
-            snap_to_boundary(plane.lon_lat((x, y)), tp.center, radius, earth_model)
-        )
-
     legs = []
     for i in range(len(route) - 1):
         _, _, leg = g.inv(route[i][1], route[i][0], route[i + 1][1], route[i + 1][0])

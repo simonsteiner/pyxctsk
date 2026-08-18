@@ -33,7 +33,13 @@ from pyxctsk.distance.goal_line import (
 )
 from pyxctsk.distance.route_optimization import calculate_iteratively_refined_route
 from pyxctsk.distance.task_distances import task_to_turnpoints
-from pyxctsk.distance.turnpoint import geod_for_earth_model
+from pyxctsk.distance.turnpoint import (
+    LocalPlane,
+    geod_for_earth_model,
+    geodesic_distance,
+    local_tm_transformers,
+    task_area_center,
+)
 from pyxctsk.model.validation import ValidationRule
 from tests.corpus import reference_task, reference_tasks
 from tests.paths import ELEVATED_GOAL_DIR
@@ -1316,3 +1322,95 @@ def _turnpoints_with_ess_last():
     del turnpoints[1]["type"]
     turnpoints[-1]["type"] = "ESS"
     return turnpoints
+
+
+class TestRouteOptimizerConformance:
+    """S7F-03 and S7F-04: §7.1.6's two passes, and §7's "shortest path"."""
+
+    def _shifted_plane(self, lat_offset, lon_offset):
+        """A plane deliberately centred away from the task area."""
+
+        def around(centers, earth_model=None):
+            lat, lon = task_area_center(centers)
+            return LocalPlane(
+                *local_tm_transformers(lat + lat_offset, lon + lon_offset, earth_model)
+            )
+
+        return staticmethod(around)
+
+    @pytest.mark.parametrize("name", ["task_bevo", "task_duna", "task_nohe"])
+    def test_the_answer_does_not_depend_on_the_projection(self, name, monkeypatch):
+        """§7 asks for *the* shortest path, so the plane must not pick which one.
+
+        The alternating method converges to a local optimum, and before
+        multi-start these three tasks each had a shorter valid route reachable
+        by nothing more than moving the projection centre — `task_bevo` by
+        98.6 m. Every route compared here touches every cylinder in order, so
+        a shorter one is strictly better.
+        """
+        turnpoints = task_to_turnpoints(reference_task(name).task)
+        shipped = calculate_iteratively_refined_route(turnpoints).total_m
+
+        for lat_offset in (-0.45, 0.0, 0.45):
+            for lon_offset in (-0.45, 0.0, 0.45):
+                monkeypatch.setattr(
+                    LocalPlane, "around", self._shifted_plane(lat_offset, lon_offset)
+                )
+                shifted = calculate_iteratively_refined_route(turnpoints).total_m
+                monkeypatch.undo()
+
+                assert shipped <= shifted + 0.05, (
+                    f"a plane shifted by ({lat_offset}, {lon_offset}) finds a route "
+                    f"{shipped - shifted:.3f} m shorter"
+                )
+
+    def test_every_route_point_touches_its_cylinder(self):
+        """Whatever basin the sweep lands in, the route must still be a route.
+
+        A shorter number is only better if it is a legal path: §7 requires each
+        control zone to be touched, in order.
+        """
+        for reference in reference_tasks():
+            turnpoints = task_to_turnpoints(reference.task)
+            route = calculate_iteratively_refined_route(turnpoints)
+
+            for i, (point, turnpoint) in enumerate(zip(route.points, turnpoints)):
+                want = 0.0 if i == 0 else turnpoint.radius
+                assert geodesic_distance(turnpoint.center, point) == pytest.approx(
+                    want, abs=0.01
+                ), f"{reference.stem} turnpoint {i}"
+
+    def test_the_plane_is_rebuilt_from_the_corrected_path(self, monkeypatch):
+        """§7.1.6 runs PathFinder twice, the second time on the found path.
+
+        "boundingBox_final = FindBoundingBox(correctedPath)" — so the centre
+        the spec says to keep comes from the route, not from the turnpoints
+        that produced it.
+        """
+        seen = []
+        real = LocalPlane.around.__func__
+
+        def spy(centers, earth_model=None):
+            seen.append(list(centers))
+            return real(LocalPlane, centers, earth_model)
+
+        monkeypatch.setattr(LocalPlane, "around", staticmethod(spy))
+        turnpoints = task_to_turnpoints(reference_task("task_bevo").task)
+        route = calculate_iteratively_refined_route(turnpoints)
+
+        assert len(seen) == 2, "the optimizer must build two planes, not one"
+        assert seen[0] == [tp.center for tp in turnpoints]
+        # The second plane is centred on the first pass's corrected path: its
+        # points sit on cylinder boundaries, so they are not the centres.
+        assert seen[1] != seen[0]
+        assert len(seen[1]) == len(route.points)
+
+    def test_a_second_pass_plane_differs_from_a_turnpoint_plane(self):
+        """The two bounding boxes are genuinely different, so the pass is not a no-op."""
+        turnpoints = task_to_turnpoints(reference_task("task_bevo").task)
+        route = calculate_iteratively_refined_route(turnpoints)
+
+        from_turnpoints = task_area_center([tp.center for tp in turnpoints])
+        from_path = task_area_center(list(route.points))
+
+        assert from_turnpoints != from_path
