@@ -19,13 +19,12 @@ import pytest
 
 from pyxctsk import Task, TaskType
 from pyxctsk.distance import (
+    MeasuredTask,  # noqa: F401
     TaskTurnpoint,
-    calculate_iteratively_refined_route,
     calculate_task_distances,
     distance_through_centers,
     optimized_distance,
-    task_distances_from_route,
-    task_to_turnpoints,
+    task_distances_from,
 )
 from pyxctsk.export import common
 from pyxctsk.export.common import TaskDrawing
@@ -143,7 +142,7 @@ class TestDistanceComprehensive:
         task = reference_task(stem).task
 
         results = calculate_task_distances(task)
-        route = calculate_iteratively_refined_route(task_to_turnpoints(task))
+        route = MeasuredTask.from_task(task).route
 
         expected = [round(m / 1000.0, 1) for m in route.cumulative_m()]
         actual = [tp["cumulative_optimized_km"] for tp in results["turnpoints"]]
@@ -246,15 +245,16 @@ class TestDistanceComprehensive:
 
 
 class TestProjectionFromARoute:
-    """`task_distances_from_route`: the report as a projection of one route."""
+    """`task_distances_from`: the report as a projection of one route."""
 
     @pytest.mark.parametrize("stem", ["task_bevo", "task_gibe"])
     def test_agrees_with_optimizing_from_scratch(self, stem):
-        """Handing over a route gives exactly the report as computing one."""
+        """Projecting a measured task gives exactly the report as measuring one."""
         task = reference_task(stem).task
-        route = calculate_iteratively_refined_route(task_to_turnpoints(task))
 
-        assert task_distances_from_route(task, route) == calculate_task_distances(task)
+        assert task_distances_from(MeasuredTask.from_task(task)) == (
+            calculate_task_distances(task)
+        )
 
     def test_a_task_and_its_map_can_share_one_route(self):
         """The distance table and the drawn map cost one optimizer run together.
@@ -265,15 +265,15 @@ class TestProjectionFromARoute:
         task = reference_task("task_bevo").task
 
         calls = []
-        real = common.calculate_iteratively_refined_route
+        real = common.MeasuredTask.from_task
 
-        def counting(*args, **kwargs):
-            calls.append(args)
-            return real(*args, **kwargs)
+        def counting(measured_task, *args, **kwargs):
+            calls.append(measured_task)
+            return real(measured_task, *args, **kwargs)
 
-        with patch.object(common, "calculate_iteratively_refined_route", counting):
+        with patch.object(common.MeasuredTask, "from_task", counting):
             drawing = TaskDrawing.from_task(task)
-            table = task_distances_from_route(task, drawing.route)
+            table = task_distances_from(drawing.measured)
             geojson = drawing_to_geojson(drawing)
 
         assert len(calls) == 1
@@ -289,9 +289,8 @@ class TestProjectionFromARoute:
     def test_degenerate_task_projects_to_zeros(self):
         """A task with fewer than two turnpoints reports zeros, not an error."""
         task = Task(task_type=TaskType.CLASSIC, version=1, turnpoints=[])
-        route = calculate_iteratively_refined_route([])
 
-        result = task_distances_from_route(task, route)
+        result = task_distances_from(MeasuredTask.from_task(task))
 
         assert result["center_distance_km"] == 0.0
         assert result["optimized_distance_km"] == 0.0

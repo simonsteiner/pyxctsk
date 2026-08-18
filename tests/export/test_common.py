@@ -147,30 +147,39 @@ class TestOneDrawingTwoFormats:
     """The reason the value exists: both writers render the same one."""
 
     def test_rendering_both_formats_optimizes_the_route_once(self, monkeypatch):
-        """Two formats, one drawing, one optimizer run.
+        """Two formats, one drawing, one measured task.
 
         Each writer used to derive its own route, so producing both formats for
-        one task optimized it twice. Note the patch target: the name is looked
-        up in ``export.common`` at call time, which is exactly what the four
-        inert ``@patch`` decorators in test_geojson.py got wrong — they patched
-        a name ``geojson.py`` had already bound into its own module.
+        one task optimized it twice. Counting optimizer calls is no longer the
+        way to say so: the drawing holds a ``MeasuredTask``, so the claim is
+        that both renderings read that one value — an assertion about identity,
+        which a call count could only approximate.
         """
         calls = []
-        real = common.calculate_iteratively_refined_route
+        real = common.MeasuredTask.from_task
 
-        def counting(*args, **kwargs):
-            calls.append(args)
-            return real(*args, **kwargs)
+        def counting(task, *args, **kwargs):
+            calls.append(task)
+            return real(task, *args, **kwargs)
 
-        monkeypatch.setattr(common, "calculate_iteratively_refined_route", counting)
+        monkeypatch.setattr(common.MeasuredTask, "from_task", counting)
 
         drawing = TaskDrawing.from_task(_task(GoalType.LINE))
         kml = drawing_to_kml(drawing)
         geojson = drawing_to_geojson(drawing)
 
-        assert len(calls) == 1, "the drawing is the shared route, not a per-format one"
+        assert len(calls) == 1, (
+            "the drawing is the shared measurement, not a per-format one"
+        )
         assert "Goal Line" in kml
         assert any(f["properties"]["type"] == "goal_line" for f in geojson["features"])
+
+    def test_the_drawings_route_is_its_measured_tasks_route(self):
+        """``drawing.route`` reads through to the measured task, not a copy."""
+        drawing = TaskDrawing.from_task(_task(GoalType.LINE))
+
+        assert drawing.route is drawing.measured.route
+        assert drawing.measured.task is drawing.task
 
     def test_the_task_entry_point_agrees_with_the_drawing_one(self):
         """``generate_task_geojson(task)`` is ``drawing_to_geojson(from_task(task))``."""

@@ -32,8 +32,8 @@ from pyxctsk.distance.goal_line import (
     GoalLineOrientation,
     goal_line_length_from_turnpoints,
 )
+from pyxctsk.distance.measured_task import MeasuredTask, task_to_turnpoints
 from pyxctsk.distance.route_optimization import calculate_iteratively_refined_route
-from pyxctsk.distance.task_distances import task_to_turnpoints
 from pyxctsk.distance.turnpoint import (
     LocalPlane,
     geod_for_earth_model,
@@ -1178,12 +1178,12 @@ class TestGoalLineFollowsTheOptimizedRoute:
     def test_approach_is_the_optimized_route_point(self, name):
         """Every LINE-goal reference task orients against the route, not a centre."""
         task = reference_task(name).task
-        route = calculate_iteratively_refined_route(task_to_turnpoints(task))
+        measured = MeasuredTask.from_task(task)
 
-        line = GoalLine.from_task(task, route=route)
+        line = GoalLine.from_measured_task(measured)
 
         assert line is not None
-        assert line.approach_from == route.points[-2]
+        assert line.approach_from == measured.route.points[-2]
 
     def test_a_goal_inside_the_previous_cylinder_faces_the_right_way(self):
         """The case that showed the rule mattered.
@@ -1218,12 +1218,13 @@ class TestGoalLineFollowsTheOptimizedRoute:
         previous = task.turnpoints[-2].waypoint
         assert legacy.approach_from == (previous.lat, previous.lon)
 
-    def test_passing_a_route_matches_deriving_one(self):
-        """The route argument is an optimization, not a different answer."""
+    def test_measuring_first_matches_deriving_one(self):
+        """Passing a measured task is an optimization, not a different answer."""
         task = reference_task("task_fobe_line").task
-        route = calculate_iteratively_refined_route(task_to_turnpoints(task))
 
-        assert GoalLine.from_task(task, route=route) == GoalLine.from_task(task)
+        assert GoalLine.from_measured_task(MeasuredTask.from_task(task)) == (
+            GoalLine.from_task(task)
+        )
 
     def test_the_orientation_does_not_move_the_distance(self):
         """A LINE goal is a zero-radius circle either way (§7.2).
@@ -1231,10 +1232,10 @@ class TestGoalLineFollowsTheOptimizedRoute:
         Only the drawn shape changes; the optimized distance must not.
         """
         task = reference_task("task_qoga_line").task
-        before = calculate_iteratively_refined_route(task_to_turnpoints(task)).total_m
+        before = MeasuredTask.from_task(task).route.total_m
 
         GoalLine.from_task(task, GoalLineOrientation.TURNPOINT_CENTERS)
-        after = calculate_iteratively_refined_route(task_to_turnpoints(task)).total_m
+        after = MeasuredTask.from_task(task).route.total_m
 
         assert before == after
 

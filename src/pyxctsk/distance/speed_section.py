@@ -29,8 +29,9 @@ the reference corpus.
 from dataclasses import dataclass
 
 from ..model.task import Task, TaskType, TurnpointType
+from .measured_task import MeasuredTask, task_to_turnpoints
 from .route_optimization import OptimizedRoute, calculate_iteratively_refined_route
-from .task_distances import task_to_turnpoints
+from .turnpoint import TaskTurnpoint
 
 
 def _role_index(task: Task, role: TurnpointType) -> int | None:
@@ -65,6 +66,23 @@ class SpeedSection:
     start_index: int
 
     @classmethod
+    def from_measured_task(cls, measured: MeasuredTask) -> "SpeedSection | None":
+        """Build the speed section for an already-measured task.
+
+        Reuses the measured task's cylinders — the LINE-goal rule is applied
+        once, there — but not its route: §7.2's ``taskToESS`` is a separate
+        optimization, which is the whole point of this module.
+
+        Args:
+            measured: The task and the route measured for it.
+
+        Returns:
+            A SpeedSection, or None for the same reasons :meth:`from_task`
+            returns None.
+        """
+        return cls._from_turnpoints(measured.task, list(measured.turnpoints))
+
+    @classmethod
     def from_task(cls, task: Task) -> "SpeedSection | None":
         """Build the speed section for a task.
 
@@ -85,6 +103,13 @@ class SpeedSection:
         # waypoints task carrying stray ``SSS``/``ESS`` annotations has no
         # speed section however they are arranged, and measuring one would let
         # unchecked annotations override the type.
+        return cls._from_turnpoints(task, task_to_turnpoints(task))
+
+    @classmethod
+    def _from_turnpoints(
+        cls, task: Task, task_turnpoints: list[TaskTurnpoint]
+    ) -> "SpeedSection | None":
+        """Find the speed section in a task whose cylinders are already derived."""
         if task.task_type == TaskType.WAYPOINTS:
             return None
 
@@ -97,7 +122,7 @@ class SpeedSection:
         # ESS *is* the goal, the last entry carries the goal's type, so a LINE
         # goal stays the zero-radius point at its centre rather than becoming
         # a cylinder of half the line's length.
-        turnpoints = task_to_turnpoints(task)[: end + 1]
+        turnpoints = task_turnpoints[: end + 1]
         if len(turnpoints) < 2:
             return None
 

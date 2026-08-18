@@ -1,81 +1,21 @@
-"""Task distance calculations and turnpoint conversion utilities for XCTrack tasks.
+"""The per-turnpoint distance table, projected from one measured task.
 
-This module provides functions to:
-- Convert task turnpoints to internal representations for distance calculations
-- Compute center and optimized (shortest possible) task distances
-- Calculate cumulative and per-leg distances for each turnpoint
-- Support both cylinder and line goal types, with correct handling of goal definitions
-- Return detailed distance breakdowns for use in analysis and visualization
+Center and optimized distances for a task, with a row per turnpoint carrying
+its cumulative distance in each. Every optimized number is read off the
+measured task's route rather than recomputed, so a turnpoint's cumulative
+distance is by construction a prefix of the task's total.
+
+The cylinder conversion this module used to own lives in
+:mod:`~pyxctsk.distance.measured_task` now, beside the value that holds its
+result — which is also what removed the edge that made the goal line depend on
+the distance *report*.
 """
 
 from typing import Any
 
 from ..model.task import Task
-from .route_optimization import OptimizedRoute, calculate_iteratively_refined_route
-from .turnpoint import TaskTurnpoint, distance_through_centers, geodesic_distance
-
-
-def task_to_turnpoints(task: Task) -> list[TaskTurnpoint]:
-    """Convert a task's turnpoints into the cylinders distance code works on.
-
-    The one place that reads a goal's type off the model and turns it into
-    geometry: a LINE goal becomes a zero-radius point — the line is centred on
-    the goal and perpendicular to the approach, so its optimal crossing is the
-    goal center — anything else stays a cylinder, and every turnpoint inherits
-    the task's earth model.
-
-    Args:
-        task (Task): Task object.
-
-    Returns:
-        List[TaskTurnpoint]: List of TaskTurnpoint objects.
-    """
-    # Determine if there's a goal and its type
-    goal_type = None
-    if task.turnpoints and task.goal:
-        goal_type = task.goal.type.value if task.goal.type else "CYLINDER"
-
-    result = []
-    earth_model = task.earth_model
-
-    for i, tp in enumerate(task.turnpoints):
-        # Check if this is the goal turnpoint (last one)
-        if i == len(task.turnpoints) - 1:
-            # This is the goal turnpoint (last one in the list)
-            if goal_type == "LINE":
-                # This is a goal line turnpoint
-                result.append(
-                    TaskTurnpoint(
-                        lat=tp.waypoint.lat,
-                        lon=tp.waypoint.lon,
-                        radius=0,  # Goal lines have 0 radius (no cylinder)
-                        goal_type=goal_type,
-                        earth_model=earth_model,
-                    )
-                )
-            else:
-                # This is a regular cylinder goal (or no explicit goal type defined)
-                result.append(
-                    TaskTurnpoint(
-                        lat=tp.waypoint.lat,
-                        lon=tp.waypoint.lon,
-                        radius=tp.radius,
-                        goal_type=goal_type,
-                        earth_model=earth_model,
-                    )
-                )
-        else:
-            # Regular turnpoint
-            result.append(
-                TaskTurnpoint(
-                    lat=tp.waypoint.lat,
-                    lon=tp.waypoint.lon,
-                    radius=tp.radius,
-                    earth_model=earth_model,
-                )
-            )
-
-    return result
+from .measured_task import MeasuredTask
+from .turnpoint import distance_through_centers, geodesic_distance
 
 
 def _calculate_savings(center_km: float, opt_km: float) -> tuple[float, float]:
@@ -93,47 +33,42 @@ def _calculate_savings(center_km: float, opt_km: float) -> tuple[float, float]:
     return savings_km, savings_percent
 
 
-def _create_turnpoint_details(
-    task_turnpoints,
-    task_distance_turnpoints: list[TaskTurnpoint],
-    route: OptimizedRoute,
-) -> list[dict[str, Any]]:
+def _create_turnpoint_details(measured: MeasuredTask) -> list[dict[str, Any]]:
     """Create detailed turnpoint information including cumulative distances.
 
-    The optimized column is read off ``route`` rather than recomputed. Both
-    are distances along one route, so a turnpoint's cumulative optimized
-    distance is by construction a prefix of the task's optimized distance —
-    which is what re-optimizing a truncated task did not give: the optimizer
-    treats the last circle of whatever it is handed as the finish, so the
-    truncated optimum bent the route towards turnpoint i instead of passing
+    The optimized column is read off the measured task's route rather than
+    recomputed. Both are distances along one route, so a turnpoint's cumulative
+    optimized distance is by construction a prefix of the task's optimized
+    distance — which is what re-optimizing a truncated task did not give: the
+    optimizer treats the last circle of whatever it is handed as the finish, so
+    the truncated optimum bent the route towards turnpoint i instead of passing
     through it, understating the prefix by up to 5 km on the reference tasks.
 
+    Taking the measured task rather than its three parts is what lets this
+    zip them without a length guard: they are one value, so they agree.
+
     Args:
-        task_turnpoints: Original task turnpoints.
-        task_distance_turnpoints (List[TaskTurnpoint]): Distance calculation turnpoints.
-        route (OptimizedRoute): The task's optimized route.
+        measured (MeasuredTask): The task and the route measured for it.
 
     Returns:
         List[Dict[str, Any]]: List of dictionaries with turnpoint details.
     """
     turnpoint_details = []
     cumulative_center = 0.0
-    cumulative_optimized = route.cumulative_m()
+    cumulative_optimized = measured.cumulative_m()
 
-    for i, (tp, task_tp) in enumerate(zip(task_turnpoints, task_distance_turnpoints)):
+    for i, (tp, task_tp) in enumerate(
+        zip(measured.task.turnpoints, measured.turnpoints)
+    ):
         # Calculate cumulative distances for all turnpoints
         if i > 0:
             # Calculate center distance incrementally
-            prev_tp = task_distance_turnpoints[i - 1]
+            prev_tp = measured.turnpoints[i - 1]
             leg_distance = (
                 geodesic_distance(prev_tp.center, task_tp.center, task_tp.earth_model)
                 / 1000.0
             )
             cumulative_center += leg_distance
-
-        cumulative_opt = (
-            cumulative_optimized[i] / 1000.0 if i < len(cumulative_optimized) else 0.0
-        )
 
         turnpoint_details.append(
             {
@@ -144,33 +79,31 @@ def _create_turnpoint_details(
                 "radius": tp.radius,
                 "type": tp.type.value if tp.type else "",
                 "cumulative_center_km": round(cumulative_center, 1),
-                "cumulative_optimized_km": round(cumulative_opt, 1),
+                "cumulative_optimized_km": round(cumulative_optimized[i] / 1000.0, 1),
             }
         )
 
     return turnpoint_details
 
 
-def task_distances_from_route(task: Task, route: OptimizedRoute) -> dict[str, Any]:
-    """Project an already-optimized route into the distance report.
+def task_distances_from(measured: MeasuredTask) -> dict[str, Any]:
+    """Project a measured task into the distance report.
 
-    Every optimized number in the report comes from ``route``, so a caller that
-    already has one — the export package's ``TaskDrawing``, say — can produce
-    the table beside the map without optimizing the task a second time.
+    Every optimized number in the report comes from the measured task's route,
+    so a caller that already holds one — the export package's ``TaskDrawing``,
+    say — produces the table beside the map without optimizing the task a
+    second time.
 
     Distances are rounded to 0.1 km here because this dictionary is a report
-    for display; ``route`` itself carries unrounded meters.
+    for display; the route itself carries unrounded meters.
 
     Args:
-        task (Task): Task object. Must be the task ``route`` was optimized for.
-        route (OptimizedRoute): The task's optimized route.
+        measured (MeasuredTask): The task and the route measured for it.
 
     Returns:
         Dict[str, Any]: Dictionary containing distance calculations and turnpoint details.
     """
-    turnpoints = task_to_turnpoints(task)
-
-    if len(turnpoints) < 2:
+    if len(measured.turnpoints) < 2:
         return {
             "center_distance_km": 0.0,
             "optimized_distance_km": 0.0,
@@ -179,8 +112,8 @@ def task_distances_from_route(task: Task, route: OptimizedRoute) -> dict[str, An
             "turnpoints": [],
         }
 
-    center_km = distance_through_centers(turnpoints) / 1000.0
-    opt_km = route.total_m / 1000.0
+    center_km = distance_through_centers(list(measured.turnpoints)) / 1000.0
+    opt_km = measured.total_m / 1000.0
     savings_km, savings_percent = _calculate_savings(center_km, opt_km)
 
     return {
@@ -188,7 +121,7 @@ def task_distances_from_route(task: Task, route: OptimizedRoute) -> dict[str, An
         "optimized_distance_km": round(opt_km, 1),
         "savings_km": round(savings_km, 1),
         "savings_percent": round(savings_percent, 1),
-        "turnpoints": _create_turnpoint_details(task.turnpoints, turnpoints, route),
+        "turnpoints": _create_turnpoint_details(measured),
     }
 
 
@@ -198,9 +131,9 @@ def calculate_task_distances(
 ) -> dict[str, Any]:
     """Calculate both center and optimized distances for a task.
 
-    Optimizes the task's route once and projects it with
-    :func:`task_distances_from_route`. Pass the route yourself through that
-    function instead if you already have one.
+    Measures the task once and projects it with :func:`task_distances_from`.
+    Pass a :class:`~pyxctsk.distance.MeasuredTask` to that function instead if
+    you already hold one.
 
     Args:
         task (Task): Task object.
@@ -209,8 +142,4 @@ def calculate_task_distances(
     Returns:
         Dict[str, Any]: Dictionary containing distance calculations and turnpoint details.
     """
-    route = calculate_iteratively_refined_route(
-        task_to_turnpoints(task),
-        num_iterations=num_iterations,
-    )
-    return task_distances_from_route(task, route)
+    return task_distances_from(MeasuredTask.from_task(task, num_iterations))

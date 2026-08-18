@@ -32,7 +32,7 @@ from pyxctsk.distance import (
     distance_through_centers,
     optimized_distance,
 )
-from pyxctsk.distance.task_distances import task_to_turnpoints
+from pyxctsk.distance.measured_task import task_to_turnpoints
 from pyxctsk.distance.turnpoint import LocalPlane, plane_circle
 from tests.corpus import reference_task, tasks_with_reference_distance
 

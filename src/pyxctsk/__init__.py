@@ -9,13 +9,14 @@ See http://xctrack.org/ and http://xctrack.org/Competition_Interfaces.html
 from importlib.metadata import version
 
 from .distance import (
+    MeasuredTask,
     OptimizedRoute,
     SpeedSection,
     TaskTurnpoint,
     calculate_task_distances,
     distance_through_centers,
     optimized_distance,
-    task_distances_from_route,
+    task_distances_from,
 )
 from .exceptions import (
     EmptyInputError,
@@ -70,6 +71,7 @@ __all__ = [
     "GoalType",
     "InvalidFormatError",
     "InvalidTimeOfDayError",
+    "MeasuredTask",
     "MIME_TYPE",
     "optimized_distance",
     "OptimizedRoute",
@@ -78,7 +80,7 @@ __all__ = [
     "SSS",
     "SSSType",
     "Takeoff",
-    "task_distances_from_route",
+    "task_distances_from",
     "task_to_kml",
     "Task",
     "TaskDrawing",

@@ -22,9 +22,13 @@ turnpoint's *centre*). Everything else — the length, the perpendicular, the
 semicircle behind it — is identical in both editions and is not configurable.
 
 Orientation is where this module gained a dependency on the optimizer: under
-the current rule a goal line cannot be derived from the task alone. Callers
-that already hold an ``OptimizedRoute`` should pass it, or the same task is
-optimized twice — which is why ``TaskDrawing`` builds its route first.
+the current rule a goal line cannot be derived from the task alone. That is why
+:meth:`GoalLine.from_measured_task` is the primary constructor — a caller
+holding a :class:`~pyxctsk.distance.MeasuredTask` passes it rather than paying
+for a second optimization, and cannot pass a route belonging to a *different*
+task, which the optional ``route`` argument this replaced could not prevent.
+:meth:`GoalLine.from_task` remains for a caller holding only a task, and under
+the 2024 orientation it still optimizes nothing at all.
 
 Everything else here is :class:`GoalLine`'s own implementation. Callers use the
 object: ``length``, ``endpoints()`` and ``control_zone()``. There is deliberately
@@ -36,8 +40,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from ..model.task import GoalType, Task
-from .route_optimization import OptimizedRoute, calculate_iteratively_refined_route
-from .task_distances import task_to_turnpoints
+from .measured_task import MeasuredTask
 from .turnpoint import geod_for_earth_model
 
 # Constants for goal line visualization
@@ -238,41 +241,81 @@ class GoalLine:
         cls,
         task: Task,
         orientation: GoalLineOrientation = DEFAULT_ORIENTATION,
-        route: OptimizedRoute | None = None,
     ) -> "GoalLine | None":
         """Build the goal line for a task.
+
+        Measures the task when the orientation needs a route, which the
+        default one does. A caller that already holds a ``MeasuredTask``
+        should use :meth:`from_measured_task` instead; the 2024 orientation
+        needs no route and measures nothing either way.
 
         Args:
             task: Task to derive the goal line from.
             orientation: Which edition's rule decides the approach direction.
                 Defaults to the current one, :attr:`~GoalLineOrientation.OPTIMIZED_ROUTE`.
-            route: The task's optimized route, if the caller already has one.
-                Only read for the optimized-route orientation, and only to
-                save optimizing the same task twice; it must be the route for
-                ``task``.
 
         Returns:
             A GoalLine if the task has a LINE goal with sufficient geometry, otherwise None.
         """
-        if not (
+        if not cls._has_line_goal(task):
+            return None
+        if orientation is GoalLineOrientation.TURNPOINT_CENTERS:
+            return cls._build(task, cls._center_candidates(task))
+        return cls.from_measured_task(MeasuredTask.from_task(task), orientation)
+
+    @classmethod
+    def from_measured_task(
+        cls,
+        measured: MeasuredTask,
+        orientation: GoalLineOrientation = DEFAULT_ORIENTATION,
+    ) -> "GoalLine | None":
+        """Build the goal line for an already-measured task.
+
+        The primary constructor: S7F 2025+ orients the line against the
+        optimized route point on the last control zone before goal, so the
+        line needs a route, and taking the measured task means it is
+        necessarily *this* task's route.
+
+        Args:
+            measured: The task and the route measured for it.
+            orientation: Which edition's rule decides the approach direction.
+                Defaults to the current one, :attr:`~GoalLineOrientation.OPTIMIZED_ROUTE`.
+
+        Returns:
+            A GoalLine if the task has a LINE goal with sufficient geometry, otherwise None.
+        """
+        task = measured.task
+        if not cls._has_line_goal(task):
+            return None
+
+        if orientation is GoalLineOrientation.TURNPOINT_CENTERS:
+            candidates = cls._center_candidates(task)
+        else:
+            candidates = list(measured.route.points[:-1])
+        return cls._build(task, candidates)
+
+    @staticmethod
+    def _has_line_goal(task: Task) -> bool:
+        """Whether this task has a LINE goal with enough turnpoints to orient one."""
+        return bool(
             task.goal
             and task.goal.type == GoalType.LINE
             and task.turnpoints
             and len(task.turnpoints) >= 2
-        ):
-            return None
+        )
 
+    @staticmethod
+    def _center_candidates(task: Task) -> list[tuple[float, float]]:
+        """The 2024 rule's approach candidates: every turnpoint centre before goal."""
+        return [(tp.waypoint.lat, tp.waypoint.lon) for tp in task.turnpoints[:-1]]
+
+    @classmethod
+    def _build(
+        cls, task: Task, candidates: list[tuple[float, float]]
+    ) -> "GoalLine | None":
+        """Assemble the line from its approach candidates, or None if it has none."""
         last_tp = task.turnpoints[-1]
         center = (last_tp.waypoint.lat, last_tp.waypoint.lon)
-
-        if orientation is GoalLineOrientation.TURNPOINT_CENTERS:
-            candidates = [
-                (tp.waypoint.lat, tp.waypoint.lon) for tp in task.turnpoints[:-1]
-            ]
-        else:
-            if route is None:
-                route = calculate_iteratively_refined_route(task_to_turnpoints(task))
-            candidates = list(route.points[:-1])
 
         approach_from = _last_distinct_point(candidates, center)
         if approach_from is None:

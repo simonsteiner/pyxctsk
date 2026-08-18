@@ -213,12 +213,11 @@ class TestSeeYouSemantics:
         Legs beyond the first are independent validation of the optimizer
         against a second implementation.
         """
-        from pyxctsk.distance import calculate_iteratively_refined_route
-        from pyxctsk.distance.task_distances import task_to_turnpoints
+        from pyxctsk.distance.measured_task import MeasuredTask
         from pyxctsk.distance.turnpoint import geodesic_distance
 
         task = parse_task((FIXTURES / f"{name}_qr_code.txt").read_text())
-        route = calculate_iteratively_refined_route(task_to_turnpoints(task)).points
+        route = MeasuredTask.from_task(task).route.points
         ours = [
             geodesic_distance(route[i - 1], route[i], None) / 1000
             for i in range(1, len(route))

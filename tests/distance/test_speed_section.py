@@ -9,6 +9,7 @@ import pytest
 
 from pyxctsk import GoalType, TaskType, TurnpointType
 from pyxctsk.distance import (
+    MeasuredTask,  # noqa: F401
     SpeedSection,
     calculate_iteratively_refined_route,
     task_to_turnpoints,
@@ -154,7 +155,7 @@ class TestNotAPrefixOfTheTaskRoute:
         """The two disagree, which is the whole point of optimizing twice."""
         built = _race_task()
         section = SpeedSection.from_task(built)
-        task_route = calculate_iteratively_refined_route(task_to_turnpoints(built))
+        task_route = MeasuredTask.from_task(built).route
 
         assert section is not None
         prefix = task_route.cumulative_m()[3]  # distance to the ESS along the task
@@ -185,7 +186,7 @@ class TestGoalShapes:
             goal=GoalType.CYLINDER,
         )
         section = SpeedSection.from_task(built)
-        total = calculate_iteratively_refined_route(task_to_turnpoints(built)).total_m
+        total = MeasuredTask.from_task(built).route.total_m
 
         assert section is not None
         assert section.to_ess_m == pytest.approx(total)

@@ -18,7 +18,7 @@ import pytest
 
 from pyxctsk import Task, TurnpointType, parse_task
 from pyxctsk.distance import calculate_iteratively_refined_route, optimized_distance
-from pyxctsk.distance.task_distances import task_to_turnpoints
+from pyxctsk.distance.measured_task import MeasuredTask, task_to_turnpoints
 from pyxctsk.distance.turnpoint import geodesic_distance
 from tests.paths import ESS_GOAL_DIR
 
@@ -83,7 +83,7 @@ def test_duplicate_turnpoint_costs_nothing(name):
 def test_duplicate_route_points_coincide(name):
     """The two points of the pair must land on the same spot."""
     task = load(FIXTURES / f"{name}_qr_code.txt")
-    route = calculate_iteratively_refined_route(task_to_turnpoints(task)).points
+    route = MeasuredTask.from_task(task).route.points
 
     assert geodesic_distance(route[-2], route[-1], None) == pytest.approx(0.0, abs=0.01)
 

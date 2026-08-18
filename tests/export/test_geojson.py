@@ -18,7 +18,7 @@ between them a colour cannot change silently or drift between writers.
 import pytest
 
 from pyxctsk import Goal, GoalType, Task, TaskType, Turnpoint, TurnpointType, Waypoint
-from pyxctsk.distance import OptimizedRoute
+from pyxctsk.distance import MeasuredTask, OptimizedRoute
 from pyxctsk.export.common import TaskDrawing
 from pyxctsk.export.geojson import (
     _create_goal_line_features,
@@ -36,6 +36,16 @@ def _route(points) -> OptimizedRoute:
     )
 
 
+def _measured(task: Task, points) -> MeasuredTask:
+    """A measured task whose route is exactly these (lat, lon) points.
+
+    The writers never look at the cylinders, only the route, so this leaves
+    them empty rather than deriving them — the point of the seam is to render
+    without running the optimizer.
+    """
+    return MeasuredTask(task=task, turnpoints=(), route=_route(points))
+
+
 def _drawing_of(turnpoints: list, goal: Goal | None = None) -> TaskDrawing:
     """A drawing for a task of these turnpoints, with no route computed.
 
@@ -47,7 +57,10 @@ def _drawing_of(turnpoints: list, goal: Goal | None = None) -> TaskDrawing:
     """
     task = Task(task_type=TaskType.CLASSIC, version=1, turnpoints=turnpoints, goal=goal)
     return TaskDrawing(
-        task=task, turnpoints=tuple(turnpoints), goal_line=None, route=_route(())
+        task=task,
+        turnpoints=tuple(turnpoints),
+        goal_line=None,
+        measured=_measured(task, ()),
     )
 
 
@@ -133,7 +146,9 @@ class TestCreateTurnpointFeature:
 def _route_drawing(points) -> TaskDrawing:
     """A drawing whose route is exactly these (lat, lon) points."""
     task = Task(task_type=TaskType.CLASSIC, version=1, turnpoints=[])
-    return TaskDrawing(task=task, turnpoints=(), goal_line=None, route=_route(points))
+    return TaskDrawing(
+        task=task, turnpoints=(), goal_line=None, measured=_measured(task, points)
+    )
 
 
 class TestCreateOptimizedRouteFeature:

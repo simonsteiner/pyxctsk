@@ -24,11 +24,10 @@ import click
 
 from .distance import (
     PROPOSED_READING,
+    MeasuredTask,
     SpeedSection,
-    calculate_iteratively_refined_route,
     center_distance,
     center_distance_readings,
-    task_to_turnpoints,
 )
 from .export.kml import task_to_kml
 from .parser import parse_task
@@ -205,10 +204,9 @@ def _distance_report(task) -> dict:
     Returns:
         A JSON-serializable report.
     """
-    turnpoints = task_to_turnpoints(task)
-    route = calculate_iteratively_refined_route(turnpoints)
-    cumulative = route.cumulative_m()
-    speed_section = SpeedSection.from_task(task)
+    measured = MeasuredTask.from_task(task)
+    cumulative = measured.cumulative_m()
+    speed_section = SpeedSection.from_measured_task(measured)
 
     return {
         "pyxctsk_version": _pyxctsk_version(),
@@ -216,7 +214,7 @@ def _distance_report(task) -> dict:
         "earth_model": (
             task.earth_model.value if task.earth_model else "WGS84 (default)"
         ),
-        "task_distance_m": route.total_m,
+        "task_distance_m": measured.total_m,
         "speed_section_distance_m": (
             speed_section.distance_m if speed_section else None
         ),
@@ -237,9 +235,9 @@ def _distance_report(task) -> dict:
                 "center_lon": tp.waypoint.lon,
                 "route_lat": point[0],
                 "route_lon": point[1],
-                "cumulative_m": cumulative[i] if i < len(cumulative) else None,
+                "cumulative_m": cumulative[i],
             }
-            for i, (tp, point) in enumerate(zip(task.turnpoints, route.points))
+            for i, (tp, point) in enumerate(zip(task.turnpoints, measured.route.points))
         ],
         "notes": {
             "task_distance_m": "FAI S7F 2026 §7.2, optimized launch to goal",

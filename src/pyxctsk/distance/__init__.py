@@ -17,8 +17,11 @@ own. Everything a caller outside the package needs is named here —
   ``LocalPlane`` and the one planar solver every caller reaches
 - :mod:`~pyxctsk.distance.route_optimization` — the shortest path through the
   cylinders
+- :mod:`~pyxctsk.distance.measured_task` — ``MeasuredTask``, a task beside the
+  optimized route flown for it. Every module that needs both takes this one
+  value, so a task cannot be paired with another task's route
 - :mod:`~pyxctsk.distance.task_distances` — per-leg and cumulative distances,
-  projected from one optimized route
+  projected from one measured task
 - :mod:`~pyxctsk.distance.goal_line` — the ``GoalLine`` deep module: length,
   endpoints and semicircular control zone, in one place
 - :mod:`~pyxctsk.distance.speed_section` — ``SpeedSection``, §7.2's second
@@ -40,7 +43,7 @@ written and never read. `export/` is `goal_line`'s only consumer today.
 `goal_line` does depend on the optimizer, though: S7F 2025+ orients the line
 against the optimized route point rather than a turnpoint centre, so the
 line cannot be derived from the task alone. That edge runs the same way as
-every other one here — `goal_line` → `task_distances` → `route_optimization`
+every other one here — `goal_line` → `measured_task` → `route_optimization`
 → `turnpoint` — so it adds no cycle.
 
 Submodules import each other directly, never through this file, which is what
@@ -69,6 +72,7 @@ from .goal_line import (
     GoalLineOrientation,
     goal_line_length_from_turnpoints,
 )
+from .measured_task import MeasuredTask, task_to_turnpoints
 from .route_optimization import (
     CONVERGENCE_EPSILON_M,
     DEFAULT_NUM_ITERATIONS,
@@ -77,11 +81,7 @@ from .route_optimization import (
     optimized_distance,
 )
 from .speed_section import SpeedSection
-from .task_distances import (
-    calculate_task_distances,
-    task_distances_from_route,
-    task_to_turnpoints,
-)
+from .task_distances import calculate_task_distances, task_distances_from
 from .turnpoint import (
     FAI_SPHERE_RADIUS_M,
     LocalPlane,
@@ -94,6 +94,7 @@ from .turnpoint import (
 # Export all the main public functions and classes
 __all__ = [
     # Core classes
+    "MeasuredTask",
     "LocalPlane",
     "plane_circle",
     "TaskTurnpoint",
@@ -112,7 +113,7 @@ __all__ = [
     "PROPOSED_READING",
     "geodesic_distance",
     "calculate_task_distances",
-    "task_distances_from_route",
+    "task_distances_from",
     "task_to_turnpoints",
     # Configuration
     "CONVERGENCE_EPSILON_M",
