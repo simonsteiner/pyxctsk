@@ -631,6 +631,7 @@ class TestTheNestedModelsAreReachableOnTheirOwn:
         source = {"d": "18:00:00Z", "fa": 50, "t": 1}
         goal = QRCodeGoal.from_dict(source)
 
+        assert goal.deadline is not None
         assert goal.deadline.hour == 18
         assert goal.finish_altitude == 50
         assert list(goal.to_dict()) == ["d", "fa", "t"]
@@ -654,6 +655,7 @@ class TestTheNestedModelsAreReachableOnTheirOwn:
         source = {"o": "08:00:00Z", "c": "09:30:00Z"}
         takeoff = QRCodeTakeoff.from_dict(source)
 
+        assert takeoff.time_open is not None and takeoff.time_close is not None
         assert (takeoff.time_open.hour, takeoff.time_close.hour) == (8, 9)
         assert takeoff.to_dict() == source
 

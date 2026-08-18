@@ -107,29 +107,27 @@ no_implicit_optional = true
 strict_optional = true
 mypy_path = ["stubs", "src"]
 
+# Third-party packages src/ imports that ship no type information. Kept to
+# what is actually reached: warn_unused_configs reports the rest as noise, and
+# the previous config carried nine dead entries behind it.
 [[tool.mypy.overrides]]
 module = [
-    "calcUtils",
     "click.*",
-    "geo",
-    "geographiclib.*",
-    "geopy.*",
-    "optype.*",
     "PIL.*",
     "pyproj.*",
-    "pytest.*",
     "qrcode.*",
-    "route",
     "scipy.*",
     "zxingcpp.*",
 ]
 ignore_missing_imports = true
 
-# scripts/ holds utilities, not library code, and airscore_clone is vendored.
+# Tests are checked too — the lefthook hook runs mypy over whatever is staged —
+# but a test function is not required to annotate `-> None`. That rule is about
+# a caller knowing what it gets back, and nothing calls a test. The checks that
+# find real mistakes in a test (attr-defined, arg-type, union-attr) stay on.
 [[tool.mypy.overrides]]
-module = ["scripts.task_viewer.airscore_clone.*", "scripts.task_viewer.airscore_utils"]
-ignore_errors = true
-ignore_missing_imports = true
+module = ["tests.*"]
+disable_error_code = ["no-untyped-def"]
 
 [tool.pytest.ini_options]
 minversion = "6.0"

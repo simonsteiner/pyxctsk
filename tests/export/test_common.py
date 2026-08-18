@@ -141,7 +141,9 @@ class TestTaskDrawing:
         drawing = TaskDrawing.from_task(_task(GoalType.CYLINDER))
 
         assert drawing.route_coordinates() == list(drawing.route.points)
-        assert len(drawing.route_coordinates()) == 3
+        coordinates = drawing.route_coordinates()
+        assert coordinates is not None
+        assert len(coordinates) == 3
 
 
 class TestOneDrawingTwoFormats:

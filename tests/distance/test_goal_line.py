@@ -76,6 +76,7 @@ class TestGoalLineClass:
     def test_from_task_returns_none_for_cylinder(self):
         """A cylinder goal produces no GoalLine."""
         task = _line_goal_task()
+        assert task.goal is not None
         task.goal.type = GoalType.CYLINDER
         assert GoalLine.from_task(task) is None
 
@@ -84,6 +85,7 @@ class TestGoalLineClass:
         # Approaching from due south, the line runs east-west and is centred
         # on the goal, so the forward azimuth is ~0/360.
         gl = GoalLine.from_task(_line_goal_task())
+        assert gl is not None
         (lon1, lat1), (lon2, lat2), forward_azimuth = gl.endpoints()
         assert abs(forward_azimuth) < 1.0 or abs(forward_azimuth - 360) < 1.0
         # Endpoints straddle the goal longitude symmetrically.
@@ -92,6 +94,7 @@ class TestGoalLineClass:
     def test_control_zone_is_a_closed_polygon(self):
         """The control zone is a closed ring of more than three points."""
         gl = GoalLine.from_task(_line_goal_task())
+        assert gl is not None
         zone = gl.control_zone()
         assert zone[0] == zone[-1]  # closed ring
         assert len(zone) > 3
@@ -282,10 +285,12 @@ class TestGoalLineEarthModel:
 
     def test_from_task_carries_the_model(self):
         """The model travels with the goal line, not with the caller."""
-        assert GoalLine.from_task(self._task(EarthModel.FAI_SPHERE)).earth_model == (
-            EarthModel.FAI_SPHERE
-        )
-        assert GoalLine.from_task(self._task(None)).earth_model is None
+        line = GoalLine.from_task(self._task(EarthModel.FAI_SPHERE))
+        assert line is not None
+        assert line.earth_model == (EarthModel.FAI_SPHERE)
+        default = GoalLine.from_task(self._task(None))
+        assert default is not None
+        assert default.earth_model is None
 
     def test_endpoints_are_half_the_length_from_the_center_on_that_model(self):
         """Each endpoint sits length / 2 from the goal, measured on the model.
@@ -295,6 +300,7 @@ class TestGoalLineEarthModel:
         """
         for earth_model in (None, EarthModel.FAI_SPHERE):
             goal_line = GoalLine.from_task(self._task(earth_model))
+            assert goal_line is not None
             (lon1, lat1), (lon2, lat2), _ = goal_line.endpoints()
             for lon, lat in ((lon1, lat1), (lon2, lat2)):
                 measured = geodesic_distance(goal_line.center, (lat, lon), earth_model)
@@ -304,8 +310,11 @@ class TestGoalLineEarthModel:
 
     def test_the_two_models_disagree_enough_to_matter(self):
         """The models place the endpoints tens of metres apart on a long line."""
-        wgs84 = GoalLine.from_task(self._task(None)).endpoints()[0]
-        sphere = GoalLine.from_task(self._task(EarthModel.FAI_SPHERE)).endpoints()[0]
+        on_wgs84 = GoalLine.from_task(self._task(None))
+        on_sphere = GoalLine.from_task(self._task(EarthModel.FAI_SPHERE))
+        assert on_wgs84 is not None and on_sphere is not None
+        wgs84 = on_wgs84.endpoints()[0]
+        sphere = on_sphere.endpoints()[0]
 
         apart = geodesic_distance((wgs84[1], wgs84[0]), (sphere[1], sphere[0]))
         assert apart > 10.0, "otherwise this test could not detect the wrong model"

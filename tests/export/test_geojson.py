@@ -184,7 +184,7 @@ class TestCreateOptimizedRouteFeature:
 
     def test_create_optimized_route_feature_empty(self):
         """Test creating optimized route feature with empty coordinates."""
-        coords = []
+        coords: list[tuple[float, float]] = []
 
         feature = _create_optimized_route_feature(_route_drawing(coords))
 

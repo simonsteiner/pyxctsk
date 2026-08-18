@@ -147,8 +147,18 @@ class TestOptionality:
         assert Value("label", "l").read({"l": None}) == {}
 
     def test_optional_omits_none(self):
-        """No value, no key."""
-        assert Value("label", "l").write(Toy(name="A"), {}) is None
+        """No value, no key.
+
+        ``write`` mutates the dict it is handed and always returns None, so
+        asserting on its return value held whatever it did — this used to read
+        ``assert Value("label", "l").write(Toy(name="A"), {}) is None`` and
+        passed for a field that wrote the key too.
+        """
+        written: dict[str, object] = {}
+
+        Value("label", "l").write(Toy(name="A"), written)
+
+        assert written == {}
 
     def test_optional_empty_treats_empty_as_absent(self):
         """An empty description says nothing a missing key does not."""

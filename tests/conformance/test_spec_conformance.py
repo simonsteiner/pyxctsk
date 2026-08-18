@@ -159,7 +159,9 @@ class TestGoalSerializedShape:
 
         qr = task.to_qr_code_task()
         assert json.loads(qr.to_json())["g"]["fa"] == 50
-        assert qr.to_task().goal.finish_altitude == 50
+        converted = qr.to_task()
+        assert converted.goal is not None
+        assert converted.goal.finish_altitude == 50
 
     def test_finish_altitude_omitted_when_absent(self):
         """An optional field must stay absent, not become null or zero."""
@@ -446,6 +448,24 @@ class TestStructuralValidation:
     def test_strict_accepts_a_valid_task(self):
         """Strict must not reject what the spec allows."""
         assert parse_task(task_json(), strict=True).turnpoints
+
+    def test_a_caller_can_react_to_a_specific_rule(self):
+        """The whole point of naming a rule, and it did not typecheck.
+
+        ``TaskValidationError.issues`` was ``Sequence[object]``, so the
+        documented way to use it — matching on ``issue.rule`` rather than on
+        the English message — failed mypy with *"object" has no attribute
+        "rule"* for any downstream caller.
+        """
+        data = json.loads(task_json())
+        data["turnpoints"][2]["type"] = "TAKEOFF"
+
+        with pytest.raises(TaskValidationError) as excinfo:
+            parse_task(json.dumps(data), strict=True)
+
+        rules = [issue.rule for issue in excinfo.value.issues]
+        assert rules == [ValidationRule.TAKEOFF_NOT_FIRST]
+        assert excinfo.value.issues[0].message
 
 
 class TestStrictValidatesWhatArrived:
@@ -933,6 +953,8 @@ class TestNestedShapesCarryUnknownKeys:
         task = self._task()
 
         assert task.turnpoints[0].waypoint.unknown == {"zz": "waypoint-extra"}
+        assert task.sss is not None and task.goal is not None
+        assert task.takeoff is not None
         assert task.sss.unknown == {"zz": "sss-extra"}
         assert task.goal.unknown == {"zz": "goal-extra"}
         assert task.takeoff.unknown == {"zz": "takeoff-extra"}
@@ -969,6 +991,7 @@ class TestNestedShapesCarryUnknownKeys:
 
         qr = QRCodeTask.from_dict(source)
 
+        assert qr.sss is not None and qr.goal is not None
         assert qr.sss.unknown == {"zz": "sss-extra"}
         assert qr.goal.unknown == {"zz": "goal-extra"}
         assert json.loads(qr.to_json()) == source
@@ -1006,6 +1029,7 @@ class TestNestedShapesCarryUnknownKeys:
 
         task = Task.from_json(json.dumps(data))
 
+        assert task.goal is not None
         assert task.goal.unknown == {}
         assert "lineLength" not in json.loads(task.to_json())["goal"]
 
@@ -1464,7 +1488,7 @@ class TestRouteOptimizerConformance:
         that produced it.
         """
         seen = []
-        real = LocalPlane.around.__func__
+        real = LocalPlane.around.__func__  # type: ignore[attr-defined]
 
         def spy(centers, earth_model=None):
             seen.append(list(centers))

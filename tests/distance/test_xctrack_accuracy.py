@@ -80,6 +80,7 @@ class TestReferenceAccuracy:
         matching = []
         for reference in WITH_REFERENCE:
             name, ref_km = reference.stem, reference.reference_optimized_km
+            assert ref_km is not None, f"{name} is in WITH_REFERENCE without one"
             turnpoints = task_to_turnpoints(reference.task)
             calc_m = optimized_distance(turnpoints)
             ref_m = ref_km * 1000.0

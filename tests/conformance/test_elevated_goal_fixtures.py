@@ -293,9 +293,9 @@ class TestConformantElevatedGoal:
         assert json.loads(task.to_json())["goal"]["finishAltitude"] == (
             self.FINISH_ALTITUDE_AGL
         )
-        assert parse_task(task.to_json()).goal.finish_altitude == (
-            self.FINISH_ALTITUDE_AGL
-        )
+        round_tripped = parse_task(task.to_json())
+        assert round_tripped.goal is not None
+        assert round_tripped.goal.finish_altitude == (self.FINISH_ALTITUDE_AGL)
 
     def test_concentric_sss_and_goal_keep_their_out_and_back(self):
         """SSS r=61.6 km and goal r=400 m share a center, so the route flies out.

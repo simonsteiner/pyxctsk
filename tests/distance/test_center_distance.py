@@ -94,7 +94,9 @@ class TestTheAlternativeReadings:
         from_start = center_distance(built, CenterDistanceReading.START_TO_GOAL)
 
         assert from_start is not None
-        assert from_start < center_distance(built)
+        whole = center_distance(built)
+        assert whole is not None
+        assert from_start < whole
 
     def test_the_start_reading_does_not_apply_without_an_sss(self):
         """Undefined rather than silently equal to the launch reading."""
@@ -181,7 +183,9 @@ class TestTheBoundaryReadingEndsWhereTheRouteEnds:
 
         boundary = center_distance(built, CenterDistanceReading.LAUNCH_TO_GOAL_BOUNDARY)
 
-        assert boundary == pytest.approx(center_distance(built) - 2000)
+        whole = center_distance(built)
+        assert whole is not None
+        assert boundary == pytest.approx(whole - 2000)
 
     def test_a_line_goal_subtracts_nothing(self):
         """A LINE goal is a zero-radius point, so the route ends at its centre.

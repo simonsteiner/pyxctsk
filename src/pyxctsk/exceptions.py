@@ -4,6 +4,10 @@ This module defines the exception hierarchy for pyxctsk, including errors for em
 """
 
 from collections.abc import Sequence
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .model.validation import ValidationIssue
 
 
 class pyXCTSKError(Exception):
@@ -30,15 +34,22 @@ class TaskValidationError(pyXCTSKError):
     Distinct from :class:`InvalidFormatError`: the input parsed fine, but the
     turnpoints it describes are not a well-formed task.
 
+    The whole point of a named rule is that a caller can react to a specific
+    violation without matching on the English message, so this is typed:
+    ``except TaskValidationError as e: e.issues[0].rule`` used to fail the type
+    checker with *"object" has no attribute "rule"*. The import is under
+    ``TYPE_CHECKING`` because the cycle it avoids is a runtime one, through
+    ``model/__init__`` — ``validation`` itself imports only ``model.enums``,
+    and never these exceptions.
+
     Attributes:
-        issues (list): One :class:`~pyxctsk.model.validation.ValidationIssue` per
-            violated rule, each naming the rule it broke. Typed loosely here
-            because ``validation`` imports the exceptions, not the reverse.
+        issues: One :class:`~pyxctsk.model.validation.ValidationIssue` per
+            violated rule, each naming the rule it broke.
     """
 
-    def __init__(self, issues: Sequence[object]):
+    def __init__(self, issues: Sequence["ValidationIssue"]):
         """Initialize with the list of structural violations."""
-        self.issues = list(issues)
+        self.issues: list[ValidationIssue] = list(issues)
         super().__init__("; ".join(str(issue) for issue in issues))
 
 
