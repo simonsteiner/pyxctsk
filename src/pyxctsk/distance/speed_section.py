@@ -28,7 +28,7 @@ the reference corpus.
 
 from dataclasses import dataclass
 
-from ..model.task import Task, TurnpointType
+from ..model.task import Task, TaskType, TurnpointType
 from .route_optimization import OptimizedRoute, calculate_iteratively_refined_route
 from .task_distances import task_to_turnpoints
 
@@ -78,6 +78,16 @@ class SpeedSection:
             :meth:`~pyxctsk.Task.validate` already reports as invalid
             (``SSS_AFTER_ESS``); there is no honest number to return for it.
         """
+        # The *task type* decides whether there is a speed section at all, not
+        # the turnpoint roles. An XC/Waypoints task is "a simple route from
+        # waypoints without cylinders", and ``model/validation.py`` already
+        # exempts it from the SSS/ESS rules on exactly that ground — so a
+        # waypoints task carrying stray ``SSS``/``ESS`` annotations has no
+        # speed section however they are arranged, and measuring one would let
+        # unchecked annotations override the type.
+        if task.task_type == TaskType.WAYPOINTS:
+            return None
+
         start = _role_index(task, TurnpointType.SSS)
         end = _role_index(task, TurnpointType.ESS)
         if start is None or end is None or start > end:

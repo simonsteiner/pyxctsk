@@ -7,7 +7,7 @@ own: the ESS route is a *separate* optimization, not a prefix of the task's.
 
 import pytest
 
-from pyxctsk import GoalType, TurnpointType
+from pyxctsk import GoalType, TaskType, TurnpointType
 from pyxctsk.distance import (
     SpeedSection,
     calculate_iteratively_refined_route,
@@ -63,9 +63,43 @@ class TestWhenThereIsNoSpeedSection:
 
         assert SpeedSection.from_task(built) is None
 
-    def test_a_route_task_with_no_roles_at_all(self):
-        """An XC/Waypoints route has no speed section by definition."""
-        assert SpeedSection.from_task(task()) is None
+    def test_a_task_with_no_roles_at_all(self):
+        """The builder's default CLASSIC task marks neither end of a speed section."""
+        built = task()
+
+        assert built.task_type is TaskType.CLASSIC
+        assert SpeedSection.from_task(built) is None
+
+    def test_a_waypoints_task_has_none_whatever_its_roles_say(self):
+        """The *task type* decides, not the turnpoint annotations.
+
+        An XC/Waypoints task is a plain route, and ``model/validation.py``
+        exempts it from the SSS/ESS rules on that ground — so it never gets
+        those annotations checked. Measuring a speed section off them anyway
+        would let unchecked roles override the type: this task would report
+        68.7 km.
+        """
+        built = task(
+            turnpoint("A", 46.0, 8.0, radius=400, type=TurnpointType.TAKEOFF),
+            turnpoint("S", 46.2, 8.0, radius=5000, type=TurnpointType.SSS),
+            turnpoint("E", 46.8, 8.0, radius=3000, type=TurnpointType.ESS),
+            goal=GoalType.CYLINDER,
+            task_type=TaskType.WAYPOINTS,
+        )
+
+        assert built.validate() == [], "precondition: the roles go unchecked"
+        assert SpeedSection.from_task(built) is None
+
+    def test_the_same_turnpoints_as_a_classic_task_do_have_one(self):
+        """So the previous test is about the type, not about the geometry."""
+        turnpoints = (
+            turnpoint("A", 46.0, 8.0, radius=400, type=TurnpointType.TAKEOFF),
+            turnpoint("S", 46.2, 8.0, radius=5000, type=TurnpointType.SSS),
+            turnpoint("E", 46.8, 8.0, radius=3000, type=TurnpointType.ESS),
+        )
+        classic = task(*turnpoints, goal=GoalType.CYLINDER)
+
+        assert SpeedSection.from_task(classic) is not None
 
 
 class TestTheThreeNumbers:
@@ -184,8 +218,14 @@ class TestAcrossTheCorpus:
         """Or the task genuinely has no speed section."""
         section = SpeedSection.from_task(reference.task)
         if section is None:
+            # Either it is a waypoints task, or it does not mark both ends.
+            # Both corpus route tasks are the former and carry no roles either,
+            # so this holds for a future task that is one without being both.
             roles = {tp.type for tp in reference.task.turnpoints}
-            assert not {TurnpointType.SSS, TurnpointType.ESS} <= roles
+            assert (
+                reference.task.task_type is TaskType.WAYPOINTS
+                or not {TurnpointType.SSS, TurnpointType.ESS} <= roles
+            )
             return
 
         assert section.distance_m == pytest.approx(
