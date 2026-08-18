@@ -60,6 +60,7 @@ lons
 lorili
 MATEC
 matecconf
+millimetres
 minversion
 mmomtchev
 mojibake

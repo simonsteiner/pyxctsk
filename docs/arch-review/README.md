@@ -61,4 +61,9 @@ superseded reviews stay for history rather than being edited. Newest first.
   — **superseded, retained for history.** Claims 100% coverage; the 2026-08-16 audit
   disproves that. Still useful as the record of the QR encoding fixes made at the time.
 
+The findings these reviews produced that are addressed to *other implementers* rather than
+to this codebase — what S7F defines, what it does not, and where pyxctsk and other vendors
+disagree on a task's published distance — are collected in
+[`../s7f-distance-reference.md`](../s7f-distance-reference.md).
+
 Design decisions that came out of these reviews are recorded in [`../adr/`](../adr/README.md).
