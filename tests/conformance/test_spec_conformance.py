@@ -448,6 +448,78 @@ class TestStructuralValidation:
         assert parse_task(task_json(), strict=True).turnpoints
 
 
+class TestStrictValidatesWhatArrived:
+    """`--strict` checks the payload, not what converting it invented.
+
+    Three of the four format adapters are the compact one, and they used to
+    call `to_task()` inside the adapter — so by the strict gate the payload was
+    gone and `Task.validate()` reported on a conversion that had invented a
+    version, a task type and a goal the payload never carried. That is the
+    failure `model/validation.py` says the `TaskStructure` split exists to
+    prevent, and it meant `UNKNOWN_VERSION` could not be reported for any QR
+    input at all.
+    """
+
+    def _payloads(self, qr):
+        """The same payload in each of the three text QR formats."""
+        return {
+            "XCTSK:": qr.to_string(),
+            "XCTSKZ:": qr.to_string(compressed=True),
+            "qrcode-json": qr.to_json(),
+        }
+
+    def _bad_version_qr(self):
+        """A QR payload declaring a version its format does not define."""
+        qr = reference_task("task_bevo").task.to_qr_code_task()
+        qr.version = 99
+        return qr
+
+    @pytest.mark.parametrize(
+        "fmt", ["XCTSK:", "XCTSKZ:", "qrcode-json"], ids=lambda f: f.strip(":-")
+    )
+    def test_a_qr_payloads_own_version_rule_reaches_strict(self, fmt):
+        """The QR format defines version 2; 99 is a violation of *that* rule."""
+        payload = self._payloads(self._bad_version_qr())[fmt]
+
+        with pytest.raises(TaskValidationError) as excinfo:
+            parse_task(payload, strict=True)
+
+        assert any(
+            issue.rule is ValidationRule.UNKNOWN_VERSION
+            for issue in excinfo.value.issues
+        )
+
+    @pytest.mark.parametrize(
+        "fmt", ["XCTSK:", "XCTSKZ:", "qrcode-json"], ids=lambda f: f.strip(":-")
+    )
+    def test_the_report_matches_the_payloads_own_verdict(self, fmt):
+        """parse_task(strict) says exactly what QRCodeTask.validate() says."""
+        qr = self._bad_version_qr()
+        payload = self._payloads(qr)[fmt]
+
+        with pytest.raises(TaskValidationError) as excinfo:
+            parse_task(payload, strict=True)
+
+        assert [str(i) for i in excinfo.value.issues] == [str(i) for i in qr.validate()]
+
+    def test_lenient_parsing_still_reads_it(self):
+        """Validation is a report, not a gate — reading stays lenient."""
+        payload = self._bad_version_qr().to_string()
+
+        # The converted Task declares the full format's version, not the 99
+        # the payload carried; that is exactly why validating it was wrong.
+        assert parse_task(payload).version == 1
+
+    @pytest.mark.parametrize("reference", reference_tasks(), ids=str)
+    def test_strict_accepts_every_corpus_task_in_every_format(self, reference):
+        """Strict must not reject what the spec allows, in any format."""
+        qr = reference.task.to_qr_code_task()
+
+        assert parse_task(reference.task.to_json(), strict=True).turnpoints
+        for payload in self._payloads(qr).values():
+            assert parse_task(payload, strict=True).turnpoints
+
+
 class TestCompressedQRScheme:
     """Finding 3 — the ``XCTSKZ:`` zlib+base64 encoding.
 
