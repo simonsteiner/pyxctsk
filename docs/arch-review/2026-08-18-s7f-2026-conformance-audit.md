@@ -20,19 +20,22 @@ everything that one raised and covers the sections it did not.
 ## Open issues
 
 Status values: **open**, **in progress**, **fixed** (name the PR/commit), **won't fix** (say why).
-Edit the table in place; the finding sections below keep the reproduction.
+Edit the table in place; the finding sections below keep the reproduction as first written,
+so a fixed finding still says what it was and how it was measured.
+
+**All eight actionable issues are fixed.** S7F-09 is not actionable in this library.
 
 | ID | § | Severity | Status | Summary |
 | --- | --- | --- | --- | --- |
 | [S7F-01](#s7f-01--the-goal-line-still-follows-the-2024-orientation-rule) | 6.2.3.1 | **High** | **fixed** `2800429` | Goal line now oriented from the optimized route point; the 2024 rule stays reachable as `GoalLineOrientation.TURNPOINT_CENTERS` |
-| [S7F-02](#s7f-02--speed-section-distance-is-not-computed) | 7.2 | Medium | **open** — deferred | Speed-section distance is not computed at all. Deferred deliberately: it is a scoring input and pyxctsk does not score |
-| [S7F-03](#s7f-03--the-task-area-centre-is-not-findtaskareacentre) | 7.1.6 | Medium | **fixed** `50dae97` | Bounding-box centre with §7.1.6.1 antimeridian handling. The second pass is **still open** — measured at ≤1 mm, see the finding |
-| [S7F-04](#s7f-04--the-optimizer-can-settle-in-a-local-optimum) | 7 | Low | **open** | The alternating sweep is only locally convergent. `task_duna`'s 41 m gap closed as a side effect of S7F-03, but the sensitivity itself remains |
+| [S7F-02](#s7f-02--speed-section-distance-is-not-computed) | 7.2 | Medium | **fixed** `5ec661a` | `SpeedSection` — its own `taskToESS` optimization, since the ESS route is not a prefix of the task route |
+| [S7F-03](#s7f-03--the-task-area-centre-is-not-findtaskareacentre) | 7.1.6 | Medium | **fixed** `50dae97`, `278ab2b` | Bounding-box centre with §7.1.6.1 antimeridian handling, and the second pass that re-centres on the corrected path |
+| [S7F-04](#s7f-04--the-optimizer-can-settle-in-a-local-optimum) | 7 | Low | **fixed** `278ab2b` | Multi-start from three deterministic placements. Worst projection sensitivity across the corpus: 98.6 m → 10 mm |
 | [S7F-05](#s7f-05--the-ltm-scale-factor-is-1-not-099994) | 7.1.2 | Low | **fixed** `17ce2de` | `ltm_scale_factor` applies k₀ = 0.99994, latitude-dependent above 55°, written as `+k_0` |
 | [S7F-06](#s7f-06--the-elevated-goal-ceiling-is-not-validated) | 6.2.3.2 | Low | **fixed** `e71b3de` | `FINISH_ALTITUDE_OUT_OF_RANGE`, checked in both formats |
 | [S7F-07](#s7f-07--an-elevated-goal-implicitly-is-the-ess) | 6.2.3.2 | Low | **fixed** `e71b3de` | `ELEVATED_GOAL_IS_NOT_ESS` reports the contradiction; `is_ess_goal()` deliberately unchanged |
 | [S7F-08](#s7f-08--fai_sphere-distances-are-not-s7f-task-distances) | 4.1, 4.2 | Info | **fixed** | Recorded in `distance/__init__.py`; deliberately not a validation rule |
-| [S7F-09](#s7f-09--shapes-the-xctrack-format-cannot-carry) | 6.2.1, 6.2.2 | Info | won't fix | Turnpoint altitude limits and general line control zones have no place in the XCTrack format |
+| [S7F-09](#s7f-09--shapes-the-xctrack-format-cannot-carry) | 6.2.1, 6.2.2 | Info | **won't fix** — not ours to fix | The XCTrack format defines no keys for either, so they cannot become model fields without inventing spec. What *is* in our hands is pinned: a producer's own keys survive both round trips uninterpreted |
 
 ---
 
@@ -76,8 +79,8 @@ filtered to what this library does:
 | 2025 change | § | in pyxctsk |
 | --- | --- | --- |
 | 7. *"Orientation of Goal Line: Follow optimized route, instead of turnpoint centres."* | 6.2.3.1 | ✅ `2800429` — [S7F-01](#s7f-01--the-goal-line-still-follows-the-2024-orientation-rule), the finding this audit opened with |
-| 9. *"Define projection algorithm for planar calculations"* | 7.1.2 | ✅ PR #8 (bar [S7F-03](#s7f-03--the-task-area-centre-is-not-findtaskareacentre), [S7F-05](#s7f-05--the-ltm-scale-factor-is-1-not-099994)) |
-| 10. *"New definition of algorithm for route optimization"* | 7.1.3 | ✅ PR #8 |
+| 9. *"Define projection algorithm for planar calculations"* | 7.1.2 | ✅ PR #8, completed by `17ce2de` ([S7F-05](#s7f-05--the-ltm-scale-factor-is-1-not-099994)) and `50dae97`+`278ab2b` ([S7F-03](#s7f-03--the-task-area-centre-is-not-findtaskareacentre)) |
+| 10. *"New definition of algorithm for route optimization"* | 7.1.3 | ✅ PR #8; `278ab2b` made it find the *shortest* path rather than a local optimum ([S7F-04](#s7f-04--the-optimizer-can-settle-in-a-local-optimum)) |
 | 11. *"Define algorithm for geodesic calculations"* | 7.1.4, 7.1.5 | ✅ PR #8 |
 | 8. Rename "Race to Goal" → "Race", "Elapsed Time" → "Time Trial" | 6.2.3.2 | n/a — `SSSType` spells XCTrack's `RACE` / `ELAPSED-TIME`, which is the format's vocabulary, not S7F's |
 
@@ -94,7 +97,7 @@ implemented them:
 | 2026 change | § | in pyxctsk |
 | --- | --- | --- |
 | 1. *"Introduces Elevated Goal"* | 6.2.3.2 | ✅ `e71b3de` — the field round-trips and both of §6.2.3.2's constraints are now checked ([S7F-06](#s7f-06--the-elevated-goal-ceiling-is-not-validated), [S7F-07](#s7f-07--an-elevated-goal-implicitly-is-the-ess)) |
-| 3. *"Introduces upper and lower limits for control zones"* | 6.2.1, 6.2.2 | ❌ [S7F-09](#s7f-09--shapes-the-xctrack-format-cannot-carry) — no representation in the XCTrack format |
+| 3. *"Introduces upper and lower limits for control zones"* | 6.2.1, 6.2.2 | ❌ [S7F-09](#s7f-09--shapes-the-xctrack-format-cannot-carry) — no representation in the XCTrack format, so not ours to add |
 
 ---
 
@@ -122,6 +125,10 @@ the 24-task reference corpus.
   (`snap_to_boundary`, `route_optimization.py`). The 2026-07-07 audit's finding 2 is
   resolved. Two details of the plane remain off-spec — [S7F-03](#s7f-03--the-task-area-centre-is-not-findtaskareacentre)
   and [S7F-05](#s7f-05--the-ltm-scale-factor-is-1-not-099994).
+- **§7.2 — the speed section.** `SpeedSection` (`5ec661a`) optimizes S7F's separate
+  `taskToESS` route and reports all three of §7.2's numbers as projections of it. It is
+  emphatically not a prefix of the task route — see
+  [S7F-02](#s7f-02--speed-section-distance-is-not-computed).
 - **§7.2 — the task-distance formula, in a different but equivalent formulation.** S7F
   routes to `goal.centre` and subtracts `goal.radius`; pyxctsk routes to the goal
   *boundary*. Because the boundary point is placed at exactly `radius` along the geodesic

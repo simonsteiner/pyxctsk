@@ -112,6 +112,7 @@ subinterval
 svgs
 taskline
 testpaths
+tracklog
 tracklogs
 turnpoint
 turnpointcylinder

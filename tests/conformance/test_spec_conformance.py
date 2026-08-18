@@ -26,6 +26,7 @@ from pyxctsk import (
     TurnpointType,
     parse_task,
 )
+from pyxctsk.distance import optimized_distance
 from pyxctsk.distance.goal_line import (
     GoalLine,
     GoalLineOrientation,
@@ -1414,3 +1415,74 @@ class TestRouteOptimizerConformance:
         from_path = task_area_center(list(route.points))
 
         assert from_turnpoints != from_path
+
+
+class TestS7FShapesTheFormatCannotCarry:
+    """S7F-09: two 2026 features the XCTrack format has no keys for.
+
+    §6.2.1 gives every turnpoint cylinder an optional upper and lower altitude
+    limit in metres AMSL, and §6.2.2 defines a line control zone anywhere in a
+    task. XCTrack's format defines neither, so pyxctsk cannot promote them to
+    model fields without inventing keys for a format that is not ours — and a
+    reader would then be free to write them back out as though they were spec.
+
+    What *is* in our hands is that a producer sending such keys does not lose
+    them. These pin that: the passthrough carries them verbatim through both
+    formats, and never interprets them.
+    """
+
+    def _with_turnpoint_keys(self, **extra):
+        """BASE_TASK with extra non-spec keys on its first turnpoint."""
+        data = json.loads(task_json())
+        data["turnpoints"][0].update(extra)
+        return Task.from_dict(data)
+
+    def test_altitude_limits_survive_the_json_round_trip(self):
+        """§6.2.1's limits are carried, not dropped."""
+        task = self._with_turnpoint_keys(altitudeMin=500, altitudeMax=3000)
+
+        assert task.turnpoints[0].unknown == {
+            "altitudeMin": 500,
+            "altitudeMax": 3000,
+        }
+        exported = json.loads(task.to_json())["turnpoints"][0]
+        assert exported["altitudeMin"] == 500
+        assert exported["altitudeMax"] == 3000
+
+    def test_altitude_limits_survive_the_qr_round_trip(self):
+        """Including across the format seam, where unknown keys are re-homed."""
+        task = self._with_turnpoint_keys(altitudeMin=500, altitudeMax=3000)
+
+        back = task.to_qr_code_task().to_task()
+
+        assert back.turnpoints[0].unknown == {
+            "altitudeMin": 500,
+            "altitudeMax": 3000,
+        }
+
+    def test_the_limits_are_never_interpreted(self):
+        """Carried is not understood: nothing reads them as a real constraint.
+
+        A cylinder with altitude limits is the same cylinder to the optimizer
+        — S7F applies the limits when validating a *tracklog* crossing
+        (§9.2.1), which is not something this library does.
+        """
+        plain = Task.from_json(task_json())
+        limited = self._with_turnpoint_keys(altitudeMin=500, altitudeMax=3000)
+
+        assert optimized_distance(task_to_turnpoints(limited)) == pytest.approx(
+            optimized_distance(task_to_turnpoints(plain))
+        )
+        assert limited.validate() == []
+
+    def test_a_line_control_zone_is_carried_the_same_way(self):
+        """§6.2.2's parameters have no home either, and are not invented one."""
+        task = self._with_turnpoint_keys(
+            lineDistance=5.0, lineOrientation="NE", lineLength=1.0
+        )
+
+        exported = json.loads(task.to_json())["turnpoints"][0]
+
+        assert exported["lineOrientation"] == "NE"
+        # And nothing has quietly become a goal line.
+        assert task.goal is not None and task.goal.type is GoalType.CYLINDER
