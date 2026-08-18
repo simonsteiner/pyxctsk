@@ -5,6 +5,22 @@ implements the [XCTrack Competition Interfaces](https://xctrack.org/Competition_
 specification and FAI Sporting Code S7F. Each file is dated and kept as written —
 superseded reviews stay for history rather than being edited. Newest first.
 
+- [2026-08-18 — FAI Sporting Code S7F 2026 conformance audit](2026-08-18-s7f-2026-conformance-audit.md)
+  — **current for S7F; six of its nine issues fixed on this branch.** The library against the 2026 V1.0 edition of the scoring code, with an
+  open-issues table maintained in the file itself. Confirms PR #8 closed the 2026-07-07 audit's
+  four algorithm findings, and finds nine that remain. The headline was a **split spec lineage**:
+  the optimizer had moved to the 2026 edition, the goal line was still on 2024, whose §6.2.3.1
+  orients it from "the last turn point that is different from the goal line centre" — the 2025
+  plenary changed that to follow the optimized route, and PR #8 took the other three changes
+  from the same list but not this one. One corpus task drew the line 151° out, control zone
+  facing away from the approach. Also: no speed-section distance
+  (§7.2), a task-area centre that is the mean of the turnpoint centres rather than
+  `FindTaskAreaCentre` and breaks across the antimeridian (§7.1.6), an alternating optimizer that
+  settles 41 m above the best route found on one task, `+k=1` where the spec fixes k₀ = 0.99994
+  (§7.1.2, worth 2 mm), and an unchecked 1000 m ceiling on the elevated goal. The open-issues
+  table in the file tracks what is fixed: everything except the speed-section distance
+  (deferred — it is a scoring input), the optimizer's local-optimum sensitivity, and the two
+  shapes the XCTrack format cannot carry.
 - [2026-08-17 — Deepening candidates after the package split](2026-08-17-deepening-candidates.md)
   — **A and B applied,** six proposed. Eight candidates in *deep module* terms, each reproduced by
   running the library: cumulative distances that disagree with the drawn route by 5.09 km

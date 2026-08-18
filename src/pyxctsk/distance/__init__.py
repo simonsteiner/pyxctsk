@@ -36,6 +36,17 @@ every other one here — `goal_line` → `task_distances` → `route_optimizatio
 
 Submodules import each other directly, never through this file, which is what
 keeps the re-export layer free of the cycles it was split out to break.
+
+**A task on the FAI sphere does not produce S7F task distances.** S7F 2026
+§4.1 and §4.2 admit one earth model — *"distances between two geographic
+points are calculated on the WGS84 ellipsoid"* — and offer no spherical
+option; paragliding left the FAI sphere in 2018. ``earthModel`` is an XCTrack
+format field, so a task declaring ``FAI_SPHERE`` is honoured here, throughout:
+route, cylinder snapping and goal-line geometry all move to the sphere
+together (ADR 0003). What comes out is what XCTrack would show and is not a
+number a CIVL competition can be scored on — XCTrack's own documentation puts
+the divergence at 200–300 m on a 50 km cylinder. This is deliberately not a
+validation rule: the field is valid in the format being validated.
 """
 
 from .goal_line import (

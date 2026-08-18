@@ -25,6 +25,7 @@ ellps
 endspeed
 equirectangular
 esbenp
+Ewald
 excinfo
 FFVL
 fminbound
@@ -44,7 +45,9 @@ imwrite
 jdir
 Jiang
 jsonify
+Jörg
 Karney
+KHTML
 LANCZOS
 latlng
 lefthook
@@ -59,6 +62,7 @@ MATEC
 matecconf
 minversion
 mmomtchev
+mojibake
 monkeypatch
 motu
 Naviter
