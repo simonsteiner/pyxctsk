@@ -12,6 +12,7 @@ All features include geometry and properties suitable for web map display, inclu
 Intended for use in web-based or desktop mapping tools to visualize XCTrack competition tasks.
 """
 
+from ..model.task import Task, Turnpoint
 from .common import (
     CONTROL_ZONE_EDGE_COLOR,
     CONTROL_ZONE_FILL_COLOR,
@@ -21,7 +22,9 @@ from .common import (
 )
 
 
-def _create_turnpoint_feature(drawing: TaskDrawing, turnpoint, index: int) -> dict:
+def _create_turnpoint_feature(
+    drawing: TaskDrawing, turnpoint: Turnpoint, index: int
+) -> dict:
     """Create a GeoJSON feature for a turnpoint.
 
     Args:
@@ -157,7 +160,7 @@ def _create_goal_line_features(drawing: TaskDrawing) -> list[dict]:
     return features
 
 
-def generate_task_geojson(task) -> dict:
+def generate_task_geojson(task: Task) -> dict:
     """Generate GeoJSON data from pyxctsk task object.
 
     Args:

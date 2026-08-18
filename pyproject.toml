@@ -91,6 +91,10 @@ known-first-party = ["pyxctsk"]
 # __init__.py re-exports; allow unsorted/star-style re-export conveniences.
 "src/pyxctsk/__init__.py" = ["F401"]
 
+# The only mypy configuration. There used to be a mypy.ini beside this, and
+# because it was passed explicitly it won — so these strict flags were inert
+# and `disable_error_code = no-untyped-def, no-untyped-call` applied instead,
+# while CLAUDE.md claimed strict mode. Nine functions in src/ were untyped.
 [tool.mypy]
 python_version = "3.11"
 warn_return_any = true
@@ -101,10 +105,30 @@ check_untyped_defs = true
 disallow_untyped_decorators = true
 no_implicit_optional = true
 strict_optional = true
-mypy_path = "stubs"
+mypy_path = ["stubs", "src"]
 
 [[tool.mypy.overrides]]
-module = ["geopy.*", "zxingcpp.*", "scipy.*", "qrcode.*", "optype.*"]
+module = [
+    "calcUtils",
+    "click.*",
+    "geo",
+    "geographiclib.*",
+    "geopy.*",
+    "optype.*",
+    "PIL.*",
+    "pyproj.*",
+    "pytest.*",
+    "qrcode.*",
+    "route",
+    "scipy.*",
+    "zxingcpp.*",
+]
+ignore_missing_imports = true
+
+# scripts/ holds utilities, not library code, and airscore_clone is vendored.
+[[tool.mypy.overrides]]
+module = ["scripts.task_viewer.airscore_clone.*", "scripts.task_viewer.airscore_utils"]
+ignore_errors = true
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

@@ -18,6 +18,7 @@ See project README for usage examples and supported formats.
 import json
 import sys
 from io import BytesIO
+from typing import BinaryIO
 
 import click
 
@@ -29,7 +30,7 @@ from .qrcode.image import generate_qrcode_image
 
 
 @click.group()
-def main():
+def main() -> None:
     r"""pyxctsk: Convert task files between formats.
 
     \b
@@ -60,7 +61,7 @@ def main():
     """
 
 
-def _read_input(input_file) -> bytes:
+def _read_input(input_file: BinaryIO | None) -> bytes:
     """Read the task payload from a file argument or stdin.
 
     Args:
@@ -147,7 +148,11 @@ def _write_output(output_file: str | None, payload: str | bytes) -> None:
     help="Reject a task that breaks the spec's structural rules",
 )
 def convert(
-    input_file, output_format: str, output_file: str, compressed: bool, strict: bool
+    input_file: BinaryIO | None,
+    output_format: str,
+    output_file: str | None,
+    compressed: bool,
+    strict: bool,
 ) -> None:
     """Convert XCTrack task files between supported formats.
 
@@ -214,7 +219,12 @@ def convert(
     default=False,
     help="Reject a task that breaks the spec's structural rules",
 )
-def distances(input_file, output_format: str, output_file: str, strict: bool) -> None:
+def distances(
+    input_file: BinaryIO | None,
+    output_format: str,
+    output_file: str | None,
+    strict: bool,
+) -> None:
     r"""Report a task's FAI S7F distances, with the route that produced them.
 
     pyxctsk aims to be a reference implementation of the S7F distance

@@ -38,8 +38,9 @@ no tuple-shaped accessor beside them — the writers used to unpack a positional
 
 from dataclasses import dataclass
 from enum import Enum
+from typing import Sequence
 
-from ..model.task import GoalType, Task
+from ..model.task import GoalType, Task, Turnpoint
 from .measured_task import MeasuredTask
 from .turnpoint import EarthModelLike, geod_for_earth_model
 
@@ -76,7 +77,9 @@ class GoalLineOrientation(str, Enum):
 DEFAULT_ORIENTATION = GoalLineOrientation.OPTIMIZED_ROUTE
 
 
-def goal_line_length_from_turnpoints(turnpoints) -> float | None:
+def goal_line_length_from_turnpoints(
+    turnpoints: Sequence[Turnpoint],
+) -> float | None:
     """Return the goal-line length implied by the turnpoints.
 
     The single source of the rule that a goal line's total length is twice
