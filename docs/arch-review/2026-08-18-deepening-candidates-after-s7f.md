@@ -1,7 +1,7 @@
 # 2026-08-18 — Deepening candidates after the S7F audit
 
-**Status: all seven applied** — see [Outcome](#outcome) for what each landed as and
-where the fix departed from the card.
+**Status: all seven candidates and all eight smaller findings applied** — see
+[Outcome](#outcome) for what each landed as and where the fix departed from the card.
 
 **Companion:** [`2026-08-18-deepening-candidates-after-s7f.html`](./2026-08-18-deepening-candidates-after-s7f.html) (visual report)
 
@@ -507,13 +507,29 @@ Departures from the card worth recording:
 - **The `route()` rows stayed `dict[str, Any]`.** Making them a value type was tempting and
   is not done: they are the published JSON shape, and a dataclass between the fields and
   `json.dumps` would be a layer with one caller.
-- **Smaller finding 2 (the front door's export set) is not addressed**, beyond adding
-  `MeasuredTask` and `DistanceReport` and swapping the renamed function.
-  `distance_through_centers` is still exported where `center_distance` is not, and the
-  486 ms eager scipy import is untouched. Both are their own change.
-- **Smaller findings 1, 4, 5, 7 and 8 are not addressed**: the dead mypy config, the
-  `Sequence[object]` on `TaskValidationError.issues`, the single `InvalidFormatError`
-  message, the missing `tests/model/test_validation.py`, and `pyxctsk --version`.
+### Outcome of the smaller findings
+
+All eight applied, in four commits.
+
+| # | commit | landed as |
+| --- | --- | --- |
+| 1 | `3eb0b29` | `mypy.ini` deleted, its overrides merged into `pyproject.toml`, whose strict flags were inert because every caller passed `--config-file mypy.ini`. Eight untyped functions in `src/` annotated. Four live references that would have broken — two CI workflows, `README.md`, `UPDATE_INSTRUCTIONS.md` — fixed. |
+| 4 | `1cb965e` | `TaskValidationError.issues` typed via `if TYPE_CHECKING:`. The docstring's stated reason was wrong: `validation.py` imports only `model.enums` and never these exceptions. |
+| 2, 3 | `8533520` | Ten answers added to the front door, including `center_distance` beside the primitive it is meant to replace. `scipy.optimize` deferred to the one function that needs it: `import pyxctsk` 400 ms → 95 ms, `pyxctsk --help` 0.57 s → 0.15 s. Both guarded in `tests/test_layering.py`. |
+| 5 | `c743a4b` | `InvalidFormatError` names the case — an unreadable path with the OS's reason, an image with no QR code, an image with the QR dependencies missing, JSON that is not a task. |
+| 6, 7, 8 | `3c7899c` | The stale `validate_turnpoint_roles` reference and "exactly two things" claim corrected; `num_iterations` dropped from the two layers that only forwarded it; `pyxctsk --version` added; `tests/model/test_validation.py` written. |
+
+Two things worth recording from doing them:
+
+- **Bringing `tests/` under the type checker found a vacuous test.**
+  `test_optional_omits_none` read `assert Value("label", "l").write(Toy(name="A"), {}) is
+  None`, but `write` mutates the dict it is handed and always returns `None` — so the
+  assertion held whatever the field did, including writing the key it was meant to prove
+  absent. 537 of the 565 errors were test functions missing `-> None`, which `tests.*`
+  now exempts; the other 28 were un-narrowed `Optional`s.
+- **`num_iterations` was not dead, so it was not deleted.** ADR 0004's precedent is about
+  *no-ops*; this is a real knob. It stays on the optimizer and lost only the two
+  pass-through layers no caller used.
 
 ---
 
