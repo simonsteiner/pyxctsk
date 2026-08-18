@@ -120,6 +120,7 @@ taskline
 testpaths
 tracklog
 tracklogs
+travelling
 turnpoint
 turnpointcylinder
 turnpoints

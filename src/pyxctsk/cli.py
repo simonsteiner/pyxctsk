@@ -17,24 +17,14 @@ See project README for usage examples and supported formats.
 
 import json
 import sys
-from importlib.metadata import PackageNotFoundError, version
 from io import BytesIO
 
 import click
 
-from .distance import (
-    PROPOSED_READING,
-    MeasuredTask,
-    SpeedSection,
-    center_distance,
-    center_distance_readings,
-)
+from .distance.report import DistanceReport
 from .export.kml import task_to_kml
 from .parser import parse_task
 from .qrcode.image import generate_qrcode_image
-
-#: The S7F edition the distance calculations are audited against.
-S7F_EDITION = "2026 V1.0"
 
 
 @click.group()
@@ -183,125 +173,6 @@ def convert(
         sys.exit(1)
 
 
-def _pyxctsk_version() -> str:
-    """Return the installed version, or "unknown" when running from a checkout."""
-    try:
-        return version("pyxctsk")
-    except PackageNotFoundError:  # pragma: no cover - editable/source runs
-        return "unknown"
-
-
-def _distance_report(task) -> dict:
-    """Build the S7F distance report for a task.
-
-    Every number is labelled with the section that defines it, and the route
-    points are included because a total only says two implementations disagree
-    — the crossing coordinates say why. See ``docs/s7f-distance-reference.md``.
-
-    Args:
-        task: The parsed task to measure.
-
-    Returns:
-        A JSON-serializable report.
-    """
-    measured = MeasuredTask.from_task(task)
-    cumulative = measured.cumulative_m()
-    speed_section = SpeedSection.from_measured_task(measured)
-
-    return {
-        "pyxctsk_version": _pyxctsk_version(),
-        "s7f_edition": S7F_EDITION,
-        "earth_model": (
-            task.earth_model.value if task.earth_model else "WGS84 (default)"
-        ),
-        "task_distance_m": measured.total_m,
-        "speed_section_distance_m": (
-            speed_section.distance_m if speed_section else None
-        ),
-        "speed_section_to_ess_m": (speed_section.to_ess_m if speed_section else None),
-        "speed_section_pre_start_m": (
-            speed_section.pre_start_m if speed_section else None
-        ),
-        "center_distance_m": center_distance(task),
-        "center_distance_reading": PROPOSED_READING.value,
-        "center_distance_readings_m": center_distance_readings(task),
-        "route": [
-            {
-                "index": i,
-                "name": tp.waypoint.name,
-                "type": tp.type.value if tp.type else "",
-                "radius_m": tp.radius,
-                "center_lat": tp.waypoint.lat,
-                "center_lon": tp.waypoint.lon,
-                "route_lat": point[0],
-                "route_lon": point[1],
-                "cumulative_m": cumulative[i],
-            }
-            for i, (tp, point) in enumerate(zip(task.turnpoints, measured.route.points))
-        ],
-        "notes": {
-            "task_distance_m": "FAI S7F 2026 §7.2, optimized launch to goal",
-            "speed_section_distance_m": (
-                "FAI S7F 2026 §7.2, a separate launch-to-ESS optimization minus "
-                "its pre-start portion; null when the task has no SSS/ESS pair"
-            ),
-            "center_distance_m": (
-                "NOT DEFINED BY S7F. A task-board convention; this is the "
-                "reading pyxctsk proposes. See center_distance_readings_m for "
-                "the alternatives and docs/s7f-distance-reference.md for why "
-                "they differ by up to 39.9 km"
-            ),
-            "route": (
-                "The optimized crossing point per turnpoint. Exchange these "
-                "rather than totals: a total says two implementations disagree, "
-                "these say where"
-            ),
-        },
-    }
-
-
-def _format_report_text(report: dict) -> str:
-    """Render the report for a human rather than a diff.
-
-    Args:
-        report: The report from :func:`_distance_report`.
-
-    Returns:
-        A plain-text rendering.
-    """
-    lines = [
-        f"pyxctsk {report['pyxctsk_version']}  |  FAI S7F {report['s7f_edition']}"
-        f"  |  earth model: {report['earth_model']}",
-        "",
-        f"  task distance (§7.2)        {report['task_distance_m'] / 1000:10.3f} km",
-    ]
-    if report["speed_section_distance_m"] is None:
-        lines.append("  speed section (§7.2)              no SSS/ESS pair")
-    else:
-        lines.append(
-            f"  speed section (§7.2)        "
-            f"{report['speed_section_distance_m'] / 1000:10.3f} km"
-        )
-    lines += [
-        f"  through centres             {report['center_distance_m'] / 1000:10.3f} km"
-        f"   [{report['center_distance_reading']}]",
-        "",
-        "  'through centres' is NOT defined by S7F. Other readings of it:",
-    ]
-    for name, value in report["center_distance_readings_m"].items():
-        shown = f"{value / 1000:10.3f} km" if value is not None else "       n/a"
-        lines.append(f"    {name:26s} {shown}")
-    lines += ["", "  optimized route:"]
-    for point in report["route"]:
-        lines.append(
-            f"    {point['index']:2d} {point['name']:<10s} {point['type']:<8s}"
-            f" r={point['radius_m']:>6d} m"
-            f"  {point['route_lat']:>10.6f} {point['route_lon']:>11.6f}"
-            f"  {point['cumulative_m'] / 1000:8.3f} km"
-        )
-    return "\n".join(lines)
-
-
 @main.command()
 @click.argument("input_file", type=click.File("rb"), required=False)
 @click.option(
@@ -368,19 +239,11 @@ def distances(input_file, output_format: str, output_file: str, strict: bool) ->
                 sys.exit(1)
             input_data = sys.stdin.buffer.read()
 
-        task = parse_task(input_data, strict=strict)
-        if len(task.turnpoints) < 2:
-            click.echo(
-                "Error: a task needs at least two turnpoints to have a distance.",
-                err=True,
-            )
-            sys.exit(1)
-
-        report = _distance_report(task)
+        report = DistanceReport.from_task(parse_task(input_data, strict=strict))
         output = (
-            json.dumps(report, indent=2)
+            json.dumps(report.as_dict(), indent=2)
             if output_format == "json"
-            else _format_report_text(report)
+            else report.as_text()
         )
 
         if output_file:

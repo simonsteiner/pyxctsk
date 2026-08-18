@@ -28,6 +28,9 @@ own. Everything a caller outside the package needs is named here —
   task distance. It is *not* a prefix of the task route: the optimizer
   treats the last circle it is handed as the finish, so S7F optimizes a
   separate ``taskToESS`` route and so does this
+- :mod:`~pyxctsk.distance.report` — ``DistanceReport``, every number pyxctsk
+  publishes about one task, with two renderings. This is the surface another
+  implementation diffs against; it was two private functions inside ``cli.py``
 - :mod:`~pyxctsk.distance.center_distance` — the "distance through centres"
   a task board publishes, which **S7F does not define**. The module states
   the reading pyxctsk proposes and keeps the alternatives so a vendor whose
@@ -73,6 +76,7 @@ from .goal_line import (
     goal_line_length_from_turnpoints,
 )
 from .measured_task import MeasuredTask, task_to_turnpoints
+from .report import NOTES, S7F_EDITION, DistanceReport, TooFewTurnpointsError
 from .route_optimization import (
     CONVERGENCE_EPSILON_M,
     DEFAULT_NUM_ITERATIONS,
@@ -95,6 +99,7 @@ from .turnpoint import (
 __all__ = [
     # Core classes
     "MeasuredTask",
+    "DistanceReport",
     "LocalPlane",
     "plane_circle",
     "TaskTurnpoint",
@@ -111,6 +116,9 @@ __all__ = [
     "center_distance",
     "center_distance_readings",
     "PROPOSED_READING",
+    "S7F_EDITION",
+    "NOTES",
+    "TooFewTurnpointsError",
     "geodesic_distance",
     "calculate_task_distances",
     "task_distances_from",

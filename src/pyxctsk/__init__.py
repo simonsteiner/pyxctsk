@@ -9,6 +9,7 @@ See http://xctrack.org/ and http://xctrack.org/Competition_Interfaces.html
 from importlib.metadata import version
 
 from .distance import (
+    DistanceReport,
     MeasuredTask,
     OptimizedRoute,
     SpeedSection,
@@ -72,6 +73,7 @@ __all__ = [
     "InvalidFormatError",
     "InvalidTimeOfDayError",
     "MeasuredTask",
+    "DistanceReport",
     "MIME_TYPE",
     "optimized_distance",
     "OptimizedRoute",
