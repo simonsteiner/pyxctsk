@@ -6,7 +6,8 @@ own. Everything a caller outside the package needs is named here —
 - optimized route and distance through turnpoint cylinders per FAI S7F §7
   (Ding–Xie–Jiang alternating point-circle-point method)
 - earth-model aware distances (WGS84 ellipsoid default, FAI sphere R = 6371 km)
-- cumulative and per-leg task distances
+- cumulative and per-leg task distances, and the speed section's own
+  distance, which §7.2 defines as a separate optimization
 - the optimizer's sweep limit, the one number here worth tuning, beside the
   convergence threshold the spec fixes
 
@@ -20,6 +21,10 @@ own. Everything a caller outside the package needs is named here —
   projected from one optimized route
 - :mod:`~pyxctsk.distance.goal_line` — the ``GoalLine`` deep module: length,
   endpoints and semicircular control zone, in one place
+- :mod:`~pyxctsk.distance.speed_section` — ``SpeedSection``, §7.2's second
+  task distance. It is *not* a prefix of the task route: the optimizer
+  treats the last circle it is handed as the finish, so S7F optimizes a
+  separate ``taskToESS`` route and so does this
 
 The goal line lives here rather than with the KML and GeoJSON writers that draw
 it because the shapes of a task must not depend on the formats it is exported
@@ -61,6 +66,7 @@ from .route_optimization import (
     calculate_iteratively_refined_route,
     optimized_distance,
 )
+from .speed_section import SpeedSection
 from .task_distances import (
     calculate_task_distances,
     task_distances_from_route,
@@ -84,6 +90,7 @@ __all__ = [
     "GoalLine",
     "GoalLineOrientation",
     "OptimizedRoute",
+    "SpeedSection",
     # Goal-line geometry
     "goal_line_length_from_turnpoints",
     # Main distance calculation functions
@@ -93,7 +100,6 @@ __all__ = [
     "calculate_task_distances",
     "task_distances_from_route",
     "task_to_turnpoints",
-    # SSS specific functions
     # Configuration
     "CONVERGENCE_EPSILON_M",
     "DEFAULT_NUM_ITERATIONS",
