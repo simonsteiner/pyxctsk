@@ -65,6 +65,7 @@ minversion
 mmomtchev
 mojibake
 monkeypatch
+monkeypatching
 motu
 Naviter
 naxe
@@ -78,6 +79,7 @@ newpolygon
 nife
 noha
 nohe
+normalisation
 nosetests
 nubu
 oneline
@@ -95,11 +97,14 @@ Placemark
 pnum
 polystyle
 pypa
+PYTHONCOERCECLOCALE
+PYTHONUTF
 pyxctsk
 pyzbar
 qavu
 qoga
 quno
+recognise
 reimplementation
 relativetoground
 RRGGBB
@@ -119,7 +124,11 @@ turnpoint
 turnpointcylinder
 turnpoints
 uncoerced
+unparseable
+unrecognised
+unreportable
 unrepresentable
+unvalidated
 vali
 validatable
 Vincenty
