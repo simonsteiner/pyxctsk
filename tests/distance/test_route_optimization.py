@@ -9,6 +9,7 @@ import math
 from dataclasses import dataclass
 
 import pytest
+from pyproj import CRS, Transformer
 
 from pyxctsk.distance import OptimizedRoute
 from pyxctsk.distance.route_optimization import (
@@ -18,8 +19,10 @@ from pyxctsk.distance.route_optimization import (
     calculate_iteratively_refined_route,
 )
 from pyxctsk.distance.turnpoint import (
+    LocalPlane,
     TaskTurnpoint,
     TurnpointGeometry,
+    ltm_scale_factor,
     plane_optimal_point,
 )
 
@@ -207,3 +210,43 @@ def test_cumulative_m_has_one_entry_per_point():
         if cumulative:
             assert cumulative[0] == 0.0
             assert cumulative[-1] == route.total_m
+
+
+class TestLtmScaleFactor:
+    """The LTM scale factor k₀ the plane is built with (S7F §7.1.2)."""
+
+    def test_below_the_break_is_the_flat_value(self):
+        """Up to 55° the spec fixes a single constant."""
+        for lat in (0.0, 46.5, 55.0):
+            assert ltm_scale_factor(lat) == pytest.approx(0.99994)
+
+    def test_above_the_break_grows_linearly(self):
+        """Beyond 55° it grows by 1.3e-4 per 60° of latitude."""
+        assert ltm_scale_factor(115.0) == pytest.approx(0.99994 + 1.3e-4)
+        assert ltm_scale_factor(85.0) == pytest.approx(0.99994 + 0.5 * 1.3e-4)
+
+    def test_southern_hemisphere_scales_like_the_northern(self):
+        """Annex A takes ``abs(refLat)`` before applying the formula."""
+        for lat in (46.5, 60.0, 78.0):
+            assert ltm_scale_factor(-lat) == ltm_scale_factor(lat)
+
+    def test_the_plane_is_actually_built_with_it(self):
+        """A coordinate in the plane carries k₀, not 1.
+
+        Guards the wiring rather than the formula: the projection used to be
+        built with ``+k=1``, and asserting the constant alone would not have
+        caught that.
+        """
+        unscaled = Transformer.from_crs(
+            CRS.from_epsg(4326),
+            CRS.from_proj4(
+                "+proj=tmerc +lat_0=46.0 +lon_0=8.0 +k_0=1 +x_0=0 +y_0=0 "
+                "+ellps=WGS84 +units=m +no_defs"
+            ),
+            always_xy=True,
+        )
+        x, _ = LocalPlane.around([(46.0, 8.0)]).xy((46.0, 8.1))
+        x_unscaled, _ = unscaled.transform(8.1, 46.0)
+
+        assert x == pytest.approx(x_unscaled * ltm_scale_factor(46.0), rel=1e-12)
+        assert x != pytest.approx(x_unscaled, rel=1e-9)

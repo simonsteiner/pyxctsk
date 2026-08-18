@@ -84,21 +84,48 @@ def geodesic_distance(
     return float(dist)
 
 
+def ltm_scale_factor(lat0: float) -> float:
+    """Return the LTM scale factor k₀ for a projection centre latitude.
+
+    The one way S7F §7.1.2 says its Localized Transverse Mercator differs from
+    UTM in more than centring: "Scaling depends on the centre point's
+    latitude". Both of Annex A's reference implementations take the absolute
+    latitude first (``double la = abs(refLat)``), so the southern hemisphere
+    scales like the northern.
+
+    Args:
+        lat0: Latitude of the projection centre in degrees.
+
+    Returns:
+        k₀: 0.99994 up to 55°, growing linearly beyond it.
+    """
+    la = abs(float(lat0))
+    if la <= 55.0:
+        return 0.99994
+    return 0.99994 + ((la - 55.0) / 60.0) * 1.3e-4
+
+
 @lru_cache(maxsize=128)
 def _cached_tm_transformers(
     lat0: float, lon0: float, fai_sphere: bool
 ) -> tuple[Transformer, Transformer]:
-    """Build (and cache) transformers for a local Transverse Mercator plane."""
+    """Build (and cache) transformers for a local Transverse Mercator plane.
+
+    ``+k_0`` rather than ``+k``: the two are synonyms in PROJ, but the 2026
+    edition's own document history records the correction "parameter +k_0
+    instead of deprecated +k" against its Annex A sample.
+    """
+    k0 = ltm_scale_factor(lat0)
     if fai_sphere:
         geo_crs = CRS.from_proj4(f"+proj=longlat +R={FAI_SPHERE_RADIUS_M} +no_defs")
         tm_crs = CRS.from_proj4(
-            f"+proj=tmerc +lat_0={lat0} +lon_0={lon0} +k=1 +x_0=0 +y_0=0 "
+            f"+proj=tmerc +lat_0={lat0} +lon_0={lon0} +k_0={k0} +x_0=0 +y_0=0 "
             f"+R={FAI_SPHERE_RADIUS_M} +units=m +no_defs"
         )
     else:
         geo_crs = CRS.from_epsg(4326)
         tm_crs = CRS.from_proj4(
-            f"+proj=tmerc +lat_0={lat0} +lon_0={lon0} +k=1 +x_0=0 +y_0=0 "
+            f"+proj=tmerc +lat_0={lat0} +lon_0={lon0} +k_0={k0} +x_0=0 +y_0=0 "
             "+ellps=WGS84 +units=m +no_defs"
         )
     to_plane = Transformer.from_crs(geo_crs, tm_crs, always_xy=True)
