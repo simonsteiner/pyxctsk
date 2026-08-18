@@ -1,6 +1,8 @@
 # 2026-08-18 — Deepening candidates after the S7F audit
 
-**Status: proposed** — none applied.
+**Status: all seven applied** — see [Outcome](#outcome) for what each landed as and
+where the fix departed from the card.
+
 **Companion:** [`2026-08-18-deepening-candidates-after-s7f.html`](./2026-08-18-deepening-candidates-after-s7f.html) (visual report)
 
 Reviewed at `8a64894`, the merge of PR #17 (the S7F 2026 conformance audit). Vocabulary
@@ -48,7 +50,7 @@ adapters, `distance/speed_section.py`, and `export/`'s `TaskDrawing` with two re
 
 ---
 
-## A. Name the measured task — **Strong**
+## A. Name the measured task — **Strong** · *applied `9c40d60`*
 
 **Files:** `distance/task_distances.py:158`, `distance/goal_line.py:242`,
 `distance/speed_section.py:100`, `export/common.py:60`, `cli.py:208`
@@ -104,7 +106,7 @@ already the shape proposed here.
 
 ---
 
-## B. The S7F report is trapped in the CLI — **Strong**
+## B. The S7F report is trapped in the CLI — **Strong** · *applied `a0192bd`*
 
 **Files:** `cli.py:195-262` (`_distance_report`), `cli.py:265-306` (`_format_report_text`),
 `tests/test_cli.py:185-275`, `docs/s7f-distance-reference.md:243`
@@ -153,7 +155,7 @@ covers every number the report publishes.
 
 ---
 
-## C. `--strict` validates the conversion, not the payload — **Strong**
+## C. `--strict` validates the conversion, not the payload — **Strong** · *applied `9363cc9`*
 
 **Files:** `parser.py:83-142` (the three QR adapters), `parser.py:148` (`_FORMAT_PARSERS`),
 `parser.py:202` (the strict block), `qrcode/conversion.py:270`, `model/validation.py:16-22`
@@ -194,7 +196,7 @@ asserts the flag appears in `--help`.
 
 ---
 
-## D. The earth model is threaded, not owned — **Strong**
+## D. The earth model is threaded, not owned — **Strong** · *applied `810ca9a`, `62243ef`*
 
 **Files:** `distance/turnpoint.py:37-84`, `:370-391` (`TurnpointGeometry`), `:394-435`
 (`LocalPlane`), `:519-556` (`optimal_point`), `route_optimization.py:436`, and 16
@@ -255,7 +257,7 @@ mixed-list case expressible.
 
 ---
 
-## E. One task, two answers about itself — **Worth exploring**
+## E. One task, two answers about itself — **Worth exploring** · *applied `9851263`*
 
 **Files:** `distance/speed_section.py:36-50` and `:84-93`,
 `distance/center_distance.py:106-120`, `distance/task_distances.py:182`, `cli.py:227`
@@ -307,7 +309,7 @@ centre-distance reading.
 
 ---
 
-## F. The CLI has no read/write seam — **Worth exploring**
+## F. The CLI has no read/write seam — **Worth exploring** · *applied `b8f99c0`*
 
 **Files:** `cli.py:128-138` and `:361-371` (byte-identical read blocks), `:146`, `:154`,
 `:176`, `:388` (four write blocks), `:182`, `:394` (error handling)
@@ -354,7 +356,7 @@ place that has to know the output is UTF-8, that stdout is `click.echo`, that a 
 
 ---
 
-## G. The drawing answers colour, but not label or description — **Worth exploring**
+## G. The drawing answers colour, but not label or description — **Worth exploring** · *applied `14bef08`*
 
 **Files:** `export/common.py:107-126` (`color_of`, the precedent), `export/kml.py:67`, `:68`,
 `:80`, `export/geojson.py:44`, `:47`, `:49`
@@ -471,6 +473,47 @@ Suggested order:
 - C in parallel — independent
 - D: start with `LocalPlane`'s fourth field, the slice that lands on its own
 - F, G: standalone fixes
+
+---
+
+## Outcome
+
+All seven applied, in the suggested order — A → B → E, C in parallel, then D, F, G.
+The suite went from 840 passing to 927; `cli.py` from 402 lines to 266.
+
+| # | commit | landed as |
+| --- | --- | --- |
+| A | `9c40d60` | `MeasuredTask` in `distance/measured_task.py`, holding the task, its cylinders and the route. `task_distances_from_route(task, route)` → `task_distances_from(measured)`; `GoalLine`'s optional `route=` → `GoalLine.from_measured_task`; `SpeedSection.from_measured_task` added. `task_to_turnpoints` moved out of `task_distances`, which removed the edge making the goal line depend on the distance *report*. Corpus output byte-identical. |
+| B | `a0192bd` | `DistanceReport` in `distance/report.py`, with `as_dict()` and `as_text()` as two renderings of one set of fields. `TooFewTurnpointsError` moved the two-turnpoint rule out of the CLI. All eight renderings byte-identical. |
+| C | `9363cc9` | Adapters return the arrived payload; `parse_task` validates *that* before converting. `UNKNOWN_VERSION` is now reportable for all four formats; 96 strict parses over the corpus, 0 false rejections. |
+| D | `810ca9a`, `62243ef` | `LocalPlane` carries its earth model (the slice that lands alone), then `EarthModelLike` replaces `object` in 16 signatures and an unrecognised value raises instead of silently meaning WGS84. `TurnpointGeometry` declares `earth_model`. Corpus output byte-identical. |
+| E | `9851263` | `speed_section_indices` is the one answer to "does this task have a speed section"; `LAUNCH_TO_GOAL_BOUNDARY` reads the goal's effective radius; the table asks `center_distance` rather than the primitive. Exactly the five LINE-goal tasks move, by their goal radius. |
+| F | `b8f99c0` | `_read_input` / `_write_output`. UTF-8 on every locale, one newline rule, `pyXCTSKError`/`OSError` instead of bare `Exception`. |
+| G | `14bef08` | `label_of`, `description_of`, `role_of` on `TaskDrawing`. The enum repr leaves the map. |
+
+Departures from the card worth recording:
+
+- **The mismatch is unrepresentable at the *call site*, not at construction.** `MeasuredTask(...)`
+  can still be built by hand with a route that does not belong to its task — the test
+  seams in `test_geojson.py` do exactly that, deliberately. What the value removes is the
+  two-argument interface every caller had to get right; it is not a proof.
+- **`GoalLine` and `SpeedSection` kept their `from_task` constructors.** The card implies
+  replacing them. Under the 2024 goal-line orientation no route is needed at all, so
+  forcing a `MeasuredTask` would have made `from_task` optimize where it previously did
+  not — a performance regression in the name of tidiness.
+- **F chose a newline rule rather than preserving both.** `convert -o` gained a trailing
+  newline it did not have. The card called the inconsistency accidental; fixing it means
+  picking one, and stdout was already newline-terminated by `click.echo`.
+- **The `route()` rows stayed `dict[str, Any]`.** Making them a value type was tempting and
+  is not done: they are the published JSON shape, and a dataclass between the fields and
+  `json.dumps` would be a layer with one caller.
+- **Smaller finding 2 (the front door's export set) is not addressed**, beyond adding
+  `MeasuredTask` and `DistanceReport` and swapping the renamed function.
+  `distance_through_centers` is still exported where `center_distance` is not, and the
+  486 ms eager scipy import is untouched. Both are their own change.
+- **Smaller findings 1, 4, 5, 7 and 8 are not addressed**: the dead mypy config, the
+  `Sequence[object]` on `TaskValidationError.issues`, the single `InvalidFormatError`
+  message, the missing `tests/model/test_validation.py`, and `pyxctsk --version`.
 
 ---
 

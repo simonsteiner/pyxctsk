@@ -6,7 +6,7 @@ specification and FAI Sporting Code S7F. Each file is dated and kept as written 
 superseded reviews stay for history rather than being edited. Newest first.
 
 - [2026-08-18 — Deepening candidates after the S7F audit](2026-08-18-deepening-candidates-after-s7f.md)
-  — **proposed;** none applied. Seven candidates in *deep module* terms, reviewed at the merge
+  — **all seven applied.** Seven candidates in *deep module* terms, reviewed at the merge
   of the S7F audit below and scoped by churn, which put `distance/` at the centre: its package
   interface had grown from 13 to 22 names in two days, every S7F number widening it rather
   than being absorbed. The headline is that a **task and the optimized route flown for it are
