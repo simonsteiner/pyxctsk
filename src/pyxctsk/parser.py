@@ -65,13 +65,64 @@ def _looks_like_file_path(data: str) -> bool:
     return "/" in data or "\\" in data or data.endswith(_FILE_EXTENSIONS)
 
 
-def _read_file(path: str) -> bytes | None:
-    """Read a file path to bytes, or return None if it cannot be read."""
+#: Magic bytes for the image formats the QR adapter can read. Used only to
+#: tell a caller that their PNG failed for want of a dependency rather than
+#: for being unreadable — every failure used to say "invalid format".
+_IMAGE_MAGIC = (b"\x89PNG\r\n\x1a\n", b"\xff\xd8\xff")
+
+
+def _read_file(path: str) -> tuple[bytes | None, str | None]:
+    """Read a file path to bytes.
+
+    Args:
+        path: The path to read.
+
+    Returns:
+        ``(contents, None)`` on success, or ``(None, reason)`` where reason is
+        the OS's own description. The reason is carried rather than discarded
+        because a path that cannot be read still falls through to the inline
+        adapters — ``_looks_like_file_path`` is a heuristic, and a JSON payload
+        containing a "/" trips it — so the only place it can be reported is the
+        error raised when everything else has also failed.
+    """
     try:
         with open(path, "rb") as f:
-            return f.read()
-    except (FileNotFoundError, IsADirectoryError, PermissionError, OSError):
-        return None
+            return f.read(), None
+    except OSError as exc:
+        return None, exc.strerror or str(exc)
+
+
+def _unrecognized(raw: bytes, path_error: str | None) -> InvalidFormatError:
+    """Build the error for input no adapter recognized.
+
+    Every failure used to raise ``InvalidFormatError("invalid format")`` — a
+    missing file, a directory, truncated JSON, an unreadable QR image, and a
+    perfectly good QR image on a machine without the optional dependencies all
+    produced the identical message, so a missing install was indistinguishable
+    from a corrupt file.
+
+    Args:
+        raw: The input bytes.
+        path_error: Why the input failed to open as a path, if it looked like
+            one and did not open.
+
+    Returns:
+        The error to raise.
+    """
+    if path_error is not None:
+        return InvalidFormatError(f"could not read it as a file ({path_error})")
+    if raw.startswith(_IMAGE_MAGIC):
+        if not QR_CODE_SUPPORT:
+            return InvalidFormatError(
+                "looks like an image, but QR code support is not installed "
+                "(pip install 'pyxctsk[web]' for Pillow and zxing-cpp)"
+            )
+        return InvalidFormatError(
+            "looks like an image, but it carries no XCTSK: QR code"
+        )
+    if raw.lstrip()[:1] in (b"{", b"["):
+        return InvalidFormatError("looks like JSON, but it is not a task in any format")
+    return InvalidFormatError("invalid format")
 
 
 def _qr_url_text(text: str | None, raw: bytes) -> str | None:
@@ -183,15 +234,21 @@ def parse_task(data: bytes | str, strict: bool = False) -> Task:
 
     Raises:
         EmptyInputError: If input is empty.
-        InvalidFormatError: If input format is invalid or cannot be parsed.
+        InvalidFormatError: If no adapter recognizes the input. The message
+            names which failure it was — an unreadable path, an image with no
+            QR code, an image with the optional QR dependencies missing, or
+            JSON that is not a task.
         TaskValidationError: If ``strict`` and the task is structurally invalid.
     """
     if not data:
         raise EmptyInputError("empty input")
 
-    # A string that names a readable file is replaced by its contents.
+    # A string that names a readable file is replaced by its contents. A
+    # failure here is not fatal — the heuristic also matches inline payloads —
+    # so the reason is kept for the error at the end.
+    path_error: str | None = None
     if isinstance(data, str) and _looks_like_file_path(data):
-        file_data = _read_file(data)
+        file_data, path_error = _read_file(data)
         if file_data is not None:
             return parse_task(file_data, strict=strict)
 
@@ -213,7 +270,7 @@ def parse_task(data: bytes | str, strict: bool = False) -> Task:
         if arrived is not None:
             break
     else:
-        raise InvalidFormatError("invalid format")
+        raise _unrecognized(raw, path_error)
 
     # Validate what arrived, before converting it. Each format answers for
     # itself — Task.validate() and QRCodeTask.validate() both present a
