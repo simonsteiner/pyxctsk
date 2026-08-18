@@ -28,11 +28,21 @@ calculation needed the goal-line length itself — stopped being true when the
 `TaskTurnpoint.goal_line_length` attribute that carried it turned out to be
 written and never read. `export/` is `goal_line`'s only consumer today.
 
+`goal_line` does depend on the optimizer, though: S7F 2025+ orients the line
+against the optimized route point rather than a turnpoint centre, so the
+line cannot be derived from the task alone. That edge runs the same way as
+every other one here — `goal_line` → `task_distances` → `route_optimization`
+→ `turnpoint` — so it adds no cycle.
+
 Submodules import each other directly, never through this file, which is what
 keeps the re-export layer free of the cycles it was split out to break.
 """
 
-from .goal_line import GoalLine, goal_line_length_from_turnpoints
+from .goal_line import (
+    GoalLine,
+    GoalLineOrientation,
+    goal_line_length_from_turnpoints,
+)
 from .route_optimization import (
     CONVERGENCE_EPSILON_M,
     DEFAULT_NUM_ITERATIONS,
@@ -61,6 +71,7 @@ __all__ = [
     "plane_circle",
     "TaskTurnpoint",
     "GoalLine",
+    "GoalLineOrientation",
     "OptimizedRoute",
     # Goal-line geometry
     "goal_line_length_from_turnpoints",

@@ -1,7 +1,8 @@
-"""Regression tests for the XCTrack Competition Interfaces conformance audit.
+"""Regression tests for the two conformance audits.
 
-These tests encode the findings from the spec-conformance audit
-(docs/arch-review/2026-08-16-competition-interfaces-audit.md). Each test
+These tests encode the findings from the spec-conformance audits
+(docs/arch-review/2026-08-16-competition-interfaces-audit.md for the XCTrack
+format, 2026-08-18-s7f-2026-conformance-audit.md for FAI S7F). Each test
 names the finding it pins, so a failure points straight at the spec clause it
 violates.
 
@@ -25,7 +26,14 @@ from pyxctsk import (
     TurnpointType,
     parse_task,
 )
-from pyxctsk.distance.goal_line import GoalLine, goal_line_length_from_turnpoints
+from pyxctsk.distance.goal_line import (
+    GoalLine,
+    GoalLineOrientation,
+    goal_line_length_from_turnpoints,
+)
+from pyxctsk.distance.route_optimization import calculate_iteratively_refined_route
+from pyxctsk.distance.task_distances import task_to_turnpoints
+from pyxctsk.distance.turnpoint import geod_for_earth_model
 from pyxctsk.model.validation import ValidationRule
 from tests.corpus import reference_task, reference_tasks
 
@@ -1126,3 +1134,96 @@ class TestWaypointsTaskEncoding:
         assert (waypoint.alt_smoothed, waypoint.radius) == (1234, 0)
         assert (competition.alt_smoothed, competition.radius) == (1234, 400)
         assert competition_z.startswith(waypoint_z)
+
+
+class TestGoalLineFollowsTheOptimizedRoute:
+    """S7F-01: goal-line orientation, S7F 2025+ §6.2.3.1.
+
+    *"The previous point p is defined as the optimized route point on the last
+    control zone before goal."* The 2024 edition said the centre of "the last
+    turn point that is different from the goal line centre" instead, which is
+    what this used to implement.
+    """
+
+    def _azimuth(self, task, line):
+        """Approach azimuth the line is built perpendicular to."""
+        geod = geod_for_earth_model(task.earth_model)
+        return geod.inv(
+            line.approach_from[1],
+            line.approach_from[0],
+            line.center[1],
+            line.center[0],
+        )[0]
+
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "task_fobe_line",
+            "task_motu_line",
+            "task_piga_line",
+            "task_qoga_line",
+            "task_quno_line",
+        ],
+    )
+    def test_approach_is_the_optimized_route_point(self, name):
+        """Every LINE-goal reference task orients against the route, not a centre."""
+        task = reference_task(name).task
+        route = calculate_iteratively_refined_route(task_to_turnpoints(task))
+
+        line = GoalLine.from_task(task, route=route)
+
+        assert line is not None
+        assert line.approach_from == route.points[-2]
+
+    def test_a_goal_inside_the_previous_cylinder_faces_the_right_way(self):
+        """The case that showed the rule mattered.
+
+        task_qoga_line's goal sits 2 259 m from the centre of a 3 000 m ESS
+        cylinder — inside it. The route therefore touches that cylinder on the
+        far side and arrives from the opposite direction to the one the centre
+        suggests, so the 2024 rule drew the line nearly *parallel* to the real
+        approach and put the control-zone semicircle behind the pilot.
+        """
+        task = reference_task("task_qoga_line").task
+
+        current = GoalLine.from_task(task)
+        legacy = GoalLine.from_task(task, GoalLineOrientation.TURNPOINT_CENTERS)
+
+        assert current is not None and legacy is not None
+        moved = abs(
+            (self._azimuth(task, current) - self._azimuth(task, legacy) + 180) % 360
+            - 180
+        )
+        assert moved > 150.0, (
+            f"expected the two editions to differ sharply, got {moved}"
+        )
+
+    def test_the_2024_rule_is_still_reachable(self):
+        """Kept deliberately: it is what a task drawn before 2025 shows."""
+        task = reference_task("task_qoga_line").task
+
+        legacy = GoalLine.from_task(task, GoalLineOrientation.TURNPOINT_CENTERS)
+
+        assert legacy is not None
+        previous = task.turnpoints[-2].waypoint
+        assert legacy.approach_from == (previous.lat, previous.lon)
+
+    def test_passing_a_route_matches_deriving_one(self):
+        """The route argument is an optimization, not a different answer."""
+        task = reference_task("task_fobe_line").task
+        route = calculate_iteratively_refined_route(task_to_turnpoints(task))
+
+        assert GoalLine.from_task(task, route=route) == GoalLine.from_task(task)
+
+    def test_the_orientation_does_not_move_the_distance(self):
+        """A LINE goal is a zero-radius circle either way (§7.2).
+
+        Only the drawn shape changes; the optimized distance must not.
+        """
+        task = reference_task("task_qoga_line").task
+        before = calculate_iteratively_refined_route(task_to_turnpoints(task)).total_m
+
+        GoalLine.from_task(task, GoalLineOrientation.TURNPOINT_CENTERS)
+        after = calculate_iteratively_refined_route(task_to_turnpoints(task)).total_m
+
+        assert before == after

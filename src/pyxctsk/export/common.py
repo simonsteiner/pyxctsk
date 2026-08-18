@@ -70,7 +70,12 @@ class TaskDrawing:
         Returns:
             The drawing both writers render.
         """
-        goal_line = GoalLine.from_task(task)
+        # The route comes first: under S7F 2025+ the goal line is oriented
+        # against the optimized route point on the last control zone before
+        # goal, so deriving the line without handing it the route would
+        # optimize the same task a second time.
+        route = calculate_iteratively_refined_route(task_to_turnpoints(task))
+        goal_line = GoalLine.from_task(task, route=route)
         # A goal line replaces the last turnpoint, so it is dropped exactly when
         # there is a line to draw in its place — one decision, made here.
         turnpoints = task.turnpoints[:-1] if goal_line else task.turnpoints
@@ -78,7 +83,7 @@ class TaskDrawing:
             task=task,
             turnpoints=tuple(turnpoints),
             goal_line=goal_line,
-            route=calculate_iteratively_refined_route(task_to_turnpoints(task)),
+            route=route,
         )
 
     def is_goal(self, turnpoint: Turnpoint) -> bool:
