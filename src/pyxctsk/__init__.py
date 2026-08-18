@@ -47,6 +47,7 @@ from .exceptions import (
     EmptyInputError,
     InvalidFormatError,
     InvalidTimeOfDayError,
+    MissingQRCodeSupportError,
     TaskValidationError,
 )
 from .export.common import TaskDrawing
@@ -81,6 +82,7 @@ VERSION = 1
 # installed package metadata.
 __version__ = version("pyxctsk")
 __all__ = [
+    "MissingQRCodeSupportError",
     "task_to_turnpoints",
     "geodesic_distance",
     "center_distance_readings",

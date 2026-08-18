@@ -53,6 +53,22 @@ class TaskValidationError(pyXCTSKError):
         super().__init__("; ".join(str(issue) for issue in issues))
 
 
+class MissingQRCodeSupportError(pyXCTSKError, ImportError):
+    """Raised when QR code image handling is asked for without its dependencies.
+
+    Both bases are load-bearing. ``pyXCTSKError`` puts it in this library's
+    hierarchy, so the CLI's ``except (pyXCTSKError, OSError)`` reports it as a
+    user-facing error rather than letting a traceback out — which it did once
+    that catch was narrowed from a bare ``except Exception``. ``ImportError``
+    keeps every existing ``except ImportError`` around
+    :func:`~pyxctsk.generate_qrcode_image` working, since that is the type it
+    has always raised.
+
+    Reading a QR image without the dependencies already reported itself
+    properly, through :class:`InvalidFormatError`; this is the writing half.
+    """
+
+
 class InvalidTimeOfDayError(pyXCTSKError):
     """Raised when time of day format is invalid."""
 

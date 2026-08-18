@@ -1,5 +1,7 @@
 """QR code image generation for XCTrack task handling."""
 
+from ..exceptions import MissingQRCodeSupportError
+
 # Optional QR code dependencies
 try:
     import qrcode
@@ -26,7 +28,9 @@ def generate_qrcode_image(data: str, size: int = 1024) -> "Image.Image":
         ImportError: If the required 'qrcode' or 'Pillow' packages are not available in the environment.
     """
     if not QR_CODE_SUPPORT:
-        raise ImportError("QR code support requires 'qrcode' and 'Pillow' packages")
+        raise MissingQRCodeSupportError(
+            "QR code support requires 'qrcode' and 'Pillow' packages"
+        )
 
     qr = qrcode.QRCode(  # type: ignore
         version=1,
