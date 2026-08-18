@@ -10,8 +10,6 @@ This module covers:
 - Helper functions for finding previous turnpoints with valid coordinates
 """
 
-from unittest.mock import Mock
-
 import pytest
 
 from pyxctsk import (
@@ -28,8 +26,8 @@ from pyxctsk.distance import geodesic_distance
 from pyxctsk.distance.goal_line import (
     GoalLine,
     _endpoints_from_coords,
-    _find_previous_turnpoint,
     _generate_semicircle_arc,
+    _last_distinct_point,
     goal_line_length_from_turnpoints,
 )
 
@@ -99,90 +97,38 @@ class TestGoalLineClass:
         assert len(zone) > 3
 
 
-class TestFindPreviousTurnpoint:
-    """Test the _find_previous_turnpoint function."""
+class TestLastDistinctPoint:
+    """The walk-backwards rule both orientations share."""
 
-    def test_find_previous_turnpoint_different_coords(self):
-        """Test finding previous turnpoint with different coordinates."""
-        last_tp = Mock()
-        last_tp.waypoint = Mock()
-        last_tp.waypoint.lat = 47.0
-        last_tp.waypoint.lon = 8.0
+    def test_returns_the_last_point_that_differs(self):
+        """The nearest preceding point with its own position wins."""
+        goal = (47.0, 8.0)
+        points = [(46.0, 8.0), (46.5, 8.1)]
 
-        tp1 = Mock()
-        tp1.waypoint = Mock()
-        tp1.waypoint.lat = 46.0
-        tp1.waypoint.lon = 8.0
+        assert _last_distinct_point(points, goal) == (46.5, 8.1)
 
-        tp2 = Mock()
-        tp2.waypoint = Mock()
-        tp2.waypoint.lat = 46.5
-        tp2.waypoint.lon = 8.1
+    def test_skips_points_coincident_with_the_goal(self):
+        """A candidate on the goal gives no approach direction, so keep walking."""
+        goal = (47.0, 8.0)
+        points = [(46.0, 8.0), (47.0, 8.0)]
 
-        turnpoints = [tp1, tp2, last_tp]
+        assert _last_distinct_point(points, goal) == (46.0, 8.0)
 
-        result = _find_previous_turnpoint(turnpoints, last_tp)
+    def test_all_coincident_yields_none(self):
+        """With nothing to approach from there is no line to draw."""
+        assert _last_distinct_point([(47.0, 8.0)], (47.0, 8.0)) is None
 
-        assert result == tp2
+    def test_empty_yields_none(self):
+        """No candidates, no approach."""
+        assert _last_distinct_point([], (47.0, 8.0)) is None
 
-    def test_find_previous_turnpoint_same_coords(self):
-        """Test finding previous turnpoint when some have same coordinates."""
-        last_tp = Mock()
-        last_tp.waypoint = Mock()
-        last_tp.waypoint.lat = 47.0
-        last_tp.waypoint.lon = 8.0
+    def test_a_difference_under_tolerance_is_no_difference(self):
+        """Coordinates within COORD_TOLERANCE are the same place.
 
-        tp1 = Mock()
-        tp1.waypoint = Mock()
-        tp1.waypoint.lat = 46.0
-        tp1.waypoint.lon = 8.0
-
-        tp2 = Mock()  # Same coordinates as last_tp
-        tp2.waypoint = Mock()
-        tp2.waypoint.lat = 47.0
-        tp2.waypoint.lon = 8.0
-
-        turnpoints = [tp1, tp2, last_tp]
-
-        result = _find_previous_turnpoint(turnpoints, last_tp)
-
-        assert result == tp1  # Should skip tp2 and return tp1
-
-    def test_find_previous_turnpoint_all_same_coords(self):
-        """Test finding previous turnpoint when all have same coordinates."""
-        last_tp = Mock()
-        last_tp.waypoint = Mock()
-        last_tp.waypoint.lat = 47.0
-        last_tp.waypoint.lon = 8.0
-
-        tp1 = Mock()
-        tp1.waypoint = Mock()
-        tp1.waypoint.lat = 47.0
-        tp1.waypoint.lon = 8.0
-
-        turnpoints = [tp1, last_tp]
-
-        result = _find_previous_turnpoint(turnpoints, last_tp)
-
-        assert result is None
-
-    def test_find_previous_turnpoint_tolerance(self):
-        """Test coordinate tolerance in finding previous turnpoint."""
-        last_tp = Mock()
-        last_tp.waypoint = Mock()
-        last_tp.waypoint.lat = 47.0
-        last_tp.waypoint.lon = 8.0
-
-        tp1 = Mock()  # Within tolerance
-        tp1.waypoint = Mock()
-        tp1.waypoint.lat = 47.0 + 1e-10  # Very small difference
-        tp1.waypoint.lon = 8.0
-
-        turnpoints = [tp1, last_tp]
-
-        result = _find_previous_turnpoint(turnpoints, last_tp)
-
-        assert result is None  # Should be treated as same coordinates
+        The optimized-route candidates come back through a projection round
+        trip, so they are never bit-exact even when they are the same point.
+        """
+        assert _last_distinct_point([(47.0 + 1e-10, 8.0)], (47.0, 8.0)) is None
 
 
 class TestEndpointsFromCoords:

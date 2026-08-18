@@ -17,6 +17,7 @@ from pathlib import Path
 import pytest
 
 from pyxctsk import Goal, GoalType, Task, TaskType, Turnpoint, TurnpointType, Waypoint
+from pyxctsk.distance import GoalLine, GoalLineOrientation
 from pyxctsk.export import common
 from pyxctsk.export.common import (
     CONTROL_ZONE_EDGE_COLOR,
@@ -81,15 +82,17 @@ class TestTaskDrawing:
     def test_the_render_list_and_the_goal_line_cannot_disagree(self):
         """Dropping the last turnpoint and having a line are one decision.
 
-        A LINE goal needs some earlier turnpoint at different coordinates to
-        give it an approach direction. With every earlier turnpoint sitting on
-        the goal there is no line — and the goal turnpoint must stay drawn.
-        (One coincident turnpoint is not enough: the search walks back past it.)
+        A LINE goal needs an approach direction. With every point of the
+        optimized route sitting on the goal there is none, so there is no line
+        — and the goal turnpoint must stay drawn.
         """
         task = _task(GoalType.LINE)
         for turnpoint in task.turnpoints:
             turnpoint.waypoint.lat = 47.0
             turnpoint.waypoint.lon = 8.0
+            # Zero radius: with a cylinder the route would still reach a
+            # boundary point away from the goal, which *is* a direction.
+            turnpoint.radius = 0
 
         drawing = TaskDrawing.from_task(task)
 
@@ -97,13 +100,31 @@ class TestTaskDrawing:
         assert len(drawing.turnpoints) == 3
         assert drawing.is_goal(drawing.turnpoints[-1])
 
-    def test_one_coincident_turnpoint_still_yields_a_line(self):
-        """The approach direction comes from the last turnpoint that differs."""
+    def test_coincident_centres_still_yield_a_line(self):
+        """Concentric cylinders have an approach direction even so.
+
+        Under S7F 2025+ the line is oriented against the optimized route
+        point, and the route touches the previous cylinder's *boundary*. The
+        pilot really does arrive from there, so there is a direction to face —
+        where the 2024 rule, comparing centres, saw none.
+        """
         drawing = TaskDrawing.from_task(_task(GoalType.LINE, prev_lat=47.0))
 
         assert drawing.goal_line is not None
-        assert drawing.goal_line.approach_from == (45.5, 8.0)
+        assert drawing.goal_line.approach_from != (47.0, 8.0)
         assert len(drawing.turnpoints) == 2
+
+    def test_the_line_faces_the_route_not_the_turnpoint_centre(self):
+        """S7F 2025+ §6.2.3.1, and the 2024 rule is still reachable."""
+        task = _task(GoalType.LINE, prev_lat=47.0)
+        drawing = TaskDrawing.from_task(task)
+
+        assert drawing.goal_line is not None
+        assert drawing.goal_line.approach_from == drawing.route.points[-2]
+
+        legacy = GoalLine.from_task(task, GoalLineOrientation.TURNPOINT_CENTERS)
+        assert legacy is not None
+        assert legacy.approach_from == (45.5, 8.0)
 
     def test_route_below_two_points_is_not_a_line(self):
         """One turnpoint is a point, not a line, so there is nothing to draw."""

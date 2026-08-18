@@ -6,7 +6,8 @@ own. Everything a caller outside the package needs is named here —
 - optimized route and distance through turnpoint cylinders per FAI S7F §7
   (Ding–Xie–Jiang alternating point-circle-point method)
 - earth-model aware distances (WGS84 ellipsoid default, FAI sphere R = 6371 km)
-- cumulative and per-leg task distances
+- cumulative and per-leg task distances, and the speed section's own
+  distance, which §7.2 defines as a separate optimization
 - the optimizer's sweep limit, the one number here worth tuning, beside the
   convergence threshold the spec fixes
 
@@ -20,6 +21,14 @@ own. Everything a caller outside the package needs is named here —
   projected from one optimized route
 - :mod:`~pyxctsk.distance.goal_line` — the ``GoalLine`` deep module: length,
   endpoints and semicircular control zone, in one place
+- :mod:`~pyxctsk.distance.speed_section` — ``SpeedSection``, §7.2's second
+  task distance. It is *not* a prefix of the task route: the optimizer
+  treats the last circle it is handed as the finish, so S7F optimizes a
+  separate ``taskToESS`` route and so does this
+- :mod:`~pyxctsk.distance.center_distance` — the "distance through centres"
+  a task board publishes, which **S7F does not define**. The module states
+  the reading pyxctsk proposes and keeps the alternatives so a vendor whose
+  board disagrees can tell a convention apart from a bug
 
 The goal line lives here rather than with the KML and GeoJSON writers that draw
 it because the shapes of a task must not depend on the formats it is exported
@@ -28,11 +37,38 @@ calculation needed the goal-line length itself — stopped being true when the
 `TaskTurnpoint.goal_line_length` attribute that carried it turned out to be
 written and never read. `export/` is `goal_line`'s only consumer today.
 
+`goal_line` does depend on the optimizer, though: S7F 2025+ orients the line
+against the optimized route point rather than a turnpoint centre, so the
+line cannot be derived from the task alone. That edge runs the same way as
+every other one here — `goal_line` → `task_distances` → `route_optimization`
+→ `turnpoint` — so it adds no cycle.
+
 Submodules import each other directly, never through this file, which is what
 keeps the re-export layer free of the cycles it was split out to break.
+
+**A task on the FAI sphere does not produce S7F task distances.** S7F 2026
+§4.1 and §4.2 admit one earth model — *"distances between two geographic
+points are calculated on the WGS84 ellipsoid"* — and offer no spherical
+option; paragliding left the FAI sphere in 2018. ``earthModel`` is an XCTrack
+format field, so a task declaring ``FAI_SPHERE`` is honoured here, throughout:
+route, cylinder snapping and goal-line geometry all move to the sphere
+together (ADR 0003). What comes out is what XCTrack would show and is not a
+number a CIVL competition can be scored on — XCTrack's own documentation puts
+the divergence at 200–300 m on a 50 km cylinder. This is deliberately not a
+validation rule: the field is valid in the format being validated.
 """
 
-from .goal_line import GoalLine, goal_line_length_from_turnpoints
+from .center_distance import (
+    PROPOSED_READING,
+    CenterDistanceReading,
+    center_distance,
+    center_distance_readings,
+)
+from .goal_line import (
+    GoalLine,
+    GoalLineOrientation,
+    goal_line_length_from_turnpoints,
+)
 from .route_optimization import (
     CONVERGENCE_EPSILON_M,
     DEFAULT_NUM_ITERATIONS,
@@ -40,6 +76,7 @@ from .route_optimization import (
     calculate_iteratively_refined_route,
     optimized_distance,
 )
+from .speed_section import SpeedSection
 from .task_distances import (
     calculate_task_distances,
     task_distances_from_route,
@@ -61,17 +98,22 @@ __all__ = [
     "plane_circle",
     "TaskTurnpoint",
     "GoalLine",
+    "GoalLineOrientation",
+    "CenterDistanceReading",
     "OptimizedRoute",
+    "SpeedSection",
     # Goal-line geometry
     "goal_line_length_from_turnpoints",
     # Main distance calculation functions
     "optimized_distance",
     "distance_through_centers",
+    "center_distance",
+    "center_distance_readings",
+    "PROPOSED_READING",
     "geodesic_distance",
     "calculate_task_distances",
     "task_distances_from_route",
     "task_to_turnpoints",
-    # SSS specific functions
     # Configuration
     "CONVERGENCE_EPSILON_M",
     "DEFAULT_NUM_ITERATIONS",

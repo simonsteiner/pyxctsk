@@ -1,8 +1,9 @@
 """Tests for the `pyxctsk` command-line interface.
 
-The CLI is the library's other public surface: every output format it offers
-(json, kml, png, qrcode-json), reading from a file or from stdin, and what it
-does with input it cannot parse.
+The CLI is the library's other public surface: every output format `convert`
+offers (json, kml, png, qrcode-json), the `distances` report another
+implementation is meant to diff against, reading from a file or from stdin, and
+what it does with input it cannot parse.
 """
 
 import json
@@ -11,7 +12,7 @@ import pytest
 from click.testing import CliRunner
 
 from pyxctsk import TurnpointType, parse_task
-from pyxctsk.cli import convert, main
+from pyxctsk.cli import convert, distances, main
 from tests.builders import task, turnpoint
 from tests.corpus import reference_task
 from tests.qr_test_utils import QR_CODE_SUPPORT, Image, decode_qr
@@ -179,3 +180,132 @@ class TestStrictValidation:
         result = CliRunner().invoke(main, ["convert", "--help"])
 
         assert "--strict" in result.output
+
+
+class TestCLIDistances:
+    """The S7F distance report — the command a vendor runs to compare."""
+
+    def _report(self, *options: str, stem: str = "task_pepi") -> dict:
+        """Run ``distances`` over a reference task and parse its JSON."""
+        result = CliRunner().invoke(
+            distances, [str(reference_task(stem).xctsk_path), *options]
+        )
+        assert result.exit_code == 0, result.output
+        report: dict = json.loads(result.output)
+        return report
+
+    def test_it_reports_both_of_s7f_7_2_s_distances(self):
+        """The two the Sporting Code actually defines."""
+        report = self._report()
+
+        assert report["task_distance_m"] == pytest.approx(92001.6, abs=1.0)
+        assert report["speed_section_distance_m"] == pytest.approx(86761.2, abs=1.0)
+
+    def test_it_reports_the_centre_distance_and_says_it_is_undefined(self):
+        """The number boards publish that S7F does not define.
+
+        A vendor reading this output must not come away thinking the convention
+        is specified, so the disclaimer travels with the number.
+        """
+        report = self._report()
+
+        assert report["center_distance_m"] == pytest.approx(321439.7, abs=1.0)
+        assert report["center_distance_reading"] == "LAUNCH_TO_GOAL"
+        assert "NOT DEFINED BY S7F" in report["notes"]["center_distance_m"]
+
+    def test_it_reports_every_reading_of_the_centre_distance(self):
+        """So a disagreement can be traced to a convention rather than a bug."""
+        readings = self._report()["center_distance_readings_m"]
+
+        assert set(readings) == {
+            "LAUNCH_TO_GOAL",
+            "LAUNCH_TO_GOAL_BOUNDARY",
+            "START_TO_GOAL",
+        }
+        values = [v for v in readings.values() if v is not None]
+        assert max(values) - min(values) > 39_000
+
+    def test_it_reports_the_route_points(self):
+        """The whole point: a total says two implementations disagree, these say where."""
+        report = self._report()
+        task = reference_task("task_pepi").task
+
+        assert len(report["route"]) == len(task.turnpoints)
+        first, last = report["route"][0], report["route"][-1]
+        assert first["cumulative_m"] == 0.0
+        assert last["cumulative_m"] == pytest.approx(report["task_distance_m"])
+        for point in report["route"]:
+            assert {"route_lat", "route_lon", "center_lat", "center_lon"} <= set(point)
+
+    def test_it_names_the_version_and_the_spec_edition(self):
+        """A number without a provenance cannot be compared later."""
+        report = self._report()
+
+        assert report["s7f_edition"] == "2026 V1.0"
+        assert report["pyxctsk_version"]
+        assert report["earth_model"].startswith("WGS84")
+
+    def test_a_task_with_no_speed_section_reports_null_not_zero(self):
+        """An XC route has no SSS/ESS pair, and zero would read as a measurement."""
+        report = self._report(stem="task_dami_route")
+
+        assert report["speed_section_distance_m"] is None
+        assert report["task_distance_m"] > 0
+
+    def test_the_text_format_is_for_humans(self):
+        """Same numbers, and the same disclaimer."""
+        result = CliRunner().invoke(
+            distances,
+            [str(reference_task("task_pepi").xctsk_path), "--format", "text"],
+        )
+
+        assert result.exit_code == 0
+        assert "92.002 km" in result.output
+        assert "NOT defined by S7F" in result.output
+        assert "optimized route:" in result.output
+
+    def test_it_reads_stdin(self):
+        """So it composes with whatever produced the task."""
+        payload = reference_task("task_bevo").xctsk_path.read_bytes()
+
+        result = CliRunner().invoke(distances, input=payload)
+
+        assert result.exit_code == 0
+        assert json.loads(result.output)["task_distance_m"] == pytest.approx(
+            94028.3, abs=1.0
+        )
+
+    def test_it_writes_to_a_file(self, tmp_path):
+        """For piping a corpus through it."""
+        out = tmp_path / "distances.json"
+
+        result = CliRunner().invoke(
+            distances, [str(reference_task("task_bevo").xctsk_path), "-o", str(out)]
+        )
+
+        assert result.exit_code == 0
+        assert json.loads(out.read_text())["task_distance_m"] > 0
+
+    def test_a_task_too_short_to_measure_is_an_error(self):
+        """One turnpoint is a point, not a distance."""
+        result = CliRunner().invoke(
+            distances, input=task(turnpoint("Only", 46.0, 8.0)).to_json().encode()
+        )
+
+        assert result.exit_code == 1
+        assert "at least two turnpoints" in result.output
+
+    def test_input_that_cannot_be_parsed_is_an_error(self):
+        """Not a traceback."""
+        result = CliRunner().invoke(distances, input=b"not a task")
+
+        assert result.exit_code == 1
+        assert "Error:" in result.output
+
+    def test_the_command_is_documented(self):
+        """A command the help does not mention is one nobody finds."""
+        top = CliRunner().invoke(main, ["--help"])
+        own = CliRunner().invoke(main, ["distances", "--help"])
+
+        assert "distances" in top.output
+        assert "--format" in own.output and "--strict" in own.output

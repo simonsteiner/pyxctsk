@@ -3,6 +3,7 @@ addopts
 airscore
 altitudemode
 AMSL
+antimeridian
 barcodes
 behaviour
 behaviours
@@ -10,9 +11,9 @@ bevo
 brentq
 changealphaint
 CIVL
+clamptoground
 colours
 conftest
-clamptoground
 dami
 darkred
 dedented
@@ -24,6 +25,7 @@ ellps
 endspeed
 equirectangular
 esbenp
+Ewald
 excinfo
 FFVL
 fminbound
@@ -43,7 +45,9 @@ imwrite
 jdir
 Jiang
 jsonify
+Jörg
 Karney
+KHTML
 LANCZOS
 latlng
 lefthook
@@ -56,8 +60,10 @@ lons
 lorili
 MATEC
 matecconf
+millimetres
 minversion
 mmomtchev
+mojibake
 monkeypatch
 motu
 Naviter
@@ -107,6 +113,7 @@ subinterval
 svgs
 taskline
 testpaths
+tracklog
 tracklogs
 turnpoint
 turnpointcylinder

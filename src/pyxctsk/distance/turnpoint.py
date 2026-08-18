@@ -84,21 +84,48 @@ def geodesic_distance(
     return float(dist)
 
 
+def ltm_scale_factor(lat0: float) -> float:
+    """Return the LTM scale factor k₀ for a projection centre latitude.
+
+    The one way S7F §7.1.2 says its Localized Transverse Mercator differs from
+    UTM in more than centring: "Scaling depends on the centre point's
+    latitude". Both of Annex A's reference implementations take the absolute
+    latitude first (``double la = abs(refLat)``), so the southern hemisphere
+    scales like the northern.
+
+    Args:
+        lat0: Latitude of the projection centre in degrees.
+
+    Returns:
+        k₀: 0.99994 up to 55°, growing linearly beyond it.
+    """
+    la = abs(float(lat0))
+    if la <= 55.0:
+        return 0.99994
+    return 0.99994 + ((la - 55.0) / 60.0) * 1.3e-4
+
+
 @lru_cache(maxsize=128)
 def _cached_tm_transformers(
     lat0: float, lon0: float, fai_sphere: bool
 ) -> tuple[Transformer, Transformer]:
-    """Build (and cache) transformers for a local Transverse Mercator plane."""
+    """Build (and cache) transformers for a local Transverse Mercator plane.
+
+    ``+k_0`` rather than ``+k``: the two are synonyms in PROJ, but the 2026
+    edition's own document history records the correction "parameter +k_0
+    instead of deprecated +k" against its Annex A sample.
+    """
+    k0 = ltm_scale_factor(lat0)
     if fai_sphere:
         geo_crs = CRS.from_proj4(f"+proj=longlat +R={FAI_SPHERE_RADIUS_M} +no_defs")
         tm_crs = CRS.from_proj4(
-            f"+proj=tmerc +lat_0={lat0} +lon_0={lon0} +k=1 +x_0=0 +y_0=0 "
+            f"+proj=tmerc +lat_0={lat0} +lon_0={lon0} +k_0={k0} +x_0=0 +y_0=0 "
             f"+R={FAI_SPHERE_RADIUS_M} +units=m +no_defs"
         )
     else:
         geo_crs = CRS.from_epsg(4326)
         tm_crs = CRS.from_proj4(
-            f"+proj=tmerc +lat_0={lat0} +lon_0={lon0} +k=1 +x_0=0 +y_0=0 "
+            f"+proj=tmerc +lat_0={lat0} +lon_0={lon0} +k_0={k0} +x_0=0 +y_0=0 "
             "+ellps=WGS84 +units=m +no_defs"
         )
     to_plane = Transformer.from_crs(geo_crs, tm_crs, always_xy=True)
@@ -290,6 +317,56 @@ def snap_to_boundary(
     return (lat, lon)
 
 
+def task_area_center(
+    points: Sequence[tuple[float, float]],
+) -> tuple[float, float]:
+    """Return the centre of the area these points occupy (S7F §7.1.6).
+
+    The centre of their bounding box, not their mean: a task with six
+    turnpoints clustered at one end and one far away is centred between the
+    extremes, so the projection covers the whole of it rather than leaning
+    toward wherever the points are dense. The mean is what this used to
+    return, and it disagreed with XCTrack's published distance by 72 m on
+    ``task_bevo`` where the box centre disagrees by 27 m.
+
+    Longitudes are handled as §7.1.6.1 specifies, which is what makes a task
+    straddling the antimeridian work: normalize to (-180, 180], sort, and if
+    the largest gap between neighbours exceeds 180° the box is the one that
+    wraps *through* that gap rather than the one spanning nearly the globe.
+    Averaging longitudes directly would put the centre of a task at ±180° out
+    near longitude 0 — half a world from the area of interest.
+
+    Args:
+        points: (lat, lon) pairs in degrees — turnpoint centers, or the points
+            of an optimized route.
+
+    Returns:
+        (lat, lon) of the bounding box's centre, in degrees.
+
+    Raises:
+        ValueError: If no points are given; there is no area of interest.
+    """
+    if not points:
+        raise ValueError("a task area needs at least one point")
+
+    lats = [lat for lat, _ in points]
+    lat0 = (min(lats) + max(lats)) / 2.0
+
+    lons = sorted(((lon + 180.0) % 360.0) - 180.0 for _, lon in points)
+    gaps = [(lons[i] - lons[i - 1], i) for i in range(1, len(lons))]
+    widest, at = max(gaps) if gaps else (0.0, 0)
+    if widest > 180.0:
+        # The box wraps the antimeridian: it runs east from the point after
+        # the gap, across ±180°, to the point before it.
+        lon0 = ((lons[at] + lons[at - 1] + 360.0) / 2.0) % 360.0
+        if lon0 > 180.0:
+            lon0 -= 360.0
+    else:
+        lon0 = (lons[0] + lons[-1]) / 2.0
+
+    return (lat0, lon0)
+
+
 @runtime_checkable
 class TurnpointGeometry(Protocol):
     """The geometry seam the route optimizer depends on.
@@ -319,7 +396,7 @@ class LocalPlane:
     """The Transverse Mercator plane a route is solved in (S7F §7.1.2).
 
     The spec places optimal points in a plane "centred on the area of
-    interest", which for a whole task is the mean of its turnpoint centers.
+    interest", which :func:`task_area_center` derives per §7.1.6.
     That policy used to be written twice: the route optimizer projected onto
     the task area, while :meth:`TaskTurnpoint.optimal_point` projected onto a
     plane centred on *that turnpoint*. Same paragraph of the spec, two
@@ -343,7 +420,7 @@ class LocalPlane:
     def around(
         cls, centers: Sequence[tuple[float, float]], earth_model: object = None
     ) -> "LocalPlane":
-        """Return the plane centred on the mean of these centers.
+        """Return the plane centred on these points' task area (§7.1.6).
 
         Args:
             centers: (lat, lon) pairs — one turnpoint's, or a whole task's.
@@ -355,11 +432,7 @@ class LocalPlane:
         Raises:
             ValueError: If no centers are given; there is no area of interest.
         """
-        if not centers:
-            raise ValueError("a local plane needs at least one center")
-        lat0 = sum(lat for lat, _ in centers) / len(centers)
-        lon0 = sum(lon for _, lon in centers) / len(centers)
-        return cls(*local_tm_transformers(lat0, lon0, earth_model))
+        return cls(*local_tm_transformers(*task_area_center(centers), earth_model))
 
     def xy(self, point: tuple[float, float]) -> tuple[float, float]:
         """Project a (lat, lon) point into the plane.
@@ -486,7 +559,14 @@ class TaskTurnpoint:
 def distance_through_centers(
     turnpoints: list[TaskTurnpoint], earth_model: object = None
 ) -> float:
-    """Calculate distance through turnpoint centers.
+    """Sum the geodesic legs between consecutive turnpoint centers.
+
+    The primitive, not the published number. **S7F defines no "distance
+    through centres"**, so which points to include and where to stop is a
+    convention — see :mod:`~pyxctsk.distance.center_distance`, which owns that
+    decision and calls this. A caller producing a figure for a task board
+    wants ``center_distance(task)``; a caller who already knows exactly which
+    turnpoints it means wants this.
 
     Args:
         turnpoints (List[TaskTurnpoint]): List of TaskTurnpoint objects.

@@ -14,6 +14,18 @@ disagree: a LINE goal whose previous turnpoint sits at the same coordinates has
 no approach direction and so no goal line, but a separate predicate dropped the
 turnpoint anyway and the goal vanished from the output entirely.
 
+**Which way the line faces is the one thing S7F changed here**, so it is the
+one thing this module makes a parameter: :class:`GoalLineOrientation` picks
+between the 2025-and-later rule (perpendicular to the *optimized route point*
+on the last control zone before goal) and the 2024 one (perpendicular to that
+turnpoint's *centre*). Everything else — the length, the perpendicular, the
+semicircle behind it — is identical in both editions and is not configurable.
+
+Orientation is where this module gained a dependency on the optimizer: under
+the current rule a goal line cannot be derived from the task alone. Callers
+that already hold an ``OptimizedRoute`` should pass it, or the same task is
+optimized twice — which is why ``TaskDrawing`` builds its route first.
+
 Everything else here is :class:`GoalLine`'s own implementation. Callers use the
 object: ``length``, ``endpoints()`` and ``control_zone()``. There is deliberately
 no tuple-shaped accessor beside them — the writers used to unpack a positional
@@ -21,13 +33,44 @@ no tuple-shaped accessor beside them — the writers used to unpack a positional
 """
 
 from dataclasses import dataclass
+from enum import Enum
 
 from ..model.task import GoalType, Task
+from .route_optimization import OptimizedRoute, calculate_iteratively_refined_route
+from .task_distances import task_to_turnpoints
 from .turnpoint import geod_for_earth_model
 
 # Constants for goal line visualization
 GOAL_LINE_NUM_POINTS = 20
 COORD_TOLERANCE = 1e-9
+
+
+class GoalLineOrientation(str, Enum):
+    """Which edition of S7F §6.2.3.1 decides where the goal line points.
+
+    The rule changed in the 2025 edition, whose change list records it as
+    *"Orientation of Goal Line: Follow optimized route, instead of turnpoint
+    centres"*. Both readings are kept because they answer different questions:
+    one is the current scoring code, the other is what a task drawn before
+    2025 — and, as far as we know, what XCTrack itself — shows.
+
+    Attributes:
+        OPTIMIZED_ROUTE (str): S7F 2025 and later. The approach comes from the
+            optimized route point on the last control zone before goal, the
+            point the task-distance calculation already found.
+        TURNPOINT_CENTERS (str): S7F 2024. The approach comes from the centre
+            of *"the last turn point that is different from the goal line
+            centre"*.
+    """
+
+    OPTIMIZED_ROUTE = "OPTIMIZED_ROUTE"
+    TURNPOINT_CENTERS = "TURNPOINT_CENTERS"
+
+
+#: What :meth:`GoalLine.from_task` uses when the caller does not say. The 2026
+#: edition is what the rest of ``distance/`` implements, so this is the one
+#: that keeps a task's geometry and its distances on the same edition.
+DEFAULT_ORIENTATION = GoalLineOrientation.OPTIMIZED_ROUTE
 
 
 def goal_line_length_from_turnpoints(turnpoints) -> float | None:
@@ -47,24 +90,33 @@ def goal_line_length_from_turnpoints(turnpoints) -> float | None:
     return float(turnpoints[-1].radius * 2)
 
 
-def _find_previous_turnpoint(turnpoints, last_tp):
-    """Find the previous turnpoint with different coordinates from the goal center.
+def _last_distinct_point(
+    points: "list[tuple[float, float]]", goal_center: tuple[float, float]
+) -> tuple[float, float] | None:
+    """Return the last of ``points`` that does not sit on the goal center.
+
+    A goal line needs an approach direction, and a candidate coincident with
+    the goal gives none. Both orientation rules need this same walk-backwards
+    — one over turnpoint centers, one over optimized route points — so it is
+    written once over bare coordinates rather than twice over the objects
+    that carry them.
 
     Args:
-        turnpoints: List of turnpoints to search through
-        last_tp: The last turnpoint (goal center)
+        points: (lat, lon) candidates in task order, excluding the goal.
+        goal_center: (lat, lon) of the goal.
 
     Returns:
-        The previous turnpoint with different coordinates, or None if not found
+        The last (lat, lon) distinct from the goal, or None if every candidate
+        coincides with it.
     """
-    for i in range(len(turnpoints) - 2, -1, -1):
-        candidate_tp = turnpoints[i]
-        # Check if coordinates are different (with small tolerance for floating point comparison)
+    for lat, lon in reversed(points):
+        # Tolerance rather than equality: these arrive from a projection round
+        # trip on the optimized-route path, so they are never bit-exact.
         if (
-            abs(candidate_tp.waypoint.lon - last_tp.waypoint.lon) > COORD_TOLERANCE
-            or abs(candidate_tp.waypoint.lat - last_tp.waypoint.lat) > COORD_TOLERANCE
+            abs(lat - goal_center[0]) > COORD_TOLERANCE
+            or abs(lon - goal_center[1]) > COORD_TOLERANCE
         ):
-            return candidate_tp
+            return (lat, lon)
     return None
 
 
@@ -163,7 +215,12 @@ class GoalLine:
 
     Attributes:
         center: (lat, lon) of the goal (last turnpoint).
-        approach_from: (lat, lon) of the previous turnpoint defining the approach.
+        approach_from: (lat, lon) of the point the line is oriented against —
+            per :class:`GoalLineOrientation`, either the optimized route point
+            on the last control zone before goal or that turnpoint's centre.
+            The line is perpendicular to the direction from here to
+            :attr:`center`, so this is the whole of what "which way does the
+            goal face" depends on.
         length: Total goal-line length in meters.
         earth_model: The model the geometry is measured on (an ``EarthModel``
             member, its string value, or None for WGS84), per ADR 0003. A task
@@ -177,11 +234,22 @@ class GoalLine:
     earth_model: object = None
 
     @classmethod
-    def from_task(cls, task: Task) -> "GoalLine | None":
+    def from_task(
+        cls,
+        task: Task,
+        orientation: GoalLineOrientation = DEFAULT_ORIENTATION,
+        route: OptimizedRoute | None = None,
+    ) -> "GoalLine | None":
         """Build the goal line for a task.
 
         Args:
             task: Task to derive the goal line from.
+            orientation: Which edition's rule decides the approach direction.
+                Defaults to the current one, :attr:`~GoalLineOrientation.OPTIMIZED_ROUTE`.
+            route: The task's optimized route, if the caller already has one.
+                Only read for the optimized-route orientation, and only to
+                save optimizing the same task twice; it must be the route for
+                ``task``.
 
         Returns:
             A GoalLine if the task has a LINE goal with sufficient geometry, otherwise None.
@@ -195,8 +263,19 @@ class GoalLine:
             return None
 
         last_tp = task.turnpoints[-1]
-        prev_tp = _find_previous_turnpoint(task.turnpoints, last_tp)
-        if prev_tp is None:
+        center = (last_tp.waypoint.lat, last_tp.waypoint.lon)
+
+        if orientation is GoalLineOrientation.TURNPOINT_CENTERS:
+            candidates = [
+                (tp.waypoint.lat, tp.waypoint.lon) for tp in task.turnpoints[:-1]
+            ]
+        else:
+            if route is None:
+                route = calculate_iteratively_refined_route(task_to_turnpoints(task))
+            candidates = list(route.points[:-1])
+
+        approach_from = _last_distinct_point(candidates, center)
+        if approach_from is None:
             return None
 
         length = goal_line_length_from_turnpoints(task.turnpoints)
@@ -204,8 +283,8 @@ class GoalLine:
             return None
 
         return cls(
-            center=(last_tp.waypoint.lat, last_tp.waypoint.lon),
-            approach_from=(prev_tp.waypoint.lat, prev_tp.waypoint.lon),
+            center=center,
+            approach_from=approach_from,
             length=length,
             earth_model=task.earth_model,
         )

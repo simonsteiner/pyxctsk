@@ -9,18 +9,27 @@ import math
 from dataclasses import dataclass
 
 import pytest
+from pyproj import CRS, Transformer
 
 from pyxctsk.distance import OptimizedRoute
 from pyxctsk.distance.route_optimization import (
+    _INITIAL_PLACEMENTS,
     _closest_circle_point,
     _optimize_plane_points,
+    _place_at_centers,
+    _place_chained_backward,
+    _place_chained_forward,
     _polyline_length,
+    _sweep_to_convergence,
     calculate_iteratively_refined_route,
 )
 from pyxctsk.distance.turnpoint import (
+    LocalPlane,
     TaskTurnpoint,
     TurnpointGeometry,
+    ltm_scale_factor,
     plane_optimal_point,
+    task_area_center,
 )
 
 
@@ -207,3 +216,172 @@ def test_cumulative_m_has_one_entry_per_point():
         if cumulative:
             assert cumulative[0] == 0.0
             assert cumulative[-1] == route.total_m
+
+
+class TestLtmScaleFactor:
+    """The LTM scale factor k₀ the plane is built with (S7F §7.1.2)."""
+
+    def test_below_the_break_is_the_flat_value(self):
+        """Up to 55° the spec fixes a single constant."""
+        for lat in (0.0, 46.5, 55.0):
+            assert ltm_scale_factor(lat) == pytest.approx(0.99994)
+
+    def test_above_the_break_grows_linearly(self):
+        """Beyond 55° it grows by 1.3e-4 per 60° of latitude."""
+        assert ltm_scale_factor(115.0) == pytest.approx(0.99994 + 1.3e-4)
+        assert ltm_scale_factor(85.0) == pytest.approx(0.99994 + 0.5 * 1.3e-4)
+
+    def test_southern_hemisphere_scales_like_the_northern(self):
+        """Annex A takes ``abs(refLat)`` before applying the formula."""
+        for lat in (46.5, 60.0, 78.0):
+            assert ltm_scale_factor(-lat) == ltm_scale_factor(lat)
+
+    def test_the_plane_is_actually_built_with_it(self):
+        """A coordinate in the plane carries k₀, not 1.
+
+        Guards the wiring rather than the formula: the projection used to be
+        built with ``+k=1``, and asserting the constant alone would not have
+        caught that.
+        """
+        unscaled = Transformer.from_crs(
+            CRS.from_epsg(4326),
+            CRS.from_proj4(
+                "+proj=tmerc +lat_0=46.0 +lon_0=8.0 +k_0=1 +x_0=0 +y_0=0 "
+                "+ellps=WGS84 +units=m +no_defs"
+            ),
+            always_xy=True,
+        )
+        x, _ = LocalPlane.around([(46.0, 8.0)]).xy((46.0, 8.1))
+        x_unscaled, _ = unscaled.transform(8.1, 46.0)
+
+        assert x == pytest.approx(x_unscaled * ltm_scale_factor(46.0), rel=1e-12)
+        assert x != pytest.approx(x_unscaled, rel=1e-9)
+
+
+class TestTaskAreaCenter:
+    """The projection centre S7F §7.1.6 asks for."""
+
+    def test_is_the_box_centre_not_the_mean(self):
+        """Six clustered points and one outlier centre between the extremes."""
+        points = [(46.0, 8.0)] * 6 + [(47.0, 9.0)]
+
+        assert task_area_center(points) == (46.5, 8.5)
+
+    def test_single_point_is_its_own_centre(self):
+        """A one-turnpoint area has a degenerate box."""
+        assert task_area_center([(46.25, 8.75)]) == (46.25, 8.75)
+
+    def test_empty_has_no_area(self):
+        """There is no area of interest to centre on."""
+        with pytest.raises(ValueError, match="at least one point"):
+            task_area_center([])
+
+    def test_antimeridian_box_wraps_through_the_widest_gap(self):
+        """A task at ±180° centres near ±180°, not near 0°.
+
+        Averaging longitudes directly puts this centre at -60°, half a world
+        from the task — which is what the mean-of-longitudes rule did.
+        """
+        lat, lon = task_area_center([(-17.0, 179.5), (-17.0, -179.5), (-17.2, -179.0)])
+
+        assert lat == pytest.approx(-17.1)
+        assert abs(lon) > 179.0, f"{lon} is not near the antimeridian"
+        assert lon == pytest.approx(-179.75)
+
+    def test_longitudes_are_normalized_before_boxing(self):
+        """370° and 10° are the same meridian."""
+        assert task_area_center([(0.0, 370.0), (0.0, 20.0)]) == task_area_center(
+            [(0.0, 10.0), (0.0, 20.0)]
+        )
+
+    def test_wide_but_not_wrapping_span_uses_the_plain_box(self):
+        """A gap under 180° leaves the box unwrapped."""
+        assert task_area_center([(0.0, -80.0), (0.0, 40.0)]) == (0.0, -20.0)
+
+
+class TestInitialPlacements:
+    """The starting configurations the alternating sweep is run from."""
+
+    CIRCLES = [
+        (0.0, 0.0, 0.0),
+        (10_000.0, 3_000.0, 2_000.0),
+        (20_000.0, -4_000.0, 5_000.0),
+        (30_000.0, 0.0, 400.0),
+    ]
+
+    @pytest.mark.parametrize("place", _INITIAL_PLACEMENTS, ids=lambda f: f.__name__)
+    def test_one_point_per_circle(self, place):
+        """Every placement must seed the sweep with a full route."""
+        assert len(place(self.CIRCLES)) == len(self.CIRCLES)
+
+    @pytest.mark.parametrize("place", _INITIAL_PLACEMENTS, ids=lambda f: f.__name__)
+    def test_the_start_point_is_the_takeoff_centre(self, place):
+        """Index 0 is the launch point, never a boundary point."""
+        assert place(self.CIRCLES)[0] == (0.0, 0.0)
+
+    def _on_boundary(self, point, circle):
+        """Planar distance from the circle's centre, for boundary assertions."""
+        cx, cy, radius = circle
+        return math.hypot(point[0] - cx, point[1] - cy) == pytest.approx(radius)
+
+    def test_forward_chain_lands_every_later_point_on_its_boundary(self):
+        """Chaining from the launch puts each point where the answer lives.
+
+        The centres never can be an answer for a non-zero radius, which is why
+        seeding there alone left the sweep in the wrong basin.
+        """
+        points = _place_chained_forward(self.CIRCLES)
+
+        for point, circle in zip(points[1:], self.CIRCLES[1:]):
+            assert self._on_boundary(point, circle)
+
+    def test_backward_chain_seeds_from_the_last_centre(self):
+        """It has to start somewhere: the final circle's centre is that seed.
+
+        Every point it then derives — walking back toward the launch — is on a
+        boundary; only the seed itself is not.
+        """
+        points = _place_chained_backward(self.CIRCLES)
+
+        assert points[-1] == (self.CIRCLES[-1][0], self.CIRCLES[-1][1])
+        for point, circle in zip(points[1:-1], self.CIRCLES[1:-1]):
+            assert self._on_boundary(point, circle)
+
+    def test_centres_placement_is_the_centres(self):
+        """The original starting configuration, kept as one of the three."""
+        assert _place_at_centers(self.CIRCLES) == [(c[0], c[1]) for c in self.CIRCLES]
+
+    def test_a_zero_radius_circle_collapses_in_every_placement(self):
+        """A LINE goal has one possible point wherever it is seeded from."""
+        circles = [(0.0, 0.0, 0.0), (10_000.0, 0.0, 1_000.0), (20_000.0, 0.0, 0.0)]
+        for place in _INITIAL_PLACEMENTS:
+            assert place(circles)[2] == (20_000.0, 0.0)
+
+
+class TestMultiStart:
+    """S7F-04: one start finds *a* local optimum, not the shortest path."""
+
+    #: Two big cylinders either side of the direct line, which is what gives
+    #: the sweep more than one basin to fall into.
+    CIRCLES = [
+        (0.0, 0.0, 0.0),
+        (20_000.0, 18_000.0, 17_000.0),
+        (40_000.0, -18_000.0, 17_000.0),
+        (60_000.0, 0.0, 400.0),
+    ]
+
+    def test_the_result_is_the_shortest_of_the_placements(self):
+        """Whatever the sweep is seeded with, the shortest survives."""
+        shipped = _polyline_length(_optimize_plane_points(self.CIRCLES, max_sweeps=100))
+
+        for place in _INITIAL_PLACEMENTS:
+            single = _sweep_to_convergence(
+                list(self.CIRCLES), place(self.CIRCLES), 100, 0.1
+            )
+            assert shipped <= _polyline_length(single) + 1e-9
+
+    def test_placements_are_deterministic_and_ordered(self):
+        """The same task must always produce the same route."""
+        first = _optimize_plane_points(self.CIRCLES, max_sweeps=100)
+
+        assert _optimize_plane_points(self.CIRCLES, max_sweeps=100) == first

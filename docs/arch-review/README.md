@@ -5,6 +5,22 @@ implements the [XCTrack Competition Interfaces](https://xctrack.org/Competition_
 specification and FAI Sporting Code S7F. Each file is dated and kept as written —
 superseded reviews stay for history rather than being edited. Newest first.
 
+- [2026-08-18 — FAI Sporting Code S7F 2026 conformance audit](2026-08-18-s7f-2026-conformance-audit.md)
+  — **current for S7F; all eight actionable issues fixed,** tracked in a table in the file.
+  The library against the 2026 V1.0 edition of the scoring code. Confirms PR #8 closed the
+  2026-07-07 audit's four algorithm findings, and found nine more. The headline was a
+  **split spec lineage**: the optimizer had moved to the 2026 edition while the goal line
+  still implemented 2024, whose §6.2.3.1 orients it from "the last turn point that is
+  different from the goal line centre" — the 2025 plenary changed that to follow the
+  optimized route, and PR #8 took the other three geometry changes from the same list but
+  not this one. One corpus task drew the line 151° out, control zone facing away from the
+  approach. Also found and fixed: no speed-section distance (§7.2), a task-area centre
+  that was the mean of the turnpoint centres rather than `FindTaskAreaCentre` and broke
+  across the antimeridian (§7.1.6), an optimizer that returned a local optimum up to 98.6 m
+  above the shortest path, `+k=1` where the spec fixes k₀ = 0.99994 (§7.1.2, worth 2 mm),
+  and the elevated goal's two unchecked constraints (§6.2.3.2). The ninth is not ours to
+  fix: the XCTrack format has no keys for S7F's control-zone altitude limits or its general
+  line control zones.
 - [2026-08-17 — Deepening candidates after the package split](2026-08-17-deepening-candidates.md)
   — **A and B applied,** six proposed. Eight candidates in *deep module* terms, each reproduced by
   running the library: cumulative distances that disagree with the drawn route by 5.09 km
@@ -44,5 +60,10 @@ superseded reviews stay for history rather than being edited. Newest first.
 - [2025-06-07 — Competition Interface support analysis](2025-06-07-competition-interfaces-analysis.md)
   — **superseded, retained for history.** Claims 100% coverage; the 2026-08-16 audit
   disproves that. Still useful as the record of the QR encoding fixes made at the time.
+
+The findings these reviews produced that are addressed to *other implementers* rather than
+to this codebase — what S7F defines, what it does not, and where pyxctsk and other vendors
+disagree on a task's published distance — are collected in
+[`../s7f-distance-reference.md`](../s7f-distance-reference.md).
 
 Design decisions that came out of these reviews are recorded in [`../adr/`](../adr/README.md).

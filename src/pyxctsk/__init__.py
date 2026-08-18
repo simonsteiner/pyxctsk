@@ -10,6 +10,7 @@ from importlib.metadata import version
 
 from .distance import (
     OptimizedRoute,
+    SpeedSection,
     TaskTurnpoint,
     calculate_task_distances,
     distance_through_centers,
@@ -54,6 +55,7 @@ VERSION = 1
 # installed package metadata.
 __version__ = version("pyxctsk")
 __all__ = [
+    "SpeedSection",
     "calculate_task_distances",
     "Direction",
     "distance_through_centers",
