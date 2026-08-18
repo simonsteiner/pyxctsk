@@ -39,14 +39,14 @@ from geographiclib.geodesic import Geodesic
 from your_module import Gate, optimize_path
 
 # Define gates (lat, lon in degrees; radii in metres)
-takeoff = Gate('circle', center=(46.521, 6.565),    radius=1000)
-sss     = Gate('circle', center=(46.530, 6.600),    radius=2000)
-tp1     = Gate('circle', center=(46.540, 6.650),    radius=2000)
-ess     = Gate('circle', center=(46.550, 6.700),    radius=3000)
-ess2    = Gate('circle', center=(46.560, 6.750),    radius=2000)
-stp1    = Gate('circle', center=(46.570, 6.700),    radius=2000)  # safety
-stp2    = Gate('circle', center=(46.580, 6.650),    radius=2000)  # safety
-goal    = Gate('circle', center=(46.590, 6.600),    radius=1000)
+takeoff = Gate("circle", center=(46.521, 6.565), radius=1000)
+sss = Gate("circle", center=(46.530, 6.600), radius=2000)
+tp1 = Gate("circle", center=(46.540, 6.650), radius=2000)
+ess = Gate("circle", center=(46.550, 6.700), radius=3000)
+ess2 = Gate("circle", center=(46.560, 6.750), radius=2000)
+stp1 = Gate("circle", center=(46.570, 6.700), radius=2000)  # safety
+stp2 = Gate("circle", center=(46.580, 6.650), radius=2000)  # safety
+goal = Gate("circle", center=(46.590, 6.600), radius=1000)
 
 gates = [takeoff, sss, tp1, ess, ess2, stp1, stp2, goal]
 
