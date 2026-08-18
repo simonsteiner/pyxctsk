@@ -23,7 +23,6 @@ from functools import lru_cache
 from typing import Protocol, Sequence, runtime_checkable
 
 from pyproj import CRS, Geod, Transformer
-from scipy.optimize import fminbound
 
 from ..model.enums import EarthModel
 
@@ -243,6 +242,12 @@ def _plane_pcp_point(
     Returns:
         The optimal boundary point (x, y).
     """
+    # scipy.optimize is 297 ms of the 400 ms `import pyxctsk` used to cost,
+    # and this is the only place in the library that needs it. Importing it
+    # here means a caller that only parses, converts or draws a task never
+    # pays for the optimizer's dependency tree; sys.modules caches it, so the
+    # optimizer itself pays a dict lookup per call.
+    from scipy.optimize import fminbound
 
     def total(theta: float) -> float:
         x, y = _plane_point_at(center, radius, theta)
