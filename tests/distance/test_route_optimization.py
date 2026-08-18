@@ -27,6 +27,7 @@ from pyxctsk.distance.turnpoint import (
     LocalPlane,
     TaskTurnpoint,
     TurnpointGeometry,
+    geodesic_distance,
     ltm_scale_factor,
     plane_optimal_point,
     task_area_center,
@@ -385,3 +386,49 @@ class TestMultiStart:
         first = _optimize_plane_points(self.CIRCLES, max_sweeps=100)
 
         assert _optimize_plane_points(self.CIRCLES, max_sweeps=100) == first
+
+
+class TestThePlaneCarriesItsEarthModel:
+    """A planar solution and the boundary it is snapped onto share one earth.
+
+    `LocalPlane.around` used the earth model to build its transformers and then
+    dropped it, so every consumer took the model a second time and nothing
+    checked the two agreed. `optimal_point` solved in the plane it was given
+    but snapped with `self.earth_model` — an FAI-sphere boundary point placed
+    from a WGS84 planar solution, silently, whenever they differed.
+    """
+
+    def test_the_plane_remembers_the_model_it_was_built_on(self):
+        """It is a field now, not an argument the caller re-supplies."""
+        assert LocalPlane.around([(46.5, 8.0)], "FAI_SPHERE").earth_model == (
+            "FAI_SPHERE"
+        )
+
+    def test_the_default_plane_is_wgs84(self):
+        """Same default as everywhere else: None means the ellipsoid."""
+        assert LocalPlane.around([(46.5, 8.0)]).earth_model is None
+
+    def test_the_point_lands_on_the_planes_model_not_the_turnpoints(self):
+        """The case the two used to disagree on."""
+        turnpoint = TaskTurnpoint(
+            lat=46.5, lon=8.0, radius=5000, earth_model="FAI_SPHERE"
+        )
+        plane = LocalPlane.around([turnpoint.center], "WGS84")
+
+        point = turnpoint.optimal_point((46.0, 7.5), (47.0, 8.6), plane=plane)
+
+        assert geodesic_distance(turnpoint.center, point, "WGS84") == pytest.approx(
+            5000.0, abs=1e-6
+        )
+
+    @pytest.mark.parametrize("model", [None, "WGS84", "FAI_SPHERE"])
+    def test_an_agreeing_plane_is_unchanged(self, model):
+        """The ordinary case — plane and turnpoint on one model — still snaps there."""
+        turnpoint = TaskTurnpoint(lat=46.5, lon=8.0, radius=5000, earth_model=model)
+        plane = LocalPlane.around([turnpoint.center], model)
+
+        point = turnpoint.optimal_point((46.0, 7.5), (47.0, 8.6), plane=plane)
+
+        assert geodesic_distance(turnpoint.center, point, model) == pytest.approx(
+            5000.0, abs=1e-6
+        )

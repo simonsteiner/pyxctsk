@@ -408,13 +408,24 @@ class LocalPlane:
     every sweep, and a caller asking about a single turnpoint gets a plane
     around that turnpoint unless it says otherwise.
 
+    The plane keeps the earth model it was built from. It has to: a planar
+    solution is snapped back onto a cylinder boundary measured on that model
+    (§7.1.7), and when the plane and the snap disagreed the answer was an
+    FAI-sphere boundary point placed from a WGS84 planar solution — the same
+    paragraph answered two ways again, one layer down. Carrying it means the
+    consumers stop taking it as a second argument nothing checked against the
+    first.
+
     Attributes:
         to_plane: Geographic to planar, in (lon, lat) → (x, y) axis order.
         to_geo: The inverse.
+        earth_model: The model this plane was built on, and the one its points
+            must be snapped back onto.
     """
 
     to_plane: Transformer
     to_geo: Transformer
+    earth_model: object = None
 
     @classmethod
     def around(
@@ -432,7 +443,10 @@ class LocalPlane:
         Raises:
             ValueError: If no centers are given; there is no area of interest.
         """
-        return cls(*local_tm_transformers(*task_area_center(centers), earth_model))
+        return cls(
+            *local_tm_transformers(*task_area_center(centers), earth_model),
+            earth_model=earth_model,
+        )
 
     def xy(self, point: tuple[float, float]) -> tuple[float, float]:
         """Project a (lat, lon) point into the plane.
@@ -551,8 +565,10 @@ class TaskTurnpoint:
         xy = plane_optimal_point(
             plane.xy(prev_point), plane.xy(next_point), (cx, cy), radius
         )
+        # Snap on the plane's own model, so the projection and the boundary it
+        # is corrected onto cannot be measured on different earths.
         return snap_to_boundary(
-            plane.lon_lat(xy), self.center, self.radius, self.earth_model
+            plane.lon_lat(xy), self.center, self.radius, plane.earth_model
         )
 
 

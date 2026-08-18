@@ -367,7 +367,6 @@ def _optimize_plane_points(
 def _corrected_path(
     turnpoints: Sequence[TurnpointGeometry],
     plane: LocalPlane,
-    earth_model: object,
     max_sweeps: int,
 ) -> list[tuple[float, float]]:
     """Optimize in ``plane`` and correct the result back onto the boundaries.
@@ -379,8 +378,8 @@ def _corrected_path(
 
     Args:
         turnpoints: The task turnpoints.
-        plane: The projection to solve in.
-        earth_model: Earth model selector (None means WGS84).
+        plane: The projection to solve in, which carries the earth model its
+            points are snapped back onto.
         max_sweeps: Upper bound on alternating sweeps, per placement.
 
     Returns:
@@ -401,7 +400,9 @@ def _corrected_path(
         # ProjectionCorrection (§7.1.7): re-place the planar solution at
         # exactly radius r on the earth model along the center→point azimuth.
         path.append(
-            snap_to_boundary(plane.lon_lat((x, y)), tp.center, radius, earth_model)
+            snap_to_boundary(
+                plane.lon_lat((x, y)), tp.center, radius, plane.earth_model
+            )
         )
     return path
 
@@ -450,9 +451,9 @@ def calculate_iteratively_refined_route(
     # boundaries, not at their middles — so the two differ whenever a large
     # cylinder pulls the turnpoint box wider than the route ever goes.
     plane = LocalPlane.around([tp.center for tp in turnpoints], earth_model)
-    route = _corrected_path(turnpoints, plane, earth_model, max_sweeps)
+    route = _corrected_path(turnpoints, plane, max_sweeps)
     plane = LocalPlane.around(route, earth_model)
-    route = _corrected_path(turnpoints, plane, earth_model, max_sweeps)
+    route = _corrected_path(turnpoints, plane, max_sweeps)
 
     g = geod_for_earth_model(earth_model)
     legs = []
