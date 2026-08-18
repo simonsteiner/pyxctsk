@@ -43,7 +43,7 @@ from enum import Enum
 from ..model.task import Task
 from .measured_task import task_to_turnpoints
 from .speed_section import speed_section_indices
-from .turnpoint import geodesic_distance
+from .turnpoint import EarthModelLike, geodesic_distance
 
 
 class CenterDistanceReading(str, Enum):
@@ -77,7 +77,7 @@ class CenterDistanceReading(str, Enum):
 PROPOSED_READING = CenterDistanceReading.LAUNCH_TO_GOAL
 
 
-def _polyline(points: list[tuple[float, float]], earth_model: object) -> float:
+def _polyline(points: list[tuple[float, float]], earth_model: EarthModelLike) -> float:
     """Total geodesic length through these (lat, lon) points, in metres."""
     return sum(
         geodesic_distance(points[i], points[i + 1], earth_model)

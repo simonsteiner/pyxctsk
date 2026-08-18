@@ -24,6 +24,7 @@ from pyxctsk.distance.route_optimization import (
     calculate_iteratively_refined_route,
 )
 from pyxctsk.distance.turnpoint import (
+    EarthModelLike,
     LocalPlane,
     TaskTurnpoint,
     TurnpointGeometry,
@@ -36,17 +37,36 @@ from pyxctsk.distance.turnpoint import (
 
 @dataclass
 class FakeTurnpoint:
-    """A minimal TurnpointGeometry stand-in for seam tests."""
+    """A minimal TurnpointGeometry stand-in for seam tests.
+
+    It declares ``earth_model`` because the protocol does. It did not, and the
+    optimizer read the attribute anyway through a ``getattr`` default — so this
+    fake satisfied ``isinstance`` while getting a different distance for
+    identical geometry than a ``TaskTurnpoint`` would.
+    """
 
     center: tuple[float, float]
     radius: float = 0.0
     goal_type: str | None = None
+    earth_model: EarthModelLike = None
 
 
 def test_fake_turnpoint_satisfies_protocol():
     """FakeTurnpoint and TaskTurnpoint should satisfy the TurnpointGeometry seam."""
     assert isinstance(FakeTurnpoint((0.0, 0.0)), TurnpointGeometry)
     assert isinstance(TaskTurnpoint(0.0, 0.0), TurnpointGeometry)
+
+
+def test_the_protocol_declares_every_attribute_the_optimizer_reads():
+    """An interface that omits a value its implementation reads is lying.
+
+    ``calculate_iteratively_refined_route`` picks the route's earth model off
+    the first turnpoint. That was a ``getattr`` against a protocol declaring
+    three attributes, whose docstring said "only three things".
+    """
+    declared = set(TurnpointGeometry.__annotations__)
+
+    assert {"center", "radius", "goal_type", "earth_model"} <= declared
 
 
 class TestPlaneOptimalPoint:

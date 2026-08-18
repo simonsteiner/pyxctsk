@@ -45,6 +45,7 @@ from dataclasses import dataclass
 from itertools import accumulate
 
 from .turnpoint import (
+    EarthModelLike,
     LocalPlane,
     TurnpointGeometry,
     geod_for_earth_model,
@@ -104,7 +105,7 @@ class OptimizedRoute:
 
     points: tuple[tuple[float, float], ...]
     legs: tuple[float, ...]
-    earth_model: object = None
+    earth_model: EarthModelLike = None
 
     @property
     def total_m(self) -> float:
@@ -410,7 +411,7 @@ def _corrected_path(
 def calculate_iteratively_refined_route(
     turnpoints: Sequence[TurnpointGeometry],
     num_iterations: int | None = None,
-    earth_model: object = None,
+    earth_model: EarthModelLike = None,
 ) -> OptimizedRoute:
     """Calculate the optimized route with the alternating point-circle-point method.
 
@@ -434,7 +435,9 @@ def calculate_iteratively_refined_route(
         num_iterations if num_iterations is not None else DEFAULT_NUM_ITERATIONS
     )
     if earth_model is None and turnpoints:
-        earth_model = getattr(turnpoints[0], "earth_model", None)
+        # Declared on TurnpointGeometry, so this is a protocol attribute now
+        # rather than a getattr against an interface that denied having it.
+        earth_model = turnpoints[0].earth_model
 
     if len(turnpoints) < 2:
         return OptimizedRoute(
@@ -469,7 +472,7 @@ def calculate_iteratively_refined_route(
 def optimized_distance(
     turnpoints: Sequence[TurnpointGeometry],
     num_iterations: int | None = None,
-    earth_model: object = None,
+    earth_model: EarthModelLike = None,
 ) -> float:
     """Compute the fully optimized task distance through the turnpoints.
 

@@ -41,7 +41,7 @@ from enum import Enum
 
 from ..model.task import GoalType, Task
 from .measured_task import MeasuredTask
-from .turnpoint import geod_for_earth_model
+from .turnpoint import EarthModelLike, geod_for_earth_model
 
 # Constants for goal line visualization
 GOAL_LINE_NUM_POINTS = 20
@@ -129,7 +129,7 @@ def _endpoints_from_coords(
     prev_lat: float,
     prev_lon: float,
     goal_line_length: float,
-    earth_model: object = None,
+    earth_model: EarthModelLike = None,
 ) -> tuple[tuple[float, float], tuple[float, float], float]:
     """Core endpoint math operating on raw coordinates.
 
@@ -166,7 +166,7 @@ def _generate_semicircle_arc(
     end_azimuth: float,
     through_azimuth: float,
     radius: float,
-    earth_model: object = None,
+    earth_model: EarthModelLike = None,
 ) -> list[tuple[float, float]]:
     """Generate arc points for a semi-circle.
 
@@ -234,7 +234,7 @@ class GoalLine:
     center: tuple[float, float]
     approach_from: tuple[float, float]
     length: float
-    earth_model: object = None
+    earth_model: EarthModelLike = None
 
     @classmethod
     def from_task(
