@@ -139,7 +139,7 @@ class TestCreateTurnpointFeature:
             "weight",
             "opacity",
         }
-        assert props["description"] == "Radius: 500m"
+        assert props["description"] == "Type: TAKEOFF, Radius: 500m"
         assert props["turnpoint_index"] == 0
 
 

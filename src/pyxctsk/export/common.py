@@ -129,6 +129,58 @@ class TaskDrawing:
             turnpoint.type or TurnpointType.NONE, self.is_goal(turnpoint)
         )
 
+    def label_of(self, turnpoint: Turnpoint, index: int) -> str:
+        """The name this turnpoint is drawn under, in either format.
+
+        Falls back to a positional name for an unnamed turnpoint. The spec
+        requires the key but the writers tolerate an empty value, and both
+        composed the same ``TP{i+1}`` fallback themselves — three times
+        between them.
+
+        Args:
+            turnpoint: One of the turnpoints being drawn.
+            index: Its position in the drawing, zero-based.
+
+        Returns:
+            The turnpoint's name, or ``TP1``, ``TP2``, … if it has none.
+        """
+        return turnpoint.waypoint.name or f"TP{index + 1}"
+
+    def description_of(self, turnpoint: Turnpoint) -> str:
+        """The description this turnpoint is drawn with, in either format.
+
+        Both writers assembled their own and disagreed. KML interpolated the
+        enum member itself — ``Type: TurnpointType.TAKEOFF`` — putting a Python
+        repr into user-visible map text, and printed ``Type: None`` for an
+        ordinary turnpoint; GeoJSON left the role out of the description
+        entirely and reached for it with ``getattr(turnpoint, "type", None)``,
+        a defensive lookup on a dataclass field that always exists, skipping
+        the ``or TurnpointType.NONE`` normalisation :meth:`color_of` performs.
+        That asymmetry is exactly what this module exists to remove.
+
+        Args:
+            turnpoint: One of the turnpoints being drawn.
+
+        Returns:
+            The role and radius, with the role omitted when it has none.
+        """
+        role = turnpoint.type or TurnpointType.NONE
+        radius = f"Radius: {turnpoint.radius}m"
+        if role is TurnpointType.NONE:
+            return radius
+        return f"Type: {role.value}, {radius}"
+
+    def role_of(self, turnpoint: Turnpoint) -> TurnpointType:
+        """The turnpoint's role, normalized the way :meth:`color_of` reads it.
+
+        Args:
+            turnpoint: One of the turnpoints being drawn.
+
+        Returns:
+            The role, or :attr:`TurnpointType.NONE` if it carries none.
+        """
+        return turnpoint.type or TurnpointType.NONE
+
     def route_coordinates(self) -> list[tuple[float, float]] | None:
         """The optimized route as (lat, lon) points, or None if there is no line.
 

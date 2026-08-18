@@ -72,7 +72,9 @@ class TestTaskToKML:
         # Verify turnpoint names and descriptions
         assert "Start" in kml_result
         assert "TP1" in kml_result
-        assert "Type: TurnpointType.TAKEOFF" in kml_result
+        assert "Type: TAKEOFF" in kml_result
+        # Not the enum's repr: this string is user-visible map text.
+        assert "TurnpointType." not in kml_result
         assert "Radius: 1000m" in kml_result
         assert "Radius: 400m" in kml_result
 
