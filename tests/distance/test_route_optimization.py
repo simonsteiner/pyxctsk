@@ -24,6 +24,7 @@ from pyxctsk.distance.turnpoint import (
     TurnpointGeometry,
     ltm_scale_factor,
     plane_optimal_point,
+    task_area_center,
 )
 
 
@@ -250,3 +251,44 @@ class TestLtmScaleFactor:
 
         assert x == pytest.approx(x_unscaled * ltm_scale_factor(46.0), rel=1e-12)
         assert x != pytest.approx(x_unscaled, rel=1e-9)
+
+
+class TestTaskAreaCenter:
+    """The projection centre S7F §7.1.6 asks for."""
+
+    def test_is_the_box_centre_not_the_mean(self):
+        """Six clustered points and one outlier centre between the extremes."""
+        points = [(46.0, 8.0)] * 6 + [(47.0, 9.0)]
+
+        assert task_area_center(points) == (46.5, 8.5)
+
+    def test_single_point_is_its_own_centre(self):
+        """A one-turnpoint area has a degenerate box."""
+        assert task_area_center([(46.25, 8.75)]) == (46.25, 8.75)
+
+    def test_empty_has_no_area(self):
+        """There is no area of interest to centre on."""
+        with pytest.raises(ValueError, match="at least one point"):
+            task_area_center([])
+
+    def test_antimeridian_box_wraps_through_the_widest_gap(self):
+        """A task at ±180° centres near ±180°, not near 0°.
+
+        Averaging longitudes directly puts this centre at -60°, half a world
+        from the task — which is what the mean-of-longitudes rule did.
+        """
+        lat, lon = task_area_center([(-17.0, 179.5), (-17.0, -179.5), (-17.2, -179.0)])
+
+        assert lat == pytest.approx(-17.1)
+        assert abs(lon) > 179.0, f"{lon} is not near the antimeridian"
+        assert lon == pytest.approx(-179.75)
+
+    def test_longitudes_are_normalized_before_boxing(self):
+        """370° and 10° are the same meridian."""
+        assert task_area_center([(0.0, 370.0), (0.0, 20.0)]) == task_area_center(
+            [(0.0, 10.0), (0.0, 20.0)]
+        )
+
+    def test_wide_but_not_wrapping_span_uses_the_plain_box(self):
+        """A gap under 180° leaves the box unwrapped."""
+        assert task_area_center([(0.0, -80.0), (0.0, 40.0)]) == (0.0, -20.0)

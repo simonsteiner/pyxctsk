@@ -3,6 +3,7 @@ addopts
 airscore
 altitudemode
 AMSL
+antimeridian
 barcodes
 behaviour
 behaviours
@@ -10,9 +11,9 @@ bevo
 brentq
 changealphaint
 CIVL
+clamptoground
 colours
 conftest
-clamptoground
 dami
 darkred
 dedented
