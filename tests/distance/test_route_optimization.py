@@ -14,7 +14,7 @@ from pyproj import CRS, Transformer
 from pyxctsk.distance import OptimizedRoute
 from pyxctsk.distance.route_optimization import (
     _INITIAL_PLACEMENTS,
-    _closest_circle_point,
+    _boundary_toward,
     _optimize_plane_points,
     _place_at_centers,
     _place_chained_backward,
@@ -130,24 +130,33 @@ class TestPlaneOptimalPoint:
             assert total(best) <= total(sample) + 1e-6
 
 
-class TestClosestCirclePoint:
-    """Nearest-boundary rule used for the final turnpoint."""
+class TestBoundaryToward:
+    """The nearest-boundary rule, used both to place points and to finish."""
 
     def test_outside(self):
         """From outside, the nearest boundary point lies on the inbound radial."""
-        assert _closest_circle_point((10.0, 0.0), (0.0, 0.0, 3.0)) == (
+        assert _boundary_toward((0.0, 0.0, 3.0), (10.0, 0.0)) == (
             pytest.approx(3.0),
             pytest.approx(0.0),
         )
 
     def test_inside(self):
         """From inside, the point moves radially out to the boundary."""
-        p = _closest_circle_point((1.0, 0.0), (0.0, 0.0, 3.0))
+        p = _boundary_toward((0.0, 0.0, 3.0), (1.0, 0.0))
         assert p == (pytest.approx(3.0), pytest.approx(0.0))
 
     def test_zero_radius(self):
         """A zero-radius circle collapses to its center."""
-        assert _closest_circle_point((10.0, 0.0), (5.0, 5.0, 0.0)) == (5.0, 5.0)
+        assert _boundary_toward((5.0, 5.0, 0.0), (10.0, 0.0)) == (5.0, 5.0)
+
+    def test_a_target_at_the_center_has_no_direction(self):
+        """The one input with no answer: any boundary point is as near.
+
+        Pinned because the two copies of this function that used to exist both
+        chose +x, and a caller relying on it would not have noticed if one
+        had changed.
+        """
+        assert _boundary_toward((0.0, 0.0, 3.0), (0.0, 0.0)) == (3.0, 0.0)
 
 
 class TestAlternatingOptimizer:
