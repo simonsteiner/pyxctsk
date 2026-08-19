@@ -16,7 +16,7 @@ from typing import Sequence
 
 from pyproj import CRS, Transformer
 
-from .earth import FAI_SPHERE_RADIUS_M, EarthModelLike, _is_fai_sphere
+from .earth import EarthModelLike, canonical, crs_for_earth_model, datum_proj4
 
 
 def ltm_scale_factor(lat0: float) -> float:
@@ -41,33 +41,6 @@ def ltm_scale_factor(lat0: float) -> float:
 
 
 @lru_cache(maxsize=128)
-def _cached_tm_transformers(
-    lat0: float, lon0: float, fai_sphere: bool
-) -> tuple[Transformer, Transformer]:
-    """Build (and cache) transformers for a local Transverse Mercator plane.
-
-    ``+k_0`` rather than ``+k``: the two are synonyms in PROJ, but the 2026
-    edition's own document history records the correction "parameter +k_0
-    instead of deprecated +k" against its Annex A sample.
-    """
-    k0 = ltm_scale_factor(lat0)
-    if fai_sphere:
-        geo_crs = CRS.from_proj4(f"+proj=longlat +R={FAI_SPHERE_RADIUS_M} +no_defs")
-        tm_crs = CRS.from_proj4(
-            f"+proj=tmerc +lat_0={lat0} +lon_0={lon0} +k_0={k0} +x_0=0 +y_0=0 "
-            f"+R={FAI_SPHERE_RADIUS_M} +units=m +no_defs"
-        )
-    else:
-        geo_crs = CRS.from_epsg(4326)
-        tm_crs = CRS.from_proj4(
-            f"+proj=tmerc +lat_0={lat0} +lon_0={lon0} +k_0={k0} +x_0=0 +y_0=0 "
-            "+ellps=WGS84 +units=m +no_defs"
-        )
-    to_plane = Transformer.from_crs(geo_crs, tm_crs, always_xy=True)
-    to_geo = Transformer.from_crs(tm_crs, geo_crs, always_xy=True)
-    return to_plane, to_geo
-
-
 def local_tm_transformers(
     lat0: float, lon0: float, earth_model: EarthModelLike = None
 ) -> tuple[Transformer, Transformer]:
@@ -77,18 +50,40 @@ def local_tm_transformers(
     obtained by a Transverse Mercator projection centred on the area of
     interest, then converted back to geographic coordinates.
 
+    The earth's own figure comes from :mod:`~pyxctsk.distance.earth`, which is
+    where the choice between the two is made. This function used to build both
+    of them itself, in a two-branch ``if`` pairing a datum with a geographic
+    CRS — so the module docstring next door claiming the choice was made
+    "once" was not true, and only that module refused a value naming no earth.
+
+    It was also two functions: this one converted its arguments and handed
+    them to a cached twin, keyed on ``fai_sphere: bool`` — the two-valued
+    world :data:`EarthModelLike` was widened to replace, one layer down. The
+    cache is keyed on the model itself now, so the pass-through is gone.
+
+    ``+k_0`` rather than ``+k``: the two are synonyms in PROJ, but the 2026
+    edition's own document history records the correction "parameter +k_0
+    instead of deprecated +k" against its Annex A sample.
+
     Args:
         lat0: Latitude of the projection centre in degrees.
         lon0: Longitude of the projection centre in degrees.
-        earth_model: Earth model selector (see :func:`geod_for_earth_model`).
+        earth_model: Earth model selector (see
+            :func:`~pyxctsk.distance.earth.geod_for_earth_model`).
 
     Returns:
         ``(to_plane, to_geo)`` transformers; both use (lon, lat) ↔ (x, y)
         axis order (``always_xy``).
     """
-    return _cached_tm_transformers(
-        float(lat0), float(lon0), _is_fai_sphere(earth_model)
+    k0 = ltm_scale_factor(lat0)
+    geo_crs = crs_for_earth_model(earth_model)
+    tm_crs = CRS.from_proj4(
+        f"+proj=tmerc +lat_0={float(lat0)} +lon_0={float(lon0)} +k_0={k0} "
+        f"+x_0=0 +y_0=0 {datum_proj4(earth_model)} +units=m +no_defs"
     )
+    to_plane = Transformer.from_crs(geo_crs, tm_crs, always_xy=True)
+    to_geo = Transformer.from_crs(tm_crs, geo_crs, always_xy=True)
+    return to_plane, to_geo
 
 
 def task_area_center(
@@ -193,8 +188,12 @@ class LocalPlane:
         Raises:
             ValueError: If no centers are given; there is no area of interest.
         """
+        # `canonical` for the cache key, so "WGS84", EarthModel.WGS84 and None
+        # are one entry rather than three; the plane keeps the selector it was
+        # given, which is what its consumers snap against.
+        lat0, lon0 = task_area_center(centers)
         return cls(
-            *local_tm_transformers(*task_area_center(centers), earth_model),
+            *local_tm_transformers(float(lat0), float(lon0), canonical(earth_model)),
             earth_model=earth_model,
         )
 

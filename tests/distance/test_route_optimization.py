@@ -7,12 +7,17 @@ TurnpointGeometry seam that lets the optimizer run against lightweight fakes.
 
 import math
 from dataclasses import dataclass
+from pathlib import Path
 
 import pytest
 from pyproj import CRS, Transformer
 
 from pyxctsk.distance import OptimizedRoute
-from pyxctsk.distance.earth import EarthModelLike, geodesic_distance
+from pyxctsk.distance.earth import (
+    FAI_SPHERE_RADIUS_M,
+    EarthModelLike,
+    geodesic_distance,
+)
 from pyxctsk.distance.plane import LocalPlane, ltm_scale_factor, task_area_center
 from pyxctsk.distance.route_optimization import (
     _INITIAL_PLACEMENTS,
@@ -492,4 +497,56 @@ class TestThePlaneCarriesItsEarthModel:
 
         assert geodesic_distance(turnpoint.center, point, model) == pytest.approx(
             5000.0, abs=1e-6
+        )
+
+
+class TestTheEarthIsChosenInOnePlace:
+    """`earth.py` said the choice is made "once". `plane.py` made it again.
+
+    One module built the two earths as `Geod`s, the other as PROJ CRSes, in a
+    two-branch `if` that paired a datum string with a geographic CRS. Adding an
+    earth model, or correcting the sphere's radius, meant editing both — and
+    only `earth.py` refused a value naming no earth at all.
+    """
+
+    def test_the_plane_asks_the_earth_for_its_figure(self):
+        """Both halves of a projection come from the module that owns them."""
+        from pyxctsk.distance.earth import crs_for_earth_model, datum_proj4
+
+        assert datum_proj4(None) == "+ellps=WGS84"
+        assert datum_proj4("FAI_SPHERE") == f"+R={FAI_SPHERE_RADIUS_M}"
+        assert crs_for_earth_model() == crs_for_earth_model("WGS84")
+        assert crs_for_earth_model("FAI_SPHERE") != crs_for_earth_model("WGS84")
+
+    def test_plane_py_no_longer_names_an_earth(self):
+        """The radius and the datum strings lived here as well as next door."""
+        source = (
+            Path(__file__).resolve().parents[2]
+            / "src"
+            / "pyxctsk"
+            / "distance"
+            / "plane.py"
+        ).read_text()
+        code = "\n".join(
+            line for line in source.splitlines() if not line.lstrip().startswith("#")
+        )
+        body = code.split('"""', 2)[-1]
+
+        assert "ellps" not in body
+        assert "FAI_SPHERE_RADIUS_M" not in body
+        assert "epsg" not in body.lower()
+
+    def test_an_unknown_model_is_refused_by_the_projection_too(self):
+        """It used to fall through a bool and quietly mean WGS84."""
+        with pytest.raises(ValueError, match="not an earth model"):
+            LocalPlane.around([(46.5, 8.0)], "WSG84")
+
+    @pytest.mark.parametrize("model", [None, "WGS84", "FAI_SPHERE"])
+    def test_the_three_spellings_of_one_earth_share_a_cache_entry(self, model):
+        """`canonical` keys the cache, so the plane stops keying it on a bool."""
+        from pyxctsk.distance.earth import canonical
+        from pyxctsk.distance.plane import local_tm_transformers
+
+        assert local_tm_transformers(46.5, 8.0, canonical(model)) is (
+            local_tm_transformers(46.5, 8.0, canonical(model))
         )
