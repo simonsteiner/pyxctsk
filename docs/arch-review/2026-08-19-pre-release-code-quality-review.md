@@ -1,6 +1,14 @@
 # 2026-08-19 — Pre-release code-quality review
 
-**Status: proposed.** Nothing in this document is applied.
+**Status: nine of twelve applied**, in the order the
+[Suggested order](#suggested-order) sets out; see [Progress](#progress) at the end.
+Findings 9 (partly), 10 and 11 are deliberately not applied — each is a decision about
+a published contract or a large mechanical move, and the argument for holding them
+until after the release is in the findings themselves.
+
+This document is kept as written. The Progress section records what changed and where
+it departed from what was proposed; the findings above it are the review as it stood at
+`9d271f3`.
 
 Reviewed at `9d271f3` (merge of PR #18), against the whole of `src/pyxctsk`, with the
 release of 0.5.0 as the frame. The suite is green (`uv run pytest` — 0 failures, 18
@@ -627,3 +635,67 @@ Deliberately after the release:
 7. Findings 9, 10, 11 — the report surface, the derived goal, and the `turnpoint.py`
    split. Each is a decision about a published contract or a large mechanical move, and
    neither is what a release week is for.
+
+
+---
+
+## Progress
+
+Applied on `docs/code-quality-review-2026-08-19`, one finding or coherent group per
+commit. Every commit ran the full suite, `ruff check`, `ruff format` and
+`mypy src/ tests/` green, and each behaviour-preserving claim was checked against the
+reference corpus rather than asserted.
+
+```
+77dae95 build: make QR image support the extra the code already assumes
+4b5ea96 fix: one constant for "the full format is version 1"
+2fb41d1 fix: five small corrections across the front door and the writers
+4b6b99f refactor(distance): one boundary helper and one crossing branch
+28b4674 refactor(distance): the goal line's geometry in the shape it is used
+54bc1bf refactor(distance): the LINE goal rule gets one owner and one type
+0f67e33 refactor(model): nesting is a codec, not a kind of row
+6d48c35 fix(model): ask the goal whether it is the ESS, and inline a two-line helper
+17b4615 fix(export): give the GeoJSON boundary a type, and stop leaking an enum
+```
+
+| # | Finding | Outcome |
+|---|---------|---------|
+| 1 | QR deps / wrong extra | **applied.** Pillow, qrcode and zxing-cpp moved to a `qr` extra; both messages name it, spelled once as `exceptions.QR_EXTRA_INSTALL`; `geopy` moved to the `dev` group; the `polyline` line left the README. `scripts/check_core_without_qr.py` is new and runs in both release workflows. |
+| 2 | The LINE rule, twice | **applied.** `task_to_turnpoints` keeps it; `plane_circle` is a projection and nothing else. |
+| 3 | Stringly-typed goal type | **applied**, and it went further than proposed: with `plane_circle` no longer reading it, nothing in the optimizer does, so `TurnpointGeometry` stops declaring it and the protocol test pins the attribute set both ways. |
+| 4 | Three version constants | **applied.** `TASK_VERSION` deleted, `pyxctsk.VERSION` is an alias. Kept exported rather than removed — nothing reads it, but aliasing fixes the drift without breaking a public name. |
+| 5 | `task_to_turnpoints` | **applied**, in the same commit as 2 and 3 rather than before them. Writing it with strings and then rewriting it with the enum would have written the same lines twice. |
+| 6 | `Nested` / `NestedList` | **applied.** Both deleted for `shape_codec`; shape.py loses 52 lines and two of its five row kinds. |
+| 7 | `_generate_semicircle_arc` | **applied**, together with 12d — both are the same module's parameter-count problem. |
+| 8 | Two copies of one function, two of one branch | **applied.** `_closest_circle_point` deleted for `_boundary_toward`; the crossing branch collapsed. Route points and both §7.2 distances bit-identical across the corpus. |
+| 9 | Two report shapes | **half applied.** The GeoJSON boundary is typed and the `tp_type` enum leak is fixed. The report shapes themselves are untouched: which surface is canonical is a decision about what is published, not a cleanup. |
+| 10 | The derived goal on `Task` | **not applied.** Deferred by design — see the finding. |
+| 11 | `distance/turnpoint.py` at 650 lines | **not applied.** Deferred by design; the finding argues against doing it in a release week. |
+| 12a | Dead `find_ess_turnpoint` | **applied**, with a **departure**: the finding suggested `is_ess_goal` read `speed_section_indices`, which it cannot — that lives in `distance/`, and `model/` may not import it. `is_ess_goal` instead asks the last turnpoint for its role, which removes the value-comparison hazard and is what the model should answer anyway. |
+| 12b | The `getattr` earth model | **applied.** |
+| 12c | The KML magic `500` | **applied**, as `GOAL_LINE_ALTITUDE` beside `TURNPOINT_ALTITUDE` (was `DEFAULT_ALTITUDE`). |
+| 12d | `_endpoints_from_coords` | **applied**, with 7. `GoalLine.approach_azimuth()` is the name that fell out. |
+| 12e | `_calculate_savings` | **applied.** Inlined. |
+| 12f | `_has_line_goal`'s redundant clause | **applied.** |
+| 12g | The mypy note | **applied.** `mypy src/ tests/` in all five places. |
+| 12h | The front-door docstring | **applied**, and `__all__` sorted. |
+
+### What the applied changes are worth
+
+None of them changes a number. Verified per commit, against every task in
+`tests/data/reference_tasks/`:
+
+- optimizer duplication (8): route points and both §7.2 distances **bit-identical**;
+- goal-line geometry (7, 12d): 3 of 1748 GeoJSON floats move, worst 7.1e-15° (~1 nm);
+- the LINE rule and the enum (2, 3, 5): distances and both export formats
+  **byte-identical**;
+- the field tables (6): every task's full JSON, `XCTSK:` string and waypoints
+  `XCTSK:` string **byte-identical**;
+- `is_ess_goal` (12a): **identical** on all 26 corpus tasks;
+- the GeoJSON typing (9, partial): serialized output **byte-identical**.
+
+The suite grew from 972 to 981 passing tests. The new ones are the cases the removed
+duplication had left uncovered: a target at a circle's centre, that the optimizer needs
+no goal vocabulary, that a nested row obeys the same optionality as any other, that the
+converter stamps the version the validator checks, and the two shapes `is_ess_goal` used
+to get wrong.
