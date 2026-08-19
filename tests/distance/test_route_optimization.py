@@ -43,11 +43,15 @@ class FakeTurnpoint:
     optimizer read the attribute anyway through a ``getattr`` default — so this
     fake satisfied ``isinstance`` while getting a different distance for
     identical geometry than a ``TaskTurnpoint`` would.
+
+    It declares no ``goal_type`` for the same reason in reverse: the protocol
+    no longer does, because nothing in the optimizer reads one. A LINE goal is
+    a zero-radius circle by the time it gets here, which ``task_to_turnpoints``
+    arranges and this fake can express with ``radius=0``.
     """
 
     center: tuple[float, float]
     radius: float = 0.0
-    goal_type: str | None = None
     earth_model: EarthModelLike = None
 
 
@@ -57,16 +61,46 @@ def test_fake_turnpoint_satisfies_protocol():
     assert isinstance(TaskTurnpoint(0.0, 0.0), TurnpointGeometry)
 
 
-def test_the_protocol_declares_every_attribute_the_optimizer_reads():
-    """An interface that omits a value its implementation reads is lying.
+def test_the_protocol_declares_exactly_what_the_optimizer_reads():
+    """Neither more nor less: both directions have been wrong here.
 
-    ``calculate_iteratively_refined_route`` picks the route's earth model off
-    the first turnpoint. That was a ``getattr`` against a protocol declaring
-    three attributes, whose docstring said "only three things".
+    Too few: ``calculate_iteratively_refined_route`` picks the route's earth
+    model off the first turnpoint, and did it with a ``getattr`` against a
+    protocol declaring three attributes whose docstring said "only three
+    things" — so a fake satisfying ``isinstance`` got a different distance for
+    identical geometry.
+
+    Too many: ``goal_type`` was declared because ``plane_circle`` read it to
+    collapse a LINE goal to a zero-radius circle. That rule belongs to
+    ``task_to_turnpoints``, which builds the cylinders, and stating it in both
+    places left three modules disagreeing about which one owned it. A LINE goal
+    now arrives already carrying ``radius=0``, nothing in the optimizer reads
+    the goal type, and an interface declaring a value nothing reads misleads a
+    caller as much as one omitting a value it needs.
     """
-    declared = set(TurnpointGeometry.__annotations__)
+    assert set(TurnpointGeometry.__annotations__) == {
+        "center",
+        "radius",
+        "earth_model",
+    }
 
-    assert {"center", "radius", "goal_type", "earth_model"} <= declared
+
+def test_a_turnpoint_without_a_goal_type_is_enough_to_optimize():
+    """The seam's whole claim: geometry in, route out, no goal vocabulary.
+
+    ``FakeTurnpoint`` has no ``goal_type`` at all, so this fails to even
+    construct if the optimizer starts reading one again.
+    """
+    route = calculate_iteratively_refined_route(
+        [
+            FakeTurnpoint((46.5, 8.0)),
+            FakeTurnpoint((46.7, 8.1), radius=1_000.0),
+            FakeTurnpoint((47.0, 8.0), radius=0.0),
+        ]
+    )
+
+    assert len(route.points) == 3
+    assert route.total_m > 0
 
 
 class TestPlaneOptimalPoint:

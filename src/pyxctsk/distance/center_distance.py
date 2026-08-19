@@ -89,9 +89,10 @@ def _goal_radius(task: Task) -> float:
     """The radius the optimized route actually ends on, in metres.
 
     A LINE goal is a zero-radius point to the optimizer — the line is centred
-    on the goal, so its optimal crossing is the goal centre — which is stated
-    once, in ``task_to_turnpoints``. Reading it from there is what keeps this
-    reading measuring to the same place the optimized distance does.
+    on the goal, so its optimal crossing is the goal centre — which
+    ``task_to_turnpoints`` states, and since ``plane_circle`` stopped stating
+    it too, states alone. Reading it from there is what keeps this reading
+    measuring to the same place the optimized distance does.
 
     Args:
         task: The task whose goal to size.

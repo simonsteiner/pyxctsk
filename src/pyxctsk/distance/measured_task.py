@@ -29,7 +29,7 @@ depends on neither.
 
 from dataclasses import dataclass
 
-from ..model.task import Task
+from ..model.task import GoalType, Task
 from .route_optimization import OptimizedRoute, calculate_iteratively_refined_route
 from .turnpoint import TaskTurnpoint
 
@@ -37,64 +37,43 @@ from .turnpoint import TaskTurnpoint
 def task_to_turnpoints(task: Task) -> list[TaskTurnpoint]:
     """Convert a task's turnpoints into the cylinders distance code works on.
 
-    The one place that reads a goal's type off the model and turns it into
-    geometry: a LINE goal becomes a zero-radius point — the line is centred on
-    the goal and perpendicular to the approach, so its optimal crossing is the
-    goal center — anything else stays a cylinder, and every turnpoint inherits
-    the task's earth model.
+    **The one place that reads a goal's type off the model and turns it into
+    geometry**, and now genuinely the only one: a LINE goal's cylinder is built
+    with ``radius=0`` — the line is centred on the goal and perpendicular to
+    the approach, so its optimal crossing is the goal center, degenerate
+    approach included (S7F §6.2.3.1). Anything else stays a cylinder, and every
+    turnpoint inherits the task's earth model.
+
+    ``plane_circle`` used to apply the same rule a second time, from the goal
+    type carried on each cylinder, and both docstrings claimed sole ownership
+    while ``center_distance._goal_radius`` picked a side in prose. Owning it
+    here is what lets that module read the answer off ``turnpoints[-1].radius``
+    rather than re-deriving it, and what makes ``MeasuredTask.turnpoints``
+    mean what it says.
 
     Args:
         task (Task): Task object.
 
     Returns:
-        List[TaskTurnpoint]: List of TaskTurnpoint objects.
+        List[TaskTurnpoint]: One cylinder per turnpoint, in task order.
     """
-    # Determine if there's a goal and its type
     goal_type = None
     if task.turnpoints and task.goal:
-        goal_type = task.goal.type.value if task.goal.type else "CYLINDER"
+        goal_type = task.goal.type or GoalType.CYLINDER
 
-    result = []
-    earth_model = task.earth_model
-
-    for i, tp in enumerate(task.turnpoints):
-        # Check if this is the goal turnpoint (last one)
-        if i == len(task.turnpoints) - 1:
-            # This is the goal turnpoint (last one in the list)
-            if goal_type == "LINE":
-                # This is a goal line turnpoint
-                result.append(
-                    TaskTurnpoint(
-                        lat=tp.waypoint.lat,
-                        lon=tp.waypoint.lon,
-                        radius=0,  # Goal lines have 0 radius (no cylinder)
-                        goal_type=goal_type,
-                        earth_model=earth_model,
-                    )
-                )
-            else:
-                # This is a regular cylinder goal (or no explicit goal type defined)
-                result.append(
-                    TaskTurnpoint(
-                        lat=tp.waypoint.lat,
-                        lon=tp.waypoint.lon,
-                        radius=tp.radius,
-                        goal_type=goal_type,
-                        earth_model=earth_model,
-                    )
-                )
-        else:
-            # Regular turnpoint
-            result.append(
-                TaskTurnpoint(
-                    lat=tp.waypoint.lat,
-                    lon=tp.waypoint.lon,
-                    radius=tp.radius,
-                    earth_model=earth_model,
-                )
-            )
-
-    return result
+    last = len(task.turnpoints) - 1
+    return [
+        TaskTurnpoint(
+            lat=tp.waypoint.lat,
+            lon=tp.waypoint.lon,
+            radius=0 if (i == last and goal_type is GoalType.LINE) else tp.radius,
+            # The goal type is the last turnpoint's alone; it is what that
+            # turnpoint *is*, not something every turnpoint carries.
+            goal_type=goal_type if i == last else None,
+            earth_model=task.earth_model,
+        )
+        for i, tp in enumerate(task.turnpoints)
+    ]
 
 
 @dataclass(frozen=True)

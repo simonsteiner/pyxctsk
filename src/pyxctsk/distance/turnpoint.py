@@ -24,7 +24,7 @@ from typing import Protocol, Sequence, runtime_checkable
 
 from pyproj import CRS, Geod, Transformer
 
-from ..model.enums import EarthModel
+from ..model.enums import EarthModel, GoalType
 
 #: Radius of the FAI sphere earth model in meters (FAI Sporting Code S7F).
 FAI_SPHERE_RADIUS_M = 6_371_000.0
@@ -404,20 +404,25 @@ def task_area_center(
 class TurnpointGeometry(Protocol):
     """The geometry seam the route optimizer depends on.
 
-    Route optimization needs four things from a turnpoint: where its center
-    is, how large its cylinder is, whether it is a goal line, and which earth
-    the first two are measured on. Everything else (goal-line length, geodesic
-    math) is an implementation detail behind this interface.
+    Route optimization needs three things from a turnpoint: where its center
+    is, how large its cylinder is, and which earth the first two are measured
+    on. Everything else (goal-line length, the goal's type, geodesic math) is
+    outside this interface.
 
-    ``earth_model`` is the fourth because it is load-bearing, not because the
-    optimizer wants it: ``calculate_iteratively_refined_route`` reads it off
-    the first turnpoint to pick the model for the whole route. It used to do
-    that through ``getattr(turnpoints[0], "earth_model", None)`` while the
-    protocol declared three attributes and its docstring said "only three
-    things" — so a fake that satisfied ``isinstance`` got a different distance
-    for identical geometry, depending on an attribute the interface denied
-    having. An interface that omits a value its implementation reads is
-    lying about what a caller must provide.
+    **It is exactly what the implementation reads, in both directions.**
+    ``earth_model`` is here because ``calculate_iteratively_refined_route``
+    reads it off the first turnpoint to pick the model for the whole route; it
+    used to do that through ``getattr(turnpoints[0], "earth_model", None)``
+    while the protocol declared three attributes and its docstring said "only
+    three things", so a fake that satisfied ``isinstance`` got a different
+    distance for identical geometry, depending on an attribute the interface
+    denied having. ``goal_type`` has since gone the other way: it was declared
+    here because :func:`plane_circle` read it to collapse a LINE goal to a
+    zero-radius circle, but that rule belongs to — and is now applied only by —
+    ``task_to_turnpoints``, which is where the cylinders are built. A LINE goal
+    therefore arrives here already carrying ``radius=0``, and an interface
+    declaring a value nothing reads misleads a caller just as an interface
+    omitting one does.
 
     Depending on this protocol instead of the concrete ``TaskTurnpoint`` lets
     the optimization core be exercised with lightweight fakes and lets new
@@ -426,14 +431,12 @@ class TurnpointGeometry(Protocol):
     Attributes:
         center: (lat, lon) of the turnpoint center.
         radius: Cylinder radius in meters (0 collapses to the center).
-        goal_type: None, "CYLINDER", or "LINE".
         earth_model: The model this turnpoint's geometry is measured on. Read
             from the first turnpoint when the caller names none.
     """
 
     center: tuple[float, float]
     radius: float
-    goal_type: str | None
     earth_model: EarthModelLike
 
 
@@ -529,25 +532,24 @@ def plane_circle(
 ) -> tuple[float, float, float]:
     """Return a turnpoint as the circle the solver sees: (x, y, radius).
 
-    The one place that says what a turnpoint is to the optimizer, including
-    the rule that **a LINE goal is a zero-radius circle at the goal center**.
-    The goal line is perpendicular to the final approach and centred on the
-    goal (S7F §6.2.3.1), so the shortest crossing from any approach is the
-    center itself — which is on the line by construction, degenerate approach
-    included. That rule was stated twice, once in the optimizer's projection
-    and once as a method whose twenty-line docstring stood over
-    ``return self.center``.
+    A projection and nothing else. It used to also apply the rule that **a LINE
+    goal is a zero-radius circle at the goal center** — but so does
+    :func:`~pyxctsk.distance.measured_task.task_to_turnpoints`, which builds
+    every cylinder the library measures, and each docstring claimed to be the
+    only place that rule lived while a third module picked a side in prose. The
+    rule now belongs to the constructor: a LINE goal arrives here already
+    carrying ``radius=0``, which is also what
+    :func:`~pyxctsk.distance.center_distance.center_distance` reads it as.
 
     Args:
-        turnpoint: Anything with a center, a radius and a goal type.
+        turnpoint: Anything with a center and a radius.
         plane: The plane to project into.
 
     Returns:
         (x, y, radius) with radius in meters; 0 collapses to the center.
     """
     x, y = plane.xy(turnpoint.center)
-    radius = 0.0 if turnpoint.goal_type == "LINE" else float(turnpoint.radius)
-    return (x, y, radius)
+    return (x, y, float(turnpoint.radius))
 
 
 class TaskTurnpoint:
@@ -558,7 +560,7 @@ class TaskTurnpoint:
         lat: float,
         lon: float,
         radius: float = 0,
-        goal_type: str | None = None,
+        goal_type: GoalType | None = None,
         earth_model: EarthModelLike = None,
     ):
         """Initialize a task turnpoint.
@@ -566,8 +568,13 @@ class TaskTurnpoint:
         Args:
             lat (float): Latitude in degrees.
             lon (float): Longitude in degrees.
-            radius (float): Cylinder radius in meters.
-            goal_type (Optional[str]): Type of goal (None, "CYLINDER", or "LINE").
+            radius (float): Cylinder radius in meters. A LINE goal is built
+                with 0 here — see ``task_to_turnpoints``, which owns that rule.
+            goal_type: Which goal this turnpoint is, for the last one of a
+                task; None for every other. A label recording where ``radius``
+                came from, not something the optimizer reads — it was a bare
+                ``str`` compared against ``"LINE"``, so a misspelling was
+                invisible to the type checker and silently meant "cylinder".
             earth_model: Earth model the turnpoint's task uses (``EarthModel``
                 member, its string value, or None for the WGS84 default).
         """
