@@ -41,9 +41,9 @@ property of that choice, not a separate convention.
 from enum import Enum
 
 from ..model.task import Task
+from .earth import EarthModelLike, geodesic_distance
 from .measured_task import task_to_turnpoints
 from .speed_section import speed_section_indices
-from .turnpoint import EarthModelLike, geodesic_distance
 
 
 class CenterDistanceReading(str, Enum):
@@ -89,9 +89,10 @@ def _goal_radius(task: Task) -> float:
     """The radius the optimized route actually ends on, in metres.
 
     A LINE goal is a zero-radius point to the optimizer — the line is centred
-    on the goal, so its optimal crossing is the goal centre — which is stated
-    once, in ``task_to_turnpoints``. Reading it from there is what keeps this
-    reading measuring to the same place the optimized distance does.
+    on the goal, so its optimal crossing is the goal centre — which
+    ``task_to_turnpoints`` states, and since ``plane_circle`` stopped stating
+    it too, states alone. Reading it from there is what keeps this reading
+    measuring to the same place the optimized distance does.
 
     Args:
         task: The task whose goal to size.
@@ -147,6 +148,33 @@ def center_distance(
     ):
         return total
     raise ValueError(f"not a center-distance reading: {reading!r}")
+
+
+def cumulative_center_m(task: Task) -> list[float]:
+    """Distance through centres to each turnpoint, in metres.
+
+    One entry per turnpoint, starting at 0.0, so the last equals
+    ``center_distance(task)`` under :data:`PROPOSED_READING` — which it must,
+    being the prefix of exactly that polyline. It lives here rather than beside
+    the table that displays it because the convention is this module's: a
+    cumulative column derived from a *different* reading than the total printed
+    above it would disagree with its own last row.
+
+    Args:
+        task: The task to measure.
+
+    Returns:
+        Cumulative distances in metres, one per turnpoint. Empty for a task
+        with no turnpoints; ``[0.0]`` for one with a single turnpoint.
+    """
+    centers = [(tp.waypoint.lat, tp.waypoint.lon) for tp in task.turnpoints]
+    cumulative = [0.0]
+    for i in range(1, len(centers)):
+        cumulative.append(
+            cumulative[-1]
+            + geodesic_distance(centers[i - 1], centers[i], task.earth_model)
+        )
+    return cumulative[: len(centers)]
 
 
 def center_distance_readings(task: Task) -> dict[str, float | None]:

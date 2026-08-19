@@ -3,10 +3,11 @@
 The core domain models — ``Task``, ``Turnpoint``, ``Waypoint``, ``Takeoff``,
 ``SSS``, ``Goal`` — and their serialization to and from the full JSON format.
 
-They are plain dataclasses: not frozen, and they do not validate on
-construction. The only thing ``Task.__post_init__`` does is default an
-unspecified goal type, and it returns a copy rather than mutating what it was
-given. Nothing derived is stored on them.
+They are plain dataclasses: not frozen, they do not validate on construction,
+and **nothing derived is stored on them** — including the goal's default,
+which is :attr:`Task.effective_goal` rather than something ``__post_init__``
+writes back onto :attr:`Task.goal`. A task therefore serializes to what it was
+read from, with no key invented along the way.
 
 Neighbouring modules hold what this one deliberately does not:
   - ``enums`` — the constrained values (``TaskType``, ``TurnpointType``, …),
@@ -39,13 +40,12 @@ from .shape import (
     REQUIRED,
     ROUNDED_INT,
     TIME_OF_DAY,
-    Nested,
-    NestedList,
     Optionality,
     Shape,
     Value,
     enum_codec,
     list_codec,
+    shape_codec,
 )
 from .time_of_day import TimeOfDay
 from .validation import ValidationIssue, validate_task
@@ -171,7 +171,7 @@ TURNPOINT_SHAPE = Shape(
     Turnpoint,
     (
         Value("radius", "radius", ROUNDED_INT, REQUIRED),
-        Nested("waypoint", "waypoint", WAYPOINT_SHAPE, REQUIRED),
+        Value("waypoint", "waypoint", shape_codec(WAYPOINT_SHAPE), REQUIRED),
         # ``TurnpointType.NONE`` is the empty string, so "no type" and "the
         # type that means none" are the same absence to OPTIONAL_EMPTY.
         Value("type", "type", enum_codec(TurnpointType), OPTIONAL_EMPTY),
@@ -423,49 +423,42 @@ class Task:
     #: everything else lands in ``unknown``.
     KNOWN_KEYS: ClassVar[frozenset[str]]
 
-    def __post_init__(self) -> None:
-        """Post-initialization processing.
+    @property
+    def effective_goal(self) -> "Goal | None":
+        """The goal this task is flown to, with the format's default applied.
 
-        Enriches the task's goal so the constructed object always satisfies
-        the documented contract below. This is the single place that derives
-        goal defaults; ``from_dict`` and ``to_dict`` rely on it rather than
-        re-deriving the same rules.
-        """
-        self.goal = self._derive_goal(self.turnpoints, self.goal)
+        A task with at least one turnpoint always has a goal, and that goal
+        always has a type: an absent goal is a ``CYLINDER`` one, and a goal
+        with an unspecified type is a ``CYLINDER`` goal. With no turnpoints
+        there is nothing to be a goal, and this is ``self.goal`` — typically
+        None.
 
-    @staticmethod
-    def _derive_goal(
-        turnpoints: "list[Turnpoint]", goal: "Goal | None"
-    ) -> "Goal | None":
-        """Return the effective goal for a task, applying defaults explicitly.
+        **Derived, not stored.** ``__post_init__`` used to write this back onto
+        :attr:`goal`, which made it part of the object and therefore part of
+        the output: a task file with no ``goal`` key round-tripped into one
+        carrying ``{"goal": {"type": "CYLINDER"}}``. That is the only place the
+        library invented a field, in the module whose own docstring says
+        nothing derived is stored on these dataclasses and in a codebase whose
+        passthrough design exists so that what arrives is what leaves. It went
+        unnoticed because every reference task carries a goal.
 
-        Contract — a task with at least one turnpoint always has a goal, and
-        that goal always has a type:
-          - if no goal was supplied, a ``CYLINDER`` one is created;
-          - a goal with an unspecified type becomes ``CYLINDER``.
-
-        With no turnpoints the goal is returned unchanged (typically ``None``).
-        A goal that already satisfies the contract is returned as-is; otherwise
-        a copy is returned, so constructing a Task never mutates the caller's
-        object.
-
-        Args:
-            turnpoints: The task's turnpoints.
-            goal: The goal supplied at construction, if any.
+        Ask for this wherever the *flown* goal is meant — the cylinders, the
+        goal line, the drawing, the QR conversion. Read :attr:`goal` where what
+        the file said is meant, which is :mod:`~pyxctsk.model.validation`'s
+        whole job.
 
         Returns:
-            The enriched goal, or the original value when there are no turnpoints.
+            The goal with defaults applied, or None for a task with no
+            turnpoints and no goal. Never the caller's own object once a
+            default has been applied — a copy is returned instead.
         """
-        if not turnpoints:
-            return goal
-
-        if goal is None:
+        if not self.turnpoints:
+            return self.goal
+        if self.goal is None:
             return Goal(type=GoalType.CYLINDER)
-
-        if not goal.type:
-            return replace(goal, type=GoalType.CYLINDER)
-
-        return goal
+        if not self.goal.type:
+            return replace(self.goal, type=GoalType.CYLINDER)
+        return self.goal
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
@@ -485,8 +478,6 @@ class Task:
         Returns:
             Task: Parsed Task object.
         """
-        # Goal defaults are derived once in Task.__post_init__; no need to
-        # repeat the rules here.
         return TASK_SHAPE.read(data)
 
     def to_json(self) -> str:
@@ -546,31 +537,33 @@ class Task:
         """
         return validate_task(self)
 
-    def find_ess_turnpoint(self) -> Turnpoint | None:
-        """Find and return the ESS turnpoint, if any.
-
-        Returns:
-            Optional[Turnpoint]: The turnpoint marked as ESS or None if no ESS turnpoint exists.
-        """
-        for tp in self.turnpoints:
-            if tp.type == TurnpointType.ESS:
-                return tp
-        return None
-
     def is_ess_goal(self) -> bool:
-        """Check if the ESS turnpoint is the same as the goal (last turnpoint).
+        """Whether the task's last turnpoint is also its ESS.
+
+        Reports what the file says, which is the model's job: an elevated goal
+        "implicitly also serves as the End of Speed Section" (FAI S7F 2026
+        §6.2.3.2), but resolving that contradiction is
+        :mod:`~pyxctsk.model.validation`'s — it reports
+        ``ELEVATED_GOAL_IS_NOT_ESS`` and leaves this answering the annotation.
+
+        This used to search for the *first* turnpoint marked ESS and compare it
+        to the last one by value. ``Turnpoint`` is a plain dataclass, so a task
+        that legitimately flies the same turnpoint twice could match the wrong
+        occurrence — the hazard :meth:`~pyxctsk.export.TaskDrawing.is_goal`
+        documents and avoids by comparing identity. Asking the last turnpoint
+        what it is needs neither a search nor a comparison. It also drops
+        ``find_ess_turnpoint``, which had no other caller, no test and no
+        mention in the docs.
+
+        Note this is *not* "does the task have a speed section" — that is
+        :func:`~pyxctsk.distance.speed_section.speed_section_indices`, which
+        also weighs the task type, and which lives in ``distance/`` because
+        ``model/`` may not depend on it.
 
         Returns:
-            bool: True if ESS is the same as goal, False otherwise.
+            bool: True if the last turnpoint carries the ESS role.
         """
-        if not self.turnpoints:
-            return False
-
-        ess_tp = self.find_ess_turnpoint()
-        if not ess_tp:
-            return False
-
-        return ess_tp == self.turnpoints[-1]
+        return bool(self.turnpoints) and self.turnpoints[-1].type is TurnpointType.ESS
 
 
 TASK_SHAPE = Shape(
@@ -578,11 +571,16 @@ TASK_SHAPE = Shape(
     (
         Value("task_type", "taskType", enum_codec(TaskType), REQUIRED),
         Value("version", "version", optionality=REQUIRED),
-        NestedList("turnpoints", "turnpoints", TURNPOINT_SHAPE, REQUIRED),
+        Value(
+            "turnpoints",
+            "turnpoints",
+            list_codec(shape_codec(TURNPOINT_SHAPE)),
+            REQUIRED,
+        ),
         Value("earth_model", "earthModel", enum_codec(EarthModel)),
-        Nested("takeoff", "takeoff", TAKEOFF_SHAPE),
-        Nested("sss", "sss", SSS_SHAPE),
-        Nested("goal", "goal", GOAL_SHAPE),
+        Value("takeoff", "takeoff", shape_codec(TAKEOFF_SHAPE)),
+        Value("sss", "sss", shape_codec(SSS_SHAPE)),
+        Value("goal", "goal", shape_codec(GOAL_SHAPE)),
     ),
     ext_key=EXTENSIONS_KEY,
 )

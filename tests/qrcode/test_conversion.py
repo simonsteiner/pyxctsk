@@ -159,17 +159,29 @@ class TestValidatingWhatArrived:
     def test_nothing_is_invented_to_check_it(self):
         """Validating must not depend on what conversion would supply.
 
-        The payload declares no goal and no version 1; the converted task has
-        both.
+        The payload declares no version 1 and no CLASSIC task type; the
+        converted task has both, which is why validation reads the payload.
+
+        The goal used to be a third invention here and no longer is: neither
+        this module nor ``Task`` fills one in, so a payload with no ``g``
+        converts to a task with no goal. The default is
+        ``Task.effective_goal``, derived where it is needed rather than stored
+        where it would be written back out.
         """
         payload = self._payload(1, 2, 3, None)
 
         assert payload.goal is None
         assert payload.version == 2
         assert payload.validate() == []
-        # The converted task does carry those inventions.
+
         converted = payload.to_task()
-        assert converted.goal is not None and converted.version == 1
+        # Still invented, because the full format requires them:
+        assert converted.version == 1
+        assert converted.task_type is TaskType.CLASSIC
+        # No longer invented:
+        assert converted.goal is None
+        assert converted.effective_goal is not None
+        assert converted.effective_goal.type is GoalType.CYLINDER
 
     def test_the_new_rules_reach_the_qr_format_too(self):
         """Radius, version and extensions are all things a QR payload carries.
@@ -203,3 +215,18 @@ class TestValidatingWhatArrived:
         # The same task in the other format declares 1, and is equally valid.
         assert payload.to_task().version == 1
         assert payload.to_task().validate() == []
+
+    def test_the_full_formats_version_is_declared_once(self):
+        """The converter stamps the number the validator checks against.
+
+        There used to be three independent literal ``1``s: this module's
+        ``TASK_VERSION`` (stamped onto every converted task),
+        ``validation.FULL_FORMAT_VERSION`` (what ``Task.validate()`` checks),
+        and ``pyxctsk.VERSION``. Editing one of the three would have made the
+        library write a version its own validator rejects.
+        """
+        import pyxctsk
+        from pyxctsk.model.validation import FULL_FORMAT_VERSION
+
+        assert pyxctsk.VERSION is FULL_FORMAT_VERSION
+        assert self._payload(1, 2, 3).to_task().version == FULL_FORMAT_VERSION

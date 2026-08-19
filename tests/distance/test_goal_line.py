@@ -25,9 +25,8 @@ from pyxctsk import (
 from pyxctsk.distance import geodesic_distance
 from pyxctsk.distance.goal_line import (
     GoalLine,
-    _endpoints_from_coords,
-    _generate_semicircle_arc,
     _last_distinct_point,
+    _semicircle_arc,
     goal_line_length_from_turnpoints,
 )
 
@@ -141,11 +140,15 @@ class TestEndpointsFromCoords:
     adapter (`calculate_goal_line_endpoints`); the core takes coordinates.
     """
 
+    @staticmethod
+    def _line(center, approach_from, length):
+        """A GoalLine positioned directly, without going through a task."""
+        return GoalLine(center=center, approach_from=approach_from, length=length)
+
     def test_approach_from_the_south_runs_the_line_east_west(self):
         """Approaching due north, the forward azimuth is 0 and the line is E-W."""
-        (lon1, lat1), (lon2, lat2), forward_azimuth = _endpoints_from_coords(
-            47.0, 8.0, 46.0, 8.0, 400.0
-        )
+        line = self._line((47.0, 8.0), (46.0, 8.0), 400.0)
+        (lon1, lat1), (lon2, lat2), forward_azimuth = line.endpoints()
 
         assert abs(forward_azimuth) < 1.0 or abs(forward_azimuth - 360) < 1.0
         # The endpoints straddle the goal in longitude, at the goal's latitude.
@@ -154,15 +157,16 @@ class TestEndpointsFromCoords:
 
     def test_approach_from_the_west_runs_the_line_north_south(self):
         """Approaching due east, the forward azimuth is 90."""
-        _, _, forward_azimuth = _endpoints_from_coords(47.0, 8.0, 47.0, 7.0, 400.0)
+        line = self._line((47.0, 8.0), (47.0, 7.0), 400.0)
 
-        assert abs(forward_azimuth - 90) < 1.0
+        assert abs(line.approach_azimuth() - 90) < 1.0
+        assert line.endpoints()[2] == line.approach_azimuth()
 
     def test_zero_length_puts_both_endpoints_on_the_goal(self):
         """A zero-length line degenerates to the goal center."""
-        (lon1, lat1), (lon2, lat2), _ = _endpoints_from_coords(
-            47.0, 8.0, 46.0, 8.0, 0.0
-        )
+        (lon1, lat1), (lon2, lat2), _ = self._line(
+            (47.0, 8.0), (46.0, 8.0), 0.0
+        ).endpoints()
 
         assert abs(lon1 - 8.0) < 1e-10
         assert abs(lat1 - 47.0) < 1e-10
@@ -174,20 +178,10 @@ class TestGenerateSemicircleArc:
     """Test the semicircle arc generator."""
 
     def test_generate_semicircle_arc_basic(self):
-        """Test basic semicircle arc generation."""
-        center_lon = 8.0
-        center_lat = 47.0
-        start_azimuth = 270.0  # West
-        end_azimuth = 90.0  # East
-        through_azimuth = 0.0  # North
-        radius = 200.0
-
-        arc_points = _generate_semicircle_arc(
-            center_lon, center_lat, start_azimuth, end_azimuth, through_azimuth, radius
-        )
-
-        # Should have GOAL_LINE_NUM_POINTS + 1 points
+        """Approaching due north, the arc runs west through north to east."""
         from pyxctsk.distance.goal_line import GOAL_LINE_NUM_POINTS
+
+        arc_points = _semicircle_arc((47.0, 8.0), 0.0, 200.0)
 
         assert len(arc_points) == GOAL_LINE_NUM_POINTS + 1
 
@@ -197,23 +191,27 @@ class TestGenerateSemicircleArc:
             assert isinstance(point[0], float)  # longitude
             assert isinstance(point[1], float)  # latitude
 
+    def test_the_arc_sweeps_180_degrees_centred_on_the_approach(self):
+        """It starts 90° left of the approach, passes through it, ends 90° right.
+
+        The rule the old three-azimuth signature let a caller state a fourth
+        way; here it is once, over the shape the one caller has always used.
+        """
+        arc = _semicircle_arc((0.0, 0.0), 0.0, 100_000.0)
+        first, middle, last = arc[0], arc[len(arc) // 2], arc[-1]
+
+        assert first[0] < 0 and abs(first[1]) < 1e-6  # due west
+        assert abs(middle[0]) < 1e-6 and middle[1] > 0  # due north
+        assert last[0] > 0 and abs(last[1]) < 1e-6  # due east
+
     def test_generate_semicircle_arc_zero_radius(self):
         """Test semicircle arc with zero radius."""
-        center_lon = 8.0
-        center_lat = 47.0
-        start_azimuth = 270.0
-        end_azimuth = 90.0
-        through_azimuth = 0.0
-        radius = 0.0
-
-        arc_points = _generate_semicircle_arc(
-            center_lon, center_lat, start_azimuth, end_azimuth, through_azimuth, radius
-        )
+        arc_points = _semicircle_arc((47.0, 8.0), 0.0, 0.0)
 
         # All points should be at the center
         for point in arc_points:
-            assert abs(point[0] - center_lon) < 1e-10
-            assert abs(point[1] - center_lat) < 1e-10
+            assert abs(point[0] - 8.0) < 1e-10
+            assert abs(point[1] - 47.0) < 1e-10
 
 
 class TestGoalLinePresence:

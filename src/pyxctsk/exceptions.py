@@ -9,6 +9,14 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .model.validation import ValidationIssue
 
+#: What to install for QR *image* handling, named once. Two modules tell a user
+#: this — :mod:`pyxctsk.parser` when an image cannot be read and
+#: :mod:`pyxctsk.qrcode.image` when one cannot be written — and it lives here
+#: beside :class:`MissingQRCodeSupportError`, the error that reports it, rather
+#: than being spelled out at each site. The spelling matters: the message used
+#: to name the ``web`` extra, which is flask.
+QR_EXTRA_INSTALL = "pyxctsk[qr]"
+
 
 class pyXCTSKError(Exception):
     """Base exception for all pyxctsk errors."""

@@ -25,7 +25,7 @@ import math
 import pytest
 from pyproj import Geod
 
-from pyxctsk import EarthModel
+from pyxctsk import EarthModel, GoalType, TurnpointType
 from pyxctsk.distance import (
     MeasuredTask,
     TaskTurnpoint,
@@ -35,7 +35,8 @@ from pyxctsk.distance import (
     optimized_distance,
 )
 from pyxctsk.distance.measured_task import task_to_turnpoints
-from pyxctsk.distance.turnpoint import LocalPlane, plane_circle
+from pyxctsk.distance.plane import LocalPlane
+from pyxctsk.distance.turnpoint import plane_circle
 from tests.builders import task, turnpoint
 from tests.corpus import reference_task, tasks_with_reference_distance
 
@@ -204,12 +205,39 @@ class TestOneSolverOneProjection:
             assert radius == pytest.approx(5_000.0, abs=0.01)
 
     def test_a_line_goal_is_a_zero_radius_circle(self):
-        """One statement of the rule, reached from either direction."""
-        goal = TaskTurnpoint(47.0, 8.0, 400.0, goal_type="LINE")
+        """One statement of the rule, at the one place that states it.
+
+        ``task_to_turnpoints`` builds the cylinders, so that is where a LINE
+        goal becomes a zero-radius point. ``plane_circle`` used to apply the
+        same rule again from the goal type it was handed; this asserts the
+        surviving owner produces a cylinder the solver already reads as a
+        point, without the projection needing to know what kind of goal it is.
+        """
+        line_task = task(
+            turnpoint("A", 46.5, 8.0, type=TurnpointType.TAKEOFF),
+            turnpoint("Goal", 47.0, 8.0, radius=400),
+            goal=GoalType.LINE,
+        )
+        goal = task_to_turnpoints(line_task)[-1]
         plane = LocalPlane.around([goal.center])
 
+        assert goal.radius == 0
+        assert goal.goal_type is GoalType.LINE
         assert plane_circle(goal, plane)[2] == 0.0
         assert goal.optimal_point((46.5, 8.0), (46.5, 8.0), plane) == goal.center
+
+    def test_a_cylinder_goal_keeps_its_radius(self):
+        """The other half of the same rule, which nothing used to assert."""
+        goal = task_to_turnpoints(
+            task(
+                turnpoint("A", 46.5, 8.0, type=TurnpointType.TAKEOFF),
+                turnpoint("Goal", 47.0, 8.0, radius=400),
+                goal=GoalType.CYLINDER,
+            )
+        )[-1]
+
+        assert goal.radius == 400
+        assert goal.goal_type is GoalType.CYLINDER
 
 
 class TestCrossingCase:
@@ -307,7 +335,7 @@ class TestGoalLine:
         The line is oriented perpendicular to the incoming leg (§6.2.3.1), so
         the perpendicular foot from the incoming point is the center itself.
         """
-        goal = TaskTurnpoint(47.0, 8.0, 0, goal_type="LINE")
+        goal = TaskTurnpoint(47.0, 8.0, 0, goal_type=GoalType.LINE)
         prev_point = (46.9, 7.95)
         finish = goal.optimal_point(prev_point, prev_point)
         assert finish == goal.center

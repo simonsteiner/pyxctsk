@@ -44,15 +44,10 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from itertools import accumulate
 
-from .turnpoint import (
-    EarthModelLike,
-    LocalPlane,
-    TurnpointGeometry,
-    geod_for_earth_model,
-    plane_circle,
-    plane_optimal_point,
-    snap_to_boundary,
-)
+from .earth import EarthModelLike, geod_for_earth_model, snap_to_boundary
+from .plane import LocalPlane
+from .solver import plane_optimal_point
+from .turnpoint import TurnpointGeometry, plane_circle
 
 #: How many alternating sweeps to allow before giving up. A safety bound, not
 #: an accuracy setting — convergence normally stops far earlier — and the one
@@ -128,33 +123,6 @@ class OptimizedRoute:
         return list(accumulate(self.legs, initial=0.0))
 
 
-def _closest_circle_point(
-    point: tuple[float, float], circle: PlaneCircle
-) -> tuple[float, float]:
-    """Return the planar circle-boundary point nearest to ``point``.
-
-    Used for the final turnpoint, which has no successor: the shortest way to
-    touch its circle from the previous route point is the radially nearest
-    boundary point (regardless of whether the previous point lies inside or
-    outside the circle).
-
-    Args:
-        point: (x, y) of the previous route point.
-        circle: (x, y, radius) of the final circle.
-
-    Returns:
-        (x, y) of the nearest boundary point, or the center for radius 0.
-    """
-    cx, cy, radius = circle
-    if radius <= 0.0:
-        return (cx, cy)
-    dx, dy = point[0] - cx, point[1] - cy
-    dist = math.hypot(dx, dy)
-    if dist == 0.0:
-        return (cx + radius, cy)
-    return (cx + radius * dx / dist, cy + radius * dy / dist)
-
-
 def _same_circle(a: PlaneCircle, b: PlaneCircle) -> bool:
     """Return True if two planar circles are the same circle."""
     return (
@@ -214,7 +182,26 @@ def _polyline_length(points: Sequence[tuple[float, float]]) -> float:
 def _boundary_toward(
     circle: PlaneCircle, target: tuple[float, float]
 ) -> tuple[float, float]:
-    """Return the point of ``circle`` nearest ``target``, in the plane."""
+    """Return the point of ``circle`` nearest ``target``, in the plane.
+
+    Two callers, one computation. The initial placements use it to start each
+    point on the boundary facing its neighbour; :func:`_sweep_to_convergence`
+    uses it for the *final* circle, which has no successor, so the shortest way
+    to touch it from the previous route point is the radially nearest boundary
+    point — whether that point lies inside the circle or outside it.
+
+    It was written twice, once per caller, under two names and with two
+    spellings of the same local; the copies were bit-identical over 5000
+    randomized circles and points.
+
+    Args:
+        circle: (x, y, radius) in the local plane.
+        target: (x, y) to face.
+
+    Returns:
+        (x, y) on the boundary, or the center for a zero-radius circle. A
+        target *at* the center has no direction, so the point due +x is used.
+    """
     cx, cy, radius = circle
     if radius <= 0.0:
         return (cx, cy)
@@ -303,7 +290,7 @@ def _sweep_to_convergence(
                     continue
                 cx, cy, radius = circles[i]
                 if i == n - 1:
-                    points[i] = _closest_circle_point(points[i - 1], circles[i])
+                    points[i] = _boundary_toward(circles[i], points[i - 1])
                 else:
                     points[i] = plane_optimal_point(
                         points[i - 1], points[i + 1], (cx, cy), radius

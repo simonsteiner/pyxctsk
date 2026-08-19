@@ -42,7 +42,12 @@ from ..model.task import (
     TurnpointType,
     Waypoint,
 )
-from ..model.validation import TaskStructure, ValidationIssue, validate_structure
+from ..model.validation import (
+    FULL_FORMAT_VERSION,
+    TaskStructure,
+    ValidationIssue,
+    validate_structure,
+)
 from .enums import (
     QRCodeDirection,
     QRCodeEarthModel,
@@ -53,9 +58,6 @@ from .enums import (
 )
 from .models import QRCodeGoal, QRCodeSSS, QRCodeTakeoff, QRCodeTurnpoint
 from .task import QR_CODE_TASK_VERSION, QRCodeTask
-
-#: The task version the full JSON format carries.
-TASK_VERSION = 1
 
 #: What a carried unknown key may not occupy on the QR side. The QR task
 #: renders as either of its two shapes and keeps its unknown keys through
@@ -162,13 +164,19 @@ def task_to_qr_code_task(task: Task) -> QRCodeTask:
             unknown=strip_foreign_keys(task.sss.unknown, QRCodeSSS.KNOWN_KEYS),
         )
 
+    # ``task.goal``, not ``effective_goal``: a task whose goal was never
+    # spelled out is written without a ``g`` object, so the payload says what
+    # the file said. Both formats read an absent goal as a CYLINDER one, so
+    # nothing is lost, and the alternative — writing the default out — is the
+    # invention this module exists not to make.
+    goal = task.goal
     qr_goal = None
-    if task.goal:
+    if goal:
         qr_goal = QRCodeGoal(
-            deadline=task.goal.deadline,
-            type=_TO_QR_GOAL_TYPE.get(task.goal.type),
-            finish_altitude=task.goal.finish_altitude,
-            unknown=strip_foreign_keys(task.goal.unknown, QRCodeGoal.KNOWN_KEYS),
+            deadline=goal.deadline,
+            type=_TO_QR_GOAL_TYPE.get(goal.type),
+            finish_altitude=goal.finish_altitude,
+            unknown=strip_foreign_keys(goal.unknown, QRCodeGoal.KNOWN_KEYS),
         )
 
     return QRCodeTask(
@@ -256,7 +264,7 @@ def qr_code_task_to_task(qr: QRCodeTask) -> Task:
 
     return Task(
         task_type=_FROM_QR_TASK_TYPE.get(qr.task_type, TaskType.CLASSIC),
-        version=TASK_VERSION,
+        version=FULL_FORMAT_VERSION,
         turnpoints=turnpoints,
         earth_model=_FROM_QR_EARTH_MODEL.get(qr.earth_model),
         takeoff=takeoff,

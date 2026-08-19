@@ -29,20 +29,19 @@ from pyxctsk import (
     parser,
 )
 from pyxctsk.distance import optimized_distance
+from pyxctsk.distance.earth import geod_for_earth_model, geodesic_distance
 from pyxctsk.distance.goal_line import (
     GoalLine,
     GoalLineOrientation,
     goal_line_length_from_turnpoints,
 )
 from pyxctsk.distance.measured_task import MeasuredTask, task_to_turnpoints
-from pyxctsk.distance.route_optimization import calculate_iteratively_refined_route
-from pyxctsk.distance.turnpoint import (
+from pyxctsk.distance.plane import (
     LocalPlane,
-    geod_for_earth_model,
-    geodesic_distance,
     local_tm_transformers,
     task_area_center,
 )
+from pyxctsk.distance.route_optimization import calculate_iteratively_refined_route
 from pyxctsk.model.validation import ValidationRule
 from tests.corpus import reference_task, reference_tasks
 from tests.paths import ELEVATED_GOAL_DIR
@@ -1629,9 +1628,7 @@ class TestUnrecognizedInputSaysWhy:
         png.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 64)
         monkeypatch.setattr(parser, "QR_CODE_SUPPORT", False)
 
-        with pytest.raises(
-            InvalidFormatError, match="QR code support is not installed"
-        ):
+        with pytest.raises(InvalidFormatError, match=r"pyxctsk\[qr\]"):
             parse_task(str(png))
 
     def test_inline_json_containing_a_slash_still_parses(self):

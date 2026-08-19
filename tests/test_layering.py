@@ -470,29 +470,37 @@ class TestTheOptimizerDependencyIsNotPaidUpFront:
     """
 
     def test_scipy_is_not_imported_at_import_time(self):
-        """Importing the package must not drag in the optimizer's solver."""
-        source = (SRC / "distance" / "turnpoint.py").read_text()
-        tree = ast.parse(source)
-        module_level = [
-            alias.module
-            for alias in ast.walk(tree)
-            if isinstance(alias, ast.ImportFrom) and alias.module
-        ]
-        deferred = [
-            node.module
-            for node in _deferred_imports(tree)
-            if node.module and node.module.startswith("scipy")
-        ]
+        """Importing the package must not drag in the optimizer's solver.
 
-        assert any(m.startswith("scipy") for m in module_level), "scipy still used"
-        assert deferred == ["scipy.optimize"], (
-            "scipy.optimize must stay a function-local import: it is 75% of the "
-            "package's import cost and one function needs it"
+        Asked of every module in ``src/`` rather than of the one file that
+        happens to hold the call — the check used to name
+        ``distance/turnpoint.py``, and would have gone quietly green had that
+        file been split without anyone noticing.
+        """
+        module_level: list[str] = []
+        deferred: list[str] = []
+        for path in sorted(SRC.rglob("*.py")):
+            tree = ast.parse(path.read_text())
+            deferred_nodes = set(map(id, _deferred_imports(tree)))
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.ImportFrom) or not node.module:
+                    continue
+                if not node.module.startswith("scipy"):
+                    continue
+                target = deferred if id(node) in deferred_nodes else module_level
+                target.append(f"{path.relative_to(SRC)}:{node.module}")
+
+        assert deferred, "scipy is no longer used — has the solver changed?"
+        assert not module_level, (
+            f"scipy must stay a function-local import: it is 75% of the "
+            f"package's import cost and one function needs it. Found at "
+            f"module level in {module_level}"
         )
+        assert [d.split(":")[1] for d in deferred] == ["scipy.optimize"]
 
     def test_the_optimizer_still_works_once_it_is_needed(self):
         """Deferring an import must not defer the answer."""
-        from pyxctsk.distance.turnpoint import plane_optimal_point
+        from pyxctsk.distance.solver import plane_optimal_point
 
         point = plane_optimal_point((-10.0, 0.0), (10.0, 0.0), (0.0, 5.0), 2.0)
 

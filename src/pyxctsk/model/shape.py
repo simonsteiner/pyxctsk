@@ -22,12 +22,20 @@ owning a list of keys beside the code that reads them:
   tools.xcontest.org byte for byte; the table is written in that order, and
   that order is what comes out.
 
-Irregular fields are still one row each. ``z`` packs four numbers into one key,
-the QR task flattens its takeoff into root ``to``/``tc``, and ``T`` names a
-shape rather than carrying data — each is a :class:`Field` subclass declared
-beside the shape that needs it, so the irregularity stays where it belongs
-instead of becoming a branch inside a method every other field also goes
-through.
+A row is an attribute, a key, a codec and an :class:`Optionality` — that is
+:class:`Value`, and **nesting is a codec, not a kind of row**. A ``Shape`` is
+already one (``write`` is ``to_wire``, ``read`` is ``from_wire``), so a nested
+object is ``Value(..., shape_codec(CHILD))`` and a nested list is
+``Value(..., list_codec(shape_codec(CHILD)))``. Two further ``Field``
+subclasses used to exist for those, each restating ``Value``'s
+required/absent/omit dance with one line changed.
+
+Genuinely irregular fields are still one row each. ``z`` packs four numbers
+into one key, the QR task flattens its takeoff into root ``to``/``tc``, and
+``T`` names a shape rather than carrying data — each is a :class:`Field`
+subclass declared beside the shape that needs it, so the irregularity stays
+where it belongs instead of becoming a branch inside a method every other
+field also goes through.
 
 Absence is one decision, not two. A field's :class:`Optionality` says both when
 an incoming value counts as absent and when an outgoing one is skipped, because
@@ -221,82 +229,6 @@ class Value(Field):
 
 
 @dataclass(frozen=True)
-class Nested(Field):
-    """One attribute holding another shape's object.
-
-    Attributes:
-        attr: The dataclass attribute.
-        key: The wire key.
-        shape: The child's table.
-        optionality: When it may be missing, on each side.
-    """
-
-    attr: str
-    key: str
-    shape: "Shape[Any]"
-    optionality: Optionality = OPTIONAL
-
-    @property
-    def keys(self) -> tuple[str, ...]:
-        """The single key this row owns; the child's keys are its own."""
-        return (self.key,)
-
-    def read(self, data: Mapping[str, Any]) -> dict[str, Any]:
-        """Read the nested object through its own shape."""
-        if self.optionality.required:
-            return {self.attr: self.shape.read(data[self.key])}
-        raw: Any = data.get(self.key)
-        if self.optionality.absent(raw):
-            return {}
-        return {self.attr: self.shape.read(raw)}
-
-    def write(self, obj: Any, result: MutableMapping[str, Any]) -> None:
-        """Write the nested object through its own shape."""
-        value = getattr(obj, self.attr)
-        if self.optionality.omit(value):
-            return
-        result[self.key] = self.shape.write(value)
-
-
-@dataclass(frozen=True)
-class NestedList(Field):
-    """One attribute holding a list of another shape's objects.
-
-    Attributes:
-        attr: The dataclass attribute.
-        key: The wire key.
-        shape: The element's table.
-        optionality: When it may be missing, on each side.
-    """
-
-    attr: str
-    key: str
-    shape: "Shape[Any]"
-    optionality: Optionality = OPTIONAL
-
-    @property
-    def keys(self) -> tuple[str, ...]:
-        """The single key this row owns."""
-        return (self.key,)
-
-    def read(self, data: Mapping[str, Any]) -> dict[str, Any]:
-        """Read every element through the element shape."""
-        if self.optionality.required:
-            return {self.attr: [self.shape.read(item) for item in data[self.key]]}
-        raw: Any = data.get(self.key)
-        if self.optionality.absent(raw):
-            return {}
-        return {self.attr: [self.shape.read(item) for item in raw]}
-
-    def write(self, obj: Any, result: MutableMapping[str, Any]) -> None:
-        """Write every element through the element shape."""
-        value = getattr(obj, self.attr)
-        if self.optionality.omit(value):
-            return
-        result[self.key] = [self.shape.write(item) for item in value]
-
-
-@dataclass(frozen=True)
 class Discriminator(Field):
     """A key whose presence names the shape rather than carrying data.
 
@@ -411,3 +343,27 @@ class Shape(Generic[T]):
                 self.ext_key,
             )
         return result
+
+
+def shape_codec(shape: "Shape[Any]") -> Codec:
+    """Return a nested shape as the codec for one value.
+
+    A ``Shape`` already *is* a codec — :meth:`Shape.write` is ``to_wire`` and
+    :meth:`Shape.read` is ``from_wire`` — so a nested object is a :class:`Value`
+    with this codec, and a nested list is one with ``list_codec(shape_codec(…))``.
+
+    That is what this replaces. ``Nested`` and ``NestedList`` were two more
+    :class:`Field` subclasses whose ``read`` was the same eight lines as
+    :class:`Value`'s, differing only in how the raw value was converted, and
+    whose ``write`` differed the same way — so the same required/absent/omit
+    dance was written three times and a fix to one could miss the others.
+    Verified byte-identical over the reference corpus before the two classes
+    were deleted.
+
+    Args:
+        shape: The child's table.
+
+    Returns:
+        Codec: Reading and writing one object of that shape.
+    """
+    return Codec(shape.write, shape.read)

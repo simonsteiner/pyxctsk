@@ -9,6 +9,7 @@ uses, because every key belongs to a row.
 
 import json
 from dataclasses import dataclass, field
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -23,12 +24,11 @@ from pyxctsk.model.shape import (
     ROUNDED_INT,
     TIME_OF_DAY,
     Discriminator,
-    Nested,
-    NestedList,
     Shape,
     Value,
     enum_codec,
     list_codec,
+    shape_codec,
 )
 from pyxctsk.model.task import (
     GOAL_SHAPE,
@@ -210,19 +210,30 @@ class TestCodecs:
 
 
 class TestNestedRows:
-    """Rows that hand off to another shape."""
+    """Nesting is a codec, not a kind of row.
+
+    A ``Shape`` already is one — ``write`` is ``to_wire`` and ``read`` is
+    ``from_wire`` — so a nested object is a ``Value`` with ``shape_codec`` and a
+    nested list is one with ``list_codec(shape_codec(...))``. ``Nested`` and
+    ``NestedList`` used to be two more ``Field`` subclasses restating ``Value``'s
+    required/absent/omit dance.
+    """
+
+    CHILD = Shape(Toy, (Value("name", "n", optionality=REQUIRED),))
 
     def test_nested_reads_and_writes_through_the_child(self):
         """A child object is its own table, reached by one row."""
-        parent = Shape(Toy, (Value("name", "n", optionality=REQUIRED),))
-        row = Nested("child", "c", parent)
+        row = Value("child", "c", shape_codec(self.CHILD))
 
         assert row.read({"c": {"n": "A"}})["child"].name == "A"
 
+        written: dict = {}
+        row.write(SimpleNamespace(child=Toy(name="A")), written)
+        assert written == {"c": {"n": "A"}}
+
     def test_nested_list_reads_every_element(self):
         """Turnpoints are the list every task has."""
-        parent = Shape(Toy, (Value("name", "n", optionality=REQUIRED),))
-        row = NestedList("children", "c", parent)
+        row = Value("children", "c", list_codec(shape_codec(self.CHILD)))
 
         assert [
             t.name for t in row.read({"c": [{"n": "A"}, {"n": "B"}]})["children"]
@@ -230,6 +241,17 @@ class TestNestedRows:
             "A",
             "B",
         ]
+
+    def test_a_nested_row_obeys_the_same_optionality_as_any_other(self):
+        """Which is the point: one dance, written once, in ``Value``."""
+        row = Value("child", "c", shape_codec(self.CHILD))
+
+        assert row.read({}) == {}
+        assert row.read({"c": None}) == {}
+
+        written: dict = {}
+        row.write(SimpleNamespace(child=None), written)
+        assert written == {}
 
     def test_a_discriminator_states_what_choosing_the_shape_meant(self):
         """The key was already read — choosing this table *was* reading it."""

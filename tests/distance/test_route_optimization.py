@@ -12,9 +12,11 @@ import pytest
 from pyproj import CRS, Transformer
 
 from pyxctsk.distance import OptimizedRoute
+from pyxctsk.distance.earth import EarthModelLike, geodesic_distance
+from pyxctsk.distance.plane import LocalPlane, ltm_scale_factor, task_area_center
 from pyxctsk.distance.route_optimization import (
     _INITIAL_PLACEMENTS,
-    _closest_circle_point,
+    _boundary_toward,
     _optimize_plane_points,
     _place_at_centers,
     _place_chained_backward,
@@ -23,16 +25,8 @@ from pyxctsk.distance.route_optimization import (
     _sweep_to_convergence,
     calculate_iteratively_refined_route,
 )
-from pyxctsk.distance.turnpoint import (
-    EarthModelLike,
-    LocalPlane,
-    TaskTurnpoint,
-    TurnpointGeometry,
-    geodesic_distance,
-    ltm_scale_factor,
-    plane_optimal_point,
-    task_area_center,
-)
+from pyxctsk.distance.solver import plane_optimal_point
+from pyxctsk.distance.turnpoint import TaskTurnpoint, TurnpointGeometry
 
 
 @dataclass
@@ -43,11 +37,15 @@ class FakeTurnpoint:
     optimizer read the attribute anyway through a ``getattr`` default — so this
     fake satisfied ``isinstance`` while getting a different distance for
     identical geometry than a ``TaskTurnpoint`` would.
+
+    It declares no ``goal_type`` for the same reason in reverse: the protocol
+    no longer does, because nothing in the optimizer reads one. A LINE goal is
+    a zero-radius circle by the time it gets here, which ``task_to_turnpoints``
+    arranges and this fake can express with ``radius=0``.
     """
 
     center: tuple[float, float]
     radius: float = 0.0
-    goal_type: str | None = None
     earth_model: EarthModelLike = None
 
 
@@ -57,16 +55,46 @@ def test_fake_turnpoint_satisfies_protocol():
     assert isinstance(TaskTurnpoint(0.0, 0.0), TurnpointGeometry)
 
 
-def test_the_protocol_declares_every_attribute_the_optimizer_reads():
-    """An interface that omits a value its implementation reads is lying.
+def test_the_protocol_declares_exactly_what_the_optimizer_reads():
+    """Neither more nor less: both directions have been wrong here.
 
-    ``calculate_iteratively_refined_route`` picks the route's earth model off
-    the first turnpoint. That was a ``getattr`` against a protocol declaring
-    three attributes, whose docstring said "only three things".
+    Too few: ``calculate_iteratively_refined_route`` picks the route's earth
+    model off the first turnpoint, and did it with a ``getattr`` against a
+    protocol declaring three attributes whose docstring said "only three
+    things" — so a fake satisfying ``isinstance`` got a different distance for
+    identical geometry.
+
+    Too many: ``goal_type`` was declared because ``plane_circle`` read it to
+    collapse a LINE goal to a zero-radius circle. That rule belongs to
+    ``task_to_turnpoints``, which builds the cylinders, and stating it in both
+    places left three modules disagreeing about which one owned it. A LINE goal
+    now arrives already carrying ``radius=0``, nothing in the optimizer reads
+    the goal type, and an interface declaring a value nothing reads misleads a
+    caller as much as one omitting a value it needs.
     """
-    declared = set(TurnpointGeometry.__annotations__)
+    assert set(TurnpointGeometry.__annotations__) == {
+        "center",
+        "radius",
+        "earth_model",
+    }
 
-    assert {"center", "radius", "goal_type", "earth_model"} <= declared
+
+def test_a_turnpoint_without_a_goal_type_is_enough_to_optimize():
+    """The seam's whole claim: geometry in, route out, no goal vocabulary.
+
+    ``FakeTurnpoint`` has no ``goal_type`` at all, so this fails to even
+    construct if the optimizer starts reading one again.
+    """
+    route = calculate_iteratively_refined_route(
+        [
+            FakeTurnpoint((46.5, 8.0)),
+            FakeTurnpoint((46.7, 8.1), radius=1_000.0),
+            FakeTurnpoint((47.0, 8.0), radius=0.0),
+        ]
+    )
+
+    assert len(route.points) == 3
+    assert route.total_m > 0
 
 
 class TestPlaneOptimalPoint:
@@ -130,24 +158,33 @@ class TestPlaneOptimalPoint:
             assert total(best) <= total(sample) + 1e-6
 
 
-class TestClosestCirclePoint:
-    """Nearest-boundary rule used for the final turnpoint."""
+class TestBoundaryToward:
+    """The nearest-boundary rule, used both to place points and to finish."""
 
     def test_outside(self):
         """From outside, the nearest boundary point lies on the inbound radial."""
-        assert _closest_circle_point((10.0, 0.0), (0.0, 0.0, 3.0)) == (
+        assert _boundary_toward((0.0, 0.0, 3.0), (10.0, 0.0)) == (
             pytest.approx(3.0),
             pytest.approx(0.0),
         )
 
     def test_inside(self):
         """From inside, the point moves radially out to the boundary."""
-        p = _closest_circle_point((1.0, 0.0), (0.0, 0.0, 3.0))
+        p = _boundary_toward((0.0, 0.0, 3.0), (1.0, 0.0))
         assert p == (pytest.approx(3.0), pytest.approx(0.0))
 
     def test_zero_radius(self):
         """A zero-radius circle collapses to its center."""
-        assert _closest_circle_point((10.0, 0.0), (5.0, 5.0, 0.0)) == (5.0, 5.0)
+        assert _boundary_toward((5.0, 5.0, 0.0), (10.0, 0.0)) == (5.0, 5.0)
+
+    def test_a_target_at_the_center_has_no_direction(self):
+        """The one input with no answer: any boundary point is as near.
+
+        Pinned because the two copies of this function that used to exist both
+        chose +x, and a caller relying on it would not have noticed if one
+        had changed.
+        """
+        assert _boundary_toward((0.0, 0.0, 3.0), (0.0, 0.0)) == (3.0, 0.0)
 
 
 class TestAlternatingOptimizer:

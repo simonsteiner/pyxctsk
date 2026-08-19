@@ -1,139 +1,198 @@
-"""The per-turnpoint distance table, projected from one measured task.
+"""The per-turnpoint distance table — a *rendering* of the distance report.
 
-Center and optimized distances for a task, with a row per turnpoint carrying
-its cumulative distance in each. Every optimized number is read off the
-measured task's route rather than recomputed, so a turnpoint's cumulative
-distance is by construction a prefix of the task's total.
+What a task board prints beside a map: two totals in kilometres, the saving
+between them, and a row per turnpoint carrying its cumulative distance in each.
+Rounded to 0.1 km, because that is what a board shows and what every published
+reference value is quoted to.
+
+**It is not a second report.** :class:`~pyxctsk.distance.report.DistanceReport`
+is the surface another implementation diffs against, and this is that value
+displayed. It used to be a parallel computation: it measured the centre column
+leg by leg itself while the report asked
+:mod:`~pyxctsk.distance.center_distance`, and its rows carried different keys
+and different units from the report's, so the two published shapes disagreed by
+up to 50 m by construction and a consumer could not tell which was canonical.
+Every number here is now read off one report, and the rounding is the only
+thing this module does.
 
 The cylinder conversion this module used to own lives in
-:mod:`~pyxctsk.distance.measured_task` now, beside the value that holds its
-result — which is also what removed the edge that made the goal line depend on
-the distance *report*.
+:mod:`~pyxctsk.distance.measured_task`, beside the value that holds its result.
 """
 
+from dataclasses import dataclass
 from typing import Any
 
 from ..model.task import Task
-from .center_distance import center_distance
 from .measured_task import MeasuredTask
-from .turnpoint import geodesic_distance
+from .report import DistanceReport
+
+#: What a board rounds to, and what every published reference value is quoted
+#: to. The report itself carries unrounded metres.
+DISPLAY_PRECISION_KM = 1
 
 
-def _calculate_savings(center_km: float, opt_km: float) -> tuple[float, float]:
-    """Calculate distance savings in km and percentage.
+def _km(metres: float) -> float:
+    """Metres to kilometres, at display precision."""
+    return round(metres / 1000.0, DISPLAY_PRECISION_KM)
 
-    Args:
-        center_km (float): Center distance in km.
-        opt_km (float): Optimized distance in km.
 
-    Returns:
-        Tuple[float, float]: Tuple of (savings_km, savings_percent).
+@dataclass(frozen=True)
+class TurnpointRow:
+    """One turnpoint's row in the table.
+
+    Attributes:
+        index: Its position in the task, zero-based.
+        name: The waypoint's name.
+        lat: Latitude of the turnpoint centre.
+        lon: Longitude of the turnpoint centre.
+        radius: Cylinder radius in metres.
+        type: The turnpoint's role as the format spells it, ``""`` for none.
+        cumulative_center_km: Distance through centres to here.
+        cumulative_optimized_km: Distance along the optimized route to here.
+            A prefix of the task's optimized distance by construction, because
+            it is read off the one route rather than re-optimized.
     """
-    savings_km = center_km - opt_km
-    savings_percent = (savings_km / center_km * 100) if center_km > 0 else 0.0
-    return savings_km, savings_percent
 
+    index: int
+    name: str
+    lat: float
+    lon: float
+    radius: int
+    type: str
+    cumulative_center_km: float
+    cumulative_optimized_km: float
 
-def _create_turnpoint_details(measured: MeasuredTask) -> list[dict[str, Any]]:
-    """Create detailed turnpoint information including cumulative distances.
-
-    The optimized column is read off the measured task's route rather than
-    recomputed. Both are distances along one route, so a turnpoint's cumulative
-    optimized distance is by construction a prefix of the task's optimized
-    distance — which is what re-optimizing a truncated task did not give: the
-    optimizer treats the last circle of whatever it is handed as the finish, so
-    the truncated optimum bent the route towards turnpoint i instead of passing
-    through it, understating the prefix by up to 5 km on the reference tasks.
-
-    Taking the measured task rather than its three parts is what lets this
-    zip them without a length guard: they are one value, so they agree.
-
-    Args:
-        measured (MeasuredTask): The task and the route measured for it.
-
-    Returns:
-        List[Dict[str, Any]]: List of dictionaries with turnpoint details.
-    """
-    turnpoint_details = []
-    cumulative_center = 0.0
-    cumulative_optimized = measured.cumulative_m()
-
-    for i, (tp, task_tp) in enumerate(
-        zip(measured.task.turnpoints, measured.turnpoints)
-    ):
-        # Calculate cumulative distances for all turnpoints
-        if i > 0:
-            # Calculate center distance incrementally
-            prev_tp = measured.turnpoints[i - 1]
-            leg_distance = (
-                geodesic_distance(prev_tp.center, task_tp.center, task_tp.earth_model)
-                / 1000.0
-            )
-            cumulative_center += leg_distance
-
-        turnpoint_details.append(
-            {
-                "index": i,
-                "name": tp.waypoint.name,
-                "lat": tp.waypoint.lat,
-                "lon": tp.waypoint.lon,
-                "radius": tp.radius,
-                "type": tp.type.value if tp.type else "",
-                "cumulative_center_km": round(cumulative_center, 1),
-                "cumulative_optimized_km": round(cumulative_optimized[i] / 1000.0, 1),
-            }
-        )
-
-    return turnpoint_details
-
-
-def task_distances_from(measured: MeasuredTask) -> dict[str, Any]:
-    """Project a measured task into the distance report.
-
-    Every optimized number in the report comes from the measured task's route,
-    so a caller that already holds one — the export package's ``TaskDrawing``,
-    say — produces the table beside the map without optimizing the task a
-    second time.
-
-    Distances are rounded to 0.1 km here because this dictionary is a report
-    for display; the route itself carries unrounded meters.
-
-    Args:
-        measured (MeasuredTask): The task and the route measured for it.
-
-    Returns:
-        Dict[str, Any]: Dictionary containing distance calculations and turnpoint details.
-    """
-    if len(measured.turnpoints) < 2:
+    def as_dict(self) -> dict[str, Any]:
+        """Render this row as the dictionary the table has always published."""
         return {
-            "center_distance_km": 0.0,
-            "optimized_distance_km": 0.0,
-            "savings_km": 0.0,
-            "savings_percent": 0.0,
-            "turnpoints": [],
+            "index": self.index,
+            "name": self.name,
+            "lat": self.lat,
+            "lon": self.lon,
+            "radius": self.radius,
+            "type": self.type,
+            "cumulative_center_km": self.cumulative_center_km,
+            "cumulative_optimized_km": self.cumulative_optimized_km,
         }
 
-    # Ask the module that owns the convention, not the primitive underneath
-    # it. This used to call distance_through_centers directly and publish the
-    # result as center_distance_km with no caveat, while the CLI honoured
-    # PROPOSED_READING — two spellings of one convention that agreed only
-    # because the proposed reading happens to be LAUNCH_TO_GOAL.
-    center_m = center_distance(measured.task)
-    center_km = (center_m or 0.0) / 1000.0
-    opt_km = measured.total_m / 1000.0
-    savings_km, savings_percent = _calculate_savings(center_km, opt_km)
 
-    return {
-        "center_distance_km": round(center_km, 1),
-        "optimized_distance_km": round(opt_km, 1),
-        "savings_km": round(savings_km, 1),
-        "savings_percent": round(savings_percent, 1),
-        "turnpoints": _create_turnpoint_details(measured),
-    }
+@dataclass(frozen=True)
+class TaskDistanceTable:
+    """A task's distances as a board displays them.
+
+    Build one with :func:`task_distances_from` or
+    :func:`calculate_task_distances`, and call :meth:`as_dict` for the
+    dictionary this used to be.
+
+    Attributes:
+        center_distance_km: The distance through centres, under
+            :data:`~pyxctsk.distance.PROPOSED_READING` — a convention S7F does
+            not define. See :mod:`~pyxctsk.distance.center_distance`.
+        optimized_distance_km: S7F §7.2's task distance.
+        savings_km: How much the optimized route saves over the centres.
+        savings_percent: The same as a percentage of the centre distance, 0.0
+            when there is no centre distance to be a percentage of.
+        turnpoints: One row per turnpoint, in task order.
+    """
+
+    center_distance_km: float
+    optimized_distance_km: float
+    savings_km: float
+    savings_percent: float
+    turnpoints: tuple[TurnpointRow, ...]
+
+    @classmethod
+    def empty(cls) -> "TaskDistanceTable":
+        """The table for a task with too few turnpoints to have a distance.
+
+        Zeros rather than an error, which is what this shape has always
+        returned. A caller wanting the rule stated instead wants
+        :meth:`~pyxctsk.distance.report.DistanceReport.from_task`, which raises
+        :class:`~pyxctsk.distance.TooFewTurnpointsError`.
+
+        Returns:
+            A table of zeros with no rows.
+        """
+        return cls(0.0, 0.0, 0.0, 0.0, ())
+
+    @classmethod
+    def from_report(cls, report: DistanceReport) -> "TaskDistanceTable":
+        """Render a distance report at display precision.
+
+        Args:
+            report: The measured task's report — the canonical values.
+
+        Returns:
+            The table, in kilometres rounded to 0.1.
+        """
+        # Each figure is rounded once, from the report's unrounded metres.
+        # Note the consequence: the displayed saving is the difference of the
+        # *exact* distances rounded, not the difference of the two displayed
+        # figures, so the three can disagree in the last digit. That is what
+        # this has always published, and changing it is a decision about the
+        # numbers rather than about the code.
+        center_km = (report.center_distance_m or 0.0) / 1000.0
+        optimized_km = report.task_distance_m / 1000.0
+        savings_km = center_km - optimized_km
+        return cls(
+            center_distance_km=round(center_km, DISPLAY_PRECISION_KM),
+            optimized_distance_km=round(optimized_km, DISPLAY_PRECISION_KM),
+            savings_km=round(savings_km, DISPLAY_PRECISION_KM),
+            savings_percent=round(
+                (savings_km / center_km * 100) if center_km > 0 else 0.0,
+                DISPLAY_PRECISION_KM,
+            ),
+            turnpoints=tuple(
+                TurnpointRow(
+                    index=row["index"],
+                    name=row["name"],
+                    lat=row["center_lat"],
+                    lon=row["center_lon"],
+                    radius=row["radius_m"],
+                    type=row["type"],
+                    cumulative_center_km=_km(row["cumulative_center_m"]),
+                    cumulative_optimized_km=_km(row["cumulative_m"]),
+                )
+                for row in report.route()
+            ),
+        )
+
+    def as_dict(self) -> dict[str, Any]:
+        """Render the table as the dictionary it has always published.
+
+        Returns:
+            Dict[str, Any]: Distance calculations and turnpoint details.
+        """
+        return {
+            "center_distance_km": self.center_distance_km,
+            "optimized_distance_km": self.optimized_distance_km,
+            "savings_km": self.savings_km,
+            "savings_percent": self.savings_percent,
+            "turnpoints": [row.as_dict() for row in self.turnpoints],
+        }
 
 
-def calculate_task_distances(task: Task) -> dict[str, Any]:
-    """Calculate both center and optimized distances for a task.
+def task_distances_from(measured: MeasuredTask) -> TaskDistanceTable:
+    """Render a measured task as the table a board displays.
+
+    A caller that already holds a measured task — the export package's
+    ``TaskDrawing``, say — gets the table beside the map without optimizing the
+    task a second time.
+
+    Args:
+        measured (MeasuredTask): The task and the route measured for it.
+
+    Returns:
+        TaskDistanceTable: The table. Call ``as_dict()`` for the dictionary
+        this used to return.
+    """
+    if len(measured.turnpoints) < 2:
+        return TaskDistanceTable.empty()
+    return TaskDistanceTable.from_report(DistanceReport.from_measured_task(measured))
+
+
+def calculate_task_distances(task: Task) -> TaskDistanceTable:
+    """Measure a task and render its distance table.
 
     Measures the task once and projects it with :func:`task_distances_from`.
     Pass a :class:`~pyxctsk.distance.MeasuredTask` to that function instead if
@@ -143,6 +202,7 @@ def calculate_task_distances(task: Task) -> dict[str, Any]:
         task (Task): Task object.
 
     Returns:
-        Dict[str, Any]: Dictionary containing distance calculations and turnpoint details.
+        TaskDistanceTable: The table. Call ``as_dict()`` for the dictionary
+        this used to return.
     """
     return task_distances_from(MeasuredTask.from_task(task))

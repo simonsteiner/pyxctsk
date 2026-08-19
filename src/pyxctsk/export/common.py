@@ -14,7 +14,7 @@ total function of its own format, and the polygon that approximates a cylinder.
 That circle is planar — a fixed metres-per-degree constant, not a
 geodesic — because it draws a decorative outline, not a measured shape. Anything
 a distance depends on is computed properly in
-:mod:`pyxctsk.distance.turnpoint` and :mod:`pyxctsk.distance.goal_line`, and
+:mod:`pyxctsk.distance.plane` and :mod:`pyxctsk.distance.goal_line`, and
 this module must not grow a second opinion about task geometry.
 """
 
@@ -51,7 +51,8 @@ class TaskDrawing:
         goal_line: The task's goal line, or None if it has none.
         measured: The task beside the optimized route through its cylinders.
             Read :attr:`route` for the route alone; hand the whole value to
-            ``task_distances_from`` for the table beside the map.
+            ``task_distances_from`` for the table beside the map, which is
+            that same measurement rendered rather than a second one.
     """
 
     task: Task
@@ -104,7 +105,7 @@ class TaskDrawing:
         Returns:
             True if this is the goal turnpoint and the task has a goal defined.
         """
-        if self.task.goal is None:
+        if self.task.effective_goal is None:
             return False
         return bool(self.task.turnpoints) and turnpoint is self.task.turnpoints[-1]
 

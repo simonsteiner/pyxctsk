@@ -12,7 +12,7 @@ This project uses [uv](https://docs.astral.sh/uv/). Run tools through `uv run` (
 
 ```bash
 # One-time dev setup: creates .venv and installs the package (editable) plus the
-# `dev` dependency group and the `web` + `analysis` extras.
+# `dev` dependency group and the `qr` + `web` + `analysis` extras.
 uv sync --all-extras
 
 # Tests
@@ -24,13 +24,13 @@ uv run pytest -m "not slow"                   # skip slow-marked tests (none at 
 # Lint / format / typecheck
 uv run ruff check --fix src/ tests/ scripts/   # lint (E/W/F/I/D) + autofix
 uv run ruff format src/ tests/ scripts/        # format (black-compatible)
-uv run mypy src/                               # type check (strict; config in pyproject.toml)
+uv run mypy src/ tests/                               # type check (strict; config in pyproject.toml)
 
 # Git hooks are managed by lefthook (config in lefthook.yml)
 uv run lefthook install                        # enable hooks on commit
 uv run lefthook run pre-commit                 # run hooks against staged files
 
-# Check optional QR dependencies are importable
+# Check the optional `qr` extra is importable and decodes end to end
 uv run python scripts/check_qr_deps.py
 
 # Build / publish (see RELEASING.md)
@@ -46,7 +46,8 @@ The CLI entry point is `pyxctsk` (`pyxctsk.cli:main`), with two commands. It par
 ```
 model/     task, enums, shape, time_of_day, passthrough, validation, rounding
 qrcode/    task, models, encoding, enums, image, conversion
-distance/  turnpoint, route_optimization, measured_task, task_distances, goal_line, speed_section, center_distance, report
+distance/  earth, plane, solver, turnpoint, route_optimization, measured_task,
+           task_distances, goal_line, speed_section, center_distance, report
 export/    kml, geojson, common
 ```
 
@@ -66,7 +67,7 @@ Dependencies run `model → qrcode` and `model → distance → export`, with no
 
 **Distance subsystem is a facade.** `distance/__init__.py` only re-exports; the real work lives in focused submodules that must avoid importing back into each other (a circular import between `distance` and `task_distances` was deliberately broken — keep the `__init__` a thin re-export layer):
 
-- `turnpoint.py` — `TaskTurnpoint`, `distance_through_centers`, earth-model helpers (WGS84 vs FAI sphere), and the one solver: `plane_optimal_point` (GetOptPi: crossing vs reflection cases per Ding, Xie & Jiang), `plane_circle` (what a turnpoint *is* to that solver — including that a LINE goal is a zero-radius circle at the goal center), and `LocalPlane`, the Transverse Mercator plane a route is solved in — built from `task_area_center` (S7F §7.1.6: the bounding box's centre, antimeridian-aware, *not* the mean of the points) at the scale factor `ltm_scale_factor` fixes (§7.1.2). **The plane is an argument, not a decision made twice**: `optimal_point` defaults to a plane around its own turnpoint but accepts the task's, which is how a test reaches the answer the optimizer actually ships
+- `earth.py` / `plane.py` / `solver.py` / `turnpoint.py` — **one subject each**, split out of a 650-line `turnpoint.py` that held all four under a name covering one. `earth.py`: the WGS84-vs-FAI-sphere choice (`EarthModelLike`, which raises on anything that is not one — a misspelling cost 97.6 m on a 135 km leg), `geodesic_distance` and `snap_to_boundary` (§7.1.7). `plane.py`: `LocalPlane`, the Transverse Mercator plane a route is solved in, built from `task_area_center` (§7.1.6: the bounding box's centre, antimeridian-aware, *not* the mean of the points) at the scale factor `ltm_scale_factor` fixes (§7.1.2); it carries the earth model it was built from, so a planar solution and the boundary it is snapped onto cannot be measured on different earths. **The plane is an argument, not a decision made twice**: `optimal_point` defaults to a plane around its own turnpoint but accepts the task's, which is how a test reaches the answer the optimizer actually ships. `solver.py`: `plane_optimal_point` (GetOptPi per Ding, Xie & Jiang — crossing vs reflection, stated in one branch), pure planar geometry that knows nothing of turnpoints or the earth. `turnpoint.py`: `TaskTurnpoint`, the `TurnpointGeometry` seam (exactly the three attributes the optimizer reads), `plane_circle` — a projection, since the LINE-goal rule belongs to `task_to_turnpoints` — and `distance_through_centers`
 - `route_optimization.py` — shortest-path through turnpoint cylinders per FAI S7F §7 via the Ding–Xie–Jiang alternating point-circle-point method (`optimized_distance`, `calculate_iteratively_refined_route`): optimize in a local TM plane, converge at ε = 0.1 m, snap points onto true cylinder boundaries, measure geodesic legs. Touching semantics: every cylinder boundary must be touched in order (concentric turnpoints force out-and-back legs, matching XCTrack). `calculate_iteratively_refined_route` returns an `OptimizedRoute` — points, legs, earth model — and `total_m` / `cumulative_m()` are projections of it. Keep it that way: the legs are the only honest source for "how far along the route is turnpoint i", and re-deriving that by optimizing `turnpoints[:i+1]` gives a *different* number (the optimizer treats the last circle it is handed as the finish), which is the bug the value object was introduced to kill.
 - `center_distance.py` — the "distance through centres" a task board publishes, which **S7F does not define**: §7.2 defines the optimized distance and the speed section's, and nothing else. `CenterDistanceReading` names the defensible readings, which sit up to 39.9 km apart on one reference task; `PROPOSED_READING` is the one pyxctsk publishes and proposes as common, and the others exist so a vendor whose board disagrees can tell a convention apart from a bug. `distance_through_centers()` in `turnpoint.py` is the primitive this calls, not the published number
 - `speed_section.py` — `SpeedSection`, S7F §7.2's *second* task distance. **Not a prefix of the task route**: the optimizer treats the last circle it is handed as the finish, so a route ending at the ESS bends toward it instead of passing through, which is why S7F optimizes a separate `taskToESS` and so does this. All three numbers (`to_ess_m`, `pre_start_m`, `distance_m`) are projections of that one route

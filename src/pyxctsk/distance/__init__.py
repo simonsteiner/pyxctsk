@@ -13,8 +13,15 @@ own. Everything a caller outside the package needs is named here —
 
 — while the work lives in focused submodules:
 
-- :mod:`~pyxctsk.distance.turnpoint` — ``TaskTurnpoint``, the earth models,
-  ``LocalPlane`` and the one planar solver every caller reaches
+- :mod:`~pyxctsk.distance.turnpoint` — ``TaskTurnpoint``: a centre, a radius
+  and the earth they are measured on, plus the ``TurnpointGeometry`` seam the
+  optimizer depends on
+- :mod:`~pyxctsk.distance.earth` — the two earth models (WGS84 ellipsoid, FAI
+  sphere) and geodesic distance upon them
+- :mod:`~pyxctsk.distance.plane` — ``LocalPlane``, the Transverse Mercator
+  projection a route is solved in, and where §7.1.6 centres it
+- :mod:`~pyxctsk.distance.solver` — the planar GetOptPi primitive, which knows
+  nothing about turnpoints or the earth
 - :mod:`~pyxctsk.distance.route_optimization` — the shortest path through the
   cylinders
 - :mod:`~pyxctsk.distance.measured_task` — ``MeasuredTask``, a task beside the
@@ -70,12 +77,14 @@ from .center_distance import (
     center_distance,
     center_distance_readings,
 )
+from .earth import FAI_SPHERE_RADIUS_M, geodesic_distance
 from .goal_line import (
     GoalLine,
     GoalLineOrientation,
     goal_line_length_from_turnpoints,
 )
 from .measured_task import MeasuredTask, task_to_turnpoints
+from .plane import LocalPlane
 from .report import NOTES, S7F_EDITION, DistanceReport, TooFewTurnpointsError
 from .route_optimization import (
     CONVERGENCE_EPSILON_M,
@@ -85,15 +94,13 @@ from .route_optimization import (
     optimized_distance,
 )
 from .speed_section import SpeedSection
-from .task_distances import calculate_task_distances, task_distances_from
-from .turnpoint import (
-    FAI_SPHERE_RADIUS_M,
-    LocalPlane,
-    TaskTurnpoint,
-    distance_through_centers,
-    geodesic_distance,
-    plane_circle,
+from .task_distances import (
+    TaskDistanceTable,
+    TurnpointRow,
+    calculate_task_distances,
+    task_distances_from,
 )
+from .turnpoint import TaskTurnpoint, distance_through_centers, plane_circle
 
 # Export all the main public functions and classes
 __all__ = [
@@ -122,6 +129,8 @@ __all__ = [
     "geodesic_distance",
     "calculate_task_distances",
     "task_distances_from",
+    "TaskDistanceTable",
+    "TurnpointRow",
     "task_to_turnpoints",
     # Configuration
     "CONVERGENCE_EPSILON_M",

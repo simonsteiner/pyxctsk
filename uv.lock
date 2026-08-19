@@ -1579,14 +1579,10 @@ version = "0.5.0"
 source = { editable = "." }
 dependencies = [
     { name = "click" },
-    { name = "geopy" },
-    { name = "pillow" },
     { name = "pyproj" },
-    { name = "qrcode", extra = ["pil"] },
     { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "scipy", version = "1.18.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
     { name = "simplekml" },
-    { name = "zxing-cpp" },
 ]
 
 [package.optional-dependencies]
@@ -1596,6 +1592,11 @@ analysis = [
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "numpy", version = "2.5.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
 ]
+qr = [
+    { name = "pillow" },
+    { name = "qrcode", extra = ["pil"] },
+    { name = "zxing-cpp" },
+]
 web = [
     { name = "flask" },
 ]
@@ -1604,6 +1605,7 @@ web = [
 dev = [
     { name = "beautifulsoup4" },
     { name = "deepdiff" },
+    { name = "geopy" },
     { name = "lefthook" },
     { name = "mypy" },
     { name = "pytest" },
@@ -1617,22 +1619,22 @@ requires-dist = [
     { name = "click", specifier = ">=8.4.2" },
     { name = "flask", marker = "extra == 'web'", specifier = ">=3.1.3" },
     { name = "geographiclib", marker = "extra == 'analysis'", specifier = ">=2.1" },
-    { name = "geopy", specifier = ">=2.5.0" },
     { name = "matplotlib", marker = "extra == 'analysis'", specifier = ">=3.11.1" },
     { name = "numpy", marker = "extra == 'analysis'", specifier = ">=2.4.6" },
-    { name = "pillow", specifier = ">=12.3.0" },
+    { name = "pillow", marker = "extra == 'qr'", specifier = ">=12.3.0" },
     { name = "pyproj", specifier = ">=3.7.2" },
-    { name = "qrcode", extras = ["pil"], specifier = ">=8.2" },
+    { name = "qrcode", extras = ["pil"], marker = "extra == 'qr'", specifier = ">=8.2" },
     { name = "scipy", specifier = ">=1.17.1" },
     { name = "simplekml", specifier = ">=1.3.6" },
-    { name = "zxing-cpp", specifier = ">=3.1.1" },
+    { name = "zxing-cpp", marker = "extra == 'qr'", specifier = ">=3.1.1" },
 ]
-provides-extras = ["web", "analysis"]
+provides-extras = ["qr", "web", "analysis"]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "beautifulsoup4", specifier = ">=4.15.0" },
     { name = "deepdiff", specifier = ">=9.1.0" },
+    { name = "geopy", specifier = ">=2.5.0" },
     { name = "lefthook", specifier = ">=2.1.10" },
     { name = "mypy", specifier = ">=2.3.1" },
     { name = "pytest", specifier = ">=9.1.1" },
