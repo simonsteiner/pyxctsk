@@ -61,7 +61,11 @@ def task_to_turnpoints(task: Task) -> list[TaskTurnpoint]:
     # so the format's CYLINDER default applies here. ``goal`` is what the file
     # said, which is validation's question rather than geometry's.
     goal = task.effective_goal
-    goal_type = goal.type or GoalType.CYLINDER if goal else None
+    # Parenthesized rather than left to precedence. A conditional expression
+    # binds less tightly than ``or``, so the unparenthesized form means the
+    # same thing — but it reads as though ``goal.type`` were evaluated before
+    # the ``if goal`` guard, and a reviewer of this line read it that way.
+    goal_type = (goal.type or GoalType.CYLINDER) if goal else None
 
     last = len(task.turnpoints) - 1
     return [

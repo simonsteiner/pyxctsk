@@ -9,7 +9,7 @@ import inspect
 
 import pytest
 
-from pyxctsk import GoalType, Task, TaskType, TurnpointType
+from pyxctsk import Goal, GoalType, Task, TaskType, TurnpointType
 from pyxctsk.distance import MeasuredTask, task_distances_from, task_to_turnpoints
 from pyxctsk.distance.goal_line import GoalLine
 from pyxctsk.distance.speed_section import SpeedSection
@@ -117,6 +117,22 @@ class TestTheNumbersItProjects:
         assert measured.turnpoints == ()
         assert measured.cumulative_m() == []
         assert task_distances_from(measured).turnpoints == ()
+
+    @pytest.mark.parametrize(
+        "goal", [None, Goal(type=GoalType.LINE)], ids=["no goal", "a goal"]
+    )
+    def test_no_turnpoints_is_no_cylinders_whatever_the_goal_says(self, goal):
+        """The empty case does not depend on reading the goal's type.
+
+        ``task_to_turnpoints`` computes the goal type before the comprehension,
+        from ``effective_goal`` — which for a task with no turnpoints is
+        whatever the file carried, including None. The guard is a conditional
+        expression, so it is evaluated before the attribute access; a review of
+        that line read the precedence the other way and predicted a crash here.
+        """
+        task = Task(task_type=TaskType.CLASSIC, version=1, turnpoints=[], goal=goal)
+
+        assert task_to_turnpoints(task) == []
 
 
 class TestTheMismatchIsGone:
