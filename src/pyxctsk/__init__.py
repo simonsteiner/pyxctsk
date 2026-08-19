@@ -17,6 +17,11 @@ Start with :func:`parse_task` for reading, :class:`Task` for the model,
 See http://xctrack.org/ and http://xctrack.org/Competition_Interfaces.html
 """
 
+# `pyXCTSKError` is exported for the same reason: it is the one name a caller
+# writes in `except`, and the front door carried five of its subclasses and not
+# it, so the suite itself reached past this module (`from pyxctsk.exceptions
+# import pyXCTSKError`) to catch anything the library raises.
+
 # The answer/primitive split above is the rule this file once broke, and the
 # reason it is stated: ``distance_through_centers`` was exported while
 # ``center_distance`` — which that function's own docstring tells you to call
@@ -25,8 +30,6 @@ See http://xctrack.org/ and http://xctrack.org/Competition_Interfaces.html
 # ``docs/s7f-distance-reference.md`` had to reach past this module for four
 # names. ``tests/test_layering.py`` now asserts every documented name is
 # reachable from here.
-
-from importlib.metadata import version
 
 from .distance import (
     PROPOSED_READING,
@@ -56,10 +59,12 @@ from .exceptions import (
     InvalidTimeOfDayError,
     MissingQRCodeSupportError,
     TaskValidationError,
+    pyXCTSKError,
 )
 from .export.common import TaskDrawing
 from .export.geojson import drawing_to_geojson, generate_task_geojson
 from .export.kml import drawing_to_kml, task_to_kml
+from .metadata import pyxctsk_version
 from .model.task import (
     SSS,
     Direction,
@@ -97,8 +102,11 @@ MIME_TYPE = "application/xctsk"
 VERSION = FULL_FORMAT_VERSION
 
 # Single source of truth: the version declared in pyproject.toml, read from the
-# installed package metadata.
-__version__ = version("pyxctsk")
+# installed package metadata. Through `metadata.pyxctsk_version`, which is also
+# what `pyxctsk --version` and the distance report print — this line used to
+# call `importlib.metadata.version` itself and raise on a source checkout,
+# where the other spelling returned "unknown".
+__version__ = pyxctsk_version()
 # Sorted, case-insensitively. It was in no discernible order, which is what
 # makes an accidental omission invisible; tests/test_layering.py checks the
 # contents, this checks that a reader can find a name in them.
@@ -133,6 +141,7 @@ __all__ = [
     "OptimizedRoute",
     "parse_task",
     "PROPOSED_READING",
+    "pyXCTSKError",
     "QRCodeTask",
     "SpeedSection",
     "SSS",

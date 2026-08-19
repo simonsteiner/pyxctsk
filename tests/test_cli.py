@@ -7,6 +7,7 @@ what it does with input it cannot parse.
 """
 
 import json
+from pathlib import Path
 
 import pytest
 from click.testing import CliRunner
@@ -434,3 +435,83 @@ class TestOptionalDependenciesAreReportedNotRaised:
 
         assert result.exit_code == 0
         assert result.output.startswith("XCTSK:")
+
+
+class TestTheLibraryErrorsAreOneHierarchy:
+    """The CLI transcribed the exception set by hand, because it had to.
+
+    `TooFewTurnpointsError` descended from `ValueError` alone and was raised
+    from `distance/report.py`, so it was the one library error outside
+    `pyXCTSKError` — and `convert` and `distances` caught two different tuples
+    because of it. A sixth library error would have meant editing `cli.py`.
+    """
+
+    def test_every_library_error_descends_from_the_base(self):
+        """`exceptions.py` is the answer to "what can pyxctsk raise"."""
+        import pyxctsk
+        from pyxctsk.exceptions import pyXCTSKError
+
+        errors = [
+            getattr(pyxctsk, name)
+            for name in pyxctsk.__all__
+            if isinstance(getattr(pyxctsk, name), type)
+            and issubclass(getattr(pyxctsk, name), BaseException)
+        ]
+
+        assert errors, "no exceptions found at the front door"
+        for error in errors:
+            assert issubclass(error, pyXCTSKError), f"{error.__name__} is outside it"
+
+    def test_the_base_is_reachable_from_the_front_door(self):
+        """It is the one name a caller writes in `except`."""
+        import pyxctsk
+
+        assert "pyXCTSKError" in pyxctsk.__all__
+
+    def test_too_few_turnpoints_is_still_a_value_error(self):
+        """Both bases are load-bearing, as `MissingQRCodeSupportError` states."""
+        from pyxctsk import TooFewTurnpointsError
+
+        assert issubclass(TooFewTurnpointsError, ValueError)
+
+    def test_both_commands_catch_the_same_set(self):
+        """One tuple, so the CLI stops knowing the library's error list."""
+        import re
+
+        source = (
+            Path(__file__).resolve().parents[1] / "src" / "pyxctsk" / "cli.py"
+        ).read_text()
+        tuples = set(re.findall(r"except \(([^)]*)\) as e:", source))
+
+        assert tuples == {"pyXCTSKError, OSError"}
+
+
+class TestOneAnswerToWhatVersionThisIs:
+    """Two spellings that failed differently, in two modules.
+
+    `__init__` called `importlib.metadata.version` directly and raised on a
+    source checkout; `distance/report.py` caught that and returned "unknown".
+    `pyxctsk --version` was served by the second — a general "what version am
+    I" utility parked in the S7F report module, reached from the CLI by a
+    private-path import, and the only reason `cli.py` imported `distance` at
+    all.
+    """
+
+    def test_the_three_places_agree(self):
+        """The report's provenance line, `--version`, and `__version__`."""
+        import pyxctsk
+        from pyxctsk.metadata import pyxctsk_version
+
+        report = DistanceReport.from_task(reference_task("task_bevo").task)
+
+        assert pyxctsk.__version__ == pyxctsk_version()
+        assert report.as_dict()["pyxctsk_version"] == pyxctsk_version()
+
+    def test_the_command_prints_it(self):
+        """`--version` shipped with no test at all."""
+        result = CliRunner().invoke(main, ["--version"])
+
+        from pyxctsk.metadata import pyxctsk_version
+
+        assert result.exit_code == 0
+        assert result.output.strip() == f"pyxctsk {pyxctsk_version()}"

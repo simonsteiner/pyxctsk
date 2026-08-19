@@ -22,9 +22,10 @@ the same fields, so they cannot disagree about a number or its absence.
 """
 
 from dataclasses import dataclass
-from importlib.metadata import PackageNotFoundError, version
 from typing import Any
 
+from ..exceptions import TooFewTurnpointsError  # noqa: F401  (re-exported)
+from ..metadata import pyxctsk_version
 from ..model.task import Task
 from .center_distance import (
     PROPOSED_READING,
@@ -66,22 +67,6 @@ NOTES = {
         "center_distance_m reading above, so its last row equals it"
     ),
 }
-
-
-def pyxctsk_version() -> str:
-    """Return the installed library version, or ``"unknown"``.
-
-    Returns:
-        The version string from package metadata.
-    """
-    try:
-        return version("pyxctsk")
-    except PackageNotFoundError:  # pragma: no cover - editable/source runs
-        return "unknown"
-
-
-class TooFewTurnpointsError(ValueError):
-    """Raised when a task has too few turnpoints to have a distance at all."""
 
 
 @dataclass(frozen=True)
