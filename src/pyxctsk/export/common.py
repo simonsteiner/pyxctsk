@@ -14,7 +14,7 @@ total function of its own format, and the polygon that approximates a cylinder.
 That circle is planar — a fixed metres-per-degree constant, not a
 geodesic — because it draws a decorative outline, not a measured shape. Anything
 a distance depends on is computed properly in
-:mod:`pyxctsk.distance.turnpoint` and :mod:`pyxctsk.distance.goal_line`, and
+:mod:`pyxctsk.distance.plane` and :mod:`pyxctsk.distance.goal_line`, and
 this module must not grow a second opinion about task geometry.
 """
 

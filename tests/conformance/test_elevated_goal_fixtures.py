@@ -224,8 +224,8 @@ class TestSeeYouSemantics:
         Legs beyond the first are independent validation of the optimizer
         against a second implementation.
         """
+        from pyxctsk.distance.earth import geodesic_distance
         from pyxctsk.distance.measured_task import MeasuredTask
-        from pyxctsk.distance.turnpoint import geodesic_distance
 
         task = parse_task((FIXTURES / f"{name}_qr_code.txt").read_text())
         route = MeasuredTask.from_task(task).route.points

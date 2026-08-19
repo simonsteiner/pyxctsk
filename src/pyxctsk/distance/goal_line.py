@@ -43,8 +43,8 @@ from enum import Enum
 from typing import Sequence
 
 from ..model.task import GoalType, Task, Turnpoint
+from .earth import EarthModelLike, geod_for_earth_model
 from .measured_task import MeasuredTask
-from .turnpoint import EarthModelLike, geod_for_earth_model
 
 # Constants for goal line visualization
 GOAL_LINE_NUM_POINTS = 20

@@ -41,9 +41,9 @@ property of that choice, not a separate convention.
 from enum import Enum
 
 from ..model.task import Task
+from .earth import EarthModelLike, geodesic_distance
 from .measured_task import task_to_turnpoints
 from .speed_section import speed_section_indices
-from .turnpoint import EarthModelLike, geodesic_distance
 
 
 class CenterDistanceReading(str, Enum):

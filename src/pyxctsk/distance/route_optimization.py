@@ -44,15 +44,10 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from itertools import accumulate
 
-from .turnpoint import (
-    EarthModelLike,
-    LocalPlane,
-    TurnpointGeometry,
-    geod_for_earth_model,
-    plane_circle,
-    plane_optimal_point,
-    snap_to_boundary,
-)
+from .earth import EarthModelLike, geod_for_earth_model, snap_to_boundary
+from .plane import LocalPlane
+from .solver import plane_optimal_point
+from .turnpoint import TurnpointGeometry, plane_circle
 
 #: How many alternating sweeps to allow before giving up. A safety bound, not
 #: an accuracy setting — convergence normally stops far earlier — and the one

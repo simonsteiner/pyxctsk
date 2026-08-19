@@ -18,8 +18,8 @@ import pytest
 
 from pyxctsk import Task, TaskType, Turnpoint, TurnpointType, parse_task
 from pyxctsk.distance import calculate_iteratively_refined_route, optimized_distance
+from pyxctsk.distance.earth import geodesic_distance
 from pyxctsk.distance.measured_task import MeasuredTask, task_to_turnpoints
-from pyxctsk.distance.turnpoint import geodesic_distance
 from tests.builders import task as build_task
 from tests.builders import turnpoint as build_turnpoint
 from tests.paths import ESS_GOAL_DIR
