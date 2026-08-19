@@ -22,7 +22,9 @@ docstrings
 efgh
 EITCE
 ellps
+elts
 endspeed
+epsg
 equirectangular
 esbenp
 Ewald
@@ -57,6 +59,7 @@ levelname
 libzbar
 linecontrol
 linestyle
+longlat
 lonlat
 lons
 lorili

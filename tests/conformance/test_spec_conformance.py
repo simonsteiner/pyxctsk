@@ -1613,11 +1613,27 @@ class TestUnrecognizedInputSaysWhy:
             parse_task('{"taskType": "CLASSIC", "vers')
 
     def test_an_image_with_no_qr_code_says_so(self, tmp_path):
-        """Not "invalid format": the file was read, it just carries no task."""
+        """Not "invalid format": the file was read, it just carries no task.
+
+        A *real* image, written by Pillow. This used to be eight magic bytes
+        followed by 64 zeros, which no decoder can open — so the case it names
+        was never the case it ran, and it passed only because the adapter
+        answered "no QR code" for anything that started like an image.
+        """
+        from PIL import Image
+
         png = tmp_path / "blank.png"
-        png.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 64)
+        Image.new("RGB", (32, 32), "white").save(png)
 
         with pytest.raises(InvalidFormatError, match="no XCTSK: QR code"):
+            parse_task(str(png))
+
+    def test_an_unreadable_image_is_told_apart_from_a_blank_one(self, tmp_path):
+        """The distinction the magic-byte guess could not make."""
+        png = tmp_path / "truncated.png"
+        png.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 64)
+
+        with pytest.raises(InvalidFormatError, match="could not be read"):
             parse_task(str(png))
 
     def test_a_missing_dependency_is_not_reported_as_a_bad_file(
