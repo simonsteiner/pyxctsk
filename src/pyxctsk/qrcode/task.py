@@ -39,11 +39,11 @@ from ..model.shape import (
     Codec,
     Discriminator,
     Field,
-    Nested,
-    NestedList,
     Optionality,
     Shape,
     Value,
+    list_codec,
+    shape_codec,
 )
 from .enums import (
     QRCodeEarthModel,
@@ -468,9 +468,14 @@ _EARTH_MODEL = Codec(
 QR_TASK_SHAPE = Shape(
     QRCodeTask,
     (
-        Nested("goal", "g", QR_GOAL_SHAPE, _A_DICT_OR_NOTHING),
-        Nested("sss", "s", QR_SSS_SHAPE, _A_DICT_OR_NOTHING),
-        NestedList("turnpoints", "t", QR_TURNPOINT_SHAPE, _A_LIST_OR_NOTHING),
+        Value("goal", "g", shape_codec(QR_GOAL_SHAPE), _A_DICT_OR_NOTHING),
+        Value("sss", "s", shape_codec(QR_SSS_SHAPE), _A_DICT_OR_NOTHING),
+        Value(
+            "turnpoints",
+            "t",
+            list_codec(shape_codec(QR_TURNPOINT_SHAPE)),
+            _A_LIST_OR_NOTHING,
+        ),
         _CompetitionTaskType(),
         _TakeoffTimes(),
         Value("earth_model", "e", _EARTH_MODEL, _NON_DEFAULT_EARTH_MODEL),
@@ -486,7 +491,12 @@ QR_WAYPOINTS_TASK_SHAPE = Shape(
     (
         Discriminator("T", "W", "task_type", QRCodeTaskType.WAYPOINTS),
         Value("version", "V", LENIENT_INT, DEFAULTED),
-        NestedList("turnpoints", "t", QR_WAYPOINT_TURNPOINT_SHAPE, _A_LIST_OR_NOTHING),
+        Value(
+            "turnpoints",
+            "t",
+            list_codec(shape_codec(QR_WAYPOINT_TURNPOINT_SHAPE)),
+            _A_LIST_OR_NOTHING,
+        ),
     ),
     ext_key=QR_EXTENSIONS_KEY,
 )

@@ -39,13 +39,12 @@ from .shape import (
     REQUIRED,
     ROUNDED_INT,
     TIME_OF_DAY,
-    Nested,
-    NestedList,
     Optionality,
     Shape,
     Value,
     enum_codec,
     list_codec,
+    shape_codec,
 )
 from .time_of_day import TimeOfDay
 from .validation import ValidationIssue, validate_task
@@ -171,7 +170,7 @@ TURNPOINT_SHAPE = Shape(
     Turnpoint,
     (
         Value("radius", "radius", ROUNDED_INT, REQUIRED),
-        Nested("waypoint", "waypoint", WAYPOINT_SHAPE, REQUIRED),
+        Value("waypoint", "waypoint", shape_codec(WAYPOINT_SHAPE), REQUIRED),
         # ``TurnpointType.NONE`` is the empty string, so "no type" and "the
         # type that means none" are the same absence to OPTIONAL_EMPTY.
         Value("type", "type", enum_codec(TurnpointType), OPTIONAL_EMPTY),
@@ -578,11 +577,16 @@ TASK_SHAPE = Shape(
     (
         Value("task_type", "taskType", enum_codec(TaskType), REQUIRED),
         Value("version", "version", optionality=REQUIRED),
-        NestedList("turnpoints", "turnpoints", TURNPOINT_SHAPE, REQUIRED),
+        Value(
+            "turnpoints",
+            "turnpoints",
+            list_codec(shape_codec(TURNPOINT_SHAPE)),
+            REQUIRED,
+        ),
         Value("earth_model", "earthModel", enum_codec(EarthModel)),
-        Nested("takeoff", "takeoff", TAKEOFF_SHAPE),
-        Nested("sss", "sss", SSS_SHAPE),
-        Nested("goal", "goal", GOAL_SHAPE),
+        Value("takeoff", "takeoff", shape_codec(TAKEOFF_SHAPE)),
+        Value("sss", "sss", shape_codec(SSS_SHAPE)),
+        Value("goal", "goal", shape_codec(GOAL_SHAPE)),
     ),
     ext_key=EXTENSIONS_KEY,
 )
