@@ -14,7 +14,7 @@ from typing import Any
 
 import pytest
 
-from pyxctsk import Task, parse_task
+from pyxctsk import GoalType, Task, parse_task
 from tests.paths import ELEVATED_GOAL_DIR
 
 FIXTURES = ELEVATED_GOAL_DIR
@@ -101,8 +101,16 @@ def test_non_spec_finish_altitude_is_not_guessed(name):
     """
     task = load(name)
 
-    assert task.goal is not None
-    assert task.goal.finish_altitude is None
+    # Whichever of these fixtures declares a goal and whichever does not, none
+    # of them ends up with a finish altitude. The test used to assert
+    # `task.goal is not None`, which held for all eight only because
+    # `__post_init__` wrote a CYLINDER goal onto every task with turnpoints.
+    assert task.goal is None or task.goal.finish_altitude is None
+    # And the flown goal — the default applied — is a cylinder, not an
+    # elevated one.
+    assert task.effective_goal is not None
+    assert task.effective_goal.type is GoalType.CYLINDER
+    assert task.effective_goal.finish_altitude is None
 
     goal_altitude = task.turnpoints[-1].waypoint.alt_smoothed
     assert goal_altitude == GOAL_WAYPOINT_ALTITUDE
@@ -111,11 +119,16 @@ def test_non_spec_finish_altitude_is_not_guessed(name):
 
 @pytest.mark.parametrize("name", TASKS)
 def test_roundtrip_matches_the_source(name):
-    """Re-encoding reproduces the payload, bar two documented behaviours.
+    """Re-encoding reproduces the payload, bar one documented behaviour.
 
-    An empty description is dropped (empty and absent mean the same, and the QR
-    format exists to save bytes), and a task that omits ``goal`` gains the
-    documented CYLINDER default.
+    An empty description is dropped: empty and absent mean the same, and the QR
+    format exists to save bytes.
+
+    There used to be a second — "a task that omits ``goal`` gains the
+    documented CYLINDER default" — because ``Task.__post_init__`` stored that
+    default on the model, from where the converter wrote it out. The default is
+    ``Task.effective_goal`` now, derived where it is needed, so a payload
+    without a ``g`` re-encodes without one.
     """
     original = source(name)
     emitted = json.loads(load(name).to_qr_code_task().to_json())
@@ -123,8 +136,6 @@ def test_roundtrip_matches_the_source(name):
     emitted = {
         k: v for k, v in emitted.items() if not (k in ("tc", "to") and v is None)
     }
-    if "g" not in original:
-        assert emitted.pop("g") == {"t": 2}
     for turnpoint in original["t"]:
         if turnpoint.get("d") == "":
             del turnpoint["d"]

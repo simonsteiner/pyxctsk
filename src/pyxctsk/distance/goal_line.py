@@ -262,9 +262,8 @@ class GoalLine:
     @staticmethod
     def _has_line_goal(task: Task) -> bool:
         """Whether this task has a LINE goal with enough turnpoints to orient one."""
-        return bool(
-            task.goal and task.goal.type == GoalType.LINE and len(task.turnpoints) >= 2
-        )
+        goal = task.effective_goal
+        return bool(goal and goal.type == GoalType.LINE and len(task.turnpoints) >= 2)
 
     @staticmethod
     def _center_candidates(task: Task) -> list[tuple[float, float]]:

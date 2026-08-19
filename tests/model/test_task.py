@@ -251,3 +251,54 @@ class TestQRCodeIntegration:
         # Parse back from string
         parsed_qr_task = QRCodeTask.from_string(qr_string)
         assert parsed_qr_task.version == 2
+
+
+class TestTheGoalDefaultIsDerivedNotStored:
+    """A task serializes to what it was read from, goal key included.
+
+    ``__post_init__`` used to write the CYLINDER default onto :attr:`Task.goal`,
+    which made it part of the object and therefore part of the output: a file
+    with no ``goal`` key round-tripped into one carrying
+    ``{"goal": {"type": "CYLINDER"}}``. The only place the library invented a
+    field, in the module whose docstring says nothing derived is stored here.
+    It went unnoticed because every reference task carries a goal.
+    """
+
+    NO_GOAL = (
+        '{"taskType":"CLASSIC","version":1,"turnpoints":['
+        '{"radius":400,"waypoint":{"name":"A","lat":47.0,"lon":8.0,"altSmoothed":500}},'
+        '{"radius":1000,"waypoint":{"name":"B","lat":47.1,"lon":8.2,"altSmoothed":900}}'
+        "]}"
+    )
+
+    def test_a_task_without_a_goal_key_writes_none(self):
+        """The round trip is exact."""
+        assert Task.from_json(self.NO_GOAL).to_json() == self.NO_GOAL
+
+    def test_but_it_is_still_flown_to_a_cylinder(self):
+        """The contract callers rely on, as a projection."""
+        task = Task.from_json(self.NO_GOAL)
+
+        assert task.goal is None
+        assert task.effective_goal is not None
+        assert task.effective_goal.type is GoalType.CYLINDER
+
+    def test_an_unstated_goal_type_defaults_without_being_written_back(self):
+        """A goal object with no type is a cylinder to fly, and unchanged on disk."""
+        task = Task.from_json(
+            self.NO_GOAL.replace("]}", '],"goal":{"deadline":"18:00:00Z"}}')
+        )
+
+        assert task.goal is not None and task.goal.type is None
+        assert task.effective_goal is not None
+        assert task.effective_goal.type is GoalType.CYLINDER
+        # And the caller's own Goal was not mutated into the derived one.
+        assert task.effective_goal is not task.goal
+        assert '"type"' not in task.to_json().split('"goal"')[1]
+
+    def test_a_task_with_no_turnpoints_has_nothing_to_be_a_goal(self):
+        """No turnpoints, no default."""
+        assert (
+            Task(task_type=TaskType.CLASSIC, version=1, turnpoints=[]).effective_goal
+            is None
+        )

@@ -164,13 +164,19 @@ def task_to_qr_code_task(task: Task) -> QRCodeTask:
             unknown=strip_foreign_keys(task.sss.unknown, QRCodeSSS.KNOWN_KEYS),
         )
 
+    # ``task.goal``, not ``effective_goal``: a task whose goal was never
+    # spelled out is written without a ``g`` object, so the payload says what
+    # the file said. Both formats read an absent goal as a CYLINDER one, so
+    # nothing is lost, and the alternative — writing the default out — is the
+    # invention this module exists not to make.
+    goal = task.goal
     qr_goal = None
-    if task.goal:
+    if goal:
         qr_goal = QRCodeGoal(
-            deadline=task.goal.deadline,
-            type=_TO_QR_GOAL_TYPE.get(task.goal.type),
-            finish_altitude=task.goal.finish_altitude,
-            unknown=strip_foreign_keys(task.goal.unknown, QRCodeGoal.KNOWN_KEYS),
+            deadline=goal.deadline,
+            type=_TO_QR_GOAL_TYPE.get(goal.type),
+            finish_altitude=goal.finish_altitude,
+            unknown=strip_foreign_keys(goal.unknown, QRCodeGoal.KNOWN_KEYS),
         )
 
     return QRCodeTask(

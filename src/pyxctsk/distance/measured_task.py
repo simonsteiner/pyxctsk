@@ -57,9 +57,11 @@ def task_to_turnpoints(task: Task) -> list[TaskTurnpoint]:
     Returns:
         List[TaskTurnpoint]: One cylinder per turnpoint, in task order.
     """
-    goal_type = None
-    if task.turnpoints and task.goal:
-        goal_type = task.goal.type or GoalType.CYLINDER
+    # ``effective_goal``, not ``goal``: the cylinders are the task as *flown*,
+    # so the format's CYLINDER default applies here. ``goal`` is what the file
+    # said, which is validation's question rather than geometry's.
+    goal = task.effective_goal
+    goal_type = goal.type or GoalType.CYLINDER if goal else None
 
     last = len(task.turnpoints) - 1
     return [

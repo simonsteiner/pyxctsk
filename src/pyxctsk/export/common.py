@@ -105,7 +105,7 @@ class TaskDrawing:
         Returns:
             True if this is the goal turnpoint and the task has a goal defined.
         """
-        if self.task.goal is None:
+        if self.task.effective_goal is None:
             return False
         return bool(self.task.turnpoints) and turnpoint is self.task.turnpoints[-1]
 
