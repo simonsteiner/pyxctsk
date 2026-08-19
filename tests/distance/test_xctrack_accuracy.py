@@ -27,13 +27,16 @@ from pyproj import Geod
 
 from pyxctsk import EarthModel
 from pyxctsk.distance import (
+    MeasuredTask,
     TaskTurnpoint,
     calculate_iteratively_refined_route,
     distance_through_centers,
+    geodesic_distance,
     optimized_distance,
 )
-from pyxctsk.distance.task_distances import task_to_turnpoints
+from pyxctsk.distance.measured_task import task_to_turnpoints
 from pyxctsk.distance.turnpoint import LocalPlane, plane_circle
+from tests.builders import task, turnpoint
 from tests.corpus import reference_task, tasks_with_reference_distance
 
 WGS84 = Geod(ellps="WGS84")
@@ -77,6 +80,7 @@ class TestReferenceAccuracy:
         matching = []
         for reference in WITH_REFERENCE:
             name, ref_km = reference.stem, reference.reference_optimized_km
+            assert ref_km is not None, f"{name} is in WITH_REFERENCE without one"
             turnpoints = task_to_turnpoints(reference.task)
             calc_m = optimized_distance(turnpoints)
             ref_m = ref_km * 1000.0
@@ -362,3 +366,54 @@ class TestEarthModel:
         object.__setattr__(task, "earth_model", None)
         wgs_tps = task_to_turnpoints(task)
         assert abs(optimized_distance(turnpoints) - optimized_distance(wgs_tps)) > 50.0
+
+
+class TestTheEarthModelSelector:
+    """The three values ADR 0003 admits, and the ones it does not.
+
+    The selector was typed `object` in 16 signatures, so anything unrecognised
+    fell through to WGS84 and neither mypy nor the runtime said a word: a
+    misspelled "FAI-SPHERE" cost 97.6 m on a 135 km leg, silently.
+    """
+
+    A = (46.0, 8.0)
+    B = (47.0, 9.0)
+
+    @pytest.mark.parametrize("selector", [None, "WGS84", EarthModel.WGS84, "wgs84"])
+    def test_the_ellipsoid_is_named_three_ways_and_defaulted(self, selector):
+        """None means WGS84, and the enum and its string value agree."""
+        assert geodesic_distance(self.A, self.B, selector) == pytest.approx(
+            geodesic_distance(self.A, self.B)
+        )
+
+    @pytest.mark.parametrize("selector", ["FAI_SPHERE", EarthModel.FAI_SPHERE])
+    def test_the_sphere_is_named_two_ways(self, selector):
+        """And it really is a different answer, not a synonym."""
+        sphere = geodesic_distance(self.A, self.B, selector)
+
+        assert sphere == pytest.approx(134989.615, abs=0.01)
+        assert sphere != pytest.approx(geodesic_distance(self.A, self.B), abs=1.0)
+
+    @pytest.mark.parametrize(
+        "selector", ["WSG84", "FAI-SPHERE", "SPHERE", "", 42, object()]
+    )
+    def test_anything_else_is_refused_rather_than_treated_as_wgs84(self, selector):
+        """The failure mode this replaces: a typo that measured 97.6 m short."""
+        with pytest.raises(ValueError, match="not an earth model"):
+            geodesic_distance(self.A, self.B, selector)
+
+    def test_the_message_names_what_is_allowed(self):
+        """So a caller can fix it without reading the source."""
+        with pytest.raises(ValueError, match="WGS84.*FAI_SPHERE"):
+            geodesic_distance(self.A, self.B, "WSG84")
+
+    def test_a_task_declaring_a_bad_model_fails_when_measured(self):
+        """The model is a format field, so this is reachable from a real file."""
+        built = task(
+            turnpoint("A", 46.0, 8.0, radius=400),
+            turnpoint("B", 46.5, 8.5, radius=400),
+        )
+        built.earth_model = "NOT_AN_EARTH"  # type: ignore[assignment]
+
+        with pytest.raises(ValueError, match="not an earth model"):
+            MeasuredTask.from_task(built)

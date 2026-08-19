@@ -594,16 +594,20 @@ class TestWithoutTheOptionalDependencies:
     def test_the_parser_declines_an_image_rather_than_crashing(self, monkeypatch):
         """An image is simply not a format this install can read.
 
-        The adapter returns None, so the input falls through to the others and
-        the failure is the ordinary "invalid format" — not a NameError from
-        the module-level ``Image = None``.
+        The adapter returns None, so the input falls through to the others —
+        not a NameError from the module-level ``Image = None``. The message
+        used to be the same flat "invalid format" every other failure gave,
+        which made a missing install indistinguishable from a corrupt file; it
+        names the missing dependency now.
         """
         from pyxctsk import parser
         from pyxctsk.exceptions import InvalidFormatError
 
         monkeypatch.setattr(parser, "QR_CODE_SUPPORT", False)
 
-        with pytest.raises(InvalidFormatError, match="invalid format"):
+        with pytest.raises(
+            InvalidFormatError, match="QR code support is not installed"
+        ):
             parse_task(b"\x89PNG\r\n\x1a\n not really an image")
 
     def test_the_text_formats_still_work(self, monkeypatch):
@@ -631,6 +635,7 @@ class TestTheNestedModelsAreReachableOnTheirOwn:
         source = {"d": "18:00:00Z", "fa": 50, "t": 1}
         goal = QRCodeGoal.from_dict(source)
 
+        assert goal.deadline is not None
         assert goal.deadline.hour == 18
         assert goal.finish_altitude == 50
         assert list(goal.to_dict()) == ["d", "fa", "t"]
@@ -654,6 +659,7 @@ class TestTheNestedModelsAreReachableOnTheirOwn:
         source = {"o": "08:00:00Z", "c": "09:30:00Z"}
         takeoff = QRCodeTakeoff.from_dict(source)
 
+        assert takeoff.time_open is not None and takeoff.time_close is not None
         assert (takeoff.time_open.hour, takeoff.time_close.hour) == (8, 9)
         assert takeoff.to_dict() == source
 

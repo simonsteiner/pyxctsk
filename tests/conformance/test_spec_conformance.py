@@ -19,12 +19,14 @@ from pyxctsk import (
     Direction,
     Goal,
     GoalType,
+    InvalidFormatError,
     SSSType,
     Task,
     TaskType,
     TaskValidationError,
     TurnpointType,
     parse_task,
+    parser,
 )
 from pyxctsk.distance import optimized_distance
 from pyxctsk.distance.goal_line import (
@@ -32,8 +34,8 @@ from pyxctsk.distance.goal_line import (
     GoalLineOrientation,
     goal_line_length_from_turnpoints,
 )
+from pyxctsk.distance.measured_task import MeasuredTask, task_to_turnpoints
 from pyxctsk.distance.route_optimization import calculate_iteratively_refined_route
-from pyxctsk.distance.task_distances import task_to_turnpoints
 from pyxctsk.distance.turnpoint import (
     LocalPlane,
     geod_for_earth_model,
@@ -159,7 +161,9 @@ class TestGoalSerializedShape:
 
         qr = task.to_qr_code_task()
         assert json.loads(qr.to_json())["g"]["fa"] == 50
-        assert qr.to_task().goal.finish_altitude == 50
+        converted = qr.to_task()
+        assert converted.goal is not None
+        assert converted.goal.finish_altitude == 50
 
     def test_finish_altitude_omitted_when_absent(self):
         """An optional field must stay absent, not become null or zero."""
@@ -446,6 +450,96 @@ class TestStructuralValidation:
     def test_strict_accepts_a_valid_task(self):
         """Strict must not reject what the spec allows."""
         assert parse_task(task_json(), strict=True).turnpoints
+
+    def test_a_caller_can_react_to_a_specific_rule(self):
+        """The whole point of naming a rule, and it did not typecheck.
+
+        ``TaskValidationError.issues`` was ``Sequence[object]``, so the
+        documented way to use it — matching on ``issue.rule`` rather than on
+        the English message — failed mypy with *"object" has no attribute
+        "rule"* for any downstream caller.
+        """
+        data = json.loads(task_json())
+        data["turnpoints"][2]["type"] = "TAKEOFF"
+
+        with pytest.raises(TaskValidationError) as excinfo:
+            parse_task(json.dumps(data), strict=True)
+
+        rules = [issue.rule for issue in excinfo.value.issues]
+        assert rules == [ValidationRule.TAKEOFF_NOT_FIRST]
+        assert excinfo.value.issues[0].message
+
+
+class TestStrictValidatesWhatArrived:
+    """`--strict` checks the payload, not what converting it invented.
+
+    Three of the four format adapters are the compact one, and they used to
+    call `to_task()` inside the adapter — so by the strict gate the payload was
+    gone and `Task.validate()` reported on a conversion that had invented a
+    version, a task type and a goal the payload never carried. That is the
+    failure `model/validation.py` says the `TaskStructure` split exists to
+    prevent, and it meant `UNKNOWN_VERSION` could not be reported for any QR
+    input at all.
+    """
+
+    def _payloads(self, qr):
+        """The same payload in each of the three text QR formats."""
+        return {
+            "XCTSK:": qr.to_string(),
+            "XCTSKZ:": qr.to_string(compressed=True),
+            "qrcode-json": qr.to_json(),
+        }
+
+    def _bad_version_qr(self):
+        """A QR payload declaring a version its format does not define."""
+        qr = reference_task("task_bevo").task.to_qr_code_task()
+        qr.version = 99
+        return qr
+
+    @pytest.mark.parametrize(
+        "fmt", ["XCTSK:", "XCTSKZ:", "qrcode-json"], ids=lambda f: f.strip(":-")
+    )
+    def test_a_qr_payloads_own_version_rule_reaches_strict(self, fmt):
+        """The QR format defines version 2; 99 is a violation of *that* rule."""
+        payload = self._payloads(self._bad_version_qr())[fmt]
+
+        with pytest.raises(TaskValidationError) as excinfo:
+            parse_task(payload, strict=True)
+
+        assert any(
+            issue.rule is ValidationRule.UNKNOWN_VERSION
+            for issue in excinfo.value.issues
+        )
+
+    @pytest.mark.parametrize(
+        "fmt", ["XCTSK:", "XCTSKZ:", "qrcode-json"], ids=lambda f: f.strip(":-")
+    )
+    def test_the_report_matches_the_payloads_own_verdict(self, fmt):
+        """parse_task(strict) says exactly what QRCodeTask.validate() says."""
+        qr = self._bad_version_qr()
+        payload = self._payloads(qr)[fmt]
+
+        with pytest.raises(TaskValidationError) as excinfo:
+            parse_task(payload, strict=True)
+
+        assert [str(i) for i in excinfo.value.issues] == [str(i) for i in qr.validate()]
+
+    def test_lenient_parsing_still_reads_it(self):
+        """Validation is a report, not a gate — reading stays lenient."""
+        payload = self._bad_version_qr().to_string()
+
+        # The converted Task declares the full format's version, not the 99
+        # the payload carried; that is exactly why validating it was wrong.
+        assert parse_task(payload).version == 1
+
+    @pytest.mark.parametrize("reference", reference_tasks(), ids=str)
+    def test_strict_accepts_every_corpus_task_in_every_format(self, reference):
+        """Strict must not reject what the spec allows, in any format."""
+        qr = reference.task.to_qr_code_task()
+
+        assert parse_task(reference.task.to_json(), strict=True).turnpoints
+        for payload in self._payloads(qr).values():
+            assert parse_task(payload, strict=True).turnpoints
 
 
 class TestCompressedQRScheme:
@@ -861,6 +955,8 @@ class TestNestedShapesCarryUnknownKeys:
         task = self._task()
 
         assert task.turnpoints[0].waypoint.unknown == {"zz": "waypoint-extra"}
+        assert task.sss is not None and task.goal is not None
+        assert task.takeoff is not None
         assert task.sss.unknown == {"zz": "sss-extra"}
         assert task.goal.unknown == {"zz": "goal-extra"}
         assert task.takeoff.unknown == {"zz": "takeoff-extra"}
@@ -897,6 +993,7 @@ class TestNestedShapesCarryUnknownKeys:
 
         qr = QRCodeTask.from_dict(source)
 
+        assert qr.sss is not None and qr.goal is not None
         assert qr.sss.unknown == {"zz": "sss-extra"}
         assert qr.goal.unknown == {"zz": "goal-extra"}
         assert json.loads(qr.to_json()) == source
@@ -934,6 +1031,7 @@ class TestNestedShapesCarryUnknownKeys:
 
         task = Task.from_json(json.dumps(data))
 
+        assert task.goal is not None
         assert task.goal.unknown == {}
         assert "lineLength" not in json.loads(task.to_json())["goal"]
 
@@ -1178,12 +1276,12 @@ class TestGoalLineFollowsTheOptimizedRoute:
     def test_approach_is_the_optimized_route_point(self, name):
         """Every LINE-goal reference task orients against the route, not a centre."""
         task = reference_task(name).task
-        route = calculate_iteratively_refined_route(task_to_turnpoints(task))
+        measured = MeasuredTask.from_task(task)
 
-        line = GoalLine.from_task(task, route=route)
+        line = GoalLine.from_measured_task(measured)
 
         assert line is not None
-        assert line.approach_from == route.points[-2]
+        assert line.approach_from == measured.route.points[-2]
 
     def test_a_goal_inside_the_previous_cylinder_faces_the_right_way(self):
         """The case that showed the rule mattered.
@@ -1218,12 +1316,13 @@ class TestGoalLineFollowsTheOptimizedRoute:
         previous = task.turnpoints[-2].waypoint
         assert legacy.approach_from == (previous.lat, previous.lon)
 
-    def test_passing_a_route_matches_deriving_one(self):
-        """The route argument is an optimization, not a different answer."""
+    def test_measuring_first_matches_deriving_one(self):
+        """Passing a measured task is an optimization, not a different answer."""
         task = reference_task("task_fobe_line").task
-        route = calculate_iteratively_refined_route(task_to_turnpoints(task))
 
-        assert GoalLine.from_task(task, route=route) == GoalLine.from_task(task)
+        assert GoalLine.from_measured_task(MeasuredTask.from_task(task)) == (
+            GoalLine.from_task(task)
+        )
 
     def test_the_orientation_does_not_move_the_distance(self):
         """A LINE goal is a zero-radius circle either way (§7.2).
@@ -1231,10 +1330,10 @@ class TestGoalLineFollowsTheOptimizedRoute:
         Only the drawn shape changes; the optimized distance must not.
         """
         task = reference_task("task_qoga_line").task
-        before = calculate_iteratively_refined_route(task_to_turnpoints(task)).total_m
+        before = MeasuredTask.from_task(task).route.total_m
 
         GoalLine.from_task(task, GoalLineOrientation.TURNPOINT_CENTERS)
-        after = calculate_iteratively_refined_route(task_to_turnpoints(task)).total_m
+        after = MeasuredTask.from_task(task).route.total_m
 
         assert before == after
 
@@ -1391,7 +1490,7 @@ class TestRouteOptimizerConformance:
         that produced it.
         """
         seen = []
-        real = LocalPlane.around.__func__
+        real = LocalPlane.around.__func__  # type: ignore[attr-defined]
 
         def spy(centers, earth_model=None):
             seen.append(list(centers))
@@ -1488,3 +1587,82 @@ class TestS7FShapesTheFormatCannotCarry:
         assert exported["lineOrientation"] == "NE"
         # And nothing has quietly become a goal line.
         assert task.goal is not None and task.goal.type is GoalType.CYLINDER
+
+
+class TestUnrecognizedInputSaysWhy:
+    """One message for every failure hid a missing install as a corrupt file.
+
+    `InvalidFormatError("invalid format")` was raised for a nonexistent path, a
+    directory, truncated JSON, a PNG carrying no QR code — and for a perfectly
+    good QR image on a machine without Pillow and zxing-cpp, because the
+    adapter returns None when the optional dependencies are absent.
+    """
+
+    def test_a_missing_file_says_so(self):
+        """The path case was lost when _read_file swallowed the OSError."""
+        with pytest.raises(InvalidFormatError, match="No such file or directory"):
+            parse_task("/no/such/task.xctsk")
+
+    def test_a_directory_says_so(self, tmp_path):
+        """A different OS error, reported as itself."""
+        with pytest.raises(InvalidFormatError, match="Is a directory"):
+            parse_task(f"{tmp_path}/")
+
+    def test_truncated_json_is_named_as_json(self):
+        """It parsed as far as being JSON-shaped; that is worth saying."""
+        with pytest.raises(InvalidFormatError, match="looks like JSON"):
+            parse_task('{"taskType": "CLASSIC", "vers')
+
+    def test_an_image_with_no_qr_code_says_so(self, tmp_path):
+        """Not "invalid format": the file was read, it just carries no task."""
+        png = tmp_path / "blank.png"
+        png.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 64)
+
+        with pytest.raises(InvalidFormatError, match="no XCTSK: QR code"):
+            parse_task(str(png))
+
+    def test_a_missing_dependency_is_not_reported_as_a_bad_file(
+        self, tmp_path, monkeypatch
+    ):
+        """The failure that most needed telling apart, and could not be."""
+        png = tmp_path / "task.png"
+        png.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 64)
+        monkeypatch.setattr(parser, "QR_CODE_SUPPORT", False)
+
+        with pytest.raises(
+            InvalidFormatError, match="QR code support is not installed"
+        ):
+            parse_task(str(png))
+
+    def test_inline_json_containing_a_slash_still_parses(self):
+        """The path heuristic matches it, so the fallthrough must survive.
+
+        `_looks_like_file_path` is `"/" in data`, so a waypoint name with a
+        slash trips it. Reading has to stay non-fatal.
+        """
+        task = parse_task(
+            json.dumps(
+                {
+                    "taskType": "CLASSIC",
+                    "version": 1,
+                    "turnpoints": [
+                        {
+                            "radius": 400,
+                            "waypoint": {
+                                "name": "A/B",
+                                "lat": 46.5,
+                                "lon": 8.0,
+                                "altSmoothed": 100,
+                            },
+                        }
+                    ],
+                }
+            )
+        )
+
+        assert task.turnpoints[0].waypoint.name == "A/B"
+
+    def test_unrecognized_bytes_still_fall_back_to_the_plain_message(self):
+        """Nothing to say beyond "not a format I know"."""
+        with pytest.raises(InvalidFormatError, match="invalid format"):
+            parse_task(b"\x00\x01\x02\x03")

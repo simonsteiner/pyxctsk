@@ -47,7 +47,7 @@ uv sync --all-extras
     ```bash
     uv run ruff check --fix src/ tests/ scripts/
     uv run ruff format src/ tests/ scripts/
-    uv run mypy --config-file mypy.ini src/
+    uv run mypy src/
     ```
 
    Note that `ruff format` reaches beyond `*.py`: since 0.16 it also formats

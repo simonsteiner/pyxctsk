@@ -13,13 +13,19 @@ so a malformed file can still be read, inspected and converted; pass
 ``strict=True`` to :func:`pyxctsk.parse_task` to turn violations into a
 :class:`~pyxctsk.exceptions.TaskValidationError`.
 
-The rules read exactly two things — the order of the turnpoint roles, and
-whether this is a waypoints task — so :func:`validate_turnpoint_roles` takes
-those and nothing else. That is what lets a QR payload be checked *as it
-arrived*: converting it to a ``Task`` first invents a version, a task type and
-a goal the payload never carried, and validating inventions reports on the
-converter rather than on the input. :func:`validate_task` is the adapter for
-the full format and :meth:`pyxctsk.QRCodeTask.validate` for the compact one.
+The rules read a :class:`TaskStructure` and nothing else — the turnpoint roles
+and radii, the extensions at both levels, the declared version and the version
+the format defines, whether this is a waypoints task, and the elevated goal's
+height. That is what lets a QR payload be checked *as it arrived*: converting
+it to a ``Task`` first invents a version, a task type and a goal the payload
+never carried, and validating inventions reports on the converter rather than
+on the input. :func:`validate_structure` applies the rules;
+:func:`validate_task` is the adapter for the full format and
+:meth:`pyxctsk.QRCodeTask.validate` for the compact one, and
+:func:`pyxctsk.parse_task` asks the arrived payload rather than its conversion.
+
+Widening that input from "the turnpoint roles" to a whole structure is what
+let four later rules reach both formats without either adapter being touched.
 """
 
 from dataclasses import dataclass

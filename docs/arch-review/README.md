@@ -5,6 +5,24 @@ implements the [XCTrack Competition Interfaces](https://xctrack.org/Competition_
 specification and FAI Sporting Code S7F. Each file is dated and kept as written —
 superseded reviews stay for history rather than being edited. Newest first.
 
+- [2026-08-18 — Deepening candidates after the S7F audit](2026-08-18-deepening-candidates-after-s7f.md)
+  — **all seven candidates and all eight smaller findings applied.** Seven candidates in *deep module* terms, reviewed at the merge
+  of the S7F audit below and scoped by churn, which put `distance/` at the centre: its package
+  interface had grown from 13 to 22 names in two days, every S7F number widening it rather
+  than being absorbed. The headline is that a **task and the optimized route flown for it are
+  never bound together** — the two-step incantation appears at 12 call sites, two interfaces
+  carry the pairing as prose no type checker can check, and handing over a mismatched pair
+  returns a fully formed report 12.8 km out reporting 36.9 % savings, with no error. Four
+  candidates uncovered live defects rather than friction: `--strict` cannot report
+  `UNKNOWN_VERSION` for *any* QR-format input, because three of the four adapters convert the
+  payload away one line before the gate — the exact failure `model/validation.py` says the
+  `TaskStructure` split exists to prevent; an XC/Waypoints task makes one CLI JSON document
+  say both "no speed section" and "here is the distance from its start", because `9749a93`
+  added that guard to one reader and not the other; KML writes `Type: TurnpointType.TAKEOFF`
+  into user-visible map text, with a test pinning it as expected; and none of the four
+  `-o` writes passes `encoding=`, which fails outright on a non-UTF-8 locale and mis-encodes
+  silently on Windows. Companion visual report:
+  [`2026-08-18-deepening-candidates-after-s7f.html`](2026-08-18-deepening-candidates-after-s7f.html).
 - [2026-08-18 — FAI Sporting Code S7F 2026 conformance audit](2026-08-18-s7f-2026-conformance-audit.md)
   — **current for S7F; all eight actionable issues fixed,** tracked in a table in the file.
   The library against the 2026 V1.0 edition of the scoring code. Confirms PR #8 closed the

@@ -82,6 +82,14 @@ The shortest path that touches every turnpoint's cylinder in order. What a task
 is actually worth, as against the longer distance through the turnpoint centres.
 _Avoid_: shortest path, optimal route, opt distance
 
+**Measured task**:
+A task together with the optimized route flown for it. The two are always used
+together and nothing else binds them, so a distance, a goal line's orientation
+or a per-turnpoint table is asked of this rather than of a task and a route
+passed side by side — which is how a task once got measured against another
+task's route.
+_Avoid_: task result, computed task, route pair
+
 **Leg**:
 One segment of the optimized route, between two consecutive points on it. Legs
 are where a route's length lives; a total or a distance-so-far is read off

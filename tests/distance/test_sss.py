@@ -13,7 +13,7 @@ import pytest
 from geopy.distance import geodesic
 
 from pyxctsk.distance import calculate_iteratively_refined_route
-from pyxctsk.distance.task_distances import task_to_turnpoints
+from pyxctsk.distance.measured_task import task_to_turnpoints
 
 
 class TestSpeedSectionRouting:

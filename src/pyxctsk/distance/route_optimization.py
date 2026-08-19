@@ -45,6 +45,7 @@ from dataclasses import dataclass
 from itertools import accumulate
 
 from .turnpoint import (
+    EarthModelLike,
     LocalPlane,
     TurnpointGeometry,
     geod_for_earth_model,
@@ -104,7 +105,7 @@ class OptimizedRoute:
 
     points: tuple[tuple[float, float], ...]
     legs: tuple[float, ...]
-    earth_model: object = None
+    earth_model: EarthModelLike = None
 
     @property
     def total_m(self) -> float:
@@ -367,7 +368,6 @@ def _optimize_plane_points(
 def _corrected_path(
     turnpoints: Sequence[TurnpointGeometry],
     plane: LocalPlane,
-    earth_model: object,
     max_sweeps: int,
 ) -> list[tuple[float, float]]:
     """Optimize in ``plane`` and correct the result back onto the boundaries.
@@ -379,8 +379,8 @@ def _corrected_path(
 
     Args:
         turnpoints: The task turnpoints.
-        plane: The projection to solve in.
-        earth_model: Earth model selector (None means WGS84).
+        plane: The projection to solve in, which carries the earth model its
+            points are snapped back onto.
         max_sweeps: Upper bound on alternating sweeps, per placement.
 
     Returns:
@@ -401,7 +401,9 @@ def _corrected_path(
         # ProjectionCorrection (§7.1.7): re-place the planar solution at
         # exactly radius r on the earth model along the center→point azimuth.
         path.append(
-            snap_to_boundary(plane.lon_lat((x, y)), tp.center, radius, earth_model)
+            snap_to_boundary(
+                plane.lon_lat((x, y)), tp.center, radius, plane.earth_model
+            )
         )
     return path
 
@@ -409,7 +411,7 @@ def _corrected_path(
 def calculate_iteratively_refined_route(
     turnpoints: Sequence[TurnpointGeometry],
     num_iterations: int | None = None,
-    earth_model: object = None,
+    earth_model: EarthModelLike = None,
 ) -> OptimizedRoute:
     """Calculate the optimized route with the alternating point-circle-point method.
 
@@ -433,7 +435,9 @@ def calculate_iteratively_refined_route(
         num_iterations if num_iterations is not None else DEFAULT_NUM_ITERATIONS
     )
     if earth_model is None and turnpoints:
-        earth_model = getattr(turnpoints[0], "earth_model", None)
+        # Declared on TurnpointGeometry, so this is a protocol attribute now
+        # rather than a getattr against an interface that denied having it.
+        earth_model = turnpoints[0].earth_model
 
     if len(turnpoints) < 2:
         return OptimizedRoute(
@@ -450,9 +454,9 @@ def calculate_iteratively_refined_route(
     # boundaries, not at their middles — so the two differ whenever a large
     # cylinder pulls the turnpoint box wider than the route ever goes.
     plane = LocalPlane.around([tp.center for tp in turnpoints], earth_model)
-    route = _corrected_path(turnpoints, plane, earth_model, max_sweeps)
+    route = _corrected_path(turnpoints, plane, max_sweeps)
     plane = LocalPlane.around(route, earth_model)
-    route = _corrected_path(turnpoints, plane, earth_model, max_sweeps)
+    route = _corrected_path(turnpoints, plane, max_sweeps)
 
     g = geod_for_earth_model(earth_model)
     legs = []
@@ -468,7 +472,7 @@ def calculate_iteratively_refined_route(
 def optimized_distance(
     turnpoints: Sequence[TurnpointGeometry],
     num_iterations: int | None = None,
-    earth_model: object = None,
+    earth_model: EarthModelLike = None,
 ) -> float:
     """Compute the fully optimized task distance through the turnpoints.
 

@@ -4,6 +4,10 @@ This module defines the exception hierarchy for pyxctsk, including errors for em
 """
 
 from collections.abc import Sequence
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .model.validation import ValidationIssue
 
 
 class pyXCTSKError(Exception):
@@ -30,16 +34,39 @@ class TaskValidationError(pyXCTSKError):
     Distinct from :class:`InvalidFormatError`: the input parsed fine, but the
     turnpoints it describes are not a well-formed task.
 
+    The whole point of a named rule is that a caller can react to a specific
+    violation without matching on the English message, so this is typed:
+    ``except TaskValidationError as e: e.issues[0].rule`` used to fail the type
+    checker with *"object" has no attribute "rule"*. The import is under
+    ``TYPE_CHECKING`` because the cycle it avoids is a runtime one, through
+    ``model/__init__`` — ``validation`` itself imports only ``model.enums``,
+    and never these exceptions.
+
     Attributes:
-        issues (list): One :class:`~pyxctsk.model.validation.ValidationIssue` per
-            violated rule, each naming the rule it broke. Typed loosely here
-            because ``validation`` imports the exceptions, not the reverse.
+        issues: One :class:`~pyxctsk.model.validation.ValidationIssue` per
+            violated rule, each naming the rule it broke.
     """
 
-    def __init__(self, issues: Sequence[object]):
+    def __init__(self, issues: Sequence["ValidationIssue"]):
         """Initialize with the list of structural violations."""
-        self.issues = list(issues)
+        self.issues: list[ValidationIssue] = list(issues)
         super().__init__("; ".join(str(issue) for issue in issues))
+
+
+class MissingQRCodeSupportError(pyXCTSKError, ImportError):
+    """Raised when QR code image handling is asked for without its dependencies.
+
+    Both bases are load-bearing. ``pyXCTSKError`` puts it in this library's
+    hierarchy, so the CLI's ``except (pyXCTSKError, OSError)`` reports it as a
+    user-facing error rather than letting a traceback out — which it did once
+    that catch was narrowed from a bare ``except Exception``. ``ImportError``
+    keeps every existing ``except ImportError`` around
+    :func:`~pyxctsk.generate_qrcode_image` working, since that is the type it
+    has always raised.
+
+    Reading a QR image without the dependencies already reported itself
+    properly, through :class:`InvalidFormatError`; this is the writing half.
+    """
 
 
 class InvalidTimeOfDayError(pyXCTSKError):

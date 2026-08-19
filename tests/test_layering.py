@@ -371,3 +371,129 @@ class TestImportsAreCollectedByWhetherTheyRun:
             from .export.common import TaskDrawing
         """)
         assert at_import_time == ["model.task", "qrcode.image", "export.common"]
+
+
+class TestTheFrontDoorNamesTheAnswers:
+    """`pyxctsk.__all__` is the whole library's interface, not a sample of it.
+
+    Its export set had no rule: it carried 7 of `pyxctsk.distance`'s 22 names,
+    including `distance_through_centers` — documented as "the primitive, not
+    the published number" — while `center_distance`, the call that docstring
+    tells you to make instead, was absent. It also exported `OptimizedRoute`
+    and `task_distances_from` without exporting anything that could build the
+    argument, which is why `docs/s7f-distance-reference.md` reached past it.
+    """
+
+    #: What a doc, a docstring or a test tells a caller to import from the top
+    #: level. Adding a name here without exporting it fails.
+    DOCUMENTED = (
+        "DistanceReport",
+        "MeasuredTask",
+        "TaskDrawing",
+        "Task",
+        "parse_task",
+        "center_distance",
+        "center_distance_readings",
+        "CenterDistanceReading",
+        "PROPOSED_READING",
+        "GoalLine",
+        "TooFewTurnpointsError",
+        "TaskValidationError",
+        "ValidationRule",
+        "calculate_iteratively_refined_route",
+        "task_to_turnpoints",
+    )
+
+    def test_every_documented_name_is_reachable_from_the_front_door(self):
+        """Reaching into a subpackage should be a choice, not a workaround."""
+        import pyxctsk
+
+        missing = [n for n in self.DOCUMENTED if not hasattr(pyxctsk, n)]
+
+        assert missing == []
+        assert [n for n in self.DOCUMENTED if n not in pyxctsk.__all__] == []
+
+    def test_the_published_reading_travels_with_the_primitive(self):
+        """Exporting `distance_through_centers` alone is what misled a caller.
+
+        The primitive stays — it is a real function over `TaskTurnpoint`s — but
+        the number a task board publishes has to be reachable beside it.
+        """
+        import pyxctsk
+
+        if "distance_through_centers" in pyxctsk.__all__:
+            assert "center_distance" in pyxctsk.__all__
+            assert "CenterDistanceReading" in pyxctsk.__all__
+
+    def test_every_exported_name_resolves(self):
+        """`__all__` and the module cannot disagree about what exists."""
+        import pyxctsk
+
+        assert [n for n in pyxctsk.__all__ if not hasattr(pyxctsk, n)] == []
+
+    def test_a_route_can_be_built_by_a_caller_who_only_uses_the_front_door(self):
+        """`OptimizedRoute` was exported with no exported way to make one."""
+        import pyxctsk
+
+        assert hasattr(pyxctsk, "OptimizedRoute")
+        assert hasattr(pyxctsk, "MeasuredTask")
+        route = pyxctsk.MeasuredTask.from_task(
+            pyxctsk.Task(
+                task_type=pyxctsk.TaskType.CLASSIC,
+                version=1,
+                turnpoints=[
+                    pyxctsk.Turnpoint(
+                        radius=400,
+                        waypoint=pyxctsk.Waypoint(
+                            name="A", lat=46.0, lon=8.0, alt_smoothed=0
+                        ),
+                    ),
+                    pyxctsk.Turnpoint(
+                        radius=400,
+                        waypoint=pyxctsk.Waypoint(
+                            name="B", lat=46.5, lon=8.5, alt_smoothed=0
+                        ),
+                    ),
+                ],
+            )
+        ).route
+
+        assert isinstance(route, pyxctsk.OptimizedRoute)
+
+
+class TestTheOptimizerDependencyIsNotPaidUpFront:
+    """`import pyxctsk` cost 400 ms, 297 of them scipy.optimize.
+
+    One function in the whole library needs it. A caller that parses a task,
+    converts it or draws it never runs that function, and used to pay for the
+    import anyway — as did `pyxctsk --help`.
+    """
+
+    def test_scipy_is_not_imported_at_import_time(self):
+        """Importing the package must not drag in the optimizer's solver."""
+        source = (SRC / "distance" / "turnpoint.py").read_text()
+        tree = ast.parse(source)
+        module_level = [
+            alias.module
+            for alias in ast.walk(tree)
+            if isinstance(alias, ast.ImportFrom) and alias.module
+        ]
+        deferred = [
+            node.module
+            for node in _deferred_imports(tree)
+            if node.module and node.module.startswith("scipy")
+        ]
+
+        assert any(m.startswith("scipy") for m in module_level), "scipy still used"
+        assert deferred == ["scipy.optimize"], (
+            "scipy.optimize must stay a function-local import: it is 75% of the "
+            "package's import cost and one function needs it"
+        )
+
+    def test_the_optimizer_still_works_once_it_is_needed(self):
+        """Deferring an import must not defer the answer."""
+        from pyxctsk.distance.turnpoint import plane_optimal_point
+
+        point = plane_optimal_point((-10.0, 0.0), (10.0, 0.0), (0.0, 5.0), 2.0)
+
+        assert point == pytest.approx((0.0, 3.0), abs=1e-6)

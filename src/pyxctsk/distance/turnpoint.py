@@ -23,7 +23,8 @@ from functools import lru_cache
 from typing import Protocol, Sequence, runtime_checkable
 
 from pyproj import CRS, Geod, Transformer
-from scipy.optimize import fminbound
+
+from ..model.enums import EarthModel
 
 #: Radius of the FAI sphere earth model in meters (FAI Sporting Code S7F).
 FAI_SPHERE_RADIUS_M = 6_371_000.0
@@ -34,7 +35,17 @@ _WGS84_GEOD = Geod(ellps="WGS84")
 _FAI_SPHERE_GEOD = Geod(a=FAI_SPHERE_RADIUS_M, b=FAI_SPHERE_RADIUS_M)
 
 
-def _is_fai_sphere(earth_model: object) -> bool:
+#: What a caller may hand any of these functions to pick an earth model: an
+#: ``EarthModel`` member, its string value, or None for the WGS84 default —
+#: the three ADR 0003 settled on. It was spelled ``object`` in 16 signatures
+#: and described in four docstrings, which meant the type checker could see
+#: nothing: ``geodesic_distance(a, b, "WSG84")`` and ``…, 42)`` both passed
+#: mypy and both silently measured on WGS84, because everything unrecognised
+#: did. Naming the set is what lets a typo be a type error.
+EarthModelLike = EarthModel | str | None
+
+
+def _is_fai_sphere(earth_model: EarthModelLike) -> bool:
     """Return True if the given earth model designates the FAI sphere.
 
     Args:
@@ -43,14 +54,27 @@ def _is_fai_sphere(earth_model: object) -> bool:
 
     Returns:
         True for the FAI sphere model, False otherwise.
+
+    Raises:
+        ValueError: If the value names no earth model this library knows. It
+            used to fall through to WGS84, so a misspelling cost 97.6 m on a
+            135 km leg and said nothing.
     """
     if earth_model is None:
         return False
     value = getattr(earth_model, "value", earth_model)
-    return str(value).upper() == "FAI_SPHERE"
+    name = str(value).upper()
+    if name == EarthModel.FAI_SPHERE.value:
+        return True
+    if name == EarthModel.WGS84.value:
+        return False
+    raise ValueError(
+        f"not an earth model: {earth_model!r} "
+        f"(expected one of {[m.value for m in EarthModel]}, or None for WGS84)"
+    )
 
 
-def geod_for_earth_model(earth_model: object = None) -> Geod:
+def geod_for_earth_model(earth_model: EarthModelLike = None) -> Geod:
     """Return the geodesic engine for an earth model.
 
     Args:
@@ -67,7 +91,7 @@ def geod_for_earth_model(earth_model: object = None) -> Geod:
 def geodesic_distance(
     point1: tuple[float, float],
     point2: tuple[float, float],
-    earth_model: object = None,
+    earth_model: EarthModelLike = None,
 ) -> float:
     """Compute the distance between two (lat, lon) points for an earth model.
 
@@ -134,7 +158,7 @@ def _cached_tm_transformers(
 
 
 def local_tm_transformers(
-    lat0: float, lon0: float, earth_model: object = None
+    lat0: float, lon0: float, earth_model: EarthModelLike = None
 ) -> tuple[Transformer, Transformer]:
     """Return transformers to/from a local Transverse Mercator plane.
 
@@ -218,6 +242,12 @@ def _plane_pcp_point(
     Returns:
         The optimal boundary point (x, y).
     """
+    # scipy.optimize is 297 ms of the 400 ms `import pyxctsk` used to cost,
+    # and this is the only place in the library that needs it. Importing it
+    # here means a caller that only parses, converts or draws a task never
+    # pays for the optimizer's dependency tree; sys.modules caches it, so the
+    # optimizer itself pays a dict lookup per call.
+    from scipy.optimize import fminbound
 
     def total(theta: float) -> float:
         x, y = _plane_point_at(center, radius, theta)
@@ -292,7 +322,7 @@ def snap_to_boundary(
     point_lonlat: tuple[float, float],
     center: tuple[float, float],
     radius: float,
-    earth_model: object = None,
+    earth_model: EarthModelLike = None,
 ) -> tuple[float, float]:
     """Snap a point onto a cylinder boundary (ProjectionCorrection, §7.1.7).
 
@@ -371,10 +401,20 @@ def task_area_center(
 class TurnpointGeometry(Protocol):
     """The geometry seam the route optimizer depends on.
 
-    Route optimization needs only three things from a turnpoint: where its
-    center is, how large its cylinder is, and whether it is a goal line.
-    Everything else (goal-line length, geodesic math) is an implementation
-    detail behind this interface.
+    Route optimization needs four things from a turnpoint: where its center
+    is, how large its cylinder is, whether it is a goal line, and which earth
+    the first two are measured on. Everything else (goal-line length, geodesic
+    math) is an implementation detail behind this interface.
+
+    ``earth_model`` is the fourth because it is load-bearing, not because the
+    optimizer wants it: ``calculate_iteratively_refined_route`` reads it off
+    the first turnpoint to pick the model for the whole route. It used to do
+    that through ``getattr(turnpoints[0], "earth_model", None)`` while the
+    protocol declared three attributes and its docstring said "only three
+    things" — so a fake that satisfied ``isinstance`` got a different distance
+    for identical geometry, depending on an attribute the interface denied
+    having. An interface that omits a value its implementation reads is
+    lying about what a caller must provide.
 
     Depending on this protocol instead of the concrete ``TaskTurnpoint`` lets
     the optimization core be exercised with lightweight fakes and lets new
@@ -384,11 +424,14 @@ class TurnpointGeometry(Protocol):
         center: (lat, lon) of the turnpoint center.
         radius: Cylinder radius in meters (0 collapses to the center).
         goal_type: None, "CYLINDER", or "LINE".
+        earth_model: The model this turnpoint's geometry is measured on. Read
+            from the first turnpoint when the caller names none.
     """
 
     center: tuple[float, float]
     radius: float
     goal_type: str | None
+    earth_model: EarthModelLike
 
 
 @dataclass(frozen=True)
@@ -408,17 +451,28 @@ class LocalPlane:
     every sweep, and a caller asking about a single turnpoint gets a plane
     around that turnpoint unless it says otherwise.
 
+    The plane keeps the earth model it was built from. It has to: a planar
+    solution is snapped back onto a cylinder boundary measured on that model
+    (§7.1.7), and when the plane and the snap disagreed the answer was an
+    FAI-sphere boundary point placed from a WGS84 planar solution — the same
+    paragraph answered two ways again, one layer down. Carrying it means the
+    consumers stop taking it as a second argument nothing checked against the
+    first.
+
     Attributes:
         to_plane: Geographic to planar, in (lon, lat) → (x, y) axis order.
         to_geo: The inverse.
+        earth_model: The model this plane was built on, and the one its points
+            must be snapped back onto.
     """
 
     to_plane: Transformer
     to_geo: Transformer
+    earth_model: EarthModelLike = None
 
     @classmethod
     def around(
-        cls, centers: Sequence[tuple[float, float]], earth_model: object = None
+        cls, centers: Sequence[tuple[float, float]], earth_model: EarthModelLike = None
     ) -> "LocalPlane":
         """Return the plane centred on these points' task area (§7.1.6).
 
@@ -432,7 +486,10 @@ class LocalPlane:
         Raises:
             ValueError: If no centers are given; there is no area of interest.
         """
-        return cls(*local_tm_transformers(*task_area_center(centers), earth_model))
+        return cls(
+            *local_tm_transformers(*task_area_center(centers), earth_model),
+            earth_model=earth_model,
+        )
 
     def xy(self, point: tuple[float, float]) -> tuple[float, float]:
         """Project a (lat, lon) point into the plane.
@@ -499,7 +556,7 @@ class TaskTurnpoint:
         lon: float,
         radius: float = 0,
         goal_type: str | None = None,
-        earth_model: object = None,
+        earth_model: EarthModelLike = None,
     ):
         """Initialize a task turnpoint.
 
@@ -551,13 +608,15 @@ class TaskTurnpoint:
         xy = plane_optimal_point(
             plane.xy(prev_point), plane.xy(next_point), (cx, cy), radius
         )
+        # Snap on the plane's own model, so the projection and the boundary it
+        # is corrected onto cannot be measured on different earths.
         return snap_to_boundary(
-            plane.lon_lat(xy), self.center, self.radius, self.earth_model
+            plane.lon_lat(xy), self.center, self.radius, plane.earth_model
         )
 
 
 def distance_through_centers(
-    turnpoints: list[TaskTurnpoint], earth_model: object = None
+    turnpoints: list[TaskTurnpoint], earth_model: EarthModelLike = None
 ) -> float:
     """Sum the geodesic legs between consecutive turnpoint centers.
 

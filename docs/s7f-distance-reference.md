@@ -238,18 +238,23 @@ version, the S7F edition, the earth model, every reading of the centre distance,
 **the optimized crossing point for every turnpoint**. Reads stdin, writes with `-o`, so a
 whole corpus goes through it in a loop.
 
-From Python, if you prefer:
+From Python, if you prefer — the same report the CLI renders, as a value:
 
 ```python
 from pathlib import Path
-from pyxctsk import parse_task
-from pyxctsk.distance import optimized_distance, center_distance, task_to_turnpoints, SpeedSection
+from pyxctsk import DistanceReport, parse_task
 
-task = parse_task(Path("your-task.xctsk").read_text())
-print(optimized_distance(task_to_turnpoints(task)))  # S7F §7.2 task distance, metres
-print(center_distance(task))                         # the convention S7F does not define
-print(SpeedSection.from_task(task).distance_m)       # S7F §7.2 speed section distance
+report = DistanceReport.from_task(parse_task(Path("your-task.xctsk").read_text()))
+
+print(report.task_distance_m)           # S7F §7.2 task distance, metres
+print(report.speed_section_distance_m)  # S7F §7.2 speed section — None if no SSS/ESS pair
+print(report.center_distance_m)         # the convention S7F does not define
+print(report.as_dict())                 # everything above, plus the route points
+print(report.as_text())                 # what --format text prints
 ```
+
+`speed_section_distance_m` is `None` rather than a number when the task has no
+SSS/ESS pair, so check it before dividing — roughly a third of the corpus has none.
 
 The 22 tasks are in `tests/data/reference_tasks/`, each as a `.xctsk` alongside the
 published values it is compared against. They are real competition tasks.

@@ -21,7 +21,7 @@ pre-commit:
       glob: "*.py"
       exclude:
         - "scripts/**"
-      run: uv run mypy --explicit-package-bases --config-file mypy.ini {staged_files}
+      run: uv run mypy --explicit-package-bases {staged_files}
 
     cspell:
       priority: 4

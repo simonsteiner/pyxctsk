@@ -1,5 +1,7 @@
 """QR code image generation for XCTrack task handling."""
 
+from ..exceptions import MissingQRCodeSupportError
+
 # Optional QR code dependencies
 try:
     import qrcode
@@ -12,7 +14,7 @@ except ImportError:
     QR_CODE_SUPPORT = False
 
 
-def generate_qrcode_image(data: str, size: int = 1024):
+def generate_qrcode_image(data: str, size: int = 1024) -> "Image.Image":
     """Generates a QR code image from the provided string data.
 
     Args:
@@ -26,7 +28,9 @@ def generate_qrcode_image(data: str, size: int = 1024):
         ImportError: If the required 'qrcode' or 'Pillow' packages are not available in the environment.
     """
     if not QR_CODE_SUPPORT:
-        raise ImportError("QR code support requires 'qrcode' and 'Pillow' packages")
+        raise MissingQRCodeSupportError(
+            "QR code support requires 'qrcode' and 'Pillow' packages"
+        )
 
     qr = qrcode.QRCode(  # type: ignore
         version=1,
@@ -41,5 +45,8 @@ def generate_qrcode_image(data: str, size: int = 1024):
 
     # Resize to requested size. Image.Resampling arrived in Pillow 9.1 and
     # pyproject pins >= 11.3, so there is no older-API branch to fall back to.
-    img = img.resize((size, size), Image.Resampling.LANCZOS)  # type: ignore
-    return img
+    resized: "Image.Image" = img.resize(  # type: ignore[no-any-unimported]
+        (size, size),
+        Image.Resampling.LANCZOS,  # type: ignore[union-attr]
+    )
+    return resized

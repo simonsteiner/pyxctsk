@@ -11,8 +11,15 @@ import json
 import pytest
 from click.testing import CliRunner
 
-from pyxctsk import TurnpointType, parse_task
+from pyxctsk import (
+    DistanceReport,
+    MissingQRCodeSupportError,
+    TurnpointType,
+    parse_task,
+)
 from pyxctsk.cli import convert, distances, main
+from pyxctsk.exceptions import pyXCTSKError
+from pyxctsk.qrcode import image
 from tests.builders import task, turnpoint
 from tests.corpus import reference_task
 from tests.qr_test_utils import QR_CODE_SUPPORT, Image, decode_qr
@@ -183,7 +190,13 @@ class TestStrictValidation:
 
 
 class TestCLIDistances:
-    """The S7F distance report — the command a vendor runs to compare."""
+    """The command wiring: it renders `DistanceReport` and writes it out.
+
+    What the report *says* is asserted on the value, in
+    `tests/distance/test_report.py`. These cover only what the command adds —
+    the two output formats, stdin, and the exit code for a task with no
+    distance to report.
+    """
 
     def _report(self, *options: str, stem: str = "task_pepi") -> dict:
         """Run ``distances`` over a reference task and parse its JSON."""
@@ -194,63 +207,23 @@ class TestCLIDistances:
         report: dict = json.loads(result.output)
         return report
 
-    def test_it_reports_both_of_s7f_7_2_s_distances(self):
-        """The two the Sporting Code actually defines."""
-        report = self._report()
-
-        assert report["task_distance_m"] == pytest.approx(92001.6, abs=1.0)
-        assert report["speed_section_distance_m"] == pytest.approx(86761.2, abs=1.0)
-
-    def test_it_reports_the_centre_distance_and_says_it_is_undefined(self):
-        """The number boards publish that S7F does not define.
-
-        A vendor reading this output must not come away thinking the convention
-        is specified, so the disclaimer travels with the number.
-        """
-        report = self._report()
-
-        assert report["center_distance_m"] == pytest.approx(321439.7, abs=1.0)
-        assert report["center_distance_reading"] == "LAUNCH_TO_GOAL"
-        assert "NOT DEFINED BY S7F" in report["notes"]["center_distance_m"]
-
-    def test_it_reports_every_reading_of_the_centre_distance(self):
-        """So a disagreement can be traced to a convention rather than a bug."""
-        readings = self._report()["center_distance_readings_m"]
-
-        assert set(readings) == {
-            "LAUNCH_TO_GOAL",
-            "LAUNCH_TO_GOAL_BOUNDARY",
-            "START_TO_GOAL",
-        }
-        values = [v for v in readings.values() if v is not None]
-        assert max(values) - min(values) > 39_000
-
-    def test_it_reports_the_route_points(self):
-        """The whole point: a total says two implementations disagree, these say where."""
-        report = self._report()
+    def test_the_json_output_is_the_reports_dict(self):
+        """The command renders the value rather than assembling its own."""
         task = reference_task("task_pepi").task
 
-        assert len(report["route"]) == len(task.turnpoints)
-        first, last = report["route"][0], report["route"][-1]
-        assert first["cumulative_m"] == 0.0
-        assert last["cumulative_m"] == pytest.approx(report["task_distance_m"])
-        for point in report["route"]:
-            assert {"route_lat", "route_lon", "center_lat", "center_lon"} <= set(point)
+        assert self._report() == DistanceReport.from_task(task).as_dict()
 
-    def test_it_names_the_version_and_the_spec_edition(self):
-        """A number without a provenance cannot be compared later."""
-        report = self._report()
+    def test_the_text_output_is_the_reports_text(self):
+        """Same value, the other rendering."""
+        result = CliRunner().invoke(
+            distances,
+            [str(reference_task("task_pepi").xctsk_path), "--format", "text"],
+        )
 
-        assert report["s7f_edition"] == "2026 V1.0"
-        assert report["pyxctsk_version"]
-        assert report["earth_model"].startswith("WGS84")
-
-    def test_a_task_with_no_speed_section_reports_null_not_zero(self):
-        """An XC route has no SSS/ESS pair, and zero would read as a measurement."""
-        report = self._report(stem="task_dami_route")
-
-        assert report["speed_section_distance_m"] is None
-        assert report["task_distance_m"] > 0
+        assert result.exit_code == 0
+        assert result.output.rstrip("\n") == (
+            DistanceReport.from_task(reference_task("task_pepi").task).as_text()
+        )
 
     def test_the_text_format_is_for_humans(self):
         """Same numbers, and the same disclaimer."""
@@ -263,6 +236,15 @@ class TestCLIDistances:
         assert "92.002 km" in result.output
         assert "NOT defined by S7F" in result.output
         assert "optimized route:" in result.output
+
+    def test_a_task_with_no_distance_exits_nonzero_and_says_why(self):
+        """One turnpoint has no leg; the report refuses and the CLI reports it."""
+        payload = SAMPLE.to_json().encode()
+
+        result = CliRunner().invoke(distances, input=payload)
+
+        assert result.exit_code == 1
+        assert "at least two turnpoints" in result.output
 
     def test_it_reads_stdin(self):
         """So it composes with whatever produced the task."""
@@ -309,3 +291,146 @@ class TestCLIDistances:
 
         assert "distances" in top.output
         assert "--format" in own.output and "--strict" in own.output
+
+
+class TestWritingOutput:
+    """The read/write seam: one place that knows encoding, newlines and bytes.
+
+    Reading and writing were spelled out six times across the two commands, so
+    encoding, trailing newline, text-vs-bytes and stdout-vs-file were each
+    decided independently — and two of them had been decided inconsistently.
+    """
+
+    #: A task whose waypoint names are outside ASCII. No corpus task has any,
+    #: which is why the encoding defect survived: `grep -lP "[^\x00-\x7F]"`
+    #: over the reference tasks matches nothing.
+    def _non_ascii_task(self):
+        built = parse_task(reference_task("task_bevo").xctsk_path.read_bytes())
+        built.turnpoints[0].waypoint.name = "Küçük"
+        return built
+
+    @pytest.mark.parametrize("fmt", ["json", "kml"])
+    def test_a_non_ascii_task_survives_a_round_trip_through_a_file(self, fmt, tmp_path):
+        """None of the four writes passed `encoding=`, so all used the locale's."""
+        out = tmp_path / f"out.{fmt}"
+        payload = self._non_ascii_task().to_json().encode()
+
+        result = CliRunner().invoke(
+            convert, ["--format", fmt, "-o", str(out)], input=payload
+        )
+
+        assert result.exit_code == 0, result.output
+        assert out.read_bytes().decode("utf-8")
+        if fmt == "json":
+            assert parse_task(out.read_bytes()).turnpoints[0].waypoint.name == "Küçük"
+        else:
+            assert "Küçük" in out.read_text(encoding="utf-8")
+
+    def test_the_distance_report_is_writable_as_a_file(self, tmp_path):
+        """Its text rendering contains §, so a non-UTF-8 locale used to refuse."""
+        out = tmp_path / "report.txt"
+
+        result = CliRunner().invoke(
+            distances,
+            [
+                str(reference_task("task_bevo").xctsk_path),
+                "--format",
+                "text",
+                "-o",
+                str(out),
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert "§7.2" in out.read_text(encoding="utf-8")
+
+    @pytest.mark.parametrize(
+        "command, options",
+        [
+            ("convert", ["--format", "json"]),
+            ("convert", ["--format", "kml"]),
+            ("convert", ["--format", "qrcode-json"]),
+            ("distances", []),
+            ("distances", ["--format", "text"]),
+        ],
+    )
+    def test_every_text_file_ends_with_a_newline(self, command, options, tmp_path):
+        """`convert` wrote none and `distances` wrote one — nobody chose that."""
+        out = tmp_path / "out"
+        cmd = convert if command == "convert" else distances
+
+        result = CliRunner().invoke(
+            cmd, [str(reference_task("task_bevo").xctsk_path), *options, "-o", str(out)]
+        )
+
+        assert result.exit_code == 0, result.output
+        assert out.read_bytes().endswith(b"\n")
+
+    def test_a_png_is_written_as_bytes_not_text(self, tmp_path):
+        """The one format whose payload is binary, through the same seam."""
+        out = tmp_path / "qr.png"
+
+        result = CliRunner().invoke(
+            convert,
+            ["--format", "png", "-o", str(out)],
+            input=SAMPLE.to_json().encode(),
+        )
+
+        assert result.exit_code == 0, result.output
+        assert out.read_bytes().startswith(b"\x89PNG")
+
+    def test_an_unwritable_path_is_reported_not_raised(self, tmp_path):
+        """OSError is caught alongside the library's own errors."""
+        result = CliRunner().invoke(
+            convert,
+            [
+                "--format",
+                "json",
+                "-o",
+                str(tmp_path / "no" / "such" / "dir" / "o.json"),
+            ],
+            input=SAMPLE.to_json().encode(),
+        )
+
+        assert result.exit_code == 1
+        assert "Error:" in result.output
+
+
+class TestOptionalDependenciesAreReportedNotRaised:
+    """A missing optional dependency is an expected failure, not a crash.
+
+    `generate_qrcode_image` raises when Pillow and qrcode are absent, and
+    narrowing `convert`'s catch from a bare `except Exception` to
+    `(pyXCTSKError, OSError)` let that escape — so `convert --format png` on an
+    install without the extras produced a traceback where it used to produce a
+    one-line error. `MissingQRCodeSupportError` inherits from both
+    `pyXCTSKError` and `ImportError` so each catch keeps working.
+    """
+
+    def test_png_without_the_dependencies_reports_an_error(self, monkeypatch):
+        """Exit 1 and a message, not a stack trace."""
+        monkeypatch.setattr(image, "QR_CODE_SUPPORT", False)
+
+        result = CliRunner().invoke(
+            convert, ["--format", "png"], input=SAMPLE.to_json().encode()
+        )
+
+        assert result.exit_code == 1
+        assert "QR code support requires" in result.output
+        assert not isinstance(result.exception, MissingQRCodeSupportError)
+
+    def test_the_error_is_both_a_library_error_and_an_import_error(self):
+        """Both bases are load-bearing, so both are pinned."""
+        assert issubclass(MissingQRCodeSupportError, pyXCTSKError)
+        assert issubclass(MissingQRCodeSupportError, ImportError)
+
+    def test_qrcode_json_needs_no_dependencies(self, monkeypatch):
+        """Only the image formats do — the string one must stay unaffected."""
+        monkeypatch.setattr(image, "QR_CODE_SUPPORT", False)
+
+        result = CliRunner().invoke(
+            convert, ["--format", "qrcode-json"], input=SAMPLE.to_json().encode()
+        )
+
+        assert result.exit_code == 0
+        assert result.output.startswith("XCTSK:")

@@ -29,8 +29,44 @@ the reference corpus.
 from dataclasses import dataclass
 
 from ..model.task import Task, TaskType, TurnpointType
+from .measured_task import MeasuredTask, task_to_turnpoints
 from .route_optimization import OptimizedRoute, calculate_iteratively_refined_route
-from .task_distances import task_to_turnpoints
+from .turnpoint import TaskTurnpoint
+
+
+def speed_section_indices(task: Task) -> tuple[int, int] | None:
+    """Where a task's speed section starts and ends, or None if it has none.
+
+    The one answer to *"does this task have a speed section?"*, so every reader
+    of that question agrees. It is not only about the SSS and ESS annotations:
+    the **task type** decides first. An XC/Waypoints task is "a simple route
+    from waypoints without cylinders", and ``model/validation.py`` exempts it
+    from the SSS/ESS rules on exactly that ground — so its annotations go
+    unchecked, and a reader that obeyed them would let unvalidated data
+    override the declared type.
+
+    That rule reached ``SpeedSection`` in ``9749a93`` and not
+    ``center_distance``'s ``START_TO_GOAL`` reading, which scanned for the same
+    annotation itself. One report then said both "this task has no speed
+    section" and "here is the distance from its start".
+
+    Args:
+        task: The task to search.
+
+    Returns:
+        ``(start, end)`` turnpoint indices, or None when the task is an
+        XC/Waypoints one, is missing either role, or has its ESS before its
+        SSS — the last being a task :meth:`~pyxctsk.Task.validate` already
+        reports as invalid (``SSS_AFTER_ESS``).
+    """
+    if task.task_type == TaskType.WAYPOINTS:
+        return None
+
+    start = _role_index(task, TurnpointType.SSS)
+    end = _role_index(task, TurnpointType.ESS)
+    if start is None or end is None or start > end:
+        return None
+    return start, end
 
 
 def _role_index(task: Task, role: TurnpointType) -> int | None:
@@ -65,6 +101,23 @@ class SpeedSection:
     start_index: int
 
     @classmethod
+    def from_measured_task(cls, measured: MeasuredTask) -> "SpeedSection | None":
+        """Build the speed section for an already-measured task.
+
+        Reuses the measured task's cylinders — the LINE-goal rule is applied
+        once, there — but not its route: §7.2's ``taskToESS`` is a separate
+        optimization, which is the whole point of this module.
+
+        Args:
+            measured: The task and the route measured for it.
+
+        Returns:
+            A SpeedSection, or None for the same reasons :meth:`from_task`
+            returns None.
+        """
+        return cls._from_turnpoints(measured.task, list(measured.turnpoints))
+
+    @classmethod
     def from_task(cls, task: Task) -> "SpeedSection | None":
         """Build the speed section for a task.
 
@@ -85,19 +138,23 @@ class SpeedSection:
         # waypoints task carrying stray ``SSS``/``ESS`` annotations has no
         # speed section however they are arranged, and measuring one would let
         # unchecked annotations override the type.
-        if task.task_type == TaskType.WAYPOINTS:
-            return None
+        return cls._from_turnpoints(task, task_to_turnpoints(task))
 
-        start = _role_index(task, TurnpointType.SSS)
-        end = _role_index(task, TurnpointType.ESS)
-        if start is None or end is None or start > end:
+    @classmethod
+    def _from_turnpoints(
+        cls, task: Task, task_turnpoints: list[TaskTurnpoint]
+    ) -> "SpeedSection | None":
+        """Find the speed section in a task whose cylinders are already derived."""
+        indices = speed_section_indices(task)
+        if indices is None:
             return None
+        start, end = indices
 
         # Slicing the task's own turnpoints keeps the goal handling: when the
         # ESS *is* the goal, the last entry carries the goal's type, so a LINE
         # goal stays the zero-radius point at its centre rather than becoming
         # a cylinder of half the line's length.
-        turnpoints = task_to_turnpoints(task)[: end + 1]
+        turnpoints = task_turnpoints[: end + 1]
         if len(turnpoints) < 2:
             return None
 

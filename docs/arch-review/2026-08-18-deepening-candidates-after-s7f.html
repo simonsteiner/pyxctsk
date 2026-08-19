@@ -1,0 +1,738 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Architecture review — pyxctsk</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+    </script>
+    <style>
+      .seam { stroke-dasharray: 5 4; }
+      .deep { background: linear-gradient(135deg, #0f172a, #1e293b); }
+      .hatch { background-image: repeating-linear-gradient(45deg, #fecaca 0 4px, #fee2e2 4px 8px); }
+      .mermaid { display: flex; justify-content: center; }
+      code { font-variant-ligatures: none; }
+      .card-anchor { scroll-margin-top: 1.5rem; }
+    </style>
+  </head>
+  <body class="bg-stone-50 text-slate-900 font-sans antialiased">
+    <main class="max-w-5xl mx-auto px-6 py-12 space-y-14">
+
+      <!-- ══════════════════ HEADER ══════════════════ -->
+      <header class="space-y-6">
+        <div class="flex flex-wrap items-baseline justify-between gap-2 border-b border-slate-300 pb-4">
+          <h1 class="font-serif text-4xl tracking-tight">Architecture review — <span class="font-mono text-3xl text-slate-600">pyxctsk</span></h1>
+          <p class="text-sm text-slate-500 font-mono">2026-08-18 · <span class="text-slate-400">8a64894</span></p>
+        </div>
+        <p class="text-sm text-slate-600 -mt-2">Companion visual report to
+          <a class="font-mono text-indigo-700 hover:underline" href="2026-08-18-deepening-candidates-after-s7f.md">2026-08-18-deepening-candidates-after-s7f.md</a>,
+          which is the written record and carries the outcome. Status: <strong>all seven candidates and all eight smaller findings applied</strong>.</p>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="rounded-lg border border-slate-200 bg-white p-4">
+            <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">Legend</p>
+            <ul class="text-sm space-y-2">
+              <li class="flex items-center gap-3"><span class="inline-block w-10 h-5 border-2 border-slate-700 rounded-sm bg-white"></span> module</li>
+              <li class="flex items-center gap-3"><svg width="40" height="10"><line class="seam" x1="0" y1="5" x2="40" y2="5" stroke="#475569" stroke-width="2"/></svg> seam</li>
+              <li class="flex items-center gap-3"><svg width="40" height="10"><line x1="0" y1="5" x2="34" y2="5" stroke="#dc2626" stroke-width="2"/><path d="M34 1 L40 5 L34 9Z" fill="#dc2626"/></svg> leakage</li>
+              <li class="flex items-center gap-3"><span class="inline-block w-10 h-5 rounded-sm deep"></span> deep module</li>
+            </ul>
+          </div>
+
+          <div class="rounded-lg border border-slate-200 bg-white p-4">
+            <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">Scope — chosen by churn</p>
+            <p class="text-sm text-slate-600 mb-3">Touches per file in <code class="font-mono text-xs">src/</code>, last 60 commits.</p>
+            <div class="space-y-1.5 text-xs font-mono">
+              <div class="flex items-center gap-2"><span class="w-48 truncate text-slate-700">distance/__init__.py</span><span class="h-3 bg-indigo-600 rounded-sm" style="width:104px"></span><span class="text-slate-500">13</span></div>
+              <div class="flex items-center gap-2"><span class="w-48 truncate text-slate-700">export/common.py</span><span class="h-3 bg-indigo-500 rounded-sm" style="width:64px"></span><span class="text-slate-500">8</span></div>
+              <div class="flex items-center gap-2"><span class="w-48 truncate text-slate-700">distance/route_optimization.py</span><span class="h-3 bg-indigo-500 rounded-sm" style="width:56px"></span><span class="text-slate-500">7</span></div>
+              <div class="flex items-center gap-2"><span class="w-48 truncate text-slate-700">distance/turnpoint.py</span><span class="h-3 bg-indigo-400 rounded-sm" style="width:48px"></span><span class="text-slate-500">6</span></div>
+              <div class="flex items-center gap-2"><span class="w-48 truncate text-slate-700">distance/task_distances.py</span><span class="h-3 bg-indigo-300 rounded-sm" style="width:32px"></span><span class="text-slate-500">4</span></div>
+              <div class="flex items-center gap-2"><span class="w-48 truncate text-slate-700">distance/goal_line.py</span><span class="h-3 bg-indigo-300 rounded-sm" style="width:32px"></span><span class="text-slate-500">4</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- The framing chart -->
+        <div class="rounded-lg border border-slate-200 bg-white p-5">
+          <p class="text-xs uppercase tracking-wider text-slate-500 mb-1">The signal behind most of what follows</p>
+          <h2 class="font-serif text-xl mb-4">The <code class="font-mono text-base">distance</code> package interface widens with every S7F number</h2>
+          <div class="flex items-end gap-1.5 h-40 border-b border-l border-slate-300 pl-2">
+            <div class="flex flex-col items-center justify-end h-full"><span class="text-[10px] text-slate-500 mb-1">13</span><div class="w-9 bg-slate-300 rounded-t" style="height:59%"></div></div>
+            <div class="flex flex-col items-center justify-end h-full"><span class="text-[10px] text-slate-500 mb-1">17</span><div class="w-9 bg-slate-300 rounded-t" style="height:77%"></div></div>
+            <div class="flex flex-col items-center justify-end h-full"><span class="text-[10px] text-slate-500 mb-1">18</span><div class="w-9 bg-slate-300 rounded-t" style="height:82%"></div></div>
+            <div class="flex flex-col items-center justify-end h-full"><span class="text-[10px] text-slate-500 mb-1">19</span><div class="w-9 bg-slate-300 rounded-t" style="height:86%"></div></div>
+            <div class="flex flex-col items-center justify-end h-full"><span class="text-[10px] text-slate-500 mb-1">16</span><div class="w-9 bg-slate-300 rounded-t" style="height:73%"></div></div>
+            <div class="flex flex-col items-center justify-end h-full"><span class="text-[10px] text-slate-500 mb-1">18</span><div class="w-9 bg-slate-300 rounded-t" style="height:82%"></div></div>
+            <div class="flex flex-col items-center justify-end h-full"><span class="text-[10px] text-slate-500 mb-1">16</span><div class="w-9 bg-slate-300 rounded-t" style="height:73%"></div></div>
+            <div class="flex flex-col items-center justify-end h-full"><span class="text-[10px] text-slate-500 mb-1">17</span><div class="w-9 bg-slate-400 rounded-t" style="height:77%"></div></div>
+            <div class="flex flex-col items-center justify-end h-full"><span class="text-[10px] text-slate-500 mb-1">18</span><div class="w-9 bg-slate-400 rounded-t" style="height:82%"></div></div>
+            <div class="flex flex-col items-center justify-end h-full"><span class="text-[10px] font-semibold text-indigo-700 mb-1">22</span><div class="w-9 bg-indigo-600 rounded-t" style="height:100%"></div></div>
+          </div>
+          <div class="flex justify-between text-[10px] font-mono text-slate-500 mt-2 px-2">
+            <span>e03ce77 · 2026-08-17</span>
+            <span>names in <code>distance/__init__.py __all__</code></span>
+            <span>60ee50a · 2026-08-18</span>
+          </div>
+          <p class="text-sm text-slate-600 mt-4">Every S7F number that arrived — the speed section, the centre-distance readings, the task-area centre — widened the interface instead of being absorbed behind it. The last commit added four names at once. A caller who wants "the S7F reading of this task" must learn and correctly sequence five of them, three of which the front door does not export.</p>
+        </div>
+
+        <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+          <strong>Already deep, and argued <em>from</em> rather than against:</strong> <code class="font-mono text-xs">model/shape.py</code> (one field table per <strong>serializable shape</strong>), <code class="font-mono text-xs">model/validation.py</code>'s <code class="font-mono text-xs">TaskStructure</code> + two format adapters, <code class="font-mono text-xs">distance/speed_section.py</code>, and <code class="font-mono text-xs">export/</code>'s <code class="font-mono text-xs">TaskDrawing</code> + two renderers.
+        </div>
+
+        <nav class="rounded-lg border border-slate-200 bg-white p-4">
+          <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">Candidates</p>
+          <ol class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
+            <li><a class="hover:underline" href="#cand-a"><span class="inline-block w-4 font-mono text-slate-400">A</span> Name the measured task <span class="text-emerald-700 text-xs">Strong</span></a></li>
+            <li><a class="hover:underline" href="#cand-b"><span class="inline-block w-4 font-mono text-slate-400">B</span> The S7F report is trapped in the CLI <span class="text-emerald-700 text-xs">Strong</span></a></li>
+            <li><a class="hover:underline" href="#cand-c"><span class="inline-block w-4 font-mono text-slate-400">C</span> <code class="text-xs">--strict</code> validates the conversion <span class="text-emerald-700 text-xs">Strong</span></a></li>
+            <li><a class="hover:underline" href="#cand-d"><span class="inline-block w-4 font-mono text-slate-400">D</span> The earth model is threaded, not owned <span class="text-emerald-700 text-xs">Strong</span></a></li>
+            <li><a class="hover:underline" href="#cand-e"><span class="inline-block w-4 font-mono text-slate-400">E</span> One task, two answers about itself <span class="text-amber-700 text-xs">Worth exploring</span></a></li>
+            <li><a class="hover:underline" href="#cand-f"><span class="inline-block w-4 font-mono text-slate-400">F</span> The CLI has no read/write seam <span class="text-amber-700 text-xs">Worth exploring</span></a></li>
+            <li><a class="hover:underline" href="#cand-g"><span class="inline-block w-4 font-mono text-slate-400">G</span> The drawing answers colour, not label <span class="text-amber-700 text-xs">Worth exploring</span></a></li>
+          </ol>
+        </nav>
+      </header>
+
+      <!-- ══════════════════ CANDIDATES ══════════════════ -->
+      <section id="candidates" class="space-y-12">
+
+        <!-- ─────────── A ─────────── -->
+        <article id="cand-a" class="card-anchor rounded-xl border border-slate-300 bg-white shadow-sm overflow-hidden">
+          <div class="px-6 pt-6">
+            <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
+              <h2 class="font-serif text-2xl">A. Name the measured task</h2>
+              <div class="flex gap-2 shrink-0">
+                <span class="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-semibold">Strong</span>
+                <span class="px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-mono">in-process</span>
+              </div>
+            </div>
+            <p class="font-mono text-sm text-slate-500 mb-5">
+              distance/task_distances.py:158 · distance/goal_line.py:242 · distance/speed_section.py:100 · export/common.py:60 · cli.py:208
+            </p>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 px-6">
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">Before — every caller re-derives the route</p>
+              <pre class="mermaid">
+flowchart TD
+  T[Task]
+  T --> C1[cli._distance_report]
+  T --> C2[TaskDrawing.from_task]
+  T --> C3[SpeedSection.from_task]
+  T --> C4["GoalLine.from_task(route=None)"]
+  T --> C5[task_viewer/api.py]
+  C1 --> O["task_to_turnpoints +<br/>calculate_iteratively_refined_route"]
+  C2 --> O
+  C3 --> O
+  C4 --> O
+  C5 -.needs a route,<br/>reaches into export.-> C2
+  O --> R[OptimizedRoute]
+  R -.unenforced pairing.-> P["task_distances_from_route(task, route)"]
+  classDef leak stroke:#dc2626,stroke-width:2px,color:#7f1d1d;
+  class C5,P leak
+              </pre>
+            </div>
+
+            <div class="rounded-lg border border-slate-800 bg-white p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">After — one value, derived once</p>
+              <pre class="mermaid">
+flowchart TD
+  T[Task] --> M["MeasuredTask.from_task(task)"]
+  M --> V[["MeasuredTask<br/>turnpoints · route · legs<br/>speed section · goal line"]]
+  V --> C1[cli distances]
+  V --> C2[TaskDrawing]
+  V --> C5[task_viewer]
+  V --> C6[library callers]
+  classDef deep fill:#0f172a,color:#f8fafc,stroke:#0f172a,stroke-width:2px;
+  class V deep
+              </pre>
+            </div>
+          </div>
+
+          <div class="px-6 py-5 space-y-4">
+            <div>
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Problem</p>
+              <p class="text-slate-800">A <strong>Task</strong> and the <strong>optimized route</strong> flown for it are always used together and nothing binds them, so every caller re-derives the route and two public interfaces carry the pairing as an unenforceable sentence of prose.</p>
+            </div>
+            <div>
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Solution</p>
+              <p class="text-slate-800">One module in <code class="font-mono text-sm">distance/</code> holding a task, the turnpoints derived from it, and the route optimized for those turnpoints. <code class="font-mono text-sm">GoalLine.from_task</code>, <code class="font-mono text-sm">TaskDrawing</code>, the report and the CLI take that instead of a task plus an optional route — the mismatch stops being <em>representable</em> rather than staying documented.</p>
+            </div>
+
+            <div class="rounded-lg bg-red-50 border border-red-200 p-4">
+              <p class="text-xs uppercase tracking-wider text-red-700 mb-2">Reproduced — a mismatched pair is silent, both directions</p>
+              <pre class="text-xs font-mono text-red-900 leading-relaxed overflow-x-auto">task_distances_from_route(task_bevo, route_of_task_duna)      # no error
+  optimized_distance_km = 81.2    # task_bevo's true value: 94.0
+  savings_km            = 47.5    # savings_percent: 36.9
+  turnpoints            = 10 rows # fully formed, entirely wrong
+
+task_distances_from_route(task_gibe, route_of_task_bevo)      # 17 tps, 10 points
+  cumulative column = [0.0, 12.7, …, 94.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]</pre>
+              <p class="text-xs text-red-800 mt-2">That tail of zeros comes from <code class="font-mono">if i &lt; len(cumulative) else 0.0</code> (<code class="font-mono">task_distances.py:134</code>, twinned at <code class="font-mono">cli.py:240</code>) — unreachable for a correctly-paired call, a wrong-number generator for an incorrect one.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="rounded-lg bg-stone-100 p-4">
+                <p class="text-xs uppercase tracking-wider text-slate-500 mb-2">The unnamed incantation</p>
+                <p class="text-sm text-slate-700 mb-2"><code class="font-mono text-xs bg-white px-1.5 py-0.5 rounded border border-slate-300">calculate_iteratively_refined_route(task_to_turnpoints(task))</code></p>
+                <p class="text-3xl font-serif text-slate-800">12 <span class="text-base text-slate-500">call sites</span></p>
+                <p class="text-xs text-slate-500">2 in <code class="font-mono">src/</code>, 10 in <code class="font-mono">tests/</code>, plus <code class="font-mono">cli.py</code> across two lines. The two prose invariants sit at <code class="font-mono">task_distances.py:165</code> and <code class="font-mono">goal_line.py:251</code>.</p>
+              </div>
+              <div class="rounded-lg bg-stone-100 p-4">
+                <p class="text-xs uppercase tracking-wider text-slate-500 mb-2">Seam leak, and a stray edge</p>
+                <p class="text-sm text-slate-700 mb-2"><code class="font-mono text-xs">scripts/task_viewer/api.py:188</code> builds a <code class="font-mono text-xs">TaskDrawing</code> — an <code class="font-mono text-xs">export</code> concept — purely to obtain an <code class="font-mono text-xs">OptimizedRoute</code> for its table.</p>
+                <p class="text-sm text-slate-700"><code class="font-mono text-xs">goal_line.py</code> and <code class="font-mono text-xs">speed_section.py</code> both import <code class="font-mono text-xs">task_distances</code> for <code class="font-mono text-xs">task_to_turnpoints</code> and nothing else — the goal line depending on the <em>report</em> module is an accident of where that adapter was parked, and <code class="font-mono text-xs">distance/__init__.py:40</code> has to explain the edge away.</p>
+              </div>
+            </div>
+
+            <div>
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-2">Wins</p>
+              <ul class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1.5 text-sm text-slate-800">
+                <li>• leverage: one interface, 12 call sites</li>
+                <li>• locality: the pairing becomes unstateable</li>
+                <li>• Deletes two prose-only preconditions</li>
+                <li>• Viewer stops reaching through <code class="font-mono text-xs">export</code></li>
+                <li>• Two dead <code class="font-mono text-xs">else 0.0</code> clauses go</li>
+                <li>• Tests construct one value, not two</li>
+              </ul>
+            </div>
+
+            <div class="rounded-lg bg-slate-50 border border-slate-200 p-3 text-sm text-slate-700">
+              <strong>Precedent in this repo:</strong> <code class="font-mono text-xs">TaskStructure</code> (<code class="font-mono text-xs">model/validation.py:108</code>) did exactly this for the rules one commit ago — one value, two format adapters — and <code class="font-mono text-xs">SpeedSection</code> is already the shape proposed here.
+            </div>
+          </div>
+        </article>
+
+        <!-- ─────────── B ─────────── -->
+        <article id="cand-b" class="card-anchor rounded-xl border border-slate-300 bg-white shadow-sm overflow-hidden">
+          <div class="px-6 pt-6">
+            <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
+              <h2 class="font-serif text-2xl">B. The S7F report is trapped in the CLI</h2>
+              <div class="flex gap-2 shrink-0">
+                <span class="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-semibold">Strong</span>
+                <span class="px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-mono">in-process</span>
+              </div>
+            </div>
+            <p class="font-mono text-sm text-slate-500 mb-5">cli.py:195–262 · cli.py:265–306 · tests/test_cli.py:185–275 · docs/s7f-distance-reference.md:243</p>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 px-6">
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">Before — the test surface is a CLI runner</p>
+              <div class="space-y-0">
+                <div class="h-11 border-l-4 border-slate-400 bg-white px-3 flex items-center text-xs uppercase tracking-wider text-slate-600">tests/test_cli.py</div>
+                <div class="h-11 border-l-4 border-red-500 hatch px-3 flex items-center text-xs uppercase tracking-wider text-red-900">CliRunner().invoke(distances)</div>
+                <div class="h-11 border-l-4 border-red-500 hatch px-3 flex items-center text-xs uppercase tracking-wider text-red-900">assert exit_code · json.loads(output)</div>
+                <div class="h-24 border-l-4 border-slate-700 bg-slate-100 px-3 flex flex-col justify-center text-xs">
+                  <span class="uppercase tracking-wider text-slate-700 font-semibold">_distance_report + _format_report_text</span>
+                  <span class="text-slate-500 mt-1">110 of cli.py's 402 lines · private · 0 test references</span>
+                </div>
+                <div class="h-11 border-l-4 border-slate-400 bg-white px-3 flex items-center text-xs uppercase tracking-wider text-slate-600">distance package</div>
+              </div>
+              <p class="text-xs text-slate-500 mt-3">Two shaded bands are machinery a test crosses to reach the numbers.</p>
+            </div>
+
+            <div class="rounded-lg border border-slate-800 bg-white p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">After — the report is a value, rendered twice</p>
+              <div class="space-y-0">
+                <div class="h-11 border-l-4 border-slate-400 bg-white px-3 flex items-center text-xs uppercase tracking-wider text-slate-600">tests · library callers · docs · CLI</div>
+                <div class="h-24 border-l-4 border-emerald-600 deep px-3 flex flex-col justify-center text-xs rounded-r">
+                  <span class="uppercase tracking-wider text-white font-semibold">DistanceReport — one interface</span>
+                  <span class="text-slate-300 mt-1">numbers · provenance · notes · route points<br/>as_dict() and as_text() are two renderings</span>
+                </div>
+                <div class="h-11 border-l-4 border-slate-400 bg-white px-3 flex items-center text-xs uppercase tracking-wider text-slate-600">cli.py — parse, render, write</div>
+                <div class="h-11 border-l-4 border-slate-400 bg-white px-3 flex items-center text-xs uppercase tracking-wider text-slate-600">distance package</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="px-6 py-5 space-y-4">
+            <div>
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Problem</p>
+              <p class="text-slate-800"><code class="font-mono text-sm">CLAUDE.md</code> calls the <code class="font-mono text-sm">distances</code> JSON keys and its <code class="font-mono text-sm">notes</code> block "part of the public surface" and "the command another implementation is meant to diff against" — yet the module producing it is a leading-underscore function in <code class="font-mono text-sm">cli.py</code>, in neither <code class="font-mono text-sm">__all__</code>.</p>
+            </div>
+            <div>
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Solution</p>
+              <p class="text-slate-800">A report value in <code class="font-mono text-sm">distance/</code>, beside <code class="font-mono text-sm">SpeedSection</code> and <code class="font-mono text-sm">CenterDistanceReading</code> whose shape it already mirrors, holding the numbers and their provenance with two renderings. The CLI shrinks to parse → build → render → write.</p>
+            </div>
+
+            <div class="rounded-lg bg-amber-50 border border-amber-200 p-4">
+              <p class="text-xs uppercase tracking-wider text-amber-800 mb-2">The same eleven numbers are assembled three times</p>
+              <ul class="text-sm text-amber-950 space-y-1.5">
+                <li><strong>1.</strong> <code class="font-mono text-xs">_distance_report</code> builds the dict. <code class="font-mono text-xs">grep -rn "_distance_report" tests/</code> → <strong>0 hits</strong>; 7 of 13 <code class="font-mono text-xs">TestCLIDistances</code> tests assert on report <em>content</em> through a runner and <code class="font-mono text-xs">json.loads(stdout)</code>.</li>
+                <li><strong>2.</strong> <code class="font-mono text-xs">_format_report_text</code> reads it back out by string key nine times. The two already disagree about absence: <code class="font-mono text-xs">:238</code> writes <code class="font-mono text-xs">cumulative_m: None</code> defensively, <code class="font-mono text-xs">:300</code> does <code class="font-mono text-xs">point['cumulative_m'] / 1000</code> unguarded.</li>
+                <li><strong>3.</strong> <code class="font-mono text-xs">docs/s7f-distance-reference.md:243</code> tells a library user to hand-roll it from four <code class="font-mono text-xs">pyxctsk.distance</code> imports. That snippet omits the route points — the doc's own headline recommendation — and <strong>crashes on a task with no speed section</strong>: <code class="font-mono text-xs">SpeedSection.from_task(t).distance_m → AttributeError: 'NoneType'</code> (verified on <code class="font-mono text-xs">task_dami_route</code>).</li>
+              </ul>
+            </div>
+
+            <div class="rounded-lg bg-stone-100 p-3 text-sm text-slate-700">
+              <code class="font-mono text-xs">README.md</code>'s usage examples show <strong>no distance interface at all</strong> — the library's headline capability is documented only as a CLI. The "at least two turnpoints" rule (<code class="font-mono text-xs">cli.py:374</code>) moves with the report: today it is the only place that knows a one-turnpoint task has no distance, and a library caller silently gets <code class="font-mono text-xs">0.0</code>.
+            </div>
+
+            <div>
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-2">Wins</p>
+              <ul class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1.5 text-sm text-slate-800">
+                <li>• The interface is the test surface again</li>
+                <li>• leverage: the public surface becomes importable</li>
+                <li>• locality: key names change in one module</li>
+                <li>• Text and JSON provably agree</li>
+                <li>• <code class="font-mono text-xs">cli.py</code> sheds 110 of 402 lines</li>
+                <li>• The docs' snippet becomes one call</li>
+              </ul>
+            </div>
+          </div>
+        </article>
+
+        <!-- ─────────── C ─────────── -->
+        <article id="cand-c" class="card-anchor rounded-xl border border-slate-300 bg-white shadow-sm overflow-hidden">
+          <div class="px-6 pt-6">
+            <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
+              <h2 class="font-serif text-2xl">C. <code class="font-mono text-xl">--strict</code> validates the conversion, not the payload</h2>
+              <div class="flex gap-2 shrink-0">
+                <span class="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-semibold">Strong</span>
+                <span class="px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-mono">ports &amp; adapters</span>
+              </div>
+            </div>
+            <p class="font-mono text-sm text-slate-500 mb-5">parser.py:83–142 · parser.py:148 · parser.py:202 · qrcode/conversion.py:270 · model/validation.py:16–22</p>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 px-6">
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">Before — the payload is gone before the gate</p>
+              <pre class="mermaid">
+flowchart TD
+  I1["XCTSK: url"] --> A1[_parse_xctsk_url]
+  I2["qrcode json"] --> A2[_parse_qrcode_json]
+  I3["qr image"] --> A3[_parse_qrcode_image]
+  I4[".xctsk json"] --> A4[_parse_json]
+  A1 --> Q["QRCodeTask.to_task()<br/>inside the adapter"]
+  A2 --> Q
+  A3 --> Q
+  Q --> TK[Task]
+  A4 --> TK
+  TK --> G["strict? Task.validate()"]
+  QV["QRCodeTask.validate()<br/>exists, tested, never reached"]
+  classDef leak stroke:#dc2626,stroke-width:2px,color:#7f1d1d;
+  class Q,QV leak
+              </pre>
+            </div>
+            <div class="rounded-lg border border-slate-800 bg-white p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">After — validate what arrived, then convert</p>
+              <pre class="mermaid">
+flowchart TD
+  I1["XCTSK: url"] --> A1[adapter]
+  I2["qrcode json"] --> A1
+  I3["qr image"] --> A1
+  I4[".xctsk json"] --> A2[adapter]
+  A1 --> P[["arrived payload<br/>knows its own validate()"]]
+  A2 --> P
+  P --> G["strict? payload.validate()"]
+  G --> TK[Task]
+  classDef deep fill:#0f172a,color:#f8fafc,stroke:#0f172a,stroke-width:2px;
+  class P deep
+              </pre>
+            </div>
+          </div>
+
+          <div class="px-6 py-5 space-y-4">
+            <div>
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Problem</p>
+              <p class="text-slate-800">Three of the four format adapters call <code class="font-mono text-sm">to_task()</code> <em>inside</em> the adapter, so by the strict gate the payload is gone and <code class="font-mono text-sm">Task.validate()</code> reports on the conversion — the exact failure <code class="font-mono text-sm">validation.py:18</code> says the <code class="font-mono text-sm">TaskStructure</code> split exists to prevent.</p>
+            </div>
+            <div>
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Solution</p>
+              <p class="text-slate-800">An adapter's job becomes "recognise, and hand back the thing that arrived" — a payload that knows how to validate itself. <code class="font-mono text-sm">parse_task</code> asks <em>that</em> before converting. The seam already exists: both formats present a <code class="font-mono text-sm">TaskStructure</code>. The parser drops the object holding the format's own answer one line before it would be useful.</p>
+            </div>
+
+            <div class="rounded-lg bg-red-50 border border-red-200 p-4">
+              <p class="text-xs uppercase tracking-wider text-red-700 mb-2">Reproduced — a QR payload's own verdict never reaches <code class="font-mono">--strict</code></p>
+              <pre class="text-xs font-mono text-red-900 leading-relaxed overflow-x-auto">qr.version = 99
+QRCodeTask.validate()           → ['this format defines version 2, the task declares 99']
+parse_task(payload).version     → 1          # the converter invented it
+parse_task(payload).validate()  → []
+parse_task(payload, strict=True)→ ACCEPTED   ← the violation is unreportable</pre>
+              <p class="text-xs text-red-800 mt-2">So <code class="font-mono">convert --strict</code> and <code class="font-mono">distances --strict</code> cannot report <code class="font-mono">UNKNOWN_VERSION</code> for <em>any</em> <code class="font-mono">XCTSK:</code> string, <code class="font-mono">XCTSKZ:</code> string, QR-code JSON or QR image. <code class="font-mono">QRCodeTask.validate()</code> is tested at <code class="font-mono">tests/qrcode/test_conversion.py:160</code>; nothing routes arrival through it. The 2026-08-17 card records this as "wired to <code class="font-mono">--strict</code>" for both formats; it is wired for one.</p>
+            </div>
+
+            <div>
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-2">Wins</p>
+              <ul class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1.5 text-sm text-slate-800">
+                <li>• <code class="font-mono text-xs">--strict</code> becomes a real gate for 4 formats</li>
+                <li>• locality: the gate sits at one place</li>
+                <li>• Two adapters justify the seam — it is real</li>
+                <li>• One table test covers every format × rule</li>
+              </ul>
+            </div>
+            <p class="text-sm text-slate-600">No test today exercises <code class="font-mono text-xs">--strict</code> on QR input at all; <code class="font-mono text-xs">tests/test_cli.py:178</code> only asserts the flag appears in <code class="font-mono text-xs">--help</code>.</p>
+          </div>
+        </article>
+
+        <!-- ─────────── D ─────────── -->
+        <article id="cand-d" class="card-anchor rounded-xl border border-slate-300 bg-white shadow-sm overflow-hidden">
+          <div class="px-6 pt-6">
+            <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
+              <h2 class="font-serif text-2xl">D. The earth model is threaded, not owned</h2>
+              <div class="flex gap-2 shrink-0">
+                <span class="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-semibold">Strong</span>
+                <span class="px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-mono">in-process</span>
+              </div>
+            </div>
+            <p class="font-mono text-sm text-slate-500 mb-5">distance/turnpoint.py:37–84 · :370–391 · :394–435 · :519–556 · route_optimization.py:436 · 16 <code>earth_model: object</code> signatures</p>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 px-6">
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-4">Before — wide interface, one-line implementation</p>
+              <div class="flex items-end gap-4 h-56">
+                <div class="flex-1 flex flex-col justify-end">
+                  <div class="hatch border-2 border-red-400 rounded-t flex items-center justify-center text-[10px] uppercase tracking-wider text-red-900 text-center px-1" style="height:150px">interface<br/>16 × <code>earth_model: object</code><br/>+ 1 getattr fallback</div>
+                  <div class="bg-slate-300 border-2 border-t-0 border-slate-400 rounded-b flex items-center justify-center text-[10px] uppercase tracking-wider text-slate-700" style="height:34px">impl</div>
+                </div>
+                <div class="flex-1 text-xs text-slate-600 pb-2">
+                  <p class="mb-2">The whole implementation:</p>
+                  <pre class="font-mono text-[10px] bg-white border border-slate-300 rounded p-2 leading-snug">str(value).upper() == "FAI_SPHERE"</pre>
+                  <p class="mt-2 text-slate-500">Everything else is WGS84 — including typos and integers.</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="rounded-lg border border-slate-800 bg-white p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-4">After — resolved once, carried as a type</p>
+              <div class="flex items-end gap-4 h-56">
+                <div class="flex-1 flex flex-col justify-end">
+                  <div class="bg-emerald-100 border-2 border-emerald-600 rounded-t flex items-center justify-center text-[10px] uppercase tracking-wider text-emerald-900 text-center px-1" style="height:40px">interface<br/><code>EarthModel | str | None</code></div>
+                  <div class="deep border-2 border-t-0 border-slate-900 rounded-b flex flex-col items-center justify-center text-[10px] uppercase tracking-wider text-slate-200 text-center px-2" style="height:144px"><span>implementation absorbs</span><span class="text-slate-400 mt-1 normal-case tracking-normal">selection · both engines<br/>distance · plane · snap</span></div>
+                </div>
+                <div class="flex-1 text-xs text-slate-600 pb-2">
+                  <p>mypy checks the 16 signatures it currently cannot see. <code class="font-mono">LocalPlane</code> keeps the model it was built from, so plane and snap cannot disagree.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="px-6 py-5 space-y-4">
+            <div>
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Problem</p>
+              <p class="text-slate-800"><code class="font-mono text-sm">CONTEXT.md</code> says the <strong>earth model</strong> is "a property of the task, so every length in a task agrees". In <code class="font-mono text-sm">distance/</code> it is a trailing <code class="font-mono text-sm">object</code>-typed argument on 16 signatures, stored on every <code class="font-mono text-sm">TaskTurnpoint</code>, and read back off element 0 by <code class="font-mono text-sm">getattr</code>.</p>
+            </div>
+            <div>
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Solution</p>
+              <p class="text-slate-800">Give ADR 0003's selector a name and a module: one value owning the two engines and the selection rule, exposing distance, plane and snap. <code class="font-mono text-sm">tests/test_layering.py</code> already permits <code class="font-mono text-sm">distance → model</code>, so the enum is reachable.</p>
+            </div>
+
+            <div class="rounded-lg bg-red-50 border border-red-200 p-4">
+              <p class="text-xs uppercase tracking-wider text-red-700 mb-2">Reproduced — three ways to be silently wrong</p>
+              <pre class="text-xs font-mono text-red-900 leading-relaxed overflow-x-auto">geodesic_distance(a, b, "FAI_SPHERE") → 134989.615 m
+geodesic_distance(a, b, "FAI-SPHERE") → 135087.210 m   ← typo, 97.6 m out, no error
+geodesic_distance(a, b, 42)           → 135087.210 m   ← passes mypy
+
+TurnpointGeometry protocol declares center, radius, goal_type — and the
+docstring says "only three things". route_optimization.py:436 then reaches
+for a fourth by getattr(turnpoints[0], "earth_model", None). A conforming
+fake gets a different distance for identical geometry.
+
+TaskTurnpoint.optimal_point(prev, next, plane=None) solves in the plane it
+is given but snaps with self.earth_model — worst corpus divergence between
+its default plane and the task's: 42.36 cm (task_nubu, tp 3).</pre>
+            </div>
+
+            <div class="rounded-lg bg-amber-50 border border-amber-300 p-3 text-sm text-amber-900">
+              ⚠ <strong>Touches ADR 0003 without contradicting it.</strong> ADR 0003 fixes <em>which</em> values the selector accepts; this names that set so the type checker can enforce it, and stops the model being stored per-turnpoint when <code class="font-mono text-xs">CONTEXT.md</code> calls it a property of the task. Worth opening the ADR alongside.
+            </div>
+
+            <div>
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-2">Wins</p>
+              <ul class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1.5 text-sm text-slate-800">
+                <li>• 16 signatures become checkable</li>
+                <li>• The protocol stops under-declaring itself</li>
+                <li>• Plane/snap mismatch unrepresentable</li>
+                <li>• "unknown earth model raises" becomes testable</li>
+              </ul>
+            </div>
+            <p class="text-sm text-slate-600"><strong>Smallest independent slice:</strong> give <code class="font-mono text-xs">LocalPlane</code> a fourth field for the model it was built from. <code class="font-mono text-xs">_corrected_path</code> then loses a parameter and <code class="font-mono text-xs">optimal_point</code> takes the model from the plane. Mechanical, and it lands on its own.</p>
+          </div>
+        </article>
+
+        <!-- ─────────── E ─────────── -->
+        <article id="cand-e" class="card-anchor rounded-xl border border-slate-300 bg-white shadow-sm overflow-hidden">
+          <div class="px-6 pt-6">
+            <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
+              <h2 class="font-serif text-2xl">E. One task, two answers about itself</h2>
+              <div class="flex gap-2 shrink-0">
+                <span class="px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-semibold">Worth exploring</span>
+                <span class="px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-mono">in-process</span>
+              </div>
+            </div>
+            <p class="font-mono text-sm text-slate-500 mb-5">distance/speed_section.py:36–50, :84–93 · distance/center_distance.py:106–120 · distance/task_distances.py:182 · cli.py:227</p>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 px-6">
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">Before — three readers, three answers</p>
+              <pre class="mermaid">
+flowchart TD
+  T[Task]
+  T --> SS["SpeedSection<br/>guards on TaskType.WAYPOINTS"]
+  T --> CD["center_distance START_TO_GOAL<br/>scans roles, no guard"]
+  T --> TD["task_distances_from_route<br/>calls the primitive"]
+  SS --> R1["speed_section: None"]
+  CD --> R2["START_TO_GOAL: 112 416 m"]
+  TD --> R3["center_distance_km<br/>bypasses the reading"]
+  classDef leak stroke:#dc2626,stroke-width:2px,color:#7f1d1d;
+  class CD,TD,R2,R3 leak
+              </pre>
+            </div>
+            <div class="rounded-lg border border-slate-800 bg-white p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">After — one owner per question</p>
+              <pre class="mermaid">
+flowchart TD
+  T[Task] --> Q[["does this task have a speed section,<br/>and where does its goal end?"]]
+  Q --> SS[SpeedSection]
+  Q --> CD[center_distance]
+  CD --> RPT[report]
+  classDef deep fill:#0f172a,color:#f8fafc,stroke:#0f172a,stroke-width:2px;
+  class Q deep
+              </pre>
+            </div>
+          </div>
+
+          <div class="px-6 py-5 space-y-4">
+            <div>
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Problem</p>
+              <p class="text-slate-800">"Does this task have a <strong>speed section</strong>", "where does its <strong>goal</strong> actually end", and "what is the published <strong>distance through centres</strong>" are each answered in two places, and a fix applied to one reader has already failed to reach the other.</p>
+            </div>
+            <div>
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Solution</p>
+              <p class="text-slate-800">One query for a task's roles and its goal's effective geometry that both readers consult, and a report that asks <code class="font-mono text-sm">center_distance(task)</code> for the published number instead of re-deriving it from the primitive.</p>
+            </div>
+
+            <div class="rounded-lg bg-red-50 border border-red-200 p-4">
+              <p class="text-xs uppercase tracking-wider text-red-700 mb-2">Reproduced — one JSON document says both things</p>
+              <pre class="text-xs font-mono text-red-900 leading-relaxed overflow-x-auto">taskType = W (XC/Waypoints), turnpoints annotated TAKEOFF / SSS / ESS
+
+speed_section_distance_m                      : None       ← roles ignored
+center_distance_readings_m['START_TO_GOAL']   : 112416.5   ← roles obeyed</pre>
+              <p class="text-xs text-red-800 mt-2">Commit <code class="font-mono">9749a93</code> added the <code class="font-mono">TaskType.WAYPOINTS</code> guard to <code class="font-mono">SpeedSection.from_task</code> precisely because a waypoints task's annotations go unvalidated. <code class="font-mono">center_distance</code>'s identical scan never got it.</p>
+            </div>
+
+            <div class="rounded-lg bg-amber-50 border border-amber-200 p-4">
+              <p class="text-xs uppercase tracking-wider text-amber-800 mb-2">Two more, same shape</p>
+              <ul class="text-sm text-amber-950 space-y-1.5">
+                <li><strong>The goal's shape is stated twice.</strong> <code class="font-mono text-xs">LAUNCH_TO_GOAL_BOUNDARY</code> subtracts the goal radius so the number "ends where the optimized distance ends" — but a LINE goal is a zero-radius circle (<code class="font-mono text-xs">task_to_turnpoints:45</code>, <code class="font-mono text-xs">plane_circle:489</code>), so the route ends at the <em>centre</em> and the subtraction is unearned. Verified on <code class="font-mono text-xs">task_fobe_line</code>: <code class="font-mono text-xs">218181.4 → 218081.4</code>, 100 m short of its own definition. <code class="font-mono text-xs">tests/distance/test_center_distance.py</code> has no LINE-goal and no WAYPOINTS case.</li>
+                <li><strong>The centre-distance convention has two spellings.</strong> <code class="font-mono text-xs">task_distances_from_route:182</code> calls <code class="font-mono text-xs">distance_through_centers</code> — documented as "the primitive, not the published number" — and publishes it as <code class="font-mono text-xs">center_distance_km</code> with no caveat, while the CLI honours <code class="font-mono text-xs">PROPOSED_READING</code>. They agree on all corpus tasks <em>today</em>, and diverge by up to <strong>1.0 km</strong> (<code class="font-mono text-xs">task_gibe</code>) the moment the proposed reading changes — the precise failure <code class="font-mono text-xs">CenterDistanceReading</code> was built to prevent.</li>
+              </ul>
+            </div>
+
+            <div>
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-2">Wins</p>
+              <ul class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1.5 text-sm text-slate-800">
+                <li>• locality: one rule, both readers</li>
+                <li>• A reading change cannot half-land</li>
+                <li>• The next role rule can't skip a reader</li>
+                <li>• LINE + WAYPOINTS gain their first tests</li>
+              </ul>
+            </div>
+          </div>
+        </article>
+
+        <!-- ─────────── F ─────────── -->
+        <article id="cand-f" class="card-anchor rounded-xl border border-slate-300 bg-white shadow-sm overflow-hidden">
+          <div class="px-6 pt-6">
+            <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
+              <h2 class="font-serif text-2xl">F. The CLI has no read/write seam</h2>
+              <div class="flex gap-2 shrink-0">
+                <span class="px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-semibold">Worth exploring</span>
+                <span class="px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-mono">in-process</span>
+              </div>
+            </div>
+            <p class="font-mono text-sm text-slate-500 mb-5">cli.py:128–138 &amp; :361–371 (identical reads) · :146, :154, :176, :388 (four writes) · :182, :394 (error handling)</p>
+          </div>
+
+          <div class="px-6">
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-4">Six blocks, four decisions, answered differently</p>
+              <div class="overflow-x-auto">
+                <table class="w-full text-xs">
+                  <thead>
+                    <tr class="text-left text-slate-500 uppercase tracking-wider border-b border-slate-300">
+                      <th class="py-2 pr-3 font-normal">write block</th>
+                      <th class="py-2 pr-3 font-normal">encoding</th>
+                      <th class="py-2 pr-3 font-normal">trailing newline</th>
+                      <th class="py-2 font-normal">stdout path</th>
+                    </tr>
+                  </thead>
+                  <tbody class="font-mono text-slate-700">
+                    <tr class="border-b border-slate-200"><td class="py-2 pr-3">convert json :146</td><td class="py-2 pr-3 text-red-600">locale</td><td class="py-2 pr-3 text-red-600">none (<code>7d</code>)</td><td class="py-2">click.echo</td></tr>
+                    <tr class="border-b border-slate-200"><td class="py-2 pr-3">convert kml :154</td><td class="py-2 pr-3 text-red-600">locale</td><td class="py-2 pr-3 text-red-600">none</td><td class="py-2">click.echo</td></tr>
+                    <tr class="border-b border-slate-200"><td class="py-2 pr-3">convert png :176</td><td class="py-2 pr-3 text-slate-500">bytes</td><td class="py-2 pr-3">—</td><td class="py-2">stdout.buffer</td></tr>
+                    <tr><td class="py-2 pr-3">distances :388</td><td class="py-2 pr-3 text-red-600">locale</td><td class="py-2 pr-3 text-emerald-700">yes (<code>0a</code>)</td><td class="py-2">click.echo</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <p class="text-xs text-slate-500 mt-3">Verified: <code class="font-mono">convert -o</code> ends <code class="font-mono">}</code>, <code class="font-mono">distances -o</code> ends <code class="font-mono">\n</code>. Nobody chose that.</p>
+            </div>
+          </div>
+
+          <div class="px-6 py-5 space-y-4">
+            <div>
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Problem</p>
+              <p class="text-slate-800">Reading input and writing output are spelled out six times, so four decisions — encoding, newline, text vs bytes, stdout vs file — are each made independently, and two of them are already made inconsistently.</p>
+            </div>
+            <div>
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Solution</p>
+              <p class="text-slate-800">One <code class="font-mono text-sm">read_input</code> and one <code class="font-mono text-sm">write_output</code> where the payload knows whether it is text or bytes. That one module becomes the only place that has to know the output is UTF-8.</p>
+            </div>
+
+            <div class="rounded-lg bg-red-50 border border-red-200 p-4">
+              <p class="text-xs uppercase tracking-wider text-red-700 mb-2">Reproduced — no <code class="font-mono">encoding=</code> on any of the four writes</p>
+              <pre class="text-xs font-mono text-red-900 leading-relaxed overflow-x-auto">$ LC_ALL=C PYTHONCOERCECLOCALE=0 PYTHONUTF8=0 \
+    pyxctsk distances task_bevo.xctsk --format text -o out.txt
+Error: 'ascii' codec can't encode character '\xa7' in position 77
+exit=1</pre>
+              <p class="text-xs text-red-800 mt-2">The text report contains <code class="font-mono">§</code>, so on a non-UTF-8 locale the <code class="font-mono">-o</code> path fails for <em>every</em> task. Linux usually escapes this via PEP 538 locale coercion — but Windows defaults to cp1252, where this <strong>silently writes a mis-encoded file</strong>, and the KML it writes declares <code class="font-mono">encoding="UTF-8"</code>. The <code class="font-mono">-o</code> path is the one <code class="font-mono">docs/s7f-distance-reference.md:238</code> recommends for running a corpus.</p>
+            </div>
+
+            <div class="rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm text-amber-900">
+              Same absence, third symptom: <code class="font-mono text-xs">except Exception as e: click.echo(f"Error: {e}")</code> makes a library <code class="font-mono text-xs">TypeError</code> indistinguishable from unparseable input, and <code class="font-mono text-xs">tests/test_cli.py:298</code> asserts only that <code class="font-mono text-xs">"Error:"</code> appears — so an internal crash passes. <code class="font-mono text-xs">except SystemExit: raise</code> at <code class="font-mono text-xs">:394</code> is dead (<code class="font-mono text-xs">SystemExit</code> is not an <code class="font-mono text-xs">Exception</code>).
+            </div>
+
+            <div>
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-2">Wins</p>
+              <ul class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1.5 text-sm text-slate-800">
+                <li>• locality: encoding decided once</li>
+                <li>• Non-ASCII round-trip becomes testable</li>
+                <li>• Error tests assert kind, not the word "Error:"</li>
+                <li>• Six blocks collapse to two</li>
+              </ul>
+            </div>
+            <p class="text-sm text-slate-600">No corpus task contains non-ASCII text (<code class="font-mono text-xs">grep -lP "[^\x00-\x7F]"</code> → nothing), which is why nothing caught it.</p>
+          </div>
+        </article>
+
+        <!-- ─────────── G ─────────── -->
+        <article id="cand-g" class="card-anchor rounded-xl border border-slate-300 bg-white shadow-sm overflow-hidden">
+          <div class="px-6 pt-6">
+            <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
+              <h2 class="font-serif text-2xl">G. The drawing answers colour, but not label or description</h2>
+              <div class="flex gap-2 shrink-0">
+                <span class="px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-semibold">Worth exploring</span>
+                <span class="px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-mono">in-process</span>
+              </div>
+            </div>
+            <p class="font-mono text-sm text-slate-500 mb-5">export/common.py:107–126 (<code>color_of</code>, the precedent) · export/kml.py:67, :68, :80 · export/geojson.py:44, :47, :49</p>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 px-6">
+            <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">Before — one question answered, three not</p>
+              <div class="space-y-2">
+                <div class="rounded border-2 border-slate-700 bg-white p-2.5">
+                  <p class="text-[10px] uppercase tracking-wider text-slate-500 mb-2">TaskDrawing</p>
+                  <div class="text-[11px] font-mono space-y-1">
+                    <div class="bg-emerald-100 border border-emerald-400 rounded px-2 py-1">color_of() ✓ shared</div>
+                    <div class="hatch border border-red-400 rounded px-2 py-1 text-red-900">label &mdash; assembled twice</div>
+                    <div class="hatch border border-red-400 rounded px-2 py-1 text-red-900">description &mdash; assembled twice</div>
+                  </div>
+                </div>
+                <div class="grid grid-cols-2 gap-2 text-[11px] font-mono">
+                  <div class="rounded border border-slate-300 bg-white px-2 py-1.5">kml.py<br/><span class="text-slate-500">TP{i+1} ×2</span></div>
+                  <div class="rounded border border-slate-300 bg-white px-2 py-1.5">geojson.py<br/><span class="text-slate-500">TP{i+1} ×1</span></div>
+                </div>
+              </div>
+            </div>
+            <div class="rounded-lg border border-slate-800 bg-white p-4">
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">After — the drawing answers all three</p>
+              <div class="rounded deep p-3">
+                <p class="text-[10px] uppercase tracking-wider text-slate-400 mb-2">TaskDrawing</p>
+                <div class="text-[11px] font-mono space-y-1 text-slate-100">
+                  <div class="bg-slate-700 rounded px-2 py-1">color_of()</div>
+                  <div class="bg-slate-700 rounded px-2 py-1">label_of()</div>
+                  <div class="bg-slate-700 rounded px-2 py-1">description_of()</div>
+                </div>
+              </div>
+              <p class="text-xs text-slate-500 mt-3">Both writers render one value; a cross-format test becomes writable.</p>
+            </div>
+          </div>
+
+          <div class="px-6 py-5 space-y-4">
+            <div>
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Problem</p>
+              <p class="text-slate-800">Applied candidate D moved <em>colour</em> onto the drawing because "a question both writers must answer identically is a method on the drawing". Label and description were left behind, and the two writers now disagree — with the KML one visibly wrong.</p>
+            </div>
+
+            <div class="rounded-lg bg-red-50 border border-red-200 p-4">
+              <p class="text-xs uppercase tracking-wider text-red-700 mb-2">Reproduced on <code class="font-mono">task_bevo</code> — a Python repr in user-visible map text</p>
+              <pre class="text-xs font-mono text-red-900 leading-relaxed overflow-x-auto">KML     &lt;description&gt;Type: TurnpointType.TAKEOFF, Radius: 400m&lt;/description&gt;
+KML     &lt;description&gt;Type: None, Radius: 4500m&lt;/description&gt;
+GeoJSON description "Radius: 400m"   tp_type &lt;TurnpointType.TAKEOFF: 'TAKEOFF'&gt;</pre>
+              <p class="text-xs text-red-800 mt-2"><code class="font-mono">geojson.py:49</code> uses <code class="font-mono">getattr(turnpoint, "type", None)</code> — a defensive <code class="font-mono">getattr</code> on a dataclass field that always exists — and skips the <code class="font-mono">or TurnpointType.NONE</code> normalisation <code class="font-mono">color_of</code> performs. That is the exact asymmetry <code class="font-mono">color_of</code>'s docstring says it was created to remove.</p>
+            </div>
+
+            <div class="rounded-lg bg-amber-50 border border-amber-300 p-3 text-sm text-amber-900">
+              ⚠ <strong>A test currently pins the bug:</strong> <code class="font-mono text-xs">tests/export/test_kml.py:76</code> asserts <code class="font-mono text-xs">"Type: TurnpointType.TAKEOFF" in kml_result</code> as expected output. Fixing the label means changing that assertion — worth confirming it was never a deliberate choice.
+            </div>
+
+            <div>
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-2">Wins</p>
+              <ul class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1.5 text-sm text-slate-800">
+                <li>• locality: three fallbacks become one</li>
+                <li>• "both writers name it the same" testable</li>
+                <li>• The enum repr leaves the map</li>
+                <li>• Follows applied candidate D exactly</li>
+              </ul>
+            </div>
+          </div>
+        </article>
+
+      </section>
+
+      <!-- ══════════════════ SMALLER FINDINGS ══════════════════ -->
+      <section class="rounded-xl border border-slate-300 bg-white p-6">
+        <h2 class="font-serif text-2xl mb-1">Smaller findings</h2>
+        <p class="text-sm text-slate-500 mb-5">Verified, but not deepening candidates — each is a fix rather than a redesign.</p>
+        <ul class="space-y-3 text-sm text-slate-800">
+          <li class="flex gap-3"><span class="text-slate-400 font-mono shrink-0">01</span><div><strong>The mypy strictness is dead config.</strong> <code class="font-mono text-xs">pyproject.toml:94</code> sets <code class="font-mono text-xs">disallow_untyped_defs</code>, but <code class="font-mono text-xs">mypy.ini</code> takes precedence and sets <code class="font-mono text-xs">disable_error_code = no-untyped-def, no-untyped-call</code>. Under the flags <code class="font-mono text-xs">pyproject.toml</code> thinks are on, <code class="font-mono text-xs">src/</code> has <strong>9 untyped defs</strong> — 4 in <code class="font-mono text-xs">cli.py</code>, plus <code class="font-mono text-xs">export/geojson.py:24,160</code>, <code class="font-mono text-xs">distance/task_distances.py:96</code>, <code class="font-mono text-xs">distance/goal_line.py:76</code>, <code class="font-mono text-xs">qrcode/image.py:15</code>. <code class="font-mono text-xs">CLAUDE.md</code> claims strict mode; neither file delivers it.</div></li>
+          <li class="flex gap-3"><span class="text-slate-400 font-mono shrink-0">02</span><div><strong>The front door offers the primitive and hides the published number.</strong> <code class="font-mono text-xs">pyxctsk.__all__</code> exports <code class="font-mono text-xs">distance_through_centers</code> — whose own docstring says a caller producing a task-board figure wants <code class="font-mono text-xs">center_distance(task)</code> — while <code class="font-mono text-xs">center_distance</code>, <code class="font-mono text-xs">CenterDistanceReading</code>, <code class="font-mono text-xs">PROPOSED_READING</code> and <code class="font-mono text-xs">GoalLine</code> are absent. It also exports <code class="font-mono text-xs">OptimizedRoute</code> and <code class="font-mono text-xs">task_distances_from_route(task, route)</code> but <strong>no way to construct a route</strong>, which is why <code class="font-mono text-xs">docs/s7f-distance-reference.md:245</code> reaches past the front door.</div></li>
+          <li class="flex gap-3"><span class="text-slate-400 font-mono shrink-0">03</span><div><strong><code class="font-mono text-xs">import pyxctsk</code> costs 486 ms</strong> and eagerly loads scipy (86% of it), pyproj and simplekml, because <code class="font-mono text-xs">__init__.py</code> imports all four packages. There is no cheaper path — even <code class="font-mono text-xs">import pyxctsk.model.task</code> pays it. A lazy <code class="font-mono text-xs">__getattr__</code> would fix it without changing a caller's import.</div></li>
+          <li class="flex gap-3"><span class="text-slate-400 font-mono shrink-0">04</span><div><strong><code class="font-mono text-xs">TaskValidationError.issues</code> is typed <code class="font-mono text-xs">Sequence[object]</code>,</strong> so the documented way to react to a rule (<code class="font-mono text-xs">issue.rule</code>) fails mypy for a downstream caller. The docstring blames a cycle with <code class="font-mono text-xs">validation</code>, but <code class="font-mono text-xs">validation.py</code> does not import <code class="font-mono text-xs">exceptions</code> at all — an <code class="font-mono text-xs">if TYPE_CHECKING:</code> import fixes it, the same escape hatch <code class="font-mono text-xs">validation.py:31</code> already uses.</div></li>
+          <li class="flex gap-3"><span class="text-slate-400 font-mono shrink-0">05</span><div><strong><code class="font-mono text-xs">InvalidFormatError("invalid format")</code> is the single diagnostic for every unrecognised input</strong> (<code class="font-mono text-xs">parser.py:200</code>) — a nonexistent path, a directory, truncated JSON, an unreadable QR, <em>and a valid QR image when the optional zxing/Pillow deps are missing</em> all produce the identical message, so a missing dependency is indistinguishable from a corrupt file.</div></li>
+          <li class="flex gap-3"><span class="text-slate-400 font-mono shrink-0">06</span><div><strong>Two stale references.</strong> <code class="font-mono text-xs">validation.py:17</code> cross-references <code class="font-mono text-xs">validate_turnpoint_roles</code>, which no longer exists (now <code class="font-mono text-xs">validate_structure</code>, reading eight fields rather than "exactly two things") — stale in <code class="font-mono text-xs">CHANGELOG.md:11</code> too. And <code class="font-mono text-xs">num_iterations</code> is threaded through three modules with exactly one caller, a test.</div></li>
+          <li class="flex gap-3"><span class="text-slate-400 font-mono shrink-0">07</span><div><strong>No <code class="font-mono text-xs">tests/model/test_validation.py</code> exists</strong> for a 352-line module — its tests live in <code class="font-mono text-xs">tests/conformance/</code> and <code class="font-mono text-xs">tests/qrcode/</code>, and nothing ever names <code class="font-mono text-xs">TaskStructure</code> or <code class="font-mono text-xs">validate_structure</code> directly, so a third format has no worked example. <code class="font-mono text-xs">finish_altitude</code> is the only defaulted field, and a future defaulted field silently skips whichever adapter forgets it.</div></li>
+        </ul>
+      </section>
+
+      <!-- ══════════════════ TOP RECOMMENDATION ══════════════════ -->
+      <section id="top-recommendation">
+        <div class="rounded-xl deep text-white p-8 shadow-lg">
+          <p class="text-xs uppercase tracking-[0.2em] text-slate-400 mb-3">Top recommendation</p>
+          <h2 class="font-serif text-3xl mb-4"><a href="#cand-a" class="underline decoration-slate-500 decoration-2 underline-offset-4 hover:decoration-white">A. Name the measured task</a></h2>
+          <p class="text-slate-200 leading-relaxed mb-4 max-w-3xl">
+            It is the candidate whose <strong>deletion test</strong> answers loudest: remove the value and the complexity reappears across 12 call sites, two prose-only invariants, two dead <code class="font-mono text-sm bg-slate-800 px-1.5 py-0.5 rounded">else 0.0</code> clauses, and a viewer reaching through <code class="font-mono text-sm bg-slate-800 px-1.5 py-0.5 rounded">export</code> for a <code class="font-mono text-sm bg-slate-800 px-1.5 py-0.5 rounded">distance</code> concept. It also has a demonstrated wrong answer behind it — a mismatched pair returns a fully formed report 12.8 km out, reporting 36.9% savings, with no error.
+          </p>
+          <p class="text-slate-300 leading-relaxed mb-5 max-w-3xl">
+            <strong class="text-white">B follows almost for free</strong> once A exists — the S7F report becomes a rendering of the measured task — and <strong class="text-white">half of E collapses into it</strong>, since one report has one centre-distance reading.
+            <strong class="text-white">Do C in parallel</strong>: it is independent of A, it is the one finding where the library accepts input it documents itself as rejecting, and its seam is already built.
+          </p>
+          <div class="flex flex-wrap gap-2 text-xs">
+            <span class="px-3 py-1.5 rounded-full bg-slate-800 text-slate-300 font-mono">A → B → E, in that order</span>
+            <span class="px-3 py-1.5 rounded-full bg-emerald-900 text-emerald-200 font-mono">C in parallel — independent</span>
+            <span class="px-3 py-1.5 rounded-full bg-slate-800 text-slate-300 font-mono">D: start with LocalPlane's fourth field</span>
+            <span class="px-3 py-1.5 rounded-full bg-slate-800 text-slate-300 font-mono">F, G: standalone fixes</span>
+          </div>
+        </div>
+      </section>
+
+      <footer class="text-xs text-slate-400 border-t border-slate-200 pt-6 font-mono leading-relaxed">
+        Suite green at 8a64894 — 840 passed, 18 documented skips · ruff clean · <code>mypy --config-file mypy.ini src/</code> clean ·
+        every number, error message and code path quoted above was reproduced by running the library at this commit.
+      </footer>
+
+    </main>
+  </body>
+</html>

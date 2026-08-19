@@ -64,8 +64,8 @@ def _create_turnpoint_elements(
 
         # Create turnpoint circle as polygon
         circle_polygon = kml.newpolygon(
-            name=turnpoint.waypoint.name or f"TP{i + 1}",
-            description=f"Type: {turnpoint.type}, Radius: {turnpoint.radius}m",
+            name=drawing.label_of(turnpoint, i),
+            description=drawing.description_of(turnpoint),
             outerboundaryis=circle_coords,
             extrude=1,
             altitudemode=simplekml.AltitudeMode.relativetoground,
@@ -77,7 +77,7 @@ def _create_turnpoint_elements(
 
         # Add turnpoint center point, in the same colour as its cylinder.
         center_point = kml.newpoint(
-            name=f"{turnpoint.waypoint.name or f'TP{i + 1}'} Center",
+            name=f"{drawing.label_of(turnpoint, i)} Center",
             coords=[coord],
         )
         center_point.style.iconstyle.scale = 0.5

@@ -91,6 +91,10 @@ known-first-party = ["pyxctsk"]
 # __init__.py re-exports; allow unsorted/star-style re-export conveniences.
 "src/pyxctsk/__init__.py" = ["F401"]
 
+# The only mypy configuration. There used to be a mypy.ini beside this, and
+# because it was passed explicitly it won — so these strict flags were inert
+# and `disable_error_code = no-untyped-def, no-untyped-call` applied instead,
+# while CLAUDE.md claimed strict mode. Nine functions in src/ were untyped.
 [tool.mypy]
 python_version = "3.11"
 warn_return_any = true
@@ -101,11 +105,29 @@ check_untyped_defs = true
 disallow_untyped_decorators = true
 no_implicit_optional = true
 strict_optional = true
-mypy_path = "stubs"
+mypy_path = ["stubs", "src"]
 
+# Third-party packages src/ imports that ship no type information. Kept to
+# what is actually reached: warn_unused_configs reports the rest as noise, and
+# the previous config carried nine dead entries behind it.
 [[tool.mypy.overrides]]
-module = ["geopy.*", "zxingcpp.*", "scipy.*", "qrcode.*", "optype.*"]
+module = [
+    "click.*",
+    "PIL.*",
+    "pyproj.*",
+    "qrcode.*",
+    "scipy.*",
+    "zxingcpp.*",
+]
 ignore_missing_imports = true
+
+# Tests are checked too — the lefthook hook runs mypy over whatever is staged —
+# but a test function is not required to annotate `-> None`. That rule is about
+# a caller knowing what it gets back, and nothing calls a test. The checks that
+# find real mistakes in a test (attr-defined, arg-type, union-attr) stay on.
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+disable_error_code = ["no-untyped-def"]
 
 [tool.pytest.ini_options]
 minversion = "6.0"

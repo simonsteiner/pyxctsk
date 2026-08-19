@@ -48,6 +48,7 @@ jsonify
 Jörg
 Karney
 KHTML
+Küçük
 LANCZOS
 latlng
 lefthook
@@ -65,6 +66,7 @@ minversion
 mmomtchev
 mojibake
 monkeypatch
+monkeypatching
 motu
 Naviter
 naxe
@@ -78,6 +80,7 @@ newpolygon
 nife
 noha
 nohe
+normalisation
 nosetests
 nubu
 oneline
@@ -95,11 +98,14 @@ Placemark
 pnum
 polystyle
 pypa
+PYTHONCOERCECLOCALE
+PYTHONUTF
 pyxctsk
 pyzbar
 qavu
 qoga
 quno
+recognise
 reimplementation
 relativetoground
 RRGGBB
@@ -107,6 +113,7 @@ seeyou
 simonsteiner
 simplekml
 Soaringlab
+strerror
 stringly
 SUBDIRS
 subinterval
@@ -115,11 +122,17 @@ taskline
 testpaths
 tracklog
 tracklogs
+travelling
 turnpoint
 turnpointcylinder
 turnpoints
 uncoerced
+unparseable
+unrecognised
+unreportable
 unrepresentable
+unvalidated
+unwritable
 vali
 validatable
 Vincenty

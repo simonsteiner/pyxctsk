@@ -11,6 +11,7 @@ outputs and compare them: that is the only way the drift the KML writer used to
 introduce could have been caught.
 """
 
+import json
 import re
 from pathlib import Path
 
@@ -140,37 +141,48 @@ class TestTaskDrawing:
         drawing = TaskDrawing.from_task(_task(GoalType.CYLINDER))
 
         assert drawing.route_coordinates() == list(drawing.route.points)
-        assert len(drawing.route_coordinates()) == 3
+        coordinates = drawing.route_coordinates()
+        assert coordinates is not None
+        assert len(coordinates) == 3
 
 
 class TestOneDrawingTwoFormats:
     """The reason the value exists: both writers render the same one."""
 
     def test_rendering_both_formats_optimizes_the_route_once(self, monkeypatch):
-        """Two formats, one drawing, one optimizer run.
+        """Two formats, one drawing, one measured task.
 
         Each writer used to derive its own route, so producing both formats for
-        one task optimized it twice. Note the patch target: the name is looked
-        up in ``export.common`` at call time, which is exactly what the four
-        inert ``@patch`` decorators in test_geojson.py got wrong — they patched
-        a name ``geojson.py`` had already bound into its own module.
+        one task optimized it twice. Counting optimizer calls is no longer the
+        way to say so: the drawing holds a ``MeasuredTask``, so the claim is
+        that both renderings read that one value — an assertion about identity,
+        which a call count could only approximate.
         """
         calls = []
-        real = common.calculate_iteratively_refined_route
+        real = common.MeasuredTask.from_task
 
-        def counting(*args, **kwargs):
-            calls.append(args)
-            return real(*args, **kwargs)
+        def counting(task, *args, **kwargs):
+            calls.append(task)
+            return real(task, *args, **kwargs)
 
-        monkeypatch.setattr(common, "calculate_iteratively_refined_route", counting)
+        monkeypatch.setattr(common.MeasuredTask, "from_task", counting)
 
         drawing = TaskDrawing.from_task(_task(GoalType.LINE))
         kml = drawing_to_kml(drawing)
         geojson = drawing_to_geojson(drawing)
 
-        assert len(calls) == 1, "the drawing is the shared route, not a per-format one"
+        assert len(calls) == 1, (
+            "the drawing is the shared measurement, not a per-format one"
+        )
         assert "Goal Line" in kml
         assert any(f["properties"]["type"] == "goal_line" for f in geojson["features"])
+
+    def test_the_drawings_route_is_its_measured_tasks_route(self):
+        """``drawing.route`` reads through to the measured task, not a copy."""
+        drawing = TaskDrawing.from_task(_task(GoalType.LINE))
+
+        assert drawing.route is drawing.measured.route
+        assert drawing.measured.task is drawing.task
 
     def test_the_task_entry_point_agrees_with_the_drawing_one(self):
         """``generate_task_geojson(task)`` is ``drawing_to_geojson(from_task(task))``."""
@@ -376,6 +388,71 @@ class TestOnePalette:
             self._placemark_color(kml, tp.waypoint.name) for tp in drawing.turnpoints
         ]
         assert from_kml == [color.kml() for color in expected]
+
+    def test_both_writers_name_the_same_turnpoint_the_same_way(self):
+        """The label was assembled twice, so it could differ; now it is asked for.
+
+        The ``TP{i+1}`` fallback for an unnamed turnpoint was written three
+        times across the two writers.
+        """
+        drawing = TaskDrawing.from_task(self._task_of_every_role())
+        expected = [drawing.label_of(tp, i) for i, tp in enumerate(drawing.turnpoints)]
+
+        geojson = drawing_to_geojson(drawing)
+        from_geojson = [
+            f["properties"]["name"]
+            for f in geojson["features"]
+            if f["properties"]["type"] == "cylinder"
+        ]
+
+        assert from_geojson == expected
+        kml = drawing_to_kml(drawing)
+        for label in expected:
+            assert f"<name>{label}</name>" in kml
+
+    def test_both_writers_describe_the_same_turnpoint_the_same_way(self):
+        """KML wrote `Type: TurnpointType.TAKEOFF`; GeoJSON wrote no role at all."""
+        drawing = TaskDrawing.from_task(self._task_of_every_role())
+        expected = [drawing.description_of(tp) for tp in drawing.turnpoints]
+
+        geojson = drawing_to_geojson(drawing)
+        from_geojson = [
+            f["properties"]["description"]
+            for f in geojson["features"]
+            if f["properties"]["type"] == "cylinder"
+        ]
+
+        assert from_geojson == expected
+        kml = drawing_to_kml(drawing)
+        for description in expected:
+            assert f"<description>{description}</description>" in kml
+
+    def test_no_writer_puts_a_python_repr_in_user_visible_text(self):
+        """`Type: TurnpointType.TAKEOFF` and `Type: None` reached the map."""
+        drawing = TaskDrawing.from_task(self._task_of_every_role())
+
+        kml = drawing_to_kml(drawing)
+        geojson = json.dumps(drawing_to_geojson(drawing), default=str)
+
+        for rendered in (kml, geojson):
+            assert "TurnpointType." not in rendered
+            assert "Type: None" not in rendered
+
+    @pytest.mark.parametrize("role", [None, TurnpointType.NONE])
+    def test_an_ordinary_turnpoint_is_described_without_a_role(self, role):
+        """It has none, and printing `Type: None` said otherwise.
+
+        Both spellings of "no role" describe the same — the asymmetry
+        ``color_of`` normalizes away, applied here too.
+        """
+        drawing = TaskDrawing.from_task(self._task_of_every_role())
+        ordinary = Turnpoint(
+            radius=1500,
+            waypoint=Waypoint(name="X", lat=46.0, lon=8.0, alt_smoothed=0),
+            type=role,
+        )
+
+        assert drawing.description_of(ordinary) == "Radius: 1500m"
 
     def test_both_writers_draw_the_route_in_one_colour(self):
         """KML's course line was ``#ff3641`` where GeoJSON's route was ``#ff4136``."""

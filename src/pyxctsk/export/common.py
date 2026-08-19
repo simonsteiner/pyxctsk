@@ -22,11 +22,8 @@ import math
 from dataclasses import dataclass
 
 from ..distance.goal_line import GoalLine
-from ..distance.route_optimization import (
-    OptimizedRoute,
-    calculate_iteratively_refined_route,
-)
-from ..distance.task_distances import task_to_turnpoints
+from ..distance.measured_task import MeasuredTask
+from ..distance.route_optimization import OptimizedRoute
 from ..model.task import Task, Turnpoint, TurnpointType
 
 # Constants for visualization
@@ -52,13 +49,20 @@ class TaskDrawing:
         turnpoints: The turnpoints to draw, in order — the task's own, less the
             last one when a goal line replaces it.
         goal_line: The task's goal line, or None if it has none.
-        route: The optimized route through the task's cylinders.
+        measured: The task beside the optimized route through its cylinders.
+            Read :attr:`route` for the route alone; hand the whole value to
+            ``task_distances_from`` for the table beside the map.
     """
 
     task: Task
     turnpoints: tuple[Turnpoint, ...]
     goal_line: GoalLine | None
-    route: OptimizedRoute
+    measured: MeasuredTask
+
+    @property
+    def route(self) -> OptimizedRoute:
+        """The optimized route through the task's cylinders."""
+        return self.measured.route
 
     @classmethod
     def from_task(cls, task: Task) -> "TaskDrawing":
@@ -70,12 +74,12 @@ class TaskDrawing:
         Returns:
             The drawing both writers render.
         """
-        # The route comes first: under S7F 2025+ the goal line is oriented
+        # Measuring comes first: under S7F 2025+ the goal line is oriented
         # against the optimized route point on the last control zone before
-        # goal, so deriving the line without handing it the route would
-        # optimize the same task a second time.
-        route = calculate_iteratively_refined_route(task_to_turnpoints(task))
-        goal_line = GoalLine.from_task(task, route=route)
+        # goal, so deriving the line from the task alone would optimize the
+        # same task a second time.
+        measured = MeasuredTask.from_task(task)
+        goal_line = GoalLine.from_measured_task(measured)
         # A goal line replaces the last turnpoint, so it is dropped exactly when
         # there is a line to draw in its place — one decision, made here.
         turnpoints = task.turnpoints[:-1] if goal_line else task.turnpoints
@@ -83,7 +87,7 @@ class TaskDrawing:
             task=task,
             turnpoints=tuple(turnpoints),
             goal_line=goal_line,
-            route=route,
+            measured=measured,
         )
 
     def is_goal(self, turnpoint: Turnpoint) -> bool:
@@ -124,6 +128,58 @@ class TaskDrawing:
         return turnpoint_color(
             turnpoint.type or TurnpointType.NONE, self.is_goal(turnpoint)
         )
+
+    def label_of(self, turnpoint: Turnpoint, index: int) -> str:
+        """The name this turnpoint is drawn under, in either format.
+
+        Falls back to a positional name for an unnamed turnpoint. The spec
+        requires the key but the writers tolerate an empty value, and both
+        composed the same ``TP{i+1}`` fallback themselves — three times
+        between them.
+
+        Args:
+            turnpoint: One of the turnpoints being drawn.
+            index: Its position in the drawing, zero-based.
+
+        Returns:
+            The turnpoint's name, or ``TP1``, ``TP2``, … if it has none.
+        """
+        return turnpoint.waypoint.name or f"TP{index + 1}"
+
+    def description_of(self, turnpoint: Turnpoint) -> str:
+        """The description this turnpoint is drawn with, in either format.
+
+        Both writers assembled their own and disagreed. KML interpolated the
+        enum member itself — ``Type: TurnpointType.TAKEOFF`` — putting a Python
+        repr into user-visible map text, and printed ``Type: None`` for an
+        ordinary turnpoint; GeoJSON left the role out of the description
+        entirely and reached for it with ``getattr(turnpoint, "type", None)``,
+        a defensive lookup on a dataclass field that always exists, skipping
+        the ``or TurnpointType.NONE`` normalisation :meth:`color_of` performs.
+        That asymmetry is exactly what this module exists to remove.
+
+        Args:
+            turnpoint: One of the turnpoints being drawn.
+
+        Returns:
+            The role and radius, with the role omitted when it has none.
+        """
+        role = turnpoint.type or TurnpointType.NONE
+        radius = f"Radius: {turnpoint.radius}m"
+        if role is TurnpointType.NONE:
+            return radius
+        return f"Type: {role.value}, {radius}"
+
+    def role_of(self, turnpoint: Turnpoint) -> TurnpointType:
+        """The turnpoint's role, normalized the way :meth:`color_of` reads it.
+
+        Args:
+            turnpoint: One of the turnpoints being drawn.
+
+        Returns:
+            The role, or :attr:`TurnpointType.NONE` if it carries none.
+        """
+        return turnpoint.type or TurnpointType.NONE
 
     def route_coordinates(self) -> list[tuple[float, float]] | None:
         """The optimized route as (lat, lon) points, or None if there is no line.

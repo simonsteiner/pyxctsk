@@ -27,7 +27,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 # Initialize function variables with proper typing
 parse_task: Optional[Callable[[Union[bytes, str]], Any]] = None
-task_distances_from_route: Optional[Callable[..., Dict[str, Any]]] = None
+task_distances_from: Optional[Callable[..., Dict[str, Any]]] = None
 generate_task_geojson: Optional[Callable[[Any], Dict[Any, Any]]] = None
 drawing_to_geojson: Optional[Callable[[Any], Dict[Any, Any]]] = None
 TaskDrawing: Optional[Any] = None
@@ -38,7 +38,7 @@ try:
         drawing_to_geojson,
         generate_task_geojson,
         parse_task,
-        task_distances_from_route,
+        task_distances_from,
     )
 
     XCTRACK_AVAILABLE = True
@@ -166,7 +166,7 @@ def compare_task(task_name: str):
 
         # One drawing: the table and the map share a single optimized route.
         drawing = TaskDrawing.from_task(task)  # type: ignore
-        distance_results = task_distances_from_route(task, drawing.route)  # type: ignore
+        distance_results = task_distances_from(drawing.measured)  # type: ignore
         xctrack_geojson = drawing_to_geojson(drawing)  # type: ignore
 
         # Prepare comparison data
