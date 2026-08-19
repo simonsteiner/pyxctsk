@@ -322,17 +322,28 @@ class GoalLine:
         geod = geod_for_earth_model(self.earth_model)
         azimuth = self.approach_azimuth()
         lat, lon = self.center
-        half_length = self.length / 2
+        half_length = self.control_zone_radius
 
         lon1, lat1, _ = geod.fwd(lon, lat, (azimuth + 90) % 360, half_length)
         lon2, lat2, _ = geod.fwd(lon, lat, (azimuth - 90) % 360, half_length)
         return (lon1, lat1), (lon2, lat2), azimuth
 
+    @property
+    def control_zone_radius(self) -> float:
+        """Half the line: the control zone's radius, and each endpoint's reach.
+
+        S7F §6.2.3.1 gives the semicircular control zone the line's half-length
+        as its radius, so this is one number with one owner. Both export writers
+        used to recompute ``length / 2`` to caption it, beside the two places
+        here that need it as geometry — one rule in three modules.
+        """
+        return self.length / 2
+
     def control_zone(self) -> list[tuple[float, float]]:
         """Return the control-zone polygon as a closed list of (lon, lat)."""
         (lon1, lat1), (lon2, lat2), forward_azimuth = self.endpoints()
         front_arc = _semicircle_arc(
-            self.center, forward_azimuth, self.length / 2, self.earth_model
+            self.center, forward_azimuth, self.control_zone_radius, self.earth_model
         )
         # Closed polygon: endpoint2 -> front arc -> endpoint1 -> endpoint2
         return [(lon2, lat2)] + front_arc + [(lon1, lat1), (lon2, lat2)]

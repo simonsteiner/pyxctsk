@@ -182,6 +182,63 @@ class TaskDrawing:
         """
         return turnpoint.type or TurnpointType.NONE
 
+    def route_label(self) -> str:
+        """The name the optimized route is drawn under, in either format.
+
+        The two writers disagreed: KML wrote "Course Line" and GeoJSON wrote
+        "Optimized Route" for the same line, each pinned as expected by a test
+        in its own file, so the suite enforced the divergence. This is the
+        glossary's term (``CONTEXT.md``: *optimized route*), which is what
+        makes it the one to keep.
+
+        Returns:
+            The route's name.
+        """
+        return "Optimized Route"
+
+    def goal_line_label(self) -> str:
+        """The name the goal line is drawn under, in either format."""
+        return "Goal Line"
+
+    def goal_line_description(self) -> str:
+        """The description the goal line is drawn with, in either format.
+
+        Both writers composed this themselves, character for character. A
+        question both must answer identically is a method here — the rule this
+        module states, applied to the goal line as it already was to the
+        turnpoints.
+
+        Returns:
+            The line's length, rounded to the metre.
+
+        Raises:
+            ValueError: If the task has no goal line to describe.
+        """
+        if self.goal_line is None:
+            raise ValueError("this task has no goal line")
+        return f"Goal line length: {self.goal_line.length:.0f}m"
+
+    def control_zone_label(self) -> str:
+        """The name the control zone is drawn under, in either format."""
+        return "Goal Control Zone"
+
+    def control_zone_description(self) -> str:
+        """The description the control zone is drawn with, in either format.
+
+        The radius is asked of the goal line, which owns S7F §6.2.3.1's rule
+        that it is half the line. Both writers used to spell ``length / 2``
+        here instead, so the rule lived in three modules.
+
+        Returns:
+            The zone's radius, rounded to the metre.
+
+        Raises:
+            ValueError: If the task has no goal line, so no control zone.
+        """
+        if self.goal_line is None:
+            raise ValueError("this task has no goal line")
+        return f"Goal control zone radius: {self.goal_line.control_zone_radius:.0f}m"
+
     def route_coordinates(self) -> list[tuple[float, float]] | None:
         """The optimized route as (lat, lon) points, or None if there is no line.
 
@@ -194,6 +251,22 @@ class TaskDrawing:
         if len(self.route.points) < 2:
             return None
         return list(self.route.points)
+
+    def route_coordinates_lon_lat(self) -> list[tuple[float, float]] | None:
+        """The optimized route in the axis order both output formats want.
+
+        KML coordinates and GeoJSON positions are both (lon, lat), and both
+        writers flipped :meth:`route_coordinates` themselves — one by unpacking,
+        one by positional index — in a codebase that records axis-order
+        confusion as a defect class it has already paid for.
+
+        Returns:
+            The route's (lon, lat) points, or None if there is no line to draw.
+        """
+        points = self.route_coordinates()
+        if points is None:
+            return None
+        return [(lon, lat) for lat, lon in points]
 
 
 @dataclass(frozen=True)
