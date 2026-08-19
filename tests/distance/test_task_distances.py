@@ -22,6 +22,7 @@ from pyxctsk.distance import (
     DistanceReport,
     MeasuredTask,  # noqa: F401
     TaskTurnpoint,
+    TooFewTurnpointsError,
     calculate_task_distances,
     distance_through_centers,
     optimized_distance,
@@ -30,6 +31,7 @@ from pyxctsk.distance import (
 from pyxctsk.export import common
 from pyxctsk.export.common import TaskDrawing
 from pyxctsk.export.geojson import drawing_to_geojson
+from tests.builders import turnpoint
 from tests.corpus import reference_task, tasks_with_reference_distance
 
 #: The reference tasks the producer recorded distances for, discovered once.
@@ -274,15 +276,24 @@ class TestProjectionFromARoute:
         ]
         assert len(line["geometry"]["coordinates"]) == len(drawing.route.points)
 
-    def test_degenerate_task_projects_to_zeros(self):
-        """A task with fewer than two turnpoints reports zeros, not an error."""
-        task = Task(task_type=TaskType.CLASSIC, version=1, turnpoints=[])
+    @pytest.mark.parametrize("count", [0, 1], ids=["no turnpoints", "one turnpoint"])
+    def test_a_task_too_short_to_have_a_distance_is_refused(self, count):
+        """It used to answer 0.0 km and `turnpoints: []`.
 
-        result = task_distances_from(MeasuredTask.from_task(task))
+        Both are at the front door, and they gave one task two answers: the
+        table dropped the turnpoint the task did have and reported a distance
+        of zero, where the report raised. The message is the same one now.
+        """
+        turnpoints = [turnpoint("A", 46.5, 8.0)][:count]
+        task = Task(task_type=TaskType.CLASSIC, version=1, turnpoints=turnpoints)
 
-        assert result.center_distance_km == 0.0
-        assert result.optimized_distance_km == 0.0
-        assert result.turnpoints == ()
+        for call in (
+            lambda: calculate_task_distances(task),
+            lambda: task_distances_from(MeasuredTask.from_task(task)),
+            lambda: DistanceReport.from_task(task),
+        ):
+            with pytest.raises(TooFewTurnpointsError, match="at least two turnpoints"):
+                call()
 
 
 class TestTheTableIsARenderingOfTheReport:

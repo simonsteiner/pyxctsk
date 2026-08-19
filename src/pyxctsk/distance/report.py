@@ -43,7 +43,15 @@ S7F_EDITION = "2026 V1.0"
 #: The fewest turnpoints a task needs before any of these numbers mean anything.
 #: One turnpoint has no leg, so there is no route and no distance — the library
 #: used to answer 0.0 and only the CLI knew to refuse.
+#:
+#: The rule has one owner because the library used to give one task two
+#: answers: ``DistanceReport.from_task`` raised while
+#: ``calculate_task_distances`` — also at the front door — returned 0.0 km and
+#: ``turnpoints: []``, dropping the one turnpoint the task did have.
 MIN_TURNPOINTS_FOR_DISTANCE = 2
+
+#: What refusing says. One message, since two shapes now refuse.
+TOO_FEW_TURNPOINTS_MESSAGE = "a task needs at least two turnpoints to have a distance."
 
 #: What each published number is, and which section defines it. Carried with
 #: the report because "not defined by S7F" is the single most important thing
@@ -102,9 +110,7 @@ class DistanceReport:
                 leg to measure.
         """
         if len(task.turnpoints) < MIN_TURNPOINTS_FOR_DISTANCE:
-            raise TooFewTurnpointsError(
-                "a task needs at least two turnpoints to have a distance."
-            )
+            raise TooFewTurnpointsError(TOO_FEW_TURNPOINTS_MESSAGE)
         return cls.from_measured_task(MeasuredTask.from_task(task))
 
     @classmethod

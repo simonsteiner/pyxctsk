@@ -10,7 +10,12 @@ import inspect
 import pytest
 
 from pyxctsk import Goal, GoalType, Task, TaskType, TurnpointType
-from pyxctsk.distance import MeasuredTask, task_distances_from, task_to_turnpoints
+from pyxctsk.distance import (
+    MeasuredTask,
+    TooFewTurnpointsError,
+    task_distances_from,
+    task_to_turnpoints,
+)
 from pyxctsk.distance.goal_line import GoalLine
 from pyxctsk.distance.speed_section import SpeedSection
 from tests.builders import task, turnpoint
@@ -108,15 +113,22 @@ class TestTheNumbersItProjects:
 
         assert len(measured.cumulative_m()) == len(measured.task.turnpoints)
 
-    def test_a_task_with_no_turnpoints_projects_to_nothing(self):
-        """The degenerate case is empty, not an error."""
+    def test_a_task_with_no_turnpoints_measures_to_nothing(self):
+        """The measurement is empty; asking it for a *distance* is the error.
+
+        `MeasuredTask` stays total — it is the pair, not the verdict — while
+        the two published distance shapes both refuse, which they did not
+        always: `task_distances_from` used to answer zeros for the task
+        `DistanceReport` raised on.
+        """
         measured = MeasuredTask.from_task(
             Task(task_type=TaskType.CLASSIC, version=1, turnpoints=[])
         )
 
         assert measured.turnpoints == ()
         assert measured.cumulative_m() == []
-        assert task_distances_from(measured).turnpoints == ()
+        with pytest.raises(TooFewTurnpointsError):
+            task_distances_from(measured)
 
     @pytest.mark.parametrize(
         "goal", [None, Goal(type=GoalType.LINE)], ids=["no goal", "a goal"]
