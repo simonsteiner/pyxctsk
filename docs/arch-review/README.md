@@ -5,6 +5,24 @@ implements the [XCTrack Competition Interfaces](https://xctrack.org/Competition_
 specification and FAI Sporting Code S7F. Each file is dated and kept as written —
 superseded reviews stay for history rather than being edited. Newest first.
 
+- [2026-08-19 — Pre-release code-quality review](2026-08-19-pre-release-code-quality-review.md)
+  — **proposed, nothing applied.** The whole of `src/pyxctsk` read at the 0.5.0 release
+  frame, asking whether the implementation is as small and hard to misuse as it could be
+  rather than whether it matches the spec. The suite, ruff and mypy are all green, and the
+  values the last three reviews introduced are holding — so the findings are mostly
+  *residue*: rules centralized in one place that survived in two, helpers copied before the
+  abstraction that would have prevented it, and a packaging story that has drifted from
+  what the code says about it. The headline is user-visible: Pillow, qrcode and zxing-cpp
+  are hard dependencies while two modules, `MissingQRCodeSupportError` and the README all
+  treat them as optional, and the error a failed PNG produces tells the user to
+  `pip install 'pyxctsk[web]'`, which installs flask. `geopy` is a required dependency
+  `src/` never imports. Also: the LINE→zero-radius rule is applied in two places, each
+  documented as the only one; three constants for "the full format is version 1"; and four
+  verified behaviour-preserving collapses worth ~130 lines — `task_to_turnpoints` 60 lines
+  to 14 (identical on 50 tasks), `_generate_semicircle_arc` 45 to 6 (agreeing to 3e-14°),
+  `plane_optimal_point`'s duplicated crossing branch (0 mismatches in 4000 configurations),
+  and `Nested`/`NestedList` shown to be `Value` with a different codec (byte-identical on
+  24 tasks).
 - [2026-08-18 — Deepening candidates after the S7F audit](2026-08-18-deepening-candidates-after-s7f.md)
   — **all seven candidates and all eight smaller findings applied.** Seven candidates in *deep module* terms, reviewed at the merge
   of the S7F audit below and scoped by churn, which put `distance/` at the centre: its package
