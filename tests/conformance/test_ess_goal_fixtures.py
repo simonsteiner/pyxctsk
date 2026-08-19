@@ -16,13 +16,21 @@ from pathlib import Path
 
 import pytest
 
-from pyxctsk import Task, TurnpointType, parse_task
+from pyxctsk import Task, TaskType, Turnpoint, TurnpointType, parse_task
 from pyxctsk.distance import calculate_iteratively_refined_route, optimized_distance
 from pyxctsk.distance.measured_task import MeasuredTask, task_to_turnpoints
 from pyxctsk.distance.turnpoint import geodesic_distance
+from tests.builders import task as build_task
+from tests.builders import turnpoint as build_turnpoint
 from tests.paths import ESS_GOAL_DIR
 
 FIXTURES = ESS_GOAL_DIR
+
+
+def build_task_of_nothing() -> Task:
+    """A task with no turnpoints, which ``builders.task`` will not make."""
+    return Task(task_type=TaskType.CLASSIC, version=1, turnpoints=[])
+
 
 #: Tasks whose last two turnpoints are the same waypoint, one marked ESS.
 DUPLICATE_GOAL_TASKS = ["task2", "task3", "task4"]
@@ -113,6 +121,45 @@ def test_ess_as_last_turnpoint_is_the_goal():
 
     assert task.turnpoints[-1].type == TurnpointType.ESS
     assert task.is_ess_goal()
+
+
+class TestIsEssGoalAsksTheLastTurnpoint:
+    """It reads the role off the goal rather than searching and comparing.
+
+    It used to find the *first* turnpoint marked ESS and compare it to the last
+    one by value. ``Turnpoint`` is a plain dataclass, so on a task that flies
+    the same waypoint twice the comparison could match the wrong occurrence —
+    the hazard ``TaskDrawing.is_goal`` documents and avoids with identity.
+    Asking the goal what it is needs neither.
+    """
+
+    @staticmethod
+    def repeated(type: TurnpointType | None = None) -> Turnpoint:
+        """The same waypoint, flown twice — value-equal but for its role."""
+        return build_turnpoint("X", 47.0, 8.0, radius=400, type=type)
+
+    def test_an_earlier_ess_does_not_make_the_goal_the_ess(self):
+        """The turnpoint that carries the role is not the goal."""
+        t = build_task(
+            build_turnpoint("A", 46.0, 7.0, type=TurnpointType.ESS),
+            self.repeated(),
+        )
+
+        assert not t.is_ess_goal()
+
+    def test_the_goal_carrying_the_role_is_the_whole_question(self):
+        """Including when an earlier turnpoint repeats it exactly."""
+        t = build_task(
+            self.repeated(TurnpointType.ESS),
+            build_turnpoint("B", 46.0, 7.0),
+            self.repeated(TurnpointType.ESS),
+        )
+
+        assert t.is_ess_goal()
+
+    def test_a_task_with_no_turnpoints_has_no_ess_goal(self):
+        """There is no goal to be the ESS."""
+        assert not build_task_of_nothing().is_ess_goal()
 
 
 @pytest.mark.parametrize("name", DUPLICATE_GOAL_TASKS)

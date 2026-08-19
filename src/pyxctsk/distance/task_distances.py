@@ -19,21 +19,6 @@ from .measured_task import MeasuredTask
 from .turnpoint import geodesic_distance
 
 
-def _calculate_savings(center_km: float, opt_km: float) -> tuple[float, float]:
-    """Calculate distance savings in km and percentage.
-
-    Args:
-        center_km (float): Center distance in km.
-        opt_km (float): Optimized distance in km.
-
-    Returns:
-        Tuple[float, float]: Tuple of (savings_km, savings_percent).
-    """
-    savings_km = center_km - opt_km
-    savings_percent = (savings_km / center_km * 100) if center_km > 0 else 0.0
-    return savings_km, savings_percent
-
-
 def _create_turnpoint_details(measured: MeasuredTask) -> list[dict[str, Any]]:
     """Create detailed turnpoint information including cumulative distances.
 
@@ -121,7 +106,8 @@ def task_distances_from(measured: MeasuredTask) -> dict[str, Any]:
     center_m = center_distance(measured.task)
     center_km = (center_m or 0.0) / 1000.0
     opt_km = measured.total_m / 1000.0
-    savings_km, savings_percent = _calculate_savings(center_km, opt_km)
+    savings_km = center_km - opt_km
+    savings_percent = (savings_km / center_km * 100) if center_km > 0 else 0.0
 
     return {
         "center_distance_km": round(center_km, 1),

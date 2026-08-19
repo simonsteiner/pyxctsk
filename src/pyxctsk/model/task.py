@@ -545,31 +545,33 @@ class Task:
         """
         return validate_task(self)
 
-    def find_ess_turnpoint(self) -> Turnpoint | None:
-        """Find and return the ESS turnpoint, if any.
-
-        Returns:
-            Optional[Turnpoint]: The turnpoint marked as ESS or None if no ESS turnpoint exists.
-        """
-        for tp in self.turnpoints:
-            if tp.type == TurnpointType.ESS:
-                return tp
-        return None
-
     def is_ess_goal(self) -> bool:
-        """Check if the ESS turnpoint is the same as the goal (last turnpoint).
+        """Whether the task's last turnpoint is also its ESS.
+
+        Reports what the file says, which is the model's job: an elevated goal
+        "implicitly also serves as the End of Speed Section" (FAI S7F 2026
+        §6.2.3.2), but resolving that contradiction is
+        :mod:`~pyxctsk.model.validation`'s — it reports
+        ``ELEVATED_GOAL_IS_NOT_ESS`` and leaves this answering the annotation.
+
+        This used to search for the *first* turnpoint marked ESS and compare it
+        to the last one by value. ``Turnpoint`` is a plain dataclass, so a task
+        that legitimately flies the same turnpoint twice could match the wrong
+        occurrence — the hazard :meth:`~pyxctsk.export.TaskDrawing.is_goal`
+        documents and avoids by comparing identity. Asking the last turnpoint
+        what it is needs neither a search nor a comparison. It also drops
+        ``find_ess_turnpoint``, which had no other caller, no test and no
+        mention in the docs.
+
+        Note this is *not* "does the task have a speed section" — that is
+        :func:`~pyxctsk.distance.speed_section.speed_section_indices`, which
+        also weighs the task type, and which lives in ``distance/`` because
+        ``model/`` may not depend on it.
 
         Returns:
-            bool: True if ESS is the same as goal, False otherwise.
+            bool: True if the last turnpoint carries the ESS role.
         """
-        if not self.turnpoints:
-            return False
-
-        ess_tp = self.find_ess_turnpoint()
-        if not ess_tp:
-            return False
-
-        return ess_tp == self.turnpoints[-1]
+        return bool(self.turnpoints) and self.turnpoints[-1].type is TurnpointType.ESS
 
 
 TASK_SHAPE = Shape(
