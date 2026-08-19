@@ -26,7 +26,11 @@ from pyxctsk.distance.route_optimization import (
     calculate_iteratively_refined_route,
 )
 from pyxctsk.distance.solver import plane_optimal_point
-from pyxctsk.distance.turnpoint import TaskTurnpoint, TurnpointGeometry
+from pyxctsk.distance.turnpoint import (
+    TaskTurnpoint,
+    TurnpointGeometry,
+    boundary_point,
+)
 
 
 @dataclass
@@ -450,8 +454,8 @@ class TestThePlaneCarriesItsEarthModel:
 
     `LocalPlane.around` used the earth model to build its transformers and then
     dropped it, so every consumer took the model a second time and nothing
-    checked the two agreed. `optimal_point` solved in the plane it was given
-    but snapped with `self.earth_model` — an FAI-sphere boundary point placed
+    checked the two agreed. `boundary_point` solved in the plane it was given
+    but snapped with the turnpoint's own model — an FAI-sphere boundary point placed
     from a WGS84 planar solution, silently, whenever they differed.
     """
 
@@ -472,7 +476,7 @@ class TestThePlaneCarriesItsEarthModel:
         )
         plane = LocalPlane.around([turnpoint.center], "WGS84")
 
-        point = turnpoint.optimal_point((46.0, 7.5), (47.0, 8.6), plane=plane)
+        point = boundary_point(turnpoint, (46.0, 7.5), (47.0, 8.6), plane)
 
         assert geodesic_distance(turnpoint.center, point, "WGS84") == pytest.approx(
             5000.0, abs=1e-6
@@ -484,7 +488,7 @@ class TestThePlaneCarriesItsEarthModel:
         turnpoint = TaskTurnpoint(lat=46.5, lon=8.0, radius=5000, earth_model=model)
         plane = LocalPlane.around([turnpoint.center], model)
 
-        point = turnpoint.optimal_point((46.0, 7.5), (47.0, 8.6), plane=plane)
+        point = boundary_point(turnpoint, (46.0, 7.5), (47.0, 8.6), plane)
 
         assert geodesic_distance(turnpoint.center, point, model) == pytest.approx(
             5000.0, abs=1e-6

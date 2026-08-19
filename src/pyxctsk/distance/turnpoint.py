@@ -113,46 +113,79 @@ class TaskTurnpoint:
         self.radius = radius
         self.earth_model = earth_model
 
-    def optimal_point(
-        self,
-        prev_point: tuple[float, float],
-        next_point: tuple[float, float],
-        plane: LocalPlane | None = None,
-    ) -> tuple[float, float]:
-        """Find the optimal point on this turnpoint's cylinder or goal line.
 
-        The point is placed with the exact planar GetOptPi solution (crossing
-        vs. reflection case per Ding, Xie & Jiang) in a local Transverse
-        Mercator plane, then snapped back onto the true cylinder boundary at
-        radius ``r`` on the selected earth model.
+def point_on_boundary(
+    turnpoint: TurnpointGeometry,
+    plane: LocalPlane,
+    plane_point: tuple[float, float],
+    radius: float,
+) -> tuple[float, float]:
+    """ProjectionCorrection (S7F §7.1.7): a planar solution put on the boundary.
 
-        Args:
-            prev_point (Tuple[float, float]): (lat, lon) of previous point in route.
-            next_point (Tuple[float, float]): (lat, lon) of next point in route.
-            plane: The plane to solve in. Defaults to one centred on this
-                turnpoint. Pass the task's own plane — the one
-                :func:`~pyxctsk.distance.route_optimization.calculate_iteratively_refined_route`
-                builds — to get the answer the route optimizer would give:
-                the projection is the only thing the two ever differed by.
+    **The one spelling of the rule.** It had two — this one and the loop body
+    of ``route_optimization._corrected_path`` — and they did not agree: one
+    guarded ``radius == 0.0`` where the other guarded ``<= 0.0``, and one
+    snapped against the turnpoint's own radius where the other snapped against
+    the projected one. Identical answers today, and two places to change
+    snapping policy, of which the product runs one.
 
-        Returns:
-            Tuple[float, float]: (lat, lon) of optimal point on cylinder perimeter or goal line.
-        """
-        if plane is None:
-            plane = LocalPlane.around([self.center], self.earth_model)
+    Args:
+        turnpoint: The turnpoint whose circle the point belongs to.
+        plane: The projection the point was solved in, which carries the earth
+            model it is snapped back onto — so a planar solution and the
+            boundary it is corrected onto cannot be measured on different
+            earths.
+        plane_point: The planar (x, y) solution.
+        radius: The circle's radius in the plane. Zero collapses to the centre,
+            which is what a LINE goal arrives here as.
 
-        cx, cy, radius = plane_circle(self, plane)
-        if radius == 0.0:
-            return self.center
+    Returns:
+        (lat, lon) on the true boundary, or the centre for a zero radius.
+    """
+    if radius <= 0.0:
+        return turnpoint.center
+    return snap_to_boundary(
+        plane.lon_lat(plane_point), turnpoint.center, radius, plane.earth_model
+    )
 
-        xy = plane_optimal_point(
-            plane.xy(prev_point), plane.xy(next_point), (cx, cy), radius
-        )
-        # Snap on the plane's own model, so the projection and the boundary it
-        # is corrected onto cannot be measured on different earths.
-        return snap_to_boundary(
-            plane.lon_lat(xy), self.center, self.radius, plane.earth_model
-        )
+
+def boundary_point(
+    turnpoint: TurnpointGeometry,
+    prev_point: tuple[float, float],
+    next_point: tuple[float, float],
+    plane: LocalPlane,
+) -> tuple[float, float]:
+    """Where a route touches one circle, given fixed neighbours (GetOptPi).
+
+    The single-circle answer, as against
+    :func:`~pyxctsk.distance.route_optimization.calculate_iteratively_refined_route`,
+    which solves every circle jointly and is what a task's route is measured
+    with. Both project, solve and correct; only the solve differs.
+
+    **The plane is required.** It used to default to one centred on this
+    turnpoint — a projection no shipped code path ever builds — and the
+    crossing-case tests took that default, so a fix to the projection the
+    product does use could go green and ship nothing. ``plane.py`` records
+    that failure as fixed; the default was the half of it left in place.
+
+    Args:
+        turnpoint: The circle to touch.
+        prev_point: (lat, lon) of the previous point on the route.
+        next_point: (lat, lon) of the next point on the route.
+        plane: The projection to solve in — the task's own, from
+            ``LocalPlane.around`` over every turnpoint centre, unless the
+            caller means something else and says so.
+
+    Returns:
+        (lat, lon) on the cylinder boundary, or the centre for a LINE goal.
+    """
+    cx, cy, radius = plane_circle(turnpoint, plane)
+    if radius <= 0.0:
+        return turnpoint.center
+    xy = plane_optimal_point(
+        plane.xy(prev_point), plane.xy(next_point), (cx, cy), radius
+    )
+    return point_on_boundary(turnpoint, plane, xy, radius)
 
 
 def distance_through_centers(

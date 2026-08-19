@@ -36,7 +36,7 @@ from pyxctsk.distance import (
 )
 from pyxctsk.distance.measured_task import task_to_turnpoints
 from pyxctsk.distance.plane import LocalPlane
-from pyxctsk.distance.turnpoint import plane_circle
+from pyxctsk.distance.turnpoint import boundary_point, plane_circle
 from tests.builders import task, turnpoint
 from tests.corpus import reference_task, tasks_with_reference_distance
 
@@ -157,11 +157,13 @@ class TestOneSolverOneProjection:
     the whole task area. Same paragraph of the spec (S7F §7.1.2), two
     different answers — and every crossing-case test below aimed at the one
     the product does not use, so a fix made there could go green and ship
-    nothing. The plane is now an argument, and these check that handing over
-    the task's own plane reproduces what the optimizer chose.
+    nothing. The plane is a required argument of ``boundary_point`` now, so a
+    test cannot reach the per-turnpoint projection without saying it means to;
+    these check that handing over the task's own plane reproduces what the
+    optimizer chose.
     """
 
-    def test_optimal_point_reproduces_the_optimizers_choice(self):
+    def test_the_single_circle_answer_reproduces_the_optimizers_choice(self):
         """Given the task's plane, the two agree to the metre."""
         takeoff = TaskTurnpoint(47.0, 8.0)
         middle = TaskTurnpoint(47.2, 8.1, 5_000.0)
@@ -171,7 +173,7 @@ class TestOneSolverOneProjection:
         route = calculate_iteratively_refined_route(turnpoints)
         plane = LocalPlane.around([tp.center for tp in turnpoints])
 
-        asked = middle.optimal_point(route.points[0], route.points[2], plane)
+        asked = boundary_point(middle, route.points[0], route.points[2], plane)
 
         _, _, apart = WGS84.inv(
             asked[1], asked[0], route.points[1][1], route.points[1][0]
@@ -192,8 +194,14 @@ class TestOneSolverOneProjection:
         ]
         prev_point, next_point = (47.0, 8.0), (47.4, 8.0)
 
-        own = turnpoints[1].optimal_point(prev_point, next_point)
-        task = turnpoints[1].optimal_point(
+        own = boundary_point(
+            turnpoints[1],
+            prev_point,
+            next_point,
+            LocalPlane.around([turnpoints[1].center]),
+        )
+        task = boundary_point(
+            turnpoints[1],
             prev_point,
             next_point,
             LocalPlane.around([tp.center for tp in turnpoints]),
@@ -225,7 +233,7 @@ class TestOneSolverOneProjection:
         # cylinder carried a ``goal_type`` label beside it that nothing read.
         assert goal.radius == 0
         assert plane_circle(goal, plane)[2] == 0.0
-        assert goal.optimal_point((46.5, 8.0), (46.5, 8.0), plane) == goal.center
+        assert boundary_point(goal, (46.5, 8.0), (46.5, 8.0), plane) == goal.center
 
     def test_a_cylinder_goal_keeps_its_radius(self):
         """The other half of the same rule, which nothing used to assert."""
@@ -257,7 +265,11 @@ class TestCrossingCase:
         lon_e, lat_e, _ = WGS84.fwd(center[1], center[0], 90.0, 5_000.0)
 
         tp = TaskTurnpoint(center[0], center[1], 5_000.0)
-        point = tp.optimal_point((lat_p, lon_p), (lat_n, lon_n))
+        # The task's own plane, which is the projection the optimizer builds —
+        # these used to take a default plane centred on this turnpoint alone,
+        # a projection no shipped code path ever constructs.
+        plane = LocalPlane.around([tp.center, (lat_p, lon_p), (lat_n, lon_n)])
+        point = boundary_point(tp, (lat_p, lon_p), (lat_n, lon_n), plane)
 
         _, _, err = WGS84.inv(point[1], point[0], lon_e, lat_e)
         assert err < 1.0, f"crossing point off by {err:.2f} m"
@@ -270,7 +282,8 @@ class TestCrossingCase:
         prev_point = (46.8, 8.0)
         next_point = (47.2, 8.0)
         tp = TaskTurnpoint(47.0, 8.0, 3_000.0)
-        point = tp.optimal_point(prev_point, next_point)
+        plane = LocalPlane.around([tp.center, prev_point, next_point])
+        point = boundary_point(tp, prev_point, next_point, plane)
 
         _, _, direct = WGS84.inv(
             prev_point[1], prev_point[0], next_point[1], next_point[0]
@@ -337,7 +350,8 @@ class TestGoalLine:
         """
         goal = TaskTurnpoint(47.0, 8.0, 0)
         prev_point = (46.9, 7.95)
-        finish = goal.optimal_point(prev_point, prev_point)
+        plane = LocalPlane.around([goal.center, prev_point])
+        finish = boundary_point(goal, prev_point, prev_point, plane)
         assert finish == goal.center
 
 
