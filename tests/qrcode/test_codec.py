@@ -605,9 +605,9 @@ class TestWithoutTheOptionalDependencies:
 
         monkeypatch.setattr(parser, "QR_CODE_SUPPORT", False)
 
-        with pytest.raises(
-            InvalidFormatError, match="QR code support is not installed"
-        ):
+        # Matched on the extra rather than the prose: naming the wrong extra
+        # is the failure this message has actually had.
+        with pytest.raises(InvalidFormatError, match=r"pyxctsk\[qr\]"):
             parse_task(b"\x89PNG\r\n\x1a\n not really an image")
 
     def test_the_text_formats_still_work(self, monkeypatch):

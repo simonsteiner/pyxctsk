@@ -1629,9 +1629,7 @@ class TestUnrecognizedInputSaysWhy:
         png.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 64)
         monkeypatch.setattr(parser, "QR_CODE_SUPPORT", False)
 
-        with pytest.raises(
-            InvalidFormatError, match="QR code support is not installed"
-        ):
+        with pytest.raises(InvalidFormatError, match=r"pyxctsk\[qr\]"):
             parse_task(str(png))
 
     def test_inline_json_containing_a_slash_still_parses(self):

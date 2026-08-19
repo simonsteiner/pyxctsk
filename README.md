@@ -37,16 +37,22 @@ The library implements the XCTrack Competition Interfaces specification: both ta
 ### Core
 
 - **click**: Command-line interface framework for the CLI tools
-- **geopy**: Geographic calculations for distance and point manipulation
-- **polyline**: Polyline encoding/decoding for compact coordinate representation
 - **pyproj**: Projection calculations for accurate distance measurements
 - **scipy**: Scientific computing library used for route optimization algorithms
+- **simplekml**: KML document generation
 
-### Optional
+### Optional — the `qr` extra
+
+QR *images* only. Reading and writing the `XCTSK:` and `XCTSKZ:` strings
+themselves needs nothing beyond the core; rendering one as a PNG, or reading one
+back out of an image, needs these:
 
 - **Pillow**: Image processing for QR code generation and parsing
 - **qrcode**: QR code generation
 - **zxing-cpp**: QR code parsing from images (ships binary wheels; no system library needed)
+
+Without them, `parse_task` on an image and `pyxctsk convert --format png` fail
+with a message naming the extra; everything else works.
 
 ### Development
 
@@ -222,6 +228,7 @@ See the CLI startup message (`pyxctsk --help` or running the CLI with no argumen
 
 - Python 3.11+
 - Optional dependencies can be installed with extras:
+  - `pip install pyxctsk[qr]` for QR code images (PNG output, QR image input)
   - `pip install pyxctsk[web]` for web interface components
   - `pip install pyxctsk[analysis]` for analysis tools
 - Development tooling lives in the `dev` dependency group and is installed

@@ -32,6 +32,12 @@ jobs:
           uv run mypy src/
           uv run pytest
 
+      - name: Verify the core install needs no `qr` extra
+        run: |
+          uv venv /tmp/core-only
+          VIRTUAL_ENV=/tmp/core-only uv pip install .
+          /tmp/core-only/bin/python scripts/check_core_without_qr.py
+
   build-and-publish:
     needs: test
     runs-on: ubuntu-latest

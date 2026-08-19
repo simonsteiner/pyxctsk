@@ -22,7 +22,12 @@ Functions:
 import json
 from io import BytesIO
 
-from .exceptions import EmptyInputError, InvalidFormatError, TaskValidationError
+from .exceptions import (
+    QR_EXTRA_INSTALL,
+    EmptyInputError,
+    InvalidFormatError,
+    TaskValidationError,
+)
 from .model.task import Task
 from .qrcode.task import QR_CODE_SCHEME, QR_CODE_SCHEME_COMPRESSED, QRCodeTask
 
@@ -114,8 +119,8 @@ def _unrecognized(raw: bytes, path_error: str | None) -> InvalidFormatError:
     if raw.startswith(_IMAGE_MAGIC):
         if not QR_CODE_SUPPORT:
             return InvalidFormatError(
-                "looks like an image, but QR code support is not installed "
-                "(pip install 'pyxctsk[web]' for Pillow and zxing-cpp)"
+                "looks like an image, but QR image support is not installed "
+                f"(pip install '{QR_EXTRA_INSTALL}')"
             )
         return InvalidFormatError(
             "looks like an image, but it carries no XCTSK: QR code"

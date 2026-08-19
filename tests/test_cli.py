@@ -416,7 +416,7 @@ class TestOptionalDependenciesAreReportedNotRaised:
         )
 
         assert result.exit_code == 1
-        assert "QR code support requires" in result.output
+        assert "pyxctsk[qr]" in result.output
         assert not isinstance(result.exception, MissingQRCodeSupportError)
 
     def test_the_error_is_both_a_library_error_and_an_import_error(self):

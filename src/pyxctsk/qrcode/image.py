@@ -1,6 +1,6 @@
 """QR code image generation for XCTrack task handling."""
 
-from ..exceptions import MissingQRCodeSupportError
+from ..exceptions import QR_EXTRA_INSTALL, MissingQRCodeSupportError
 
 # Optional QR code dependencies
 try:
@@ -25,11 +25,14 @@ def generate_qrcode_image(data: str, size: int = 1024) -> "Image.Image":
         Image: A PIL Image object containing the generated QR code.
 
     Raises:
-        ImportError: If the required 'qrcode' or 'Pillow' packages are not available in the environment.
+        MissingQRCodeSupportError: If 'qrcode' or 'Pillow' are not installed.
+            It subclasses ImportError, so an existing ``except ImportError``
+            around this function keeps working.
     """
     if not QR_CODE_SUPPORT:
         raise MissingQRCodeSupportError(
-            "QR code support requires 'qrcode' and 'Pillow' packages"
+            "rendering a QR code image requires 'qrcode' and 'Pillow' "
+            f"(pip install '{QR_EXTRA_INSTALL}')"
         )
 
     qr = qrcode.QRCode(  # type: ignore

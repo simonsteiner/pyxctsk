@@ -12,7 +12,7 @@ This project uses [uv](https://docs.astral.sh/uv/). Run tools through `uv run` (
 
 ```bash
 # One-time dev setup: creates .venv and installs the package (editable) plus the
-# `dev` dependency group and the `web` + `analysis` extras.
+# `dev` dependency group and the `qr` + `web` + `analysis` extras.
 uv sync --all-extras
 
 # Tests
@@ -30,7 +30,7 @@ uv run mypy src/                               # type check (strict; config in p
 uv run lefthook install                        # enable hooks on commit
 uv run lefthook run pre-commit                 # run hooks against staged files
 
-# Check optional QR dependencies are importable
+# Check the optional `qr` extra is importable and decodes end to end
 uv run python scripts/check_qr_deps.py
 
 # Build / publish (see RELEASING.md)
