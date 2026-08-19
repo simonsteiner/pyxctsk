@@ -6,9 +6,9 @@ specification and FAI Sporting Code S7F. Each file is dated and kept as written 
 superseded reviews stay for history rather than being edited. Newest first.
 
 - [2026-08-19 — Pre-release code-quality review](2026-08-19-pre-release-code-quality-review.md)
-  — **nine of twelve applied,** with 9 half-applied and 10, 11 deliberately held for
-  after the release; a Progress table in the file records each outcome and the two
-  departures. The whole of `src/pyxctsk` read at the 0.5.0 release
+  — **all twelve applied;** a Progress table in the file records each outcome, the two
+  departures, and the eight breaking changes they produced. The whole of `src/pyxctsk`
+  read at the 0.5.0 release
   frame, asking whether the implementation is as small and hard to misuse as it could be
   rather than whether it matches the spec. The suite, ruff and mypy are all green, and the
   values the last three reviews introduced are holding — so the findings are mostly

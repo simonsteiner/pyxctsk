@@ -1,10 +1,12 @@
 # 2026-08-19 — Pre-release code-quality review
 
-**Status: nine of twelve applied**, in the order the
+**Status: all twelve applied**, in the order the
 [Suggested order](#suggested-order) sets out; see [Progress](#progress) at the end.
-Findings 9 (partly), 10 and 11 are deliberately not applied — each is a decision about
-a published contract or a large mechanical move, and the argument for holding them
-until after the release is in the findings themselves.
+
+Findings 9, 10 and 11 were proposed for *after* the release and were then asked for
+anyway. That was the right call — 10 turned out to be a live round-trip infidelity
+rather than only an inconsistent docstring, and 11 exposed a layering guard that would
+have gone quietly green through the move it was meant to survive.
 
 This document is kept as written. The Progress section records what changed and where
 it departed from what was proposed; the findings above it are the review as it stood at
@@ -656,6 +658,10 @@ reference corpus rather than asserted.
 0f67e33 refactor(model): nesting is a codec, not a kind of row
 6d48c35 fix(model): ask the goal whether it is the ESS, and inline a two-line helper
 17b4615 fix(export): give the GeoJSON boundary a type, and stop leaking an enum
+5019af0 docs: record the review's outcomes and the two departures
+c17ec18 refactor(distance): the distance table is a rendering of the report, not a second one
+7be1fa2 fix(model): derive the goal's default, stop storing it
+78a62e0 refactor(distance): split turnpoint.py into the four modules it was
 ```
 
 | # | Finding | Outcome |
@@ -668,9 +674,9 @@ reference corpus rather than asserted.
 | 6 | `Nested` / `NestedList` | **applied.** Both deleted for `shape_codec`; shape.py loses 52 lines and two of its five row kinds. |
 | 7 | `_generate_semicircle_arc` | **applied**, together with 12d — both are the same module's parameter-count problem. |
 | 8 | Two copies of one function, two of one branch | **applied.** `_closest_circle_point` deleted for `_boundary_toward`; the crossing branch collapsed. Route points and both §7.2 distances bit-identical across the corpus. |
-| 9 | Two report shapes | **half applied.** The GeoJSON boundary is typed and the `tp_type` enum leak is fixed. The report shapes themselves are untouched: which surface is canonical is a decision about what is published, not a cleanup. |
-| 10 | The derived goal on `Task` | **not applied.** Deferred by design — see the finding. |
-| 11 | `distance/turnpoint.py` at 650 lines | **not applied.** Deferred by design; the finding argues against doing it in a release week. |
+| 9 | Two report shapes | **applied.** `DistanceReport` is canonical; `TaskDistanceTable`/`TurnpointRow` are it rounded for display, with `as_dict()` byte-identical to the dictionary they replace. The one datum the table had that the report lacked — `cumulative_center_m` — is new in `center_distance.py`, the module that owns the convention, and in the report's route rows. Its typed return immediately caught an unchecked `Optional` in a corpus test that the `Any` values had hidden. |
+| 10 | The derived goal on `Task` | **applied**, and it was a live defect rather than only an inconsistent docstring: two corpus tasks gained `"goal":{"type":"CYLINDER"}` on every round trip. `Task.effective_goal` is the contract as a projection; `qrcode/conversion.py` moved to `task.goal` in the same spirit, so a task whose goal was never spelled out now writes a payload without a `g`. |
+| 11 | `distance/turnpoint.py` at 650 lines | **applied.** Four modules of 125–228 lines: `earth`, `plane`, `solver`, `turnpoint`. Every published output byte-identical. It also caught the guard the finding did not anticipate — the scipy-is-deferred check read `distance/turnpoint.py` by name and would have passed while checking a file that no longer held the call. It walks all of `src/` now. |
 | 12a | Dead `find_ess_turnpoint` | **applied**, with a **departure**: the finding suggested `is_ess_goal` read `speed_section_indices`, which it cannot — that lives in `distance/`, and `model/` may not import it. `is_ess_goal` instead asks the last turnpoint for its role, which removes the value-comparison hazard and is what the model should answer anyway. |
 | 12b | The `getattr` earth model | **applied.** |
 | 12c | The KML magic `500` | **applied**, as `GOAL_LINE_ALTITUDE` beside `TURNPOINT_ALTITUDE` (was `DEFAULT_ALTITUDE`). |
@@ -682,8 +688,9 @@ reference corpus rather than asserted.
 
 ### What the applied changes are worth
 
-None of them changes a number. Verified per commit, against every task in
-`tests/data/reference_tasks/`:
+Only one changes a number a user sees, and it is the point of its finding: two
+goal-less corpus tasks stop gaining a `goal` key on output. Verified per commit,
+against every task in `tests/data/reference_tasks/`:
 
 - optimizer duplication (8): route points and both §7.2 distances **bit-identical**;
 - goal-line geometry (7, 12d): 3 of 1748 GeoJSON floats move, worst 7.1e-15° (~1 nm);
@@ -692,10 +699,34 @@ None of them changes a number. Verified per commit, against every task in
 - the field tables (6): every task's full JSON, `XCTSK:` string and waypoints
   `XCTSK:` string **byte-identical**;
 - `is_ess_goal` (12a): **identical** on all 26 corpus tasks;
-- the GeoJSON typing (9, partial): serialized output **byte-identical**.
+- the distance table (9): `as_dict()` **byte-identical** to the dict it replaces;
+- the derived goal (10): all 26 QR strings, all 26 GeoJSON documents and every
+  distance unchanged; the two goal-less XC/Waypoints tasks now round-trip **exactly**;
+- the module split (11): distances, KML, GeoJSON, both serializations and the display
+  table all **byte-identical**.
 
-The suite grew from 972 to 981 passing tests. The new ones are the cases the removed
+The suite grew from 972 to 993 passing tests. The new ones are the cases the removed
 duplication had left uncovered: a target at a circle's centre, that the optimizer needs
 no goal vocabulary, that a nested row obeys the same optionality as any other, that the
-converter stamps the version the validator checks, and the two shapes `is_ess_goal` used
-to get wrong.
+converter stamps the version the validator checks, that the table is the report rounded
+and its centre column ends at its centre total, that a task without a goal key writes
+none, and the two shapes `is_ess_goal` used to get wrong.
+
+### Breaking changes this produced
+
+All are in `CHANGELOG.md` under Unreleased; collected here because they are the price
+of the review:
+
+- `pip install pyxctsk` no longer brings QR *image* support — `pyxctsk[qr]` does (1);
+- `TaskTurnpoint.goal_type` is a `GoalType`, not a `str`, and `TurnpointGeometry` no
+  longer declares it (3);
+- `task_distances_from` / `calculate_task_distances` return a `TaskDistanceTable`;
+  `.as_dict()` restores the dictionary exactly (9);
+- `Task.__post_init__` no longer stores the CYLINDER default — `Task.effective_goal`
+  derives it (10);
+- `Task.find_ess_turnpoint` is gone (12a);
+- `model.shape.Nested` and `NestedList` are gone, replaced by `shape_codec` (6);
+- `export.kml.DEFAULT_ALTITUDE` is `TURNPOINT_ALTITUDE` (12c);
+- code reaching into `pyxctsk.distance.turnpoint` for an earth model or a projection
+  must name `pyxctsk.distance.earth` or `.plane`; everything stays exported from
+  `pyxctsk.distance` itself (11).
