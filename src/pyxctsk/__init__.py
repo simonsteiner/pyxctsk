@@ -84,10 +84,15 @@ from .model.validation import FULL_FORMAT_VERSION, ValidationIssue, ValidationRu
 from .parser import parse_task
 from .qrcode.image import generate_qrcode_image
 from .qrcode.task import QRCodeTask
+from .renderer import OUTPUT_FORMATS, OutputFormat, render_task
 
-# Constants
-EXTENSION = ".xctsk"
-MIME_TYPE = "application/xctsk"
+#: The task file's extension and media type — aliases onto the ``json`` row of
+#: :data:`~pyxctsk.renderer.OUTPUT_FORMATS`, not a second statement of them.
+#: They were two literals here, exported and read by *nothing*, while the CLI
+#: and ``scripts/task_viewer`` each spelled their own media types and
+#: ``parser.py`` kept its own extension list.
+EXTENSION = OUTPUT_FORMATS["json"].extension
+MIME_TYPE = OUTPUT_FORMATS["json"].media_type
 
 #: The version the full JSON task format declares — an alias, not a fourth
 #: spelling. This was one of three independent literal ``1``s, beside
@@ -138,11 +143,14 @@ __all__ = [
     "MIME_TYPE",
     "MissingQRCodeSupportError",
     "optimized_distance",
+    "OUTPUT_FORMATS",
+    "OutputFormat",
     "OptimizedRoute",
     "parse_task",
     "PROPOSED_READING",
     "pyXCTSKError",
     "QRCodeTask",
+    "render_task",
     "SpeedSection",
     "SSS",
     "SSSType",

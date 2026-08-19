@@ -392,6 +392,8 @@ class TestTheFrontDoorNamesTheAnswers:
         "TaskDrawing",
         "Task",
         "parse_task",
+        "render_task",
+        "OUTPUT_FORMATS",
         "center_distance",
         "center_distance_readings",
         "CenterDistanceReading",

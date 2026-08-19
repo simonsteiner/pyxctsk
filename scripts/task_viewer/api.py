@@ -7,12 +7,12 @@ from flask import Blueprint, Response, abort, jsonify, make_response
 
 try:
     from pyxctsk import (
+        OUTPUT_FORMATS,
         TaskDrawing,
         drawing_to_geojson,
-        generate_qrcode_image,
         parse_task,
+        render_task,
         task_distances_from,
-        task_to_kml,
     )
 
     XCTRACK_AVAILABLE = True
@@ -63,36 +63,13 @@ def qrcode_image(task_name: str) -> Response | tuple[Response, int]:
     xctsk_path = XCTSK_DIR / f"{task_name}.xctsk"
     if not xctsk_path.exists():
         return json_error(".xctsk file not found for this task", 404)
+    # One call, one row of pyxctsk's rendering table. This used to be the
+    # library's six-line PNG incantation copied out — parse, to_qr_code_task,
+    # to_string, generate_qrcode_image, BytesIO, save — beside a hand-written
+    # media type, which is the duplication `pyxctsk/renderer.py` exists to hold.
+    fmt = OUTPUT_FORMATS["png"]
     try:
-        from pyxctsk import parse_task
-
-        task = parse_task(str(xctsk_path))
-        if hasattr(task, "to_qr_code_task"):
-            qr_task = task.to_qr_code_task()
-            qr_string = qr_task.to_string()
-        else:
-            return json_error("Task object does not support QR code generation", 500)
-    except Exception as e:
-        import traceback
-
-        stacktrace = traceback.format_exc()
-        return json_error(
-            f"Error generating QR code string from task: {str(e)}",
-            500,
-            stacktrace=stacktrace,
-        )
-
-    try:
-        img = generate_qrcode_image(qr_string, size=512)
-        from io import BytesIO
-
-        buf = BytesIO()
-        img.save(buf, format="PNG")
-        buf.seek(0)
-        response = make_response(buf.getvalue())
-        response.mimetype = "image/png"
-        response.headers["Content-Disposition"] = f"inline; filename={task_name}.png"
-        return response
+        payload = render_task(parse_task(str(xctsk_path)), fmt.name)
     except Exception as e:
         import traceback
 
@@ -100,6 +77,13 @@ def qrcode_image(task_name: str) -> Response | tuple[Response, int]:
         return json_error(
             f"Error generating QR code image: {str(e)}", 500, stacktrace=stacktrace
         )
+
+    response = make_response(payload)
+    response.mimetype = fmt.media_type
+    response.headers["Content-Disposition"] = (
+        f"inline; filename={task_name}{fmt.extension}"
+    )
+    return response
 
 
 @api_bp.route("/api/task/<task_name>")
@@ -143,13 +127,13 @@ def kml_task_api(task_name: str) -> Response | tuple[Response, int]:
     if not xctsk_path.exists():
         return json_error("XCTSK file not found", 404)
 
+    fmt = OUTPUT_FORMATS["kml"]  # type: ignore
     try:
         task = parse_task(str(xctsk_path))  # type: ignore
-        kml_str = task_to_kml(task)  # type: ignore
-        response = make_response(kml_str)
-        response.mimetype = "application/vnd.google-earth.kml+xml"
+        response = make_response(render_task(task, fmt.name))  # type: ignore
+        response.mimetype = fmt.media_type
         response.headers["Content-Disposition"] = (
-            f"attachment; filename={task_name}.kml"
+            f"attachment; filename={task_name}{fmt.extension}"
         )
         return response
     except Exception as e:
