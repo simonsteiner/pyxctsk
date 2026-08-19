@@ -44,10 +44,10 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from itertools import accumulate
 
-from .earth import EarthModelLike, geod_for_earth_model, snap_to_boundary
+from .earth import EarthModelLike, geod_for_earth_model
 from .plane import LocalPlane
 from .solver import plane_optimal_point
-from .turnpoint import TurnpointGeometry, plane_circle
+from .turnpoint import TurnpointGeometry, plane_circle, point_on_boundary
 
 #: How many alternating sweeps to allow before giving up. A safety bound, not
 #: an accuracy setting — convergence normally stops far earlier — and the one
@@ -377,21 +377,17 @@ def _corrected_path(
     plane_points = _optimize_plane_points(circles, max_sweeps=max_sweeps)
 
     path: list[tuple[float, float]] = []
-    for i, ((x, y), (_, _, radius), tp) in enumerate(
+    for i, (xy, (_, _, radius), tp) in enumerate(
         zip(plane_points, circles, turnpoints)
     ):
-        if i == 0 or radius <= 0.0:
-            # Takeoff start point and zero-radius circles (including LINE
-            # goals) sit exactly on the turnpoint center.
+        # The takeoff start point sits on the centre whatever its radius: the
+        # takeoff cylinder is not touched (ADR 0002). Everything else goes
+        # through ProjectionCorrection (§7.1.7), which owns the zero-radius
+        # case — a LINE goal included.
+        if i == 0:
             path.append((tp.center[0], tp.center[1]))
             continue
-        # ProjectionCorrection (§7.1.7): re-place the planar solution at
-        # exactly radius r on the earth model along the center→point azimuth.
-        path.append(
-            snap_to_boundary(
-                plane.lon_lat((x, y)), tp.center, radius, plane.earth_model
-            )
-        )
+        path.append(point_on_boundary(tp, plane, xy, radius))
     return path
 
 

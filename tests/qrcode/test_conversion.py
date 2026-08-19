@@ -6,6 +6,8 @@ is a value added to one enum and mapped in only one direction, so the tables'
 symmetry is pinned here.
 """
 
+from typing import Any
+
 import pytest
 
 from pyxctsk.model.task import (
@@ -15,6 +17,7 @@ from pyxctsk.model.task import (
     GoalType,
     SSSType,
     TaskType,
+    TurnpointType,
 )
 from pyxctsk.qrcode.conversion import (
     _FROM_QR_DIRECTION,
@@ -230,3 +233,169 @@ class TestValidatingWhatArrived:
 
         assert pyxctsk.VERSION is FULL_FORMAT_VERSION
         assert self._payload(1, 2, 3).to_task().version == FULL_FORMAT_VERSION
+
+
+class TestEveryFieldCrossesTheSeam:
+    """The last hand-written field mirror, and the guard it never had.
+
+    `model/shape.py` exists to abolish "a hand-written to_dict sitting beside a
+    hand-written from_dict, with nothing making the two agree", and it did — at
+    the model↔wire seam, where `test_shape.py` pairs each table against its
+    dataclass. The model↔*model* seam is still exactly that situation:
+    `task_to_qr_code_task` and `qr_code_task_to_task` are two hand-written
+    field-by-field constructors of ~65 lines each.
+
+    So adding one spec field is six edits in four files, and only the first
+    four are checked. Miss either constructor and mypy is silent, the corpus is
+    silent — no reference task carries a field the spec has just gained — and
+    the value vanishes on every QR round trip.
+
+    These two tests close it from both ends: `NOT_CROSSING` says which fields
+    deliberately have no counterpart and why, and the round trip says every
+    other field survives. A new field must be populated (or declared), and must
+    then come back.
+    """
+
+    #: Fields with no counterpart on the other side, and the reason. Anything
+    #: not named here must survive the crossing in both directions.
+    NOT_CROSSING = {
+        # The QR format has no key for it: the compact SSS carries the open
+        # time and the gates, not the close.
+        ("SSS", "time_close"),
+        # The QR format flattens the takeoff into two root keys, so there is
+        # nothing to split its unknown keys apart by coming back; they stay in
+        # the full format. Same reason a Waypoint's do.
+        ("Takeoff", "unknown"),
+        # A converted task always declares the full format's version, which is
+        # the whole reason `--strict` validates what arrived rather than the
+        # conversion: the QR payload's own version is a different number.
+        ("Task", "version"),
+    }
+
+    #: Fields holding a shape that has its own entry. Compared there, so a
+    #: child's exemption is not silently re-applied to the whole parent — a
+    #: `Takeoff` compared inside a `Task` would drag `Takeoff.unknown` with it.
+    NESTED = {
+        ("Task", "turnpoints"),
+        ("Task", "takeoff"),
+        ("Task", "sss"),
+        ("Task", "goal"),
+        ("Turnpoint", "waypoint"),
+    }
+
+    def _populated(self) -> dict[str, Any]:
+        """One fully populated instance per 1:1 pair, keyed by class name.
+
+        Every field carries a value distinguishable from its default, so a
+        field that fails to cross shows up as the default coming back.
+        """
+        from pyxctsk.model.task import SSS, Goal, Takeoff, Task, Turnpoint, Waypoint
+        from pyxctsk.model.time_of_day import TimeOfDay
+
+        parts: dict[str, Any] = {
+            "Turnpoint": Turnpoint(
+                radius=1234,
+                waypoint=Waypoint(
+                    name="TP", lat=46.5, lon=8.25, alt_smoothed=1100, description="d"
+                ),
+                type=TurnpointType.SSS,
+                extensions=[{"id": "x", "k": 1}],
+                unknown={"zz": 9},
+            ),
+            "SSS": SSS(
+                type=SSSType.RACE,
+                direction=Direction.EXIT,
+                time_gates=[TimeOfDay(11, 30, 0)],
+                time_close=TimeOfDay(13, 0, 0),
+                unknown={"zz": 9},
+            ),
+            "Goal": Goal(
+                type=GoalType.LINE,
+                deadline=TimeOfDay(19, 45, 0),
+                finish_altitude=321,
+                unknown={"zz": 9},
+            ),
+            "Takeoff": Takeoff(
+                time_open=TimeOfDay(8, 0, 0),
+                time_close=TimeOfDay(9, 30, 0),
+                unknown={"zz": 9},
+            ),
+        }
+        parts["Task"] = Task(
+            task_type=TaskType.CLASSIC,
+            version=1,
+            turnpoints=[parts["Turnpoint"], parts["Turnpoint"]],
+            earth_model=EarthModel.FAI_SPHERE,
+            takeoff=parts["Takeoff"],
+            sss=parts["SSS"],
+            goal=parts["Goal"],
+            extensions=[{"id": "root", "k": 2}],
+            unknown={"root_zz": 8},
+        )
+        return parts
+
+    def test_every_field_of_every_pair_is_populated(self):
+        """Otherwise the round trip below silently stops covering a new field."""
+        from dataclasses import fields
+
+        for name, obj in self._populated().items():
+            unset = [
+                f.name
+                for f in fields(obj)
+                if not getattr(obj, f.name)  # noqa: B009
+            ]
+            assert unset == [], f"{name}: add {unset} to the populated instance"
+
+    def test_every_field_survives_the_crossing(self):
+        """A missed line in either hand-written constructor shows up here."""
+        from dataclasses import fields
+
+        populated = self._populated()
+        back = populated["Task"].to_qr_code_task().to_task()
+        returned = {
+            "Task": back,
+            "Turnpoint": back.turnpoints[0],
+            "SSS": back.sss,
+            "Goal": back.goal,
+            "Takeoff": back.takeoff,
+        }
+
+        for name, before in populated.items():
+            after = returned[name]
+            assert after is not None, f"{name} did not cross at all"
+            for f in fields(before):
+                if (name, f.name) in self.NOT_CROSSING | self.NESTED:
+                    continue
+                assert getattr(after, f.name) == getattr(before, f.name), (
+                    f"{name}.{f.name} was lost crossing to the QR format and back — "
+                    f"add it to qrcode/conversion.py, or to NOT_CROSSING with a reason"
+                )
+
+    def test_the_nested_waypoint_crosses_one_level_down(self):
+        """`Turnpoint.waypoint` has no counterpart; its values still cross."""
+        from pyxctsk.model.task import Task
+
+        turnpoint = self._populated()["Turnpoint"]
+        task = Task(
+            task_type=TaskType.CLASSIC, version=1, turnpoints=[turnpoint, turnpoint]
+        )
+
+        back = task.to_qr_code_task().to_task().turnpoints[0].waypoint
+
+        assert (back.name, back.lat, back.lon) == (
+            turnpoint.waypoint.name,
+            turnpoint.waypoint.lat,
+            turnpoint.waypoint.lon,
+        )
+        assert back.description == turnpoint.waypoint.description
+        assert back.alt_smoothed == turnpoint.waypoint.alt_smoothed
+
+    def test_not_crossing_names_only_fields_that_exist(self):
+        """A renamed field must not leave a stale exemption behind."""
+        from dataclasses import fields
+
+        for name, obj in self._populated().items():
+            declared = {
+                f for (cls, f) in self.NOT_CROSSING | self.NESTED if cls == name
+            }
+            assert declared <= {f.name for f in fields(obj)}

@@ -5,6 +5,34 @@ implements the [XCTrack Competition Interfaces](https://xctrack.org/Competition_
 specification and FAI Sporting Code S7F. Each file is dated and kept as written —
 superseded reviews stay for history rather than being edited. Newest first.
 
+- [2026-08-19 — Deepening candidates at the front door](2026-08-19-deepening-candidates-at-the-front-door.md)
+  — **all ten candidates applied;** a Progress table in the file records each outcome, the
+  three departures and the nine breaking changes they produced. The suite went from 995 to
+  1133 passing at the same 98 % coverage. Written after the
+  pre-release review below was merged, on a suite of 995 passing tests at 98 % line
+  coverage — so the friction is no longer *inside* a module. The last three reviews drove it
+  outward, and what is left sits at the two seams where the library meets the outside world
+  and at the one between its two formats. The framing number is that `distance`'s interface
+  went 13 → 22 → 29 names in three days while its implementation was being split into eleven
+  focused modules: every S7F number arrived as a new name rather than behind an existing one.
+  The headline is that **`parser.py`'s four adapters have no recognition question** — the one
+  its module docstring says each of them answers. `_parse_qrcode_json` accepts *any* JSON
+  object, so a ten-turnpoint `.xctsk` reads as zero turnpoints with its content in `unknown`
+  and only tuple order prevents it; `echo '{"hello":"world"}' | pyxctsk convert` invents a
+  task type, a version and an empty turnpoint list and exits 0; `[]` escapes as a bare
+  `TypeError`; and `_unrecognized`, which exists to name which failure occurred, is
+  unreachable for both. Three more candidates are live defects: a QR payload spelling
+  `taskType: "W"` is read in one shape and written in the other, dropping the goal, the earth
+  model, the takeoff window and a turnpoint radius in one round trip; `_A_DICT_OR_NOTHING`
+  promises passthrough it structurally cannot deliver, so a malformed `g` or `s` is dropped
+  rather than carried; and `calculate_task_distances` answers 0.0 km with an empty turnpoint
+  list for the task `DistanceReport.from_task` refuses. Also: the drawing answers for
+  turnpoints but not the goal line, so KML and GeoJSON call the same route "Course Line" and
+  "Optimized Route" with a test in each file pinning the divergence; two write-only fields
+  survive the very pattern `distance/__init__.py` records as retired; and the model↔QR
+  crossing is the last hand-written field mirror, six unguarded edits per spec field.
+  Companion visual report:
+  [`2026-08-19-deepening-candidates-at-the-front-door.html`](2026-08-19-deepening-candidates-at-the-front-door.html).
 - [2026-08-19 — Pre-release code-quality review](2026-08-19-pre-release-code-quality-review.md)
   — **all twelve applied;** a Progress table in the file records each outcome, the two
   departures, and the eight breaking changes they produced. The whole of `src/pyxctsk`

@@ -427,6 +427,85 @@ class TestOnePalette:
         for description in expected:
             assert f"<description>{description}</description>" in kml
 
+    def test_both_writers_name_the_route_the_same_way(self):
+        """KML wrote "Course Line" where GeoJSON wrote "Optimized Route".
+
+        The same line, two user-visible names, each pinned as expected by a
+        test in its own file — so the suite enforced the divergence rather
+        than catching it. The name is the drawing's answer now, and it is the
+        glossary's term.
+        """
+        drawing = TaskDrawing.from_task(_task(GoalType.CYLINDER))
+        expected = drawing.route_label()
+
+        geojson = drawing_to_geojson(drawing)
+        (route,) = [
+            f
+            for f in geojson["features"]
+            if f["properties"]["type"] == "optimized_route"
+        ]
+
+        assert route["properties"]["name"] == expected
+        assert f"<name>{expected}</name>" in drawing_to_kml(drawing)
+
+    def test_both_writers_name_and_describe_the_goal_line_the_same_way(self):
+        """Two byte-identical f-strings, one per writer, with nothing pairing them."""
+        drawing = TaskDrawing.from_task(_task(GoalType.LINE))
+        assert drawing.goal_line is not None
+
+        geojson = drawing_to_geojson(drawing)
+        (line,) = [
+            f for f in geojson["features"] if f["properties"]["type"] == "goal_line"
+        ]
+        kml = drawing_to_kml(drawing)
+
+        assert line["properties"]["name"] == drawing.goal_line_label()
+        assert line["properties"]["description"] == drawing.goal_line_description()
+        assert f"<name>{drawing.goal_line_label()}</name>" in kml
+        assert f"<description>{drawing.goal_line_description()}</description>" in kml
+
+    def test_both_writers_describe_the_control_zone_the_same_way(self):
+        """And its radius is the goal line's, not `length / 2` in three modules."""
+        drawing = TaskDrawing.from_task(_task(GoalType.LINE))
+        assert drawing.goal_line is not None
+
+        geojson = drawing_to_geojson(drawing)
+        (zone,) = [
+            f
+            for f in geojson["features"]
+            if f["properties"]["type"] == "goal_control_zone"
+        ]
+        kml = drawing_to_kml(drawing)
+
+        assert zone["properties"]["name"] == drawing.control_zone_label()
+        assert zone["properties"]["description"] == drawing.control_zone_description()
+        assert zone["properties"]["radius"] == drawing.goal_line.control_zone_radius
+        assert f"<name>{drawing.control_zone_label()}</name>" in kml
+        assert f"<description>{drawing.control_zone_description()}</description>" in kml
+
+    def test_the_control_zone_radius_is_half_the_line(self):
+        """S7F §6.2.3.1, owned by the goal line rather than by its captions."""
+        drawing = TaskDrawing.from_task(_task(GoalType.LINE))
+        assert drawing.goal_line is not None
+
+        assert drawing.goal_line.control_zone_radius == drawing.goal_line.length / 2
+
+    def test_both_writers_read_one_route_in_one_axis_order(self):
+        """One flipped by unpacking, the other by positional index."""
+        drawing = TaskDrawing.from_task(_task(GoalType.CYLINDER))
+        lon_lat = drawing.route_coordinates_lon_lat()
+        assert lon_lat is not None
+
+        geojson = drawing_to_geojson(drawing)
+        (route,) = [
+            f
+            for f in geojson["features"]
+            if f["properties"]["type"] == "optimized_route"
+        ]
+
+        assert route["geometry"]["coordinates"] == [list(p) for p in lon_lat]
+        assert [(lat, lon) for lon, lat in lon_lat] == drawing.route_coordinates()
+
     def test_no_writer_puts_a_python_repr_in_user_visible_text(self):
         """`Type: TurnpointType.TAKEOFF` and `Type: None` reached the map."""
         drawing = TaskDrawing.from_task(self._task_of_every_role())
@@ -468,7 +547,9 @@ class TestOnePalette:
         assert route["properties"]["arrow_color"] == ROUTE_COLOR.hex
 
         kml = drawing_to_kml(drawing)
-        assert self._placemark_color(kml, "Course Line") == ROUTE_COLOR.kml(ROUTE_ALPHA)
+        assert self._placemark_color(kml, drawing.route_label()) == ROUTE_COLOR.kml(
+            ROUTE_ALPHA
+        )
 
     def test_both_writers_draw_the_goal_line_in_one_colour(self):
         """It was red in KML and green in GeoJSON — the same shape, two colours."""

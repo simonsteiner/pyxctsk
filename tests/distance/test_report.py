@@ -172,3 +172,56 @@ class TestTooFewTurnpoints:
 
         with pytest.raises(TooFewTurnpointsError, match="at least two turnpoints"):
             DistanceReport.from_task(built)
+
+
+class TestTheEarthModelIsReadOffTheRoute:
+    """The route is where the legs were measured; the task only declared it.
+
+    `OptimizedRoute.earth_model` was set at both construction sites, documented
+    as "the model the legs were measured on", and read by nothing — in `src/`,
+    in `tests/` or in `scripts/`. Every consumer went back to the task instead,
+    so the one value that could tell a caller what a hand-built route was
+    actually measured on was write-only.
+    """
+
+    def test_it_agrees_with_the_task_for_a_measured_task(self):
+        """Which is every measured task `MeasuredTask.from_task` builds."""
+        from pyxctsk import EarthModel
+        from pyxctsk.distance import MeasuredTask
+
+        for model, expected in (
+            (None, "WGS84 (default)"),
+            (EarthModel.WGS84, "WGS84"),
+            (EarthModel.FAI_SPHERE, "FAI_SPHERE"),
+        ):
+            t = reference_task("task_bevo").task
+            t.earth_model = model
+            measured = MeasuredTask.from_task(t)
+
+            assert DistanceReport.from_measured_task(measured).earth_model == expected
+
+    def test_a_hand_built_pair_names_the_model_its_numbers_came_from(self):
+        """The case the two answers differ in, and the report used to lie about."""
+        from pyxctsk import EarthModel
+        from pyxctsk.distance import MeasuredTask
+
+        t = reference_task("task_bevo").task
+        t.earth_model = None
+        measured = MeasuredTask.from_task(t)
+        # The declaration moves after the fact; the legs do not.
+        t.earth_model = EarthModel.FAI_SPHERE
+
+        assert DistanceReport.from_measured_task(measured).earth_model == (
+            "WGS84 (default)"
+        )
+
+    def test_the_name_is_the_earth_modules_to_give(self):
+        """The default's name was spelled in the report, which does not own it."""
+        from pyxctsk import EarthModel
+        from pyxctsk.distance.earth import name_of
+
+        assert name_of(None) == "WGS84 (default)"
+        assert name_of("FAI_SPHERE") == "FAI_SPHERE"
+        assert name_of(EarthModel.WGS84) == "WGS84"
+        with pytest.raises(ValueError, match="not an earth model"):
+            name_of("WSG84")

@@ -22,9 +22,10 @@ the same fields, so they cannot disagree about a number or its absence.
 """
 
 from dataclasses import dataclass
-from importlib.metadata import PackageNotFoundError, version
 from typing import Any
 
+from ..exceptions import TooFewTurnpointsError  # noqa: F401  (re-exported)
+from ..metadata import pyxctsk_version
 from ..model.task import Task
 from .center_distance import (
     PROPOSED_READING,
@@ -32,6 +33,7 @@ from .center_distance import (
     center_distance_readings,
     cumulative_center_m,
 )
+from .earth import name_of
 from .measured_task import MeasuredTask
 from .speed_section import SpeedSection
 
@@ -41,7 +43,15 @@ S7F_EDITION = "2026 V1.0"
 #: The fewest turnpoints a task needs before any of these numbers mean anything.
 #: One turnpoint has no leg, so there is no route and no distance — the library
 #: used to answer 0.0 and only the CLI knew to refuse.
+#:
+#: The rule has one owner because the library used to give one task two
+#: answers: ``DistanceReport.from_task`` raised while
+#: ``calculate_task_distances`` — also at the front door — returned 0.0 km and
+#: ``turnpoints: []``, dropping the one turnpoint the task did have.
 MIN_TURNPOINTS_FOR_DISTANCE = 2
+
+#: What refusing says. One message, since two shapes now refuse.
+TOO_FEW_TURNPOINTS_MESSAGE = "a task needs at least two turnpoints to have a distance."
 
 #: What each published number is, and which section defines it. Carried with
 #: the report because "not defined by S7F" is the single most important thing
@@ -65,22 +75,6 @@ NOTES = {
         "center_distance_m reading above, so its last row equals it"
     ),
 }
-
-
-def pyxctsk_version() -> str:
-    """Return the installed library version, or ``"unknown"``.
-
-    Returns:
-        The version string from package metadata.
-    """
-    try:
-        return version("pyxctsk")
-    except PackageNotFoundError:  # pragma: no cover - editable/source runs
-        return "unknown"
-
-
-class TooFewTurnpointsError(ValueError):
-    """Raised when a task has too few turnpoints to have a distance at all."""
 
 
 @dataclass(frozen=True)
@@ -116,9 +110,7 @@ class DistanceReport:
                 leg to measure.
         """
         if len(task.turnpoints) < MIN_TURNPOINTS_FOR_DISTANCE:
-            raise TooFewTurnpointsError(
-                "a task needs at least two turnpoints to have a distance."
-            )
+            raise TooFewTurnpointsError(TOO_FEW_TURNPOINTS_MESSAGE)
         return cls.from_measured_task(MeasuredTask.from_task(task))
 
     @classmethod
@@ -143,9 +135,18 @@ class DistanceReport:
 
     @property
     def earth_model(self) -> str:
-        """The earth model the distances were measured on, named for output."""
-        model = self.task.earth_model
-        return model.value if model else "WGS84 (default)"
+        """The earth model the distances were measured on, named for output.
+
+        Read off the *route*, which is where the legs were measured, rather
+        than off the task, which is only where the choice was declared. The two
+        agree for any measured task built by ``MeasuredTask.from_task``; when a
+        caller assembles one by hand they need not, and the report was then
+        naming a model its own numbers had not been computed on.
+
+        ``earth.name_of`` owns the two names and the "missing means WGS84"
+        rule, so this module does not have to know them.
+        """
+        return name_of(self.measured.route.earth_model)
 
     @property
     def task_distance_m(self) -> float:

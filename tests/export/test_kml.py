@@ -78,8 +78,8 @@ class TestTaskToKML:
         assert "Radius: 1000m" in kml_result
         assert "Radius: 400m" in kml_result
 
-        # Verify course line
-        assert "Course Line" in kml_result
+        # Verify course line, under the name both formats now use
+        assert "Optimized Route" in kml_result
         assert "XCTrack task course with 2 turnpoints" in kml_result
 
     def test_task_to_kml_single_turnpoint(self):

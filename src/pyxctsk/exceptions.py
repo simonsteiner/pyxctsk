@@ -77,6 +77,22 @@ class MissingQRCodeSupportError(pyXCTSKError, ImportError):
     """
 
 
+class TooFewTurnpointsError(pyXCTSKError, ValueError):
+    """Raised when a task has too few turnpoints to have a distance at all.
+
+    Both bases are load-bearing, for the reason
+    :class:`MissingQRCodeSupportError` states: ``pyXCTSKError`` puts it in this
+    library's hierarchy, and ``ValueError`` keeps every existing
+    ``except ValueError`` working, since that is the type it has always raised.
+
+    It was raised from ``distance/report.py`` and descended from ``ValueError``
+    alone, so it was the one library error outside the hierarchy — and the CLI
+    paid for it directly, in two commands with two different catch tuples
+    (``except (pyXCTSKError, OSError)`` for ``convert``, the same plus this for
+    ``distances``). A sixth library error would have meant editing ``cli.py``.
+    """
+
+
 class InvalidTimeOfDayError(pyXCTSKError):
     """Raised when time of day format is invalid."""
 

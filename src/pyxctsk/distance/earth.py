@@ -6,11 +6,20 @@ must have *every* length measured there — route, legs, goal line and control
 zone alike (ADR 0003). This module is where that choice is made, once, and the
 rest of ``distance/`` takes an :data:`EarthModelLike` and passes it down.
 
+That claim was not true of ``plane.py``, which built the same two earths a
+second time and in a different formalism — ``Geod`` here, PROJ CRSes there —
+so adding an earth model, or correcting the sphere's radius, meant editing two
+files and only one of them refused an unknown value. Both shapes of an earth
+model live here now: :func:`geod_for_earth_model` for measuring on it, and
+:func:`crs_for_earth_model` / :func:`datum_proj4` for projecting on it.
+
 Split out of ``turnpoint.py``, which had grown to hold four unrelated things
 under a name that covered one of them.
 """
 
-from pyproj import Geod
+from functools import lru_cache
+
+from pyproj import CRS, Geod
 
 from ..model.enums import EarthModel
 
@@ -60,6 +69,93 @@ def _is_fai_sphere(earth_model: EarthModelLike) -> bool:
         f"not an earth model: {earth_model!r} "
         f"(expected one of {[m.value for m in EarthModel]}, or None for WGS84)"
     )
+
+
+def canonical(earth_model: EarthModelLike) -> EarthModel:
+    """The earth model a selector names, with None resolved to the default.
+
+    One value per earth rather than three spellings of it, which is what lets a
+    cache be keyed on the model instead of on a bool. ``plane.py`` reduced
+    :data:`EarthModelLike` to ``fai_sphere: bool`` for exactly that, putting
+    the two-valued world this type was widened to replace back one layer down.
+
+    Args:
+        earth_model: An ``EarthModel`` member, its string value, or None.
+
+    Returns:
+        The ``EarthModel`` member it names.
+
+    Raises:
+        ValueError: If the value names no earth model this library knows.
+    """
+    return EarthModel.FAI_SPHERE if _is_fai_sphere(earth_model) else EarthModel.WGS84
+
+
+def datum_proj4(earth_model: EarthModelLike = None) -> str:
+    """The PROJ parameter naming this earth's figure.
+
+    The one place the sphere's radius reaches a projection string. It was
+    written out twice in ``plane.py``, in two branches that also differed in
+    which geographic CRS they paired it with.
+
+    Args:
+        earth_model: An ``EarthModel`` member, its string value, or None.
+
+    Returns:
+        ``+R=6371000.0`` for the FAI sphere, ``+ellps=WGS84`` otherwise.
+    """
+    if canonical(earth_model) is EarthModel.FAI_SPHERE:
+        return f"+R={FAI_SPHERE_RADIUS_M}"
+    return "+ellps=WGS84"
+
+
+@lru_cache(maxsize=4)
+def _crs_for(model: EarthModel) -> CRS:
+    """Build (and cache) the geographic CRS for one earth model."""
+    if model is EarthModel.FAI_SPHERE:
+        return CRS.from_proj4(f"+proj=longlat +R={FAI_SPHERE_RADIUS_M} +no_defs")
+    return CRS.from_epsg(4326)
+
+
+def crs_for_earth_model(earth_model: EarthModelLike = None) -> CRS:
+    """Return the geographic CRS a task's coordinates are in.
+
+    The projection counterpart of :func:`geod_for_earth_model`, and the reason
+    this module can claim to make the choice once.
+
+    Args:
+        earth_model: An ``EarthModel`` member, its string value, or None for
+            the WGS84 default.
+
+    Returns:
+        EPSG:4326 for WGS84, or a spherical geographic CRS at
+        R = 6 371 000 m for the FAI sphere.
+    """
+    return _crs_for(canonical(earth_model))
+
+
+def name_of(earth_model: EarthModelLike) -> str:
+    """Name an earth model for output, saying so when it is the default.
+
+    The report published this string, so it knew what the two earths are called
+    and that a missing value means WGS84 — knowledge belonging to the module
+    that owns the choice, not to the one rendering it. Raising on a value that
+    names no earth model comes with it: the report's ``model.value if model``
+    could not have been asked about a string.
+
+    Args:
+        earth_model: An ``EarthModel`` enum member, its string value, or None
+            for the WGS84 default.
+
+    Returns:
+        The model's name, or ``"WGS84 (default)"`` when none was declared.
+
+    Raises:
+        ValueError: If the value names no earth model this library knows.
+    """
+    if earth_model is None:
+        return f"{EarthModel.WGS84.value} (default)"
+    return canonical(earth_model).value
 
 
 def geod_for_earth_model(earth_model: EarthModelLike = None) -> Geod:

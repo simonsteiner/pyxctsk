@@ -102,16 +102,13 @@ def _create_course_line(kml: simplekml.Kml, drawing: TaskDrawing) -> None:
         kml: The KML document to add elements to.
         drawing: The task drawing, carrying the optimized route.
     """
-    opt_route_coords = drawing.route_coordinates()
-    if opt_route_coords is None:
+    route_coordinates = drawing.route_coordinates_lon_lat()
+    if route_coordinates is None:
         return
-
-    # Convert from (lat, lon) to (lon, lat) format (no altitude)
-    route_coordinates = [(lon, lat) for lat, lon in opt_route_coords]
 
     # Create the course line
     course_line = kml.newlinestring(
-        name="Course Line",
+        name=drawing.route_label(),
         description=(
             f"XCTrack task course with {len(drawing.task.turnpoints)} turnpoints"
         ),
@@ -139,12 +136,11 @@ def _create_goal_line_elements(
         return
 
     (lon1, lat1), (lon2, lat2), _ = goal_line.endpoints()
-    goal_line_length = goal_line.length
 
     # Create goal line
     goal_line_placemark = kml.newlinestring(
-        name="Goal Line",
-        description=f"Goal line length: {goal_line_length:.0f}m",
+        name=drawing.goal_line_label(),
+        description=drawing.goal_line_description(),
         coords=[(lon1, lat1, altitude), (lon2, lat2, altitude)],
         extrude=1,
         altitudemode=simplekml.AltitudeMode.relativetoground,
@@ -158,8 +154,8 @@ def _create_goal_line_elements(
     ]
 
     control_zone = kml.newpolygon(
-        name="Goal Control Zone",
-        description=f"Goal control zone radius: {goal_line_length / 2:.0f}m",
+        name=drawing.control_zone_label(),
+        description=drawing.control_zone_description(),
         outerboundaryis=control_zone_coords_3d,
         extrude=1,
         altitudemode=simplekml.AltitudeMode.relativetoground,

@@ -17,16 +17,15 @@ See project README for usage examples and supported formats.
 
 import json
 import sys
-from io import BytesIO
 from typing import BinaryIO
 
 import click
 
-from .distance.report import DistanceReport, TooFewTurnpointsError, pyxctsk_version
+from .distance.report import DistanceReport
 from .exceptions import pyXCTSKError
-from .export.kml import task_to_kml
+from .metadata import pyxctsk_version
 from .parser import parse_task
-from .qrcode.image import generate_qrcode_image
+from .renderer import OUTPUT_FORMATS, render_task
 
 
 @click.group()
@@ -129,7 +128,7 @@ def _write_output(output_file: str | None, payload: str | bytes) -> None:
 @click.option(
     "--format",
     "output_format",
-    type=click.Choice(["json", "kml", "png", "qrcode-json"]),
+    type=click.Choice(list(OUTPUT_FORMATS)),
     default="json",
     help="Output format",
 )
@@ -184,20 +183,7 @@ def convert(
     """
     try:
         task = parse_task(_read_input(input_file), strict=strict)
-
-        if output_format == "json":
-            _write_output(output_file, task.to_json())
-        elif output_format == "kml":
-            _write_output(output_file, task_to_kml(task))
-        elif output_format == "qrcode-json":
-            qr_string = task.to_qr_code_task().to_string(compressed=compressed)
-            _write_output(output_file, qr_string)
-        elif output_format == "png":
-            qr_string = task.to_qr_code_task().to_string(compressed=compressed)
-            buffer = BytesIO()
-            generate_qrcode_image(qr_string, size=1024).save(buffer, format="PNG")
-            _write_output(output_file, buffer.getvalue())
-
+        _write_output(output_file, render_task(task, output_format, compressed))
     except (pyXCTSKError, OSError) as e:
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
@@ -260,7 +246,9 @@ def distances(
 
     Raises:
         SystemExit: If input is missing, the task cannot be parsed, or it has
-            too few turnpoints to have a distance at all.
+            too few turnpoints to have a distance at all. All three are
+            ``pyXCTSKError`` — this command used to name the last one
+            separately, because it descended from ``ValueError`` alone.
     """
     try:
         input_data = _read_input(input_file)
@@ -273,7 +261,7 @@ def distances(
             else report.as_text(),
         )
 
-    except (pyXCTSKError, OSError, TooFewTurnpointsError) as e:
+    except (pyXCTSKError, OSError) as e:
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
 

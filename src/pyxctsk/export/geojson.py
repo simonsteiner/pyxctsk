@@ -74,21 +74,18 @@ def _create_optimized_route_feature(drawing: TaskDrawing) -> dict[str, Any] | No
     Returns:
         The route feature, or None when there is no line to draw.
     """
-    opt_coords = drawing.route_coordinates()
+    opt_coords = drawing.route_coordinates_lon_lat()
     if opt_coords is None:
         return None
-
-    # Convert from (lat, lon) to [lon, lat] format for GeoJSON
-    opt_coordinates = [[coord[1], coord[0]] for coord in opt_coords]
 
     return {
         "type": "Feature",
         "geometry": {
             "type": "LineString",
-            "coordinates": opt_coordinates,
+            "coordinates": [list(point) for point in opt_coords],
         },
         "properties": {
-            "name": "Optimized Route",
+            "name": drawing.route_label(),
             "type": "optimized_route",
             "color": ROUTE_COLOR.hex,
             "weight": 3,
@@ -115,7 +112,6 @@ def _create_goal_line_features(drawing: TaskDrawing) -> list[dict[str, Any]]:
         return []
 
     (lon1, lat1), (lon2, lat2), _ = goal_line.endpoints()
-    goal_line_length = goal_line.length
     features: list[dict[str, Any]] = []
 
     # Create goal line feature
@@ -126,19 +122,16 @@ def _create_goal_line_features(drawing: TaskDrawing) -> list[dict[str, Any]]:
             "coordinates": [[lon1, lat1], [lon2, lat2]],
         },
         "properties": {
-            "name": "Goal Line",
+            "name": drawing.goal_line_label(),
             "type": "goal_line",
-            "length": goal_line_length,
-            "description": f"Goal line length: {goal_line_length:.0f}m",
+            "length": goal_line.length,
+            "description": drawing.goal_line_description(),
             "stroke": GOAL_LINE_COLOR.hex,
             "stroke-width": 4,
             "stroke-opacity": 1.0,
         },
     }
     features.append(goal_line_feature)
-
-    # Create goal line control zone (semi-circle in front of the goal line)
-    control_zone_radius = goal_line_length / 2
 
     # Convert control zone coordinates to GeoJSON format [lon, lat]
     control_zone_geojson_coords = [[lon, lat] for lon, lat in goal_line.control_zone()]
@@ -150,10 +143,10 @@ def _create_goal_line_features(drawing: TaskDrawing) -> list[dict[str, Any]]:
             "coordinates": [control_zone_geojson_coords],
         },
         "properties": {
-            "name": "Goal Control Zone",
+            "name": drawing.control_zone_label(),
             "type": "goal_control_zone",
-            "radius": control_zone_radius,
-            "description": f"Goal control zone radius: {control_zone_radius:.0f}m",
+            "radius": goal_line.control_zone_radius,
+            "description": drawing.control_zone_description(),
             "fill": CONTROL_ZONE_FILL_COLOR.hex,
             "fill-opacity": 0.3,
             "stroke": CONTROL_ZONE_EDGE_COLOR.hex,

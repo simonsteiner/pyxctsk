@@ -1,0 +1,908 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Architecture review — pyxctsk — 2026-08-19</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+    </script>
+    <style>
+      .seam { stroke-dasharray: 5 4; }
+      .deep { background: linear-gradient(135deg, #0f172a, #1e293b); }
+      .hatch { background-image: repeating-linear-gradient(45deg, #fecaca 0 4px, #fee2e2 4px 8px); }
+      .hatch-ok { background-image: repeating-linear-gradient(45deg, #bbf7d0 0 4px, #dcfce7 4px 8px); }
+      .mermaid { display: flex; justify-content: center; }
+      code { font-variant-ligatures: none; }
+      .card-anchor { scroll-margin-top: 1.5rem; }
+    </style>
+  </head>
+  <body class="bg-stone-50 text-slate-900 font-sans antialiased">
+    <main class="max-w-5xl mx-auto px-6 py-12 space-y-14">
+
+      <!-- ══════════════════ HEADER ══════════════════ -->
+      <header class="space-y-6">
+        <div class="flex flex-wrap items-baseline justify-between gap-2 border-b border-slate-300 pb-4">
+          <h1 class="font-serif text-4xl tracking-tight">Architecture review — <span class="font-mono text-3xl text-slate-600">pyxctsk</span></h1>
+          <p class="text-sm text-slate-500 font-mono">2026-08-19 · <span class="text-slate-400">8d4ce8d</span></p>
+        </div>
+        <p class="text-sm text-slate-600 -mt-2">Companion visual report to
+          <a class="font-mono text-indigo-700 hover:underline" href="2026-08-19-deepening-candidates-at-the-front-door.md">2026-08-19-deepening-candidates-at-the-front-door.md</a>,
+          which is the written record and carries the evidence. Suite at this commit:
+          <strong>995 passed, 18 skipped, 98&nbsp;% line coverage</strong>, ruff and mypy green.</p>
+        <div class="rounded-lg border border-emerald-300 bg-emerald-50 p-4 -mt-2">
+          <p class="text-sm text-emerald-900"><strong>Status: all ten candidates applied</strong>, one per commit, on
+          <code class="font-mono text-xs">docs/deepening-candidates-2026-08-19</code>. The suite went from 995 to
+          <strong>1133 passing</strong> at the same 98&nbsp;% coverage. Three candidates were applied differently
+          from the card once the code was read closely — E gave the write-only field a reader instead of deleting it,
+          F kept a single-circle seam rather than pushing the pipeline into the test file, and I found that six of the
+          eight <code class="font-mono text-xs">&lt; 2</code> guards are four different rules sharing a number. The
+          Markdown record's Progress table carries each outcome and the nine breaking changes.</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="rounded-lg border border-slate-200 bg-white p-4">
+            <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">Legend</p>
+            <ul class="text-sm space-y-2">
+              <li class="flex items-center gap-3"><span class="inline-block w-10 h-5 border-2 border-slate-700 rounded-sm bg-white"></span> module</li>
+              <li class="flex items-center gap-3"><svg width="40" height="10"><line class="seam" x1="0" y1="5" x2="40" y2="5" stroke="#475569" stroke-width="2"/></svg> seam</li>
+              <li class="flex items-center gap-3"><svg width="40" height="10"><line x1="0" y1="5" x2="34" y2="5" stroke="#dc2626" stroke-width="2"/><path d="M34 1 L40 5 L34 9Z" fill="#dc2626"/></svg> leakage</li>
+              <li class="flex items-center gap-3"><span class="inline-block w-10 h-5 rounded-sm deep"></span> deep module</li>
+              <li class="flex items-center gap-3"><span class="inline-block w-10 h-5 rounded-sm hatch border border-red-300"></span> knowledge stated twice</li>
+            </ul>
+          </div>
+
+          <div class="rounded-lg border border-slate-200 bg-white p-4">
+            <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">Scope — chosen by churn</p>
+            <p class="text-sm text-slate-600 mb-3">Touches per file in <code class="font-mono text-xs">src/</code>, last 60 commits.</p>
+            <div class="space-y-1.5 text-xs font-mono">
+              <div class="flex items-center gap-2"><span class="w-48 truncate text-slate-700">distance/__init__.py</span><span class="h-3 bg-indigo-600 rounded-sm" style="width:112px"></span><span class="text-slate-500">16</span></div>
+              <div class="flex items-center gap-2"><span class="w-48 truncate text-slate-700">distance/turnpoint.py</span><span class="h-3 bg-indigo-600 rounded-sm" style="width:91px"></span><span class="text-slate-500">13</span></div>
+              <div class="flex items-center gap-2"><span class="w-48 truncate text-slate-700">export/common.py</span><span class="h-3 bg-indigo-500 rounded-sm" style="width:84px"></span><span class="text-slate-500">12</span></div>
+              <div class="flex items-center gap-2"><span class="w-48 truncate text-slate-700">distance/goal_line.py</span><span class="h-3 bg-indigo-500 rounded-sm" style="width:77px"></span><span class="text-slate-500">11</span></div>
+              <div class="flex items-center gap-2"><span class="w-48 truncate text-slate-700">distance/route_optimization.py</span><span class="h-3 bg-indigo-400 rounded-sm" style="width:70px"></span><span class="text-slate-500">10</span></div>
+              <div class="flex items-center gap-2"><span class="w-48 truncate text-slate-700">__init__.py</span><span class="h-3 bg-indigo-400 rounded-sm" style="width:63px"></span><span class="text-slate-500">9</span></div>
+              <div class="flex items-center gap-2"><span class="w-48 truncate text-slate-700">export/kml.py · geojson.py</span><span class="h-3 bg-indigo-300 rounded-sm" style="width:56px"></span><span class="text-slate-500">8</span></div>
+              <div class="flex items-center gap-2"><span class="w-48 truncate text-slate-700">cli.py</span><span class="h-3 bg-indigo-300 rounded-sm" style="width:49px"></span><span class="text-slate-500">7</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- The framing chart -->
+        <div class="rounded-lg border border-slate-200 bg-white p-5">
+          <p class="text-xs uppercase tracking-wider text-slate-500 mb-1">The signal</p>
+          <p class="text-sm text-slate-600 mb-4">Names in <code class="font-mono text-xs">distance.__all__</code>, per commit. The implementation was being <em>narrowed</em> across the same three days — split into eleven focused modules — while its interface more than doubled. Every new S7F number arrived as a new name rather than behind an existing one.</p>
+          <svg viewBox="0 0 720 190" class="w-full h-44">
+            <line x1="40" y1="160" x2="700" y2="160" stroke="#cbd5e1" stroke-width="1"/>
+            <line x1="40" y1="20" x2="40" y2="160" stroke="#cbd5e1" stroke-width="1"/>
+            <text x="18" y="164" class="text-[9px]" fill="#94a3b8" font-family="monospace">0</text>
+            <text x="14" y="26" class="text-[9px]" fill="#94a3b8" font-family="monospace">30</text>
+            <!-- 20 commits, values 13,17,18,19,18,17,18,16,16,18,16,16,17,17,18,22,23,27,29,29 -->
+            <polyline fill="none" stroke="#4f46e5" stroke-width="2.5"
+              points="40,99 75,81 110,76 145,72 180,76 215,81 250,76 285,86 320,86 355,76 390,86 425,86 460,81 495,81 530,76 565,58 600,53 635,34 670,25 700,25"/>
+            <circle cx="40" cy="99" r="4" fill="#4f46e5"/><text x="30" y="115" class="text-[10px]" fill="#4f46e5" font-family="monospace">13</text>
+            <circle cx="700" cy="25" r="4" fill="#4f46e5"/><text x="682" y="18" class="text-[10px]" fill="#4f46e5" font-family="monospace">29</text>
+            <text x="34" y="178" class="text-[10px]" fill="#94a3b8" font-family="monospace">08-17 · package split</text>
+            <text x="510" y="178" class="text-[10px]" fill="#94a3b8" font-family="monospace">08-19 · today</text>
+            <line class="seam" x1="565" y1="20" x2="565" y2="160" stroke="#94a3b8" stroke-width="1"/>
+            <text x="410" y="45" class="text-[10px]" fill="#64748b" font-family="monospace">S7F numbers arrive →</text>
+          </svg>
+          <div class="grid grid-cols-3 gap-3 mt-3 text-center">
+            <div class="rounded border border-slate-200 p-2"><p class="font-mono text-2xl text-indigo-700">52</p><p class="text-[11px] text-slate-500 uppercase tracking-wide">names at the front door</p></div>
+            <div class="rounded border border-slate-200 p-2"><p class="font-mono text-2xl text-indigo-700">29</p><p class="text-[11px] text-slate-500 uppercase tracking-wide">names in <code>distance</code></p></div>
+            <div class="rounded border border-red-200 bg-red-50 p-2"><p class="font-mono text-2xl text-red-700">0 / 4</p><p class="text-[11px] text-red-700 uppercase tracking-wide">adapters that can say “not mine”</p></div>
+          </div>
+        </div>
+
+        <!-- index -->
+        <div class="rounded-lg border border-slate-200 bg-white p-4">
+          <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">Candidates</p>
+          <ol class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
+            <li><a class="text-indigo-700 hover:underline" href="#a">A · The parser's adapters have no recognition question</a> <span class="text-emerald-700 text-xs">Strong</span></li>
+            <li><a class="text-indigo-700 hover:underline" href="#b">B · The QR shape is chosen twice</a> <span class="text-emerald-700 text-xs">Strong</span></li>
+            <li><a class="text-indigo-700 hover:underline" href="#c">C · The last hand-written field mirror</a> <span class="text-emerald-700 text-xs">Strong</span></li>
+            <li><a class="text-indigo-700 hover:underline" href="#d">D · The drawing stops at the turnpoints</a> <span class="text-emerald-700 text-xs">Strong</span></li>
+            <li><a class="text-indigo-700 hover:underline" href="#e">E · Two write-only fields</a> <span class="text-emerald-700 text-xs">Strong</span></li>
+            <li><a class="text-indigo-700 hover:underline" href="#f">F · A second optimizer nobody ships</a> <span class="text-amber-700 text-xs">Worth exploring</span></li>
+            <li><a class="text-indigo-700 hover:underline" href="#g">G · One library, two error hierarchies</a> <span class="text-amber-700 text-xs">Worth exploring</span></li>
+            <li><a class="text-indigo-700 hover:underline" href="#h">H · Rendering has no seam</a> <span class="text-amber-700 text-xs">Worth exploring</span></li>
+            <li><a class="text-indigo-700 hover:underline" href="#i">I · One task, two answers</a> <span class="text-amber-700 text-xs">Worth exploring</span></li>
+            <li><a class="text-indigo-700 hover:underline" href="#j">J · Two modules build the two earths</a> <span class="text-amber-700 text-xs">Worth exploring</span></li>
+          </ol>
+        </div>
+      </header>
+
+      <section id="candidates" class="space-y-14">
+
+        <!-- ══════════════════ A ══════════════════ -->
+        <article id="a" class="card-anchor space-y-4">
+          <div class="flex flex-wrap items-baseline gap-3">
+            <h2 class="font-serif text-2xl">A · The parser's adapters have no recognition question</h2>
+            <span class="rounded-full bg-emerald-100 text-emerald-800 text-xs px-2.5 py-0.5 font-medium">Strong</span>
+            <span class="rounded-full bg-slate-100 text-slate-700 text-xs px-2.5 py-0.5 font-mono">in-process</span>
+            <span class="rounded-full bg-red-100 text-red-800 text-xs px-2.5 py-0.5 font-medium">live defect</span>
+          </div>
+          <p class="font-mono text-sm text-slate-600">src/pyxctsk/parser.py</p>
+
+          <div class="rounded-lg border border-slate-200 bg-white p-4">
+            <p class="text-xs uppercase tracking-wider text-slate-500 mb-2">What the module docstring promises</p>
+            <p class="text-sm text-slate-700 italic">“Each adapter answers two questions independently: does the input <em>look like</em> my format, and can I parse it? This keeps every format's recognition and parsing logic in one place and makes each adapter testable in isolation.” — <code class="font-mono text-xs">parser.py:12-16</code></p>
+            <p class="text-sm text-slate-700 mt-2">There is no recognition question. “Not my format” is expressed by returning <code class="font-mono text-xs">None</code> — indistinguishable from “is my format but malformed”.</p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="rounded-lg border border-red-200 bg-white p-4">
+              <p class="text-xs uppercase tracking-wider text-red-600 mb-3">Before — one question, asked twice in two places</p>
+              <pre class="mermaid">
+flowchart TB
+  IN[["input bytes"]] --> T{"_FORMAT_PARSERS<br/>ordered tuple"}
+  T --> P1["_parse_xctsk_url<br/><i>raises on malformed</i>"]
+  T --> P2["_parse_task_json<br/><i>returns None</i>"]
+  T --> P3["_parse_qrcode_json<br/><b>accepts ANY JSON object</b>"]
+  T --> P4["_parse_qrcode_image<br/><i>returns None</i>"]
+  P2 -. "order is the only<br/>thing keeping .xctsk<br/>out of P3" .-> P3
+  T --> U["_unrecognized<br/>re-derives 4 predicates<br/>image magic · JSON shape · path"]
+  classDef leak fill:#fee2e2,stroke:#dc2626,stroke-width:2px;
+  classDef dead fill:#f1f5f9,stroke:#94a3b8,stroke-dasharray:4 3;
+  class P3 leak
+  class U dead
+              </pre>
+              <p class="text-xs text-slate-500 mt-1">Dashed = unreachable for a JSON object (P3 accepts it) and for a JSON array (it crashes first).</p>
+            </div>
+            <div class="rounded-lg border border-emerald-200 bg-white p-4">
+              <p class="text-xs uppercase tracking-wider text-emerald-700 mb-3">After — the adapter owns both questions</p>
+              <pre class="mermaid">
+flowchart TB
+  IN2[["input bytes"]] --> T2{"_FORMAT_ADAPTERS"}
+  T2 --> A1["XctskUrl<br/>recognizes / parse"]
+  T2 --> A2["TaskJson<br/>recognizes / parse"]
+  T2 --> A3["QrJson<br/>recognizes / parse"]
+  T2 --> A4["QrImage<br/>recognizes / parse"]
+  A1 --> ERR["at most one claims it<br/>→ that adapter names the failure"]
+  A2 --> ERR
+  A3 --> ERR
+  A4 --> ERR
+  classDef deepc fill:#0f172a,color:#e2e8f0,stroke:#0f172a;
+  class A1,A2,A3,A4 deepc
+              </pre>
+              <p class="text-xs text-slate-500 mt-1">Order stops being load-bearing. <code class="font-mono">_unrecognized</code>'s three branches move into the adapters that own them.</p>
+            </div>
+          </div>
+
+          <div class="rounded-lg border border-red-300 bg-red-50 p-4 font-mono text-[13px] leading-relaxed">
+            <p class="text-xs uppercase tracking-wider text-red-700 mb-2 font-sans font-medium">Reproduced at this commit</p>
+<pre class="whitespace-pre-wrap text-slate-800">$ echo -n '{"hello":"world"}' | pyxctsk convert
+{"taskType":"CLASSIC","version":1,"turnpoints":[],"hello":"world"}
+$ echo $?
+0
+
+$ echo -n '[]' | pyxctsk convert
+Traceback (most recent call last):
+  ...
+TypeError: list indices must be integers or slices, not str</pre>
+            <p class="text-xs text-red-800 mt-2 font-sans">A ten-turnpoint <code>.xctsk</code> fed to <code>_parse_qrcode_json</code> reads as <strong>zero</strong> turnpoints with its whole content in <code>unknown</code>.</p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+            <div><p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Problem</p><p>One adapter answers “yes” to input that is not its format, so tuple order is load-bearing and the error path re-derives four predicates the adapters should own.</p></div>
+            <div><p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Solution</p><p>Give the adapter the two-member interface its docstring describes: <code class="font-mono text-xs">recognizes()</code> beside <code class="font-mono text-xs">parse()</code>.</p></div>
+            <div><p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Wins</p>
+              <ul class="list-disc list-inside space-y-0.5 text-slate-700">
+                <li>locality: recognition beside parsing</li>
+                <li>leverage: a format is one row</li>
+                <li>the interface becomes the test surface</li>
+                <li>deletion test: <code class="font-mono text-xs">_unrecognized</code> concentrates</li>
+              </ul>
+            </div>
+          </div>
+        </article>
+
+        <!-- ══════════════════ B ══════════════════ -->
+        <article id="b" class="card-anchor space-y-4">
+          <div class="flex flex-wrap items-baseline gap-3">
+            <h2 class="font-serif text-2xl">B · The QR shape is chosen twice, on two different inputs</h2>
+            <span class="rounded-full bg-emerald-100 text-emerald-800 text-xs px-2.5 py-0.5 font-medium">Strong</span>
+            <span class="rounded-full bg-slate-100 text-slate-700 text-xs px-2.5 py-0.5 font-mono">in-process</span>
+            <span class="rounded-full bg-red-100 text-red-800 text-xs px-2.5 py-0.5 font-medium">live defect</span>
+          </div>
+          <p class="font-mono text-sm text-slate-600">src/pyxctsk/qrcode/task.py</p>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="rounded-lg border border-red-200 bg-white p-4">
+              <p class="text-xs uppercase tracking-wider text-red-600 mb-3">Before — read decides on keys, write decides on the type</p>
+              <svg viewBox="0 0 340 250" class="w-full">
+                <rect x="10" y="10" width="140" height="46" rx="4" fill="#fff" stroke="#334155" stroke-width="2"/>
+                <text x="80" y="30" text-anchor="middle" font-size="11" font-family="monospace" fill="#0f172a">from_dict</text>
+                <text x="80" y="46" text-anchor="middle" font-size="10" font-family="monospace" fill="#64748b">"T" in data</text>
+
+                <rect x="190" y="10" width="140" height="46" rx="4" fill="#fff" stroke="#334155" stroke-width="2"/>
+                <text x="260" y="30" text-anchor="middle" font-size="11" font-family="monospace" fill="#0f172a">to_dict</text>
+                <text x="260" y="46" text-anchor="middle" font-size="10" font-family="monospace" fill="#64748b">self.task_type</text>
+
+                <rect x="70" y="92" width="200" height="42" rx="4" class="hatch" stroke="#dc2626" stroke-width="2"/>
+                <text x="170" y="110" text-anchor="middle" font-size="10.5" font-family="monospace" fill="#7f1d1d">_CompetitionTaskType.read</text>
+                <text x="170" y="126" text-anchor="middle" font-size="10" font-family="monospace" fill="#7f1d1d">accepts "W" → WAYPOINTS</text>
+
+                <line x1="80" y1="56" x2="130" y2="92" stroke="#dc2626" stroke-width="2"/>
+                <line x1="260" y1="56" x2="215" y2="92" stroke="#dc2626" stroke-width="2" class="seam"/>
+                <path d="M212 88 L219 95 L211 97Z" fill="#dc2626"/>
+
+                <rect x="30" y="166" width="280" height="70" rx="4" fill="#fee2e2" stroke="#dc2626"/>
+                <text x="170" y="186" text-anchor="middle" font-size="10.5" font-family="monospace" fill="#7f1d1d">read: competition shape → goal, e, tc/to, radius</text>
+                <text x="170" y="204" text-anchor="middle" font-size="10.5" font-family="monospace" fill="#7f1d1d">write: waypoints shape → all five dropped</text>
+                <text x="170" y="224" text-anchor="middle" font-size="10" font-family="monospace" fill="#991b1b">one round trip, silent, exit 0</text>
+              </svg>
+            </div>
+            <div class="rounded-lg border border-emerald-200 bg-white p-4">
+              <p class="text-xs uppercase tracking-wider text-emerald-700 mb-3">After — the shape is decided once and carried</p>
+              <svg viewBox="0 0 340 250" class="w-full">
+                <rect x="70" y="14" width="200" height="40" rx="4" fill="#fff" stroke="#334155" stroke-width="2"/>
+                <text x="170" y="39" text-anchor="middle" font-size="11" font-family="monospace" fill="#0f172a">payload arrives</text>
+
+                <rect x="70" y="82" width="200" height="52" rx="5" class="deep"/>
+                <text x="170" y="103" text-anchor="middle" font-size="11" font-family="monospace" fill="#e2e8f0">shape decided ONCE</text>
+                <text x="170" y="120" text-anchor="middle" font-size="10" font-family="monospace" fill="#94a3b8">carried on the value</text>
+
+                <line x1="170" y1="54" x2="170" y2="82" stroke="#334155" stroke-width="2"/>
+                <path d="M166 76 L170 84 L174 76Z" fill="#334155"/>
+
+                <line x1="130" y1="134" x2="100" y2="170" stroke="#334155" stroke-width="2"/>
+                <line x1="210" y1="134" x2="240" y2="170" stroke="#334155" stroke-width="2"/>
+
+                <rect x="26" y="170" width="140" height="40" rx="4" fill="#fff" stroke="#334155"/>
+                <text x="96" y="195" text-anchor="middle" font-size="10.5" font-family="monospace" fill="#0f172a">read</text>
+                <rect x="180" y="170" width="140" height="40" rx="4" fill="#fff" stroke="#334155"/>
+                <text x="250" y="195" text-anchor="middle" font-size="10.5" font-family="monospace" fill="#0f172a">write</text>
+
+                <rect x="26" y="222" width="294" height="24" rx="4" class="hatch-ok" stroke="#16a34a"/>
+                <text x="173" y="238" text-anchor="middle" font-size="10" font-family="monospace" fill="#14532d">round-trip property test becomes writable</text>
+              </svg>
+            </div>
+          </div>
+
+          <div class="rounded-lg border border-red-300 bg-red-50 p-4 font-mono text-[13px]">
+            <p class="text-xs uppercase tracking-wider text-red-700 mb-2 font-sans font-medium">Reproduced — and a second hole at the same seam</p>
+<pre class="whitespace-pre-wrap text-slate-800">>>> q = QRCodeTask.from_dict({"g":{"d":"22:00:00Z","t":2}, "taskType":"W",
+...     "t":[{"n":"A","z":"b`dpMgc{YgsB_X"}], "tc":None,"to":None,"version":2,"e":1})
+>>> q.goal, q.earth_model
+(QRCodeGoal(deadline=22:00:00, type=CYLINDER, ...), 1)
+>>> q.to_dict()
+{'T':'W','V':2,'t':[{'n':'A','z':'b`dpMgc{YgsB'}]}      # goal, e, tc, to, radius gone
+
+>>> q2 = QRCodeTask.from_dict({"taskType":"CLASSIC","version":2,"t":[],
+...     "g":"nonsense","s":123,"tc":None,"to":None})
+>>> q2.goal, q2.sss, q2.unknown
+(None, None, {})        # _A_DICT_OR_NOTHING says "it lands in unknown". It cannot.</pre>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+            <div><p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Problem</p><p>Two shape decisions on two different inputs, and one lenient row that can put them into disagreement — plus a passthrough docstring asserting the opposite of the behaviour.</p></div>
+            <div><p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Solution</p><p>Decide the shape once when the payload is read; declare the third state a row can be in (declares a key, may decline to read it) so passthrough can carry the value.</p></div>
+            <div><p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Wins</p>
+              <ul class="list-disc list-inside space-y-0.5 text-slate-700">
+                <li>locality: one decision, one place</li>
+                <li>a round-trip property test covers both</li>
+                <li>two docstrings become true</li>
+              </ul>
+            </div>
+          </div>
+        </article>
+
+        <!-- ══════════════════ C ══════════════════ -->
+        <article id="c" class="card-anchor space-y-4">
+          <div class="flex flex-wrap items-baseline gap-3">
+            <h2 class="font-serif text-2xl">C · The model↔QR crossing is the last hand-written field mirror</h2>
+            <span class="rounded-full bg-emerald-100 text-emerald-800 text-xs px-2.5 py-0.5 font-medium">Strong</span>
+            <span class="rounded-full bg-slate-100 text-slate-700 text-xs px-2.5 py-0.5 font-mono">largest scope</span>
+          </div>
+          <p class="font-mono text-sm text-slate-600">qrcode/conversion.py:127-192, :213-275 · model/shape.py</p>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="rounded-lg border border-emerald-200 bg-white p-4">
+              <p class="text-xs uppercase tracking-wider text-emerald-700 mb-3">Solved — the model↔wire seam</p>
+              <svg viewBox="0 0 320 200" class="w-full">
+                <rect x="20" y="20" width="120" height="150" rx="5" fill="#fff" stroke="#334155" stroke-width="2"/>
+                <text x="80" y="42" text-anchor="middle" font-size="11" font-family="monospace">Goal</text>
+                <rect x="180" y="20" width="120" height="150" rx="5" fill="#fff" stroke="#334155" stroke-width="2"/>
+                <text x="240" y="42" text-anchor="middle" font-size="11" font-family="monospace">JSON keys</text>
+                <rect x="140" y="60" width="40" height="70" rx="3" class="deep"/>
+                <text x="160" y="100" text-anchor="middle" font-size="9" font-family="monospace" fill="#e2e8f0" transform="rotate(-90 160 100)">GOAL_SHAPE</text>
+                <line x1="140" y1="80" x2="140" y2="80" stroke="#334155"/>
+                <line x1="140" y1="95" x2="180" y2="95" stroke="#16a34a" stroke-width="2"/>
+                <line x1="140" y1="95" x2="140" y2="95" stroke="#16a34a"/>
+                <text x="160" y="152" text-anchor="middle" font-size="9" fill="#16a34a" font-family="monospace">1 row</text>
+                <text x="160" y="188" text-anchor="middle" font-size="10" fill="#15803d" font-family="monospace">guarded: test_shape.py:358</text>
+              </svg>
+            </div>
+            <div class="rounded-lg border border-red-200 bg-white p-4">
+              <p class="text-xs uppercase tracking-wider text-red-600 mb-3">Unsolved — the model↔model seam</p>
+              <svg viewBox="0 0 320 200" class="w-full">
+                <rect x="10" y="20" width="130" height="150" rx="5" fill="#fff" stroke="#334155" stroke-width="2"/>
+                <text x="75" y="42" text-anchor="middle" font-size="11" font-family="monospace">Goal</text>
+                <rect x="180" y="20" width="130" height="150" rx="5" fill="#fff" stroke="#334155" stroke-width="2"/>
+                <text x="245" y="42" text-anchor="middle" font-size="11" font-family="monospace">QRCodeGoal</text>
+                <line class="seam" x1="160" y1="15" x2="160" y2="180" stroke="#dc2626" stroke-width="2"/>
+                <path d="M140 75 L176 75" stroke="#dc2626" stroke-width="2"/><path d="M170 71 L178 75 L170 79Z" fill="#dc2626"/>
+                <text x="158" y="68" text-anchor="middle" font-size="9" fill="#7f1d1d" font-family="monospace">hand-written</text>
+                <path d="M180 118 L144 118" stroke="#dc2626" stroke-width="2"/><path d="M150 114 L142 118 L150 122Z" fill="#dc2626"/>
+                <text x="158" y="134" text-anchor="middle" font-size="9" fill="#7f1d1d" font-family="monospace">hand-written</text>
+                <text x="160" y="192" text-anchor="middle" font-size="10" fill="#b91c1c" font-family="monospace">unguarded · 6 edits · mypy silent</text>
+              </svg>
+            </div>
+          </div>
+
+          <div class="rounded-lg border border-slate-200 bg-white p-4">
+            <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">Adding one spec field to the goal, today</p>
+            <div class="space-y-1 font-mono text-xs">
+              <div class="flex items-center gap-2"><span class="w-6 text-slate-400">1</span><span class="w-56 text-slate-700">model/task.py:323</span><span class="h-4 bg-emerald-500 rounded-sm" style="width:120px"></span><span class="text-emerald-700">guarded</span></div>
+              <div class="flex items-center gap-2"><span class="w-6 text-slate-400">2</span><span class="w-56 text-slate-700">model/task.py:374</span><span class="h-4 bg-emerald-500 rounded-sm" style="width:120px"></span><span class="text-emerald-700">guarded</span></div>
+              <div class="flex items-center gap-2"><span class="w-6 text-slate-400">3</span><span class="w-56 text-slate-700">qrcode/models.py:60</span><span class="h-4 bg-emerald-500 rounded-sm" style="width:120px"></span><span class="text-emerald-700">guarded</span></div>
+              <div class="flex items-center gap-2"><span class="w-6 text-slate-400">4</span><span class="w-56 text-slate-700">qrcode/models.py:84</span><span class="h-4 bg-emerald-500 rounded-sm" style="width:120px"></span><span class="text-emerald-700">guarded</span></div>
+              <div class="flex items-center gap-2"><span class="w-6 text-red-500">5</span><span class="w-56 text-red-700">qrcode/conversion.py:175</span><span class="h-4 bg-red-500 rounded-sm" style="width:120px"></span><span class="text-red-700">nothing checks it</span></div>
+              <div class="flex items-center gap-2"><span class="w-6 text-red-500">6</span><span class="w-56 text-red-700">qrcode/conversion.py:258</span><span class="h-4 bg-red-500 rounded-sm" style="width:120px"></span><span class="text-red-700">nothing checks it</span></div>
+            </div>
+            <p class="text-sm text-slate-600 mt-3">Miss #5 or #6 and mypy is silent, the corpus is silent (no reference task carries the new key), and the field vanishes on every QR round trip.</p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+            <div><p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Problem</p><p>The “twelve edits, type checker enforces none” shape <code class="font-mono text-xs">shape.py</code> exists to abolish survives at the one seam it does not reach.</p></div>
+            <div><p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Solution</p><p>Cheap: a guard pairing the two dataclasses' field sets, in the shape <code class="font-mono text-xs">test_shape.py:358</code> already has. Expensive: a declared crossing for the three flat pairs, leaving the nested turnpoint hand-written.</p></div>
+            <div><p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Wins</p>
+              <ul class="list-disc list-inside space-y-0.5 text-slate-700">
+                <li>drift caught where it happens</li>
+                <li>leverage: one guard, every future field</li>
+                <li>six edits become four</li>
+              </ul>
+            </div>
+          </div>
+        </article>
+
+        <!-- ══════════════════ D ══════════════════ -->
+        <article id="d" class="card-anchor space-y-4">
+          <div class="flex flex-wrap items-baseline gap-3">
+            <h2 class="font-serif text-2xl">D · The drawing answers for turnpoints, not for the goal line or the route</h2>
+            <span class="rounded-full bg-emerald-100 text-emerald-800 text-xs px-2.5 py-0.5 font-medium">Strong</span>
+            <span class="rounded-full bg-slate-100 text-slate-700 text-xs px-2.5 py-0.5 font-mono">2 adapters = real seam</span>
+          </div>
+          <p class="font-mono text-sm text-slate-600">export/common.py · export/kml.py · export/geojson.py</p>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+              <p class="text-xs uppercase tracking-wider text-red-600 mb-3">Before — half the drawing crossed the seam</p>
+              <svg viewBox="0 0 340 280" class="w-full">
+                <rect x="90" y="10" width="160" height="76" rx="5" class="deep"/>
+                <text x="170" y="30" text-anchor="middle" font-size="11" font-family="monospace" fill="#e2e8f0">TaskDrawing</text>
+                <text x="170" y="48" text-anchor="middle" font-size="9" font-family="monospace" fill="#7dd3fc">color_of · label_of</text>
+                <text x="170" y="62" text-anchor="middle" font-size="9" font-family="monospace" fill="#7dd3fc">description_of · role_of</text>
+                <text x="170" y="78" text-anchor="middle" font-size="9" font-family="monospace" fill="#64748b">…and nothing for the goal line</text>
+
+                <line class="seam" x1="20" y1="104" x2="320" y2="104" stroke="#475569" stroke-width="2"/>
+
+                <rect x="16" y="122" width="140" height="140" rx="5" fill="#fff" stroke="#334155" stroke-width="2"/>
+                <text x="86" y="142" text-anchor="middle" font-size="11" font-family="monospace">kml.py</text>
+                <rect x="184" y="122" width="140" height="140" rx="5" fill="#fff" stroke="#334155" stroke-width="2"/>
+                <text x="254" y="142" text-anchor="middle" font-size="11" font-family="monospace">geojson.py</text>
+
+                <rect x="26" y="152" width="120" height="18" class="hatch" stroke="#dc2626" stroke-width="1"/>
+                <text x="86" y="165" text-anchor="middle" font-size="8.5" font-family="monospace" fill="#7f1d1d">"Goal line length: …"</text>
+                <rect x="194" y="152" width="120" height="18" class="hatch" stroke="#dc2626" stroke-width="1"/>
+                <text x="254" y="165" text-anchor="middle" font-size="8.5" font-family="monospace" fill="#7f1d1d">"Goal line length: …"</text>
+
+                <rect x="26" y="176" width="120" height="18" class="hatch" stroke="#dc2626" stroke-width="1"/>
+                <text x="86" y="189" text-anchor="middle" font-size="8.5" font-family="monospace" fill="#7f1d1d">length / 2</text>
+                <rect x="194" y="176" width="120" height="18" class="hatch" stroke="#dc2626" stroke-width="1"/>
+                <text x="254" y="189" text-anchor="middle" font-size="8.5" font-family="monospace" fill="#7f1d1d">length / 2</text>
+
+                <rect x="26" y="200" width="120" height="18" class="hatch" stroke="#dc2626" stroke-width="1"/>
+                <text x="86" y="213" text-anchor="middle" font-size="8.5" font-family="monospace" fill="#7f1d1d">"Goal control zone…"</text>
+                <rect x="194" y="200" width="120" height="18" class="hatch" stroke="#dc2626" stroke-width="1"/>
+                <text x="254" y="213" text-anchor="middle" font-size="8.5" font-family="monospace" fill="#7f1d1d">"Goal control zone…"</text>
+
+                <rect x="26" y="228" width="120" height="22" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
+                <text x="86" y="243" text-anchor="middle" font-size="9" font-family="monospace" fill="#78350f">"Course Line"</text>
+                <rect x="194" y="228" width="120" height="22" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
+                <text x="254" y="243" text-anchor="middle" font-size="9" font-family="monospace" fill="#78350f">"Optimized Route"</text>
+                <text x="170" y="272" text-anchor="middle" font-size="9.5" font-family="monospace" fill="#b45309">↑ same thing, two names — each pinned by its own test</text>
+              </svg>
+            </div>
+            <div class="rounded-lg border border-emerald-200 bg-white p-4">
+              <p class="text-xs uppercase tracking-wider text-emerald-700 mb-3">After — the drawing answers all three subjects</p>
+              <svg viewBox="0 0 340 280" class="w-full">
+                <rect x="60" y="10" width="220" height="140" rx="5" class="deep"/>
+                <text x="170" y="32" text-anchor="middle" font-size="11" font-family="monospace" fill="#e2e8f0">TaskDrawing</text>
+                <text x="170" y="54" text-anchor="middle" font-size="9" font-family="monospace" fill="#7dd3fc">color_of · label_of · description_of · role_of</text>
+                <text x="170" y="74" text-anchor="middle" font-size="9" font-family="monospace" fill="#86efac">+ goal_line_label · goal_line_description</text>
+                <text x="170" y="90" text-anchor="middle" font-size="9" font-family="monospace" fill="#86efac">+ control_zone_radius · control_zone_description</text>
+                <text x="170" y="106" text-anchor="middle" font-size="9" font-family="monospace" fill="#86efac">+ route_label</text>
+                <text x="170" y="132" text-anchor="middle" font-size="9" font-family="monospace" fill="#64748b">one value, one set of answers</text>
+
+                <line class="seam" x1="20" y1="168" x2="320" y2="168" stroke="#475569" stroke-width="2"/>
+
+                <rect x="16" y="186" width="140" height="62" rx="5" fill="#fff" stroke="#334155" stroke-width="2"/>
+                <text x="86" y="212" text-anchor="middle" font-size="11" font-family="monospace">kml.py</text>
+                <text x="86" y="230" text-anchor="middle" font-size="9" font-family="monospace" fill="#64748b">renders only</text>
+                <rect x="184" y="186" width="140" height="62" rx="5" fill="#fff" stroke="#334155" stroke-width="2"/>
+                <text x="254" y="212" text-anchor="middle" font-size="11" font-family="monospace">geojson.py</text>
+                <text x="254" y="230" text-anchor="middle" font-size="9" font-family="monospace" fill="#64748b">renders only</text>
+
+                <rect x="16" y="256" width="308" height="20" rx="3" class="hatch-ok" stroke="#16a34a"/>
+                <text x="170" y="270" text-anchor="middle" font-size="9.5" font-family="monospace" fill="#14532d">test_both_writers_describe_the_goal_line_the_same_way</text>
+              </svg>
+            </div>
+          </div>
+
+          <div class="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm">
+            <p class="text-amber-900"><strong>Same defect shape as applied card G.</strong> The 2026-08-18 review found KML shipping <code class="font-mono text-xs">Type: TurnpointType.TAKEOFF</code> into user-visible map text “with a test pinning it as expected”, and fixed it — for turnpoints. The goal line and the route were left. <code class="font-mono text-xs">tests/export/test_kml.py:82</code> and <code class="font-mono text-xs">tests/export/test_geojson.py:173</code> now <em>enforce</em> the two names disagreeing.</p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+            <div><p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Problem</p><p>Six rendering decisions made once per writer, three of them byte-identical, one of them a geometry rule <code class="font-mono text-xs">GoalLine</code> already owns.</p></div>
+            <div><p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Solution</p><p>Four sibling accessors on the drawing, plus one agreed name for the route.</p></div>
+            <div><p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Wins</p>
+              <ul class="list-disc list-inside space-y-0.5 text-slate-700">
+                <li>locality: six duplicates → four accessors</li>
+                <li>length ÷ 2 stated once, not three times</li>
+                <li>the cross-format test becomes writable</li>
+              </ul>
+            </div>
+          </div>
+        </article>
+
+        <!-- ══════════════════ E ══════════════════ -->
+        <article id="e" class="card-anchor space-y-4">
+          <div class="flex flex-wrap items-baseline gap-3">
+            <h2 class="font-serif text-2xl">E · Two write-only fields the interface still declares</h2>
+            <span class="rounded-full bg-emerald-100 text-emerald-800 text-xs px-2.5 py-0.5 font-medium">Strong</span>
+            <span class="rounded-full bg-slate-100 text-slate-700 text-xs px-2.5 py-0.5 font-mono">deletion</span>
+          </div>
+          <p class="font-mono text-sm text-slate-600">distance/turnpoint.py:118 · distance/route_optimization.py:103</p>
+
+          <div class="rounded-lg border border-slate-200 bg-white p-4">
+            <p class="text-sm text-slate-700 italic">“…an interface declaring a value nothing reads misleads a caller just as an interface omitting one does.” — <code class="font-mono text-xs">TurnpointGeometry</code>, <code class="font-mono text-xs">turnpoint.py:41-47</code>, about one of the two fields below.</p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="rounded-lg border border-red-200 bg-white p-4">
+              <p class="text-xs uppercase tracking-wider text-red-600 mb-3">Before — mass diagram, writes vs reads</p>
+              <svg viewBox="0 0 340 230" class="w-full">
+                <text x="20" y="18" font-size="10" font-family="monospace" fill="#64748b">TaskTurnpoint.goal_type</text>
+                <rect x="20" y="26" width="130" height="30" fill="#fecaca" stroke="#dc2626"/>
+                <text x="85" y="46" text-anchor="middle" font-size="9.5" font-family="monospace" fill="#7f1d1d">3 writes + 5-line doc</text>
+                <rect x="190" y="26" width="8" height="30" fill="#f1f5f9" stroke="#cbd5e1"/>
+                <text x="250" y="46" font-size="9.5" font-family="monospace" fill="#94a3b8">0 reads in src/</text>
+
+                <text x="20" y="88" font-size="10" font-family="monospace" fill="#64748b">OptimizedRoute.earth_model</text>
+                <rect x="20" y="96" width="130" height="30" fill="#fecaca" stroke="#dc2626"/>
+                <text x="85" y="116" text-anchor="middle" font-size="9.5" font-family="monospace" fill="#7f1d1d">2 writes + doc</text>
+                <rect x="190" y="96" width="8" height="30" fill="#f1f5f9" stroke="#cbd5e1"/>
+                <text x="250" y="116" font-size="9.5" font-family="monospace" fill="#94a3b8">0 reads anywhere</text>
+
+                <line class="seam" x1="20" y1="146" x2="320" y2="146" stroke="#cbd5e1"/>
+                <text x="20" y="168" font-size="9.5" font-family="monospace" fill="#7f1d1d">consequence 1 — constructor takes 4 params,</text>
+                <text x="20" y="182" font-size="9.5" font-family="monospace" fill="#7f1d1d">interface declares 3; the fake explains in prose</text>
+                <text x="20" y="182" font-size="9.5" font-family="monospace" fill="#7f1d1d"> </text>
+                <text x="20" y="204" font-size="9.5" font-family="monospace" fill="#7f1d1d">consequence 2 — test_geojson builds routes with</text>
+                <text x="20" y="218" font-size="9.5" font-family="monospace" fill="#7f1d1d">earth_model=None on FAI_SPHERE tasks, undetectably</text>
+              </svg>
+            </div>
+            <div class="rounded-lg border border-emerald-200 bg-white p-4">
+              <p class="text-xs uppercase tracking-wider text-emerald-700 mb-3">After — the interface is what the implementation reads</p>
+              <svg viewBox="0 0 340 230" class="w-full">
+                <rect x="60" y="20" width="220" height="34" rx="4" fill="#fff" stroke="#334155" stroke-width="2"/>
+                <text x="170" y="42" text-anchor="middle" font-size="11" font-family="monospace">TurnpointGeometry</text>
+                <text x="170" y="70" text-anchor="middle" font-size="9.5" font-family="monospace" fill="#64748b">center · radius · earth_model</text>
+
+                <rect x="60" y="86" width="220" height="60" rx="4" class="deep"/>
+                <text x="170" y="112" text-anchor="middle" font-size="11" font-family="monospace" fill="#e2e8f0">TaskTurnpoint</text>
+                <text x="170" y="130" text-anchor="middle" font-size="9.5" font-family="monospace" fill="#94a3b8">3 params, 3 attributes, both directions</text>
+
+                <rect x="60" y="164" width="220" height="46" rx="4" class="hatch-ok" stroke="#16a34a"/>
+                <text x="170" y="184" text-anchor="middle" font-size="9.5" font-family="monospace" fill="#14532d">“this turnpoint is a LINE goal”</text>
+                <text x="170" y="200" text-anchor="middle" font-size="9.5" font-family="monospace" fill="#14532d">already carried by radius == 0</text>
+              </svg>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+            <div><p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Problem</p><p>Two attributes written, documented and never read — verbatim the pattern <code class="font-mono text-xs">distance/__init__.py:48-51</code> records as already retired once.</p></div>
+            <div><p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Solution</p><p>Delete both, and the three test assertions that exist because the field exists.</p></div>
+            <div><p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Wins</p>
+              <ul class="list-disc list-inside space-y-0.5 text-slate-700">
+                <li>deletion test: passes cleanly</li>
+                <li>interface shrinks to what is read</li>
+                <li>the fake stops needing a paragraph</li>
+              </ul>
+            </div>
+          </div>
+        </article>
+
+        <!-- ══════════════════ F ══════════════════ -->
+        <article id="f" class="card-anchor space-y-4">
+          <div class="flex flex-wrap items-baseline gap-3">
+            <h2 class="font-serif text-2xl">F · <code class="font-mono text-xl">optimal_point</code> is a second optimizer nobody ships</h2>
+            <span class="rounded-full bg-amber-100 text-amber-800 text-xs px-2.5 py-0.5 font-medium">Worth exploring</span>
+            <span class="rounded-full bg-slate-100 text-slate-700 text-xs px-2.5 py-0.5 font-mono">no locality</span>
+          </div>
+          <p class="font-mono text-sm text-slate-600">distance/turnpoint.py:121-160 · tests/distance/test_xctrack_accuracy.py</p>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="rounded-lg border border-red-200 bg-white p-4">
+              <p class="text-xs uppercase tracking-wider text-red-600 mb-3">Before — the tests aim past the interface</p>
+              <pre class="mermaid">
+flowchart TB
+  PROD["calculate_iteratively_refined_route<br/><i>what ships</i>"] --> CP["_corrected_path<br/>project · zero-radius · solve · snap"]
+  OP["TaskTurnpoint.optimal_point<br/><i>0 callers in src/</i>"] --> CP2["project · zero-radius · solve · snap<br/><b>spelled differently</b>"]
+  TESTS(["crossing-case tests<br/>test_xctrack_accuracy.py:246, :268"]) --> OP
+  TESTS -. "never reach" .-> CP
+  classDef leak fill:#fee2e2,stroke:#dc2626,stroke-width:2px;
+  classDef dead fill:#f1f5f9,stroke:#94a3b8,stroke-dasharray:4 3;
+  class OP,CP2 leak
+              </pre>
+            </div>
+            <div class="rounded-lg border border-emerald-200 bg-white p-4">
+              <p class="text-xs uppercase tracking-wider text-emerald-700 mb-3">After — one pipeline, tests on it</p>
+              <pre class="mermaid">
+flowchart TB
+  PROD2["calculate_iteratively_refined_route"] --> CP3["_corrected_path<br/>the only pipeline"]
+  CP3 --> S["solver.plane_optimal_point"]
+  CP3 --> B["earth.snap_to_boundary"]
+  TESTS2(["crossing-case tests"]) --> PROD2
+  TESTS2 --> S
+  classDef deepc fill:#0f172a,color:#e2e8f0,stroke:#0f172a;
+  class CP3 deepc
+              </pre>
+            </div>
+          </div>
+
+          <div class="rounded-lg border border-slate-200 bg-white p-4 overflow-x-auto">
+            <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">The same four steps, spelled two ways</p>
+            <table class="text-xs font-mono w-full">
+              <thead><tr class="text-left text-slate-500"><th class="pb-2 pr-4">step</th><th class="pb-2 pr-4"><code>optimal_point</code></th><th class="pb-2"><code>_corrected_path</code></th></tr></thead>
+              <tbody class="text-slate-700">
+                <tr class="border-t border-slate-100"><td class="py-1 pr-4">project</td><td class="py-1 pr-4">plane_circle(self, plane)</td><td class="py-1">plane_circle(tp, plane)</td></tr>
+                <tr class="border-t border-slate-100 bg-red-50"><td class="py-1 pr-4">zero-radius</td><td class="py-1 pr-4">radius == 0.0</td><td class="py-1">i == 0 or radius &lt;= 0.0</td></tr>
+                <tr class="border-t border-slate-100"><td class="py-1 pr-4">solve</td><td class="py-1 pr-4">plane_optimal_point(…)</td><td class="py-1">_optimize_plane_points(…)</td></tr>
+                <tr class="border-t border-slate-100 bg-red-50"><td class="py-1 pr-4">snap against</td><td class="py-1 pr-4">self.radius</td><td class="py-1">the <i>projected</i> radius</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm">
+            <p class="text-amber-900"><code class="font-mono text-xs">plane.py:146-153</code> narrates this exact bug and its fix — <em>“the tests aimed at the one the product does not use — so a crossing-case fix could go green and ship nothing.”</em> Making the plane an argument fixed the projection. The method, the duplicated pipeline, and the two crossing tests that call it <strong>with no plane</strong> all remain.</p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+            <div><p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Problem</p><p>A public method with no product caller, duplicating the shipped pipeline and holding the crossing-case tests away from the code that runs.</p></div>
+            <div><p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Solution</p><p>Delete it; re-point the two crossing tests at the route optimizer or at the solver + snap primitives directly.</p></div>
+            <div><p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Wins</p>
+              <ul class="list-disc list-inside space-y-0.5 text-slate-700">
+                <li>locality: one snapping policy</li>
+                <li>crossing tests test what ships</li>
+                <li>deletion test: passes</li>
+              </ul>
+            </div>
+          </div>
+        </article>
+
+        <!-- ══════════════════ G ══════════════════ -->
+        <article id="g" class="card-anchor space-y-4">
+          <div class="flex flex-wrap items-baseline gap-3">
+            <h2 class="font-serif text-2xl">G · One library, two error hierarchies</h2>
+            <span class="rounded-full bg-amber-100 text-amber-800 text-xs px-2.5 py-0.5 font-medium">Worth exploring</span>
+            <span class="rounded-full bg-slate-100 text-slate-700 text-xs px-2.5 py-0.5 font-mono">interface</span>
+          </div>
+          <p class="font-mono text-sm text-slate-600">exceptions.py · distance/report.py:82 · __init__.py:53-59 · cli.py:201, :276</p>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="rounded-lg border border-red-200 bg-white p-4">
+              <p class="text-xs uppercase tracking-wider text-red-600 mb-3">Before</p>
+              <pre class="mermaid">
+flowchart TB
+  E["Exception"] --> P["pyXCTSKError<br/><b>not exported</b>"]
+  P --> E1["EmptyInputError"]
+  P --> E2["InvalidFormatError"]
+  P --> E3["TaskValidationError"]
+  P --> E4["MissingQRCodeSupportError"]
+  P --> E5["InvalidTimeOfDayError"]
+  E --> V["ValueError"]
+  V --> T["TooFewTurnpointsError<br/><i>in distance/report.py</i>"]
+  CLI["cli.py — two catch tuples"] --> P
+  CLI --> T
+  classDef leak fill:#fee2e2,stroke:#dc2626,stroke-width:2px;
+  class T,P leak
+              </pre>
+            </div>
+            <div class="rounded-lg border border-emerald-200 bg-white p-4">
+              <p class="text-xs uppercase tracking-wider text-emerald-700 mb-3">After</p>
+              <pre class="mermaid">
+flowchart TB
+  E2b["Exception"] --> P2["pyXCTSKError<br/><b>exported · in DOCUMENTED</b>"]
+  P2 --> F1["EmptyInputError"]
+  P2 --> F2["InvalidFormatError"]
+  P2 --> F3["TaskValidationError"]
+  P2 --> F4["MissingQRCodeSupportError"]
+  P2 --> F5["InvalidTimeOfDayError"]
+  P2 --> F6["TooFewTurnpointsError"]
+  CLI2["cli.py — one catch tuple"] --> P2
+  classDef deepc fill:#0f172a,color:#e2e8f0,stroke:#0f172a;
+  class P2 deepc
+              </pre>
+            </div>
+          </div>
+
+          <div class="rounded-lg border border-slate-200 bg-white p-4 font-mono text-xs">
+<pre class="text-slate-800">cli.py:201  except (pyXCTSKError, OSError) as e:                        # convert
+cli.py:276  except (pyXCTSKError, OSError, TooFewTurnpointsError) as e:  # distances</pre>
+            <p class="text-sm text-slate-600 mt-2 font-sans">Two commands, two tuples, and the difference is one library error that opted out of the hierarchy. <code>MissingQRCodeSupportError</code>'s own docstring states the rule the newer error breaks.</p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+            <div><p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Problem</p><p>The exception hierarchy is transcribed by hand into the command layer, the base a caller writes in <code class="font-mono text-xs">except</code> is not exported, and <code class="font-mono text-xs">pyxctsk --version</code> is served from <code class="font-mono text-xs">distance/report.py</code>.</p></div>
+            <div><p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Solution</p><p>Move <code class="font-mono text-xs">TooFewTurnpointsError</code> under the base in <code class="font-mono text-xs">exceptions.py</code>; export the base; give the version one owner.</p></div>
+            <div><p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Wins</p>
+              <ul class="list-disc list-inside space-y-0.5 text-slate-700">
+                <li>leverage: one <code class="font-mono text-xs">except</code> catches all</li>
+                <li>locality: one module answers “what can it raise”</li>
+                <li>the CLI stops knowing the set</li>
+              </ul>
+            </div>
+          </div>
+        </article>
+
+        <!-- ══════════════════ H ══════════════════ -->
+        <article id="h" class="card-anchor space-y-4">
+          <div class="flex flex-wrap items-baseline gap-3">
+            <h2 class="font-serif text-2xl">H · Rendering has no seam</h2>
+            <span class="rounded-full bg-amber-100 text-amber-800 text-xs px-2.5 py-0.5 font-medium">Worth exploring</span>
+            <span class="rounded-full bg-slate-100 text-slate-700 text-xs px-2.5 py-0.5 font-mono">2 adapters = real seam</span>
+          </div>
+          <p class="font-mono text-sm text-slate-600">cli.py:188-199 · __init__.py:84-85 · scripts/task_viewer/api.py</p>
+
+          <div class="rounded-lg border border-slate-200 bg-white p-4">
+            <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">Cross-section — in, and out</p>
+            <div class="grid grid-cols-2 gap-6">
+              <div>
+                <p class="text-xs text-emerald-700 font-medium mb-2">Reading — one deep module</p>
+                <div class="space-y-0"><div class="h-9 border-l-4 border-emerald-600 bg-emerald-50 flex items-center px-3 text-xs font-mono">.xctsk / XCTSK: / XCTSKZ: / PNG</div>
+                <div class="h-20 border-l-4 border-slate-900 deep flex items-center px-3 text-xs font-mono text-slate-100">parse_task(data, strict=…) → Task</div>
+                <div class="h-9 border-l-4 border-slate-300 bg-white flex items-center px-3 text-xs font-mono text-slate-500">callers learn one name</div></div>
+              </div>
+              <div>
+                <p class="text-xs text-red-700 font-medium mb-2">Writing — five spellings, no module</p>
+                <div class="space-y-0.5">
+                  <div class="h-7 border-l-4 border-red-400 bg-red-50 flex items-center px-3 text-[11px] font-mono">task.to_json()</div>
+                  <div class="h-7 border-l-4 border-red-400 bg-red-50 flex items-center px-3 text-[11px] font-mono">task_to_kml(task)</div>
+                  <div class="h-7 border-l-4 border-red-400 bg-red-50 flex items-center px-3 text-[11px] font-mono">generate_task_geojson(task)</div>
+                  <div class="h-7 border-l-4 border-red-400 bg-red-50 flex items-center px-3 text-[11px] font-mono">task.to_qr_code_task().to_string(z)</div>
+                  <div class="h-7 border-l-4 border-red-400 bg-red-50 flex items-center px-3 text-[11px] font-mono">generate_qrcode_image(s).save(buf,"PNG")</div>
+                  <div class="h-9 border-l-4 border-amber-500 bg-amber-50 flex items-center px-3 text-[11px] font-mono text-amber-900">cli.py if/elif — no <code>else</code></div>
+                  <div class="h-9 border-l-4 border-amber-500 bg-amber-50 flex items-center px-3 text-[11px] font-mono text-amber-900">task_viewer/api.py — re-spells 2 of 4</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="rounded-lg border border-red-200 bg-white p-4">
+              <p class="text-xs uppercase tracking-wider text-red-600 mb-3">Before</p>
+              <pre class="mermaid">
+flowchart LR
+  CLI["cli.py<br/>if/elif × 4<br/><i>no else</i>"] --> J["to_json"]
+  CLI --> K["task_to_kml"]
+  CLI --> Q["to_qr_code_task().to_string"]
+  CLI --> PNG["generate_qrcode_image"]
+  VIEW["task_viewer/api.py"] --> K
+  VIEW --> Q
+  VIEW --> PNG
+  DEAD["EXTENSION · MIME_TYPE<br/>exported, 0 readers"]
+  classDef leak fill:#fee2e2,stroke:#dc2626,stroke-width:2px;
+  classDef dead fill:#f1f5f9,stroke:#94a3b8,stroke-dasharray:4 3;
+  class CLI,VIEW leak
+  class DEAD dead
+              </pre>
+            </div>
+            <div class="rounded-lg border border-emerald-200 bg-white p-4">
+              <p class="text-xs uppercase tracking-wider text-emerald-700 mb-3">After</p>
+              <pre class="mermaid">
+flowchart LR
+  CLI2["cli.py<br/>lookup"] --> R["render_task(task, fmt)<br/>name · MIME · binary? · ext"]
+  VIEW2["task_viewer/api.py"] --> R
+  R --> J2["to_json"]
+  R --> K2["task_to_kml"]
+  R --> Q2["to_string"]
+  R --> P2["qrcode image"]
+  classDef deepc fill:#0f172a,color:#e2e8f0,stroke:#0f172a;
+  class R deepc
+              </pre>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+            <div><p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Problem</p><p>“Format name → renderer” exists only as an <code class="font-mono text-xs">if/elif</code> in the CLI, so the second consumer re-derives it — including the MIME types and the six-line PNG incantation.</p></div>
+            <div><p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Solution</p><p>One rendering table beside <code class="font-mono text-xs">_FORMAT_PARSERS</code>. <code class="font-mono text-xs">render_task</code> is the writing counterpart to <code class="font-mono text-xs">parse_task</code>.</p></div>
+            <div><p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Wins</p>
+              <ul class="list-disc list-inside space-y-0.5 text-slate-700">
+                <li>leverage: one interface out, as in</li>
+                <li>a new format is one row</li>
+                <li>the missing <code class="font-mono text-xs">else</code> stops being reachable</li>
+                <li>two dead constants become rows or go</li>
+              </ul>
+            </div>
+          </div>
+        </article>
+
+        <!-- ══════════════════ I ══════════════════ -->
+        <article id="i" class="card-anchor space-y-4">
+          <div class="flex flex-wrap items-baseline gap-3">
+            <h2 class="font-serif text-2xl">I · One task, two answers about its distance</h2>
+            <span class="rounded-full bg-amber-100 text-amber-800 text-xs px-2.5 py-0.5 font-medium">Worth exploring</span>
+            <span class="rounded-full bg-red-100 text-red-800 text-xs px-2.5 py-0.5 font-medium">reproducible</span>
+          </div>
+          <p class="font-mono text-sm text-slate-600">distance/task_distances.py:189 · distance/report.py:44, :118</p>
+
+          <div class="rounded-lg border border-red-300 bg-red-50 p-4 font-mono text-[13px]">
+<pre class="whitespace-pre-wrap text-slate-800">>>> calculate_task_distances(one_turnpoint_task).as_dict()
+{'center_distance_km': 0.0, 'optimized_distance_km': 0.0,
+ 'savings_km': 0.0, 'savings_percent': 0.0, 'turnpoints': []}
+
+>>> DistanceReport.from_task(one_turnpoint_task)
+TooFewTurnpointsError: a task needs at least two turnpoints to have a distance.</pre>
+            <p class="text-xs text-red-800 mt-2 font-sans">Both are exported from the front door. The table reports <code>turnpoints: []</code> for a task that has one.</p>
+          </div>
+
+          <div class="rounded-lg border border-slate-200 bg-white p-4">
+            <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">“A task needs two turnpoints” — 8 sites, 4 answers, 1 constant</p>
+            <div class="space-y-1 text-xs font-mono">
+              <div class="flex items-center gap-2"><span class="w-56 truncate text-slate-700">report.py:44,118</span><span class="px-2 py-0.5 rounded bg-slate-900 text-slate-100">MIN_TURNPOINTS_FOR_DISTANCE</span><span class="px-2 py-0.5 rounded bg-red-100 text-red-800">raises</span></div>
+              <div class="flex items-center gap-2"><span class="w-56 truncate text-slate-700">task_distances.py:189</span><span class="px-2 py-0.5 rounded bg-slate-100 text-slate-600">&lt; 2</span><span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800">zeros, empty rows</span></div>
+              <div class="flex items-center gap-2"><span class="w-56 truncate text-slate-700">center_distance.py:128</span><span class="px-2 py-0.5 rounded bg-slate-100 text-slate-600">&lt; 2</span><span class="px-2 py-0.5 rounded bg-sky-100 text-sky-800">None</span></div>
+              <div class="flex items-center gap-2"><span class="w-56 truncate text-slate-700">turnpoint.py:184</span><span class="px-2 py-0.5 rounded bg-slate-100 text-slate-600">&lt; 2</span><span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800">0.0</span></div>
+              <div class="flex items-center gap-2"><span class="w-56 truncate text-slate-700">route_optimization.py:340,429</span><span class="px-2 py-0.5 rounded bg-slate-100 text-slate-600">&lt; 2</span><span class="px-2 py-0.5 rounded bg-slate-100 text-slate-700">empty-leg route</span></div>
+              <div class="flex items-center gap-2"><span class="w-56 truncate text-slate-700">speed_section.py:158</span><span class="px-2 py-0.5 rounded bg-slate-100 text-slate-600">&lt; 2</span><span class="px-2 py-0.5 rounded bg-sky-100 text-sky-800">None</span></div>
+              <div class="flex items-center gap-2"><span class="w-56 truncate text-slate-700">goal_line.py:266</span><span class="px-2 py-0.5 rounded bg-slate-100 text-slate-600">&gt;= 2</span><span class="px-2 py-0.5 rounded bg-sky-100 text-sky-800">None</span></div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+            <div><p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Problem</p><p>Two published entry points give a task two incompatible answers, and the rule underneath is spelled eight times.</p></div>
+            <div><p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Solution</p><p>“Is this task measurable” is one predicate with one owner; the two front-door answers agree. Primitives may stay total.</p></div>
+            <div><p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Wins</p>
+              <ul class="list-disc list-inside space-y-0.5 text-slate-700">
+                <li>locality: one rule, one place</li>
+                <li>a caller stops picking a door by its failure mode</li>
+              </ul>
+            </div>
+          </div>
+        </article>
+
+        <!-- ══════════════════ J ══════════════════ -->
+        <article id="j" class="card-anchor space-y-4">
+          <div class="flex flex-wrap items-baseline gap-3">
+            <h2 class="font-serif text-2xl">J · Two modules build the two earths</h2>
+            <span class="rounded-full bg-amber-100 text-amber-800 text-xs px-2.5 py-0.5 font-medium">Worth exploring</span>
+            <span class="rounded-full bg-slate-100 text-slate-700 text-xs px-2.5 py-0.5 font-mono">seam leak</span>
+          </div>
+          <p class="font-mono text-sm text-slate-600">distance/earth.py:22-23 · distance/plane.py:19, :44, :54-65</p>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="rounded-lg border border-red-200 bg-white p-4">
+              <p class="text-xs uppercase tracking-wider text-red-600 mb-3">Before — the choice made twice, in two formalisms</p>
+              <svg viewBox="0 0 340 220" class="w-full">
+                <rect x="14" y="20" width="140" height="100" rx="5" fill="#fff" stroke="#334155" stroke-width="2"/>
+                <text x="84" y="40" text-anchor="middle" font-size="11" font-family="monospace">earth.py</text>
+                <rect x="24" y="52" width="120" height="24" class="hatch" stroke="#dc2626"/>
+                <text x="84" y="68" text-anchor="middle" font-size="8.5" font-family="monospace" fill="#7f1d1d">Geod(ellps=WGS84)</text>
+                <rect x="24" y="82" width="120" height="24" class="hatch" stroke="#dc2626"/>
+                <text x="84" y="98" text-anchor="middle" font-size="8.5" font-family="monospace" fill="#7f1d1d">Geod(a=R, b=R)</text>
+
+                <rect x="186" y="20" width="140" height="100" rx="5" fill="#fff" stroke="#334155" stroke-width="2"/>
+                <text x="256" y="40" text-anchor="middle" font-size="11" font-family="monospace">plane.py</text>
+                <rect x="196" y="52" width="120" height="24" class="hatch" stroke="#dc2626"/>
+                <text x="256" y="68" text-anchor="middle" font-size="8.5" font-family="monospace" fill="#7f1d1d">CRS +ellps=WGS84</text>
+                <rect x="196" y="82" width="120" height="24" class="hatch" stroke="#dc2626"/>
+                <text x="256" y="98" text-anchor="middle" font-size="8.5" font-family="monospace" fill="#7f1d1d">CRS +R=6371000</text>
+
+                <path d="M154 140 L184 140" stroke="#dc2626" stroke-width="2"/><path d="M178 136 L186 140 L178 144Z" fill="#dc2626"/>
+                <text x="169" y="134" text-anchor="middle" font-size="8.5" font-family="monospace" fill="#b91c1c">_is_fai_sphere</text>
+                <text x="169" y="156" text-anchor="middle" font-size="8" font-family="monospace" fill="#b91c1c">private name, imported</text>
+
+                <rect x="60" y="176" width="220" height="30" rx="4" fill="#fee2e2" stroke="#dc2626"/>
+                <text x="170" y="195" text-anchor="middle" font-size="9" font-family="monospace" fill="#7f1d1d">cache key: EarthModelLike → bool</text>
+              </svg>
+              <p class="text-xs text-slate-500 mt-2"><code class="font-mono">earth.py:5-7</code>: “This module is where that choice is made, <em>once</em>.”</p>
+            </div>
+            <div class="rounded-lg border border-emerald-200 bg-white p-4">
+              <p class="text-xs uppercase tracking-wider text-emerald-700 mb-3">After — the earth owns both representations</p>
+              <svg viewBox="0 0 340 220" class="w-full">
+                <rect x="60" y="20" width="220" height="96" rx="5" class="deep"/>
+                <text x="170" y="44" text-anchor="middle" font-size="11" font-family="monospace" fill="#e2e8f0">earth.py</text>
+                <text x="170" y="66" text-anchor="middle" font-size="9.5" font-family="monospace" fill="#7dd3fc">Geod for measuring</text>
+                <text x="170" y="84" text-anchor="middle" font-size="9.5" font-family="monospace" fill="#7dd3fc">CRS base for projecting</text>
+                <text x="170" y="104" text-anchor="middle" font-size="9" font-family="monospace" fill="#94a3b8">raises on anything that is not one</text>
+
+                <line class="seam" x1="30" y1="136" x2="310" y2="136" stroke="#475569" stroke-width="2"/>
+
+                <rect x="90" y="156" width="160" height="46" rx="5" fill="#fff" stroke="#334155" stroke-width="2"/>
+                <text x="170" y="176" text-anchor="middle" font-size="11" font-family="monospace">plane.py</text>
+                <text x="170" y="193" text-anchor="middle" font-size="9" font-family="monospace" fill="#64748b">asks; derives nothing</text>
+              </svg>
+            </div>
+          </div>
+
+          <div class="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm">
+            <p class="text-amber-900"><strong>Touches ADR 0003</strong> — but fulfils it rather than contradicting it. The ADR's first decision is “<em>One selector</em>”; today that selector has two implementations, and only one of them refuses an unknown value. Not a reason to reopen the ADR.</p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+            <div><p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Problem</p><p>Adding an earth model, or correcting the sphere radius, means editing two modules — and only one of them validates.</p></div>
+            <div><p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Solution</p><p>One value per earth model owning both its <code class="font-mono text-xs">Geod</code> and its CRS base; <code class="font-mono text-xs">plane.py</code> asks for it.</p></div>
+            <div><p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Wins</p>
+              <ul class="list-disc list-inside space-y-0.5 text-slate-700">
+                <li>locality: one place knows what an earth is</li>
+                <li>the private import disappears</li>
+                <li>the raise-on-unknown guard covers projection</li>
+              </ul>
+            </div>
+          </div>
+        </article>
+
+      </section>
+
+      <!-- ══════════════════ SMALLER ══════════════════ -->
+      <section class="space-y-4">
+        <h2 class="font-serif text-2xl border-b border-slate-300 pb-2">Smaller findings</h2>
+        <p class="text-sm text-slate-600">Each verified against the source at this commit; none large enough for a card. Full evidence in the <a class="text-indigo-700 hover:underline font-mono" href="2026-08-19-deepening-candidates-at-the-front-door.md">Markdown record</a>.</p>
+        <div class="rounded-lg border border-slate-200 bg-white overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
+              <tr><th class="text-left px-4 py-2 font-medium">#</th><th class="text-left px-4 py-2 font-medium">Finding</th><th class="text-left px-4 py-2 font-medium">Where</th></tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <tr><td class="px-4 py-2 text-slate-400 font-mono">1</td><td class="px-4 py-2"><code class="font-mono text-xs">report.route()</code>'s rows are a string-keyed wire format with <strong>three</strong> consumers — the justification for leaving them untyped expired one review ago; the typed row type exists and is built <em>from</em> the untyped one.</td><td class="px-4 py-2 font-mono text-xs text-slate-500">report.py:189 · task_distances.py:146</td></tr>
+              <tr><td class="px-4 py-2 text-slate-400 font-mono">2</td><td class="px-4 py-2"><code class="font-mono text-xs">route_optimization.py</code> is still two modules — 283 planar lines that meet <code class="font-mono text-xs">solver.py</code>'s own stated rule; the test file imports <strong>eight private names</strong> against two public ones.</td><td class="px-4 py-2 font-mono text-xs text-slate-500">route_optimization.py:70-352</td></tr>
+              <tr><td class="px-4 py-2 text-slate-400 font-mono">3</td><td class="px-4 py-2"><code class="font-mono text-xs">TaskDrawing</code> is the only measured value with no <code class="font-mono text-xs">from_measured_task</code>. Four answers about one task cost <strong>six optimizer runs</strong> (~220 ms).</td><td class="px-4 py-2 font-mono text-xs text-slate-500">export/common.py:69</td></tr>
+              <tr><td class="px-4 py-2 text-slate-400 font-mono">4</td><td class="px-4 py-2"><code class="font-mono text-xs">validate_qr_code_task</code> has no structural guard — the AST test that pins every <code class="font-mono text-xs">TaskStructure</code> field covers one of the two adapters onto it.</td><td class="px-4 py-2 font-mono text-xs text-slate-500">qrcode/conversion.py:278</td></tr>
+              <tr><td class="px-4 py-2 text-slate-400 font-mono">5</td><td class="px-4 py-2">The turnpoint-type table is the one enum pair with no totality test; a new role would be invisible to every validation rule.</td><td class="px-4 py-2 font-mono text-xs text-slate-500">qrcode/conversion.py:78, :108</td></tr>
+              <tr><td class="px-4 py-2 text-slate-400 font-mono">6</td><td class="px-4 py-2"><code class="font-mono text-xs">model/shape.py</code> is absent from the model package's own interface, and <code class="font-mono text-xs">model/__all__</code> publishes a QR wire key (<code class="font-mono text-xs">QR_EXTENSIONS_KEY</code>).</td><td class="px-4 py-2 font-mono text-xs text-slate-500">model/__init__.py · passthrough.py:32</td></tr>
+              <tr><td class="px-4 py-2 text-slate-400 font-mono">7</td><td class="px-4 py-2">Three of four package interfaces have zero callers — and they are not free: <code class="font-mono text-xs">import pyxctsk</code> costs <strong>94 ms</strong> with PIL, qrcode, zxingcpp, simplekml and pyproj all resident.</td><td class="px-4 py-2 font-mono text-xs text-slate-500">model/ qrcode/ export/ __init__.py</td></tr>
+              <tr><td class="px-4 py-2 text-slate-400 font-mono">8</td><td class="px-4 py-2"><code class="font-mono text-xs">GoalLine</code>'s two constructors duplicate a guard and a branch; <code class="font-mono text-xs">_build</code>'s <code class="font-mono text-xs">length is None</code> branch is unreachable.</td><td class="px-4 py-2 font-mono text-xs text-slate-500">goal_line.py:225, :252, :285</td></tr>
+              <tr><td class="px-4 py-2 text-slate-400 font-mono">9</td><td class="px-4 py-2"><code class="font-mono text-xs">snap_to_boundary</code> carries two axis orders in one signature and is called by <strong>no test</strong>.</td><td class="px-4 py-2 font-mono text-xs text-slate-500">earth.py:99-125</td></tr>
+              <tr><td class="px-4 py-2 text-slate-400 font-mono">10</td><td class="px-4 py-2">The <code class="font-mono text-xs">(lat,lon)→(lon,lat)</code> flip is written twice, differently — one of them by positional index.</td><td class="px-4 py-2 font-mono text-xs text-slate-500">kml.py:110 · geojson.py:82</td></tr>
+              <tr><td class="px-4 py-2 text-slate-400 font-mono">11</td><td class="px-4 py-2">Test-suite residue: corpus distances pinned through <code class="font-mono text-xs">CliRunner</code> and stdout against that class's own rule; KML asserted as substrings while proper helpers sit unusable in a sibling file; <code class="font-mono text-xs">corpus.py</code>'s caching is decorative; <code class="font-mono text-xs">--version</code> and <code class="font-mono text-xs">__main__.py</code> untested.</td><td class="px-4 py-2 font-mono text-xs text-slate-500">tests/</td></tr>
+              <tr><td class="px-4 py-2 text-slate-400 font-mono">12</td><td class="px-4 py-2">Three shallow publics: <code class="font-mono text-xs">generate_circle_coordinates_2d</code> (1 caller, 0 tests), <code class="font-mono text-xs">distance_through_centers</code> (0 <code>src/</code> callers, a test oracle), <code class="font-mono text-xs">local_tm_transformers</code> (a 21-line pass-through).</td><td class="px-4 py-2 font-mono text-xs text-slate-500">export/common.py · turnpoint.py · plane.py</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ══════════════════ TOP ══════════════════ -->
+      <section id="top-recommendation" class="space-y-4">
+        <h2 class="font-serif text-2xl border-b border-slate-300 pb-2">Top recommendation</h2>
+        <div class="rounded-xl deep p-7 text-slate-100 space-y-4">
+          <div class="flex items-baseline gap-3">
+            <span class="font-mono text-xs uppercase tracking-widest text-sky-300">start here</span>
+            <a href="#a" class="font-serif text-2xl hover:underline">A · Give the parser's adapters the recognition question their docstring promises</a>
+          </div>
+          <p class="text-sm text-slate-300 leading-relaxed">It is the only candidate with a demonstrated silent wrong answer at the library's front door, and it reproduces in one line:</p>
+          <pre class="bg-slate-950/60 rounded-lg p-4 text-[13px] font-mono text-emerald-200 overflow-x-auto">$ echo -n '{"hello":"world"}' | pyxctsk convert
+{"taskType":"CLASSIC","version":1,"turnpoints":[],"hello":"world"}</pre>
+          <p class="text-sm text-slate-300 leading-relaxed">The interface it needs is already written down in <code class="font-mono text-xs text-sky-200">parser.py:12-16</code>; the implementation is four predicates that already exist, in a different form, inside <code class="font-mono text-xs text-sky-200">_unrecognized</code>. It removes the load-bearing tuple order, makes the four adapters testable in isolation as the docstring claims they already are, and turns an error path that re-derives four recognition rules into a question asked of the adapters that own them.</p>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-slate-700 text-sm">
+            <div><p class="text-xs uppercase tracking-wider text-sky-300 mb-1">Runner-up</p><p class="text-slate-300"><a href="#b" class="underline">B</a> — cheaper. Two holes at the model↔QR seam, both reproducible, both with a docstring asserting the opposite of the behaviour.</p></div>
+            <div><p class="text-xs uppercase tracking-wider text-sky-300 mb-1">Cheapest wins</p><p class="text-slate-300"><a href="#d" class="underline">D</a> is four accessors on a value that already exists; <a href="#e" class="underline">E</a> is two deletions the package's own docstrings argue for.</p></div>
+            <div><p class="text-xs uppercase tracking-wider text-sky-300 mb-1">Largest scope</p><p class="text-slate-300"><a href="#c" class="underline">C</a> — the last hand-written field mirror. Start with the guard, not the table.</p></div>
+          </div>
+        </div>
+      </section>
+
+      <footer class="pt-6 border-t border-slate-300 text-xs text-slate-500 space-y-1">
+        <p>Reviewed at <code class="font-mono">8d4ce8d</code> on branch <code class="font-mono">docs/deepening-candidates-2026-08-19</code>. Suite: 995 passed, 18 skipped, 98&nbsp;% line coverage; ruff and mypy green.</p>
+        <p>Not re-litigated: ADRs 0001–0004, and every finding recorded as applied by the 2026-06-30, 2026-08-16, 2026-08-17, 2026-08-18 and 2026-08-19 reviews.</p>
+        <p>Vocabulary: <a class="text-indigo-700 hover:underline" href="../../CONTEXT.md">CONTEXT.md</a> for the domain, the <code class="font-mono">codebase-design</code> glossary for the architecture.</p>
+      </footer>
+
+    </main>
+  </body>
+</html>

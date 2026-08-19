@@ -43,7 +43,7 @@ ALLOWED: dict[str, set[str]] = {
 
 #: Top-level modules with no internal dependencies, free for anyone to import.
 #: `test_leaf_modules_are_leaves` keeps this honest.
-LEAVES = {"exceptions"}
+LEAVES = {"exceptions", "metadata"}
 
 #: Every function-local import of one pyxctsk module by another, as
 #: "importer -> imported". Not all of them cross a package boundary — the
@@ -392,6 +392,8 @@ class TestTheFrontDoorNamesTheAnswers:
         "TaskDrawing",
         "Task",
         "parse_task",
+        "render_task",
+        "OUTPUT_FORMATS",
         "center_distance",
         "center_distance_readings",
         "CenterDistanceReading",
@@ -399,6 +401,7 @@ class TestTheFrontDoorNamesTheAnswers:
         "GoalLine",
         "TooFewTurnpointsError",
         "TaskValidationError",
+        "pyXCTSKError",
         "ValidationRule",
         "calculate_iteratively_refined_route",
         "task_to_turnpoints",

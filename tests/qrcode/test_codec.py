@@ -668,3 +668,103 @@ class TestTheNestedModelsAreReachableOnTheirOwn:
         from pyxctsk.qrcode.models import QRCodeTakeoff
 
         assert QRCodeTakeoff().to_dict() == {}
+
+
+class TestTheShapeIsDecidedOnce:
+    """It used to be decided twice, on two different inputs.
+
+    `from_dict` dispatched on the payload's keys and `to_dict` on
+    `task_type`, and `_CompetitionTaskType` reads the legacy `"W"` spelling
+    that the competition shape's `taskType` sometimes carried — so a payload
+    read in one shape wrote itself in the other, and one round trip dropped
+    the goal, the earth model, the takeoff window and every turnpoint radius,
+    silently and with nothing to notice it by.
+    """
+
+    LEGACY = {
+        "g": {"d": "22:00:00Z", "t": 2},
+        "t": [{"n": "A", "z": "b`dpMgc{YgsB_X"}],
+        "taskType": "W",
+        "tc": None,
+        "to": None,
+        "version": 2,
+        "e": 1,
+    }
+
+    def test_reading_is_idempotent_through_a_write(self):
+        """The invariant that was broken: an object equals its own payload."""
+        task = QRCodeTask.from_dict(self.LEGACY)
+        payload = task.to_dict()
+
+        assert QRCodeTask.from_dict(payload) == task
+        assert QRCodeTask.from_dict(payload).to_dict() == payload
+
+    def test_a_legacy_waypoints_spelling_is_reduced_where_it_is_documented(self):
+        """`as_waypoints` is where "reduced to what the format can represent" lives."""
+        task = QRCodeTask.from_dict(self.LEGACY)
+
+        assert task.task_type is QRCodeTaskType.WAYPOINTS
+        # Not carried in the object either, so nothing can be lost between
+        # holding it and writing it — which is what "silently" meant.
+        assert task.goal is None and task.earth_model is None
+
+    @pytest.mark.parametrize("reference", reference_tasks(), ids=str)
+    def test_every_corpus_payload_still_round_trips_in_its_own_shape(self, reference):
+        """The competition shape must be untouched by the legacy branch."""
+        qr = reference.task.to_qr_code_task()
+
+        assert QRCodeTask.from_dict(qr.to_dict()).to_dict() == qr.to_dict()
+        waypoints = qr.as_waypoints().to_dict()
+        assert QRCodeTask.from_dict(waypoints).to_dict() == waypoints
+
+
+class TestAnUnreadableSectionIsCarriedNotEaten:
+    """`_A_DICT_OR_NOTHING` said so; the mechanism could not deliver it.
+
+    `g` and `s` are declared keys, and the passthrough excludes every declared
+    key by construction, so a section of the wrong shape was neither read nor
+    carried — it was dropped, in the package whose docstring says the library
+    hands back anything it cannot interpret.
+    """
+
+    def test_a_malformed_section_travels_back_out(self):
+        """The docstring's claim, now true."""
+        source = {
+            "taskType": "CLASSIC",
+            "version": 2,
+            "t": [],
+            "g": "nonsense",
+            "s": 123,
+            "tc": None,
+            "to": None,
+        }
+        task = QRCodeTask.from_dict(source)
+
+        assert task.goal is None and task.sss is None
+        assert task.unknown == {"g": "nonsense", "s": 123}
+        assert task.to_dict()["g"] == "nonsense"
+        assert task.to_dict()["s"] == 123
+
+    def test_a_malformed_turnpoint_list_travels_back_out(self):
+        """The same rule for `_A_LIST_OR_NOTHING`."""
+        task = QRCodeTask.from_dict(
+            {"taskType": "CLASSIC", "version": 2, "t": "not a list"}
+        )
+
+        assert task.turnpoints == []
+        assert task.to_dict()["t"] == "not a list"
+
+    def test_a_null_section_is_absent_rather_than_unreadable(self):
+        """Null is how the format says "not there"; it is not carried."""
+        task = QRCodeTask.from_dict(
+            {"taskType": "CLASSIC", "version": 2, "t": [], "g": None, "s": None}
+        )
+
+        assert task.unknown == {}
+        assert "g" not in task.to_dict() and "s" not in task.to_dict()
+
+    def test_a_row_that_reads_what_it_declares_carries_nothing(self):
+        """The default, and why every other row is unaffected."""
+        from pyxctsk.model.shape import OPTIONAL, Value
+
+        assert Value("goal", "g", optionality=OPTIONAL).unread({"g": 7}) == ()
