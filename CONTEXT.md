@@ -157,3 +157,18 @@ _Avoid_: extra field, custom field, passthrough field
 The format's own mechanism for manufacturer data: a list of opaque objects, each
 naming who wrote it. Distinct from an unknown key in being sanctioned — both are
 carried without being read.
+
+## Reading and writing one
+
+**Format adapter**:
+One input format, answering two questions: does this input look like mine, and
+can I read it. Both, or the second alone cannot say "not mine" — it can only
+fail to parse, which is a different thing.
+_Avoid_: parser, handler
+
+**Output format**:
+One way a task is written out — the full JSON, a map, a QR payload, a QR image
+— together with what a caller needs to deliver it: its media type, its file
+extension, and whether the payload is bytes or text.
+_Avoid_: exporter, writer (a *writer* is the code, a format is the choice)
+

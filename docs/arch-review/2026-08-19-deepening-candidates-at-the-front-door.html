@@ -32,6 +32,15 @@
           <a class="font-mono text-indigo-700 hover:underline" href="2026-08-19-deepening-candidates-at-the-front-door.md">2026-08-19-deepening-candidates-at-the-front-door.md</a>,
           which is the written record and carries the evidence. Suite at this commit:
           <strong>995 passed, 18 skipped, 98&nbsp;% line coverage</strong>, ruff and mypy green.</p>
+        <div class="rounded-lg border border-emerald-300 bg-emerald-50 p-4 -mt-2">
+          <p class="text-sm text-emerald-900"><strong>Status: all ten candidates applied</strong>, one per commit, on
+          <code class="font-mono text-xs">docs/deepening-candidates-2026-08-19</code>. The suite went from 995 to
+          <strong>1133 passing</strong> at the same 98&nbsp;% coverage. Three candidates were applied differently
+          from the card once the code was read closely — E gave the write-only field a reader instead of deleting it,
+          F kept a single-circle seam rather than pushing the pipeline into the test file, and I found that six of the
+          eight <code class="font-mono text-xs">&lt; 2</code> guards are four different rules sharing a number. The
+          Markdown record's Progress table carries each outcome and the nine breaking changes.</p>
+        </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div class="rounded-lg border border-slate-200 bg-white p-4">

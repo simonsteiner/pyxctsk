@@ -6,7 +6,9 @@ specification and FAI Sporting Code S7F. Each file is dated and kept as written 
 superseded reviews stay for history rather than being edited. Newest first.
 
 - [2026-08-19 — Deepening candidates at the front door](2026-08-19-deepening-candidates-at-the-front-door.md)
-  — **ten candidates and fourteen smaller findings, proposed.** Written after the
+  — **all ten candidates applied;** a Progress table in the file records each outcome, the
+  three departures and the nine breaking changes they produced. The suite went from 995 to
+  1133 passing at the same 98 % coverage. Written after the
   pre-release review below was merged, on a suite of 995 passing tests at 98 % line
   coverage — so the friction is no longer *inside* a module. The last three reviews drove it
   outward, and what is left sits at the two seams where the library meets the outside world

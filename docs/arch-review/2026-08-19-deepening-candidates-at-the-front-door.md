@@ -773,3 +773,87 @@ not the `earth_model` attribute ADR 0003 puts there.
   is what makes C's remaining six edits visible as the exception they are.
 - `tests/test_layering.py` — still eight lines of declaration governing 36 modules. G and
   smaller finding 6 are gaps in *what it is told to check*, not in how it checks.
+
+---
+
+## Progress
+
+**All ten candidates applied**, on `docs/deepening-candidates-2026-08-19`, one per commit.
+Every commit ran the full suite, `ruff check`, `ruff format` and `mypy src/ tests/` green,
+and each behaviour-preserving claim was checked against the reference corpus rather than
+asserted. The suite went from **995 to 1133 passing** at the same 98 % line coverage.
+
+```
+b7312b4 fix(parser)!: give the adapters the recognition question their docstring promised
+2965787 fix(qrcode): decide the QR shape once, and carry a section it cannot read
+ca1e754 fix(export)!: let the drawing answer for the goal line and the route too
+e5cff73 fix(distance)!: retire one write-only field, and give the other a reader
+db09cb7 test(qrcode): guard the one field mirror still written by hand
+bc91b3f refactor(distance): one spelling of §7.1.7, and no plane the product never builds
+5c64d43 fix!: one exception hierarchy, and one answer to what version this is
+41ecd7b feat: give writing a task the seam reading one already has
+17f911f fix(distance)!: one task, one answer about whether it has a distance
+c0466b2 refactor(distance): the earth is chosen in the module that says it is
+```
+
+| # | Candidate | Outcome |
+|---|-----------|---------|
+| A | Adapters have no recognition question | **applied.** `FormatAdapter` is a name, a `recognizes` and a `read`. The two JSON recognizers' key sets are *derived* from the shapes (`FULL_FORMAT_ONLY_KEYS`, `QR_FORMAT_ONLY_KEYS`), so a recognizer cannot claim a key its shape does not read. `Input` decodes the payload once, removing three dead parameters and two redundant `json.loads`. A recognized-but-unreadable payload raises with the reason. `tests/test_parser.py` is new. |
+| B | The QR shape chosen twice | **applied**, in two parts. `from_dict` reduces a legacy `taskType:"W"` payload through `as_waypoints()`, restoring the invariant that an object equals what re-reading its own payload produces. `Field.unread` + `Optionality.carry_unreadable` are the third state a key can be in, which is what makes `_A_DICT_OR_NOTHING`'s docstring true. Every corpus rendering byte-identical. |
+| C | The last hand-written field mirror | **applied as the guard**, which the card named as the cheap move — and *not* as a field-set guard, which would not have caught the hole: adding a field to both dataclasses and both tables while forgetting either constructor leaves the field sets matching. `TestEveryFieldCrossesTheSeam` populates every field of every 1:1 shape and asserts each survives the crossing. Verified by mutation: deleting any single field line from either constructor fails it, naming the field. |
+| D | The drawing stops at the turnpoints | **applied.** Five accessors (`route_label`, `goal_line_label`, `goal_line_description`, `control_zone_label`, `control_zone_description`) plus `route_coordinates_lon_lat`, and `GoalLine.control_zone_radius` for §6.2.3.1's "half the line". KML's "Course Line" becomes "Optimized Route" — one line per document across all 24 tasks, and the only user-visible change. GeoJSON byte-identical. |
+| E | Two write-only fields | **applied, with a departure.** `TaskTurnpoint.goal_type` is deleted as proposed. `OptimizedRoute.earth_model` is **not**: it was accurate and unread while `DistanceReport.earth_model` answered the same question off the *task*, so it got a reader instead. That is the better fix — for a hand-built pair the report was naming a model its own numbers had not been computed on. `earth.name_of` came with it. |
+| F | A second optimizer nobody ships | **applied, with a departure.** Deleting `optimal_point` outright would have pushed the four-step pipeline into the test file, which is worse than the duplication. Instead: `point_on_boundary` is the one spelling of §7.1.7, called by the optimizer *and* by `boundary_point`, which is the single-circle answer as a function with the **plane required** — so a test cannot reach the per-turnpoint projection without saying it means to. `TaskTurnpoint` is now exactly the three attributes its interface declares. |
+| G | Two error hierarchies | **applied.** `TooFewTurnpointsError` moves to `exceptions.py` as `(pyXCTSKError, ValueError)`; the CLI's two catch tuples become one, pinned by a test. `pyXCTSKError` joins `__all__` and the layering guard's `DOCUMENTED`. `metadata.py` is a new leaf holding `pyxctsk_version`, read by all three places that needed it — the layering guard caught the new edge on the first run. |
+| H | Rendering has no seam | **applied.** `renderer.py` holds `OUTPUT_FORMATS` — name, media type, extension, binary, renderer — and `render_task` is the counterpart to `parse_task`. `cli.py`'s convert body is two lines; `scripts/task_viewer/api.py` drops both copies; `EXTENSION`/`MIME_TYPE` become aliases onto the `json` row. `geojson` becomes a CLI format on the way past. |
+| I | One task, two answers | **applied, with a departure.** The two published shapes agree — `calculate_task_distances` raises where the report raises, and `TaskDistanceTable.empty()` is gone. The card's "eight spellings of one rule" was wrong on re-reading: the other six guards are *four different rules* that share a number (a polyline of <2 points, a route of <2 circles, a speed-section slice, a goal line needing an approach). They stay total, and the commit says why. |
+| J | Two modules build the two earths | **applied.** `earth.py` answers for both shapes of a model — `geod_for_earth_model`, `crs_for_earth_model`, `datum_proj4`, `canonical`. `plane.py` no longer names an ellipsoid, an EPSG code or a radius (asserted by a test), loses the private `_is_fai_sphere` import and the cached twin it converted arguments for, and `LocalPlane.around(centers, "WSG84")` now raises. Byte-identical on both earth models. |
+
+### Live defects fixed
+
+Four candidates were reproducible wrong answers rather than friction:
+
+- **A** — `echo '{"hello":"world"}' | pyxctsk convert` printed an invented task and exited 0;
+  `[]` escaped as a bare `TypeError`; every `.xctsk` document was also a valid input to
+  the QR adapter, kept apart only by tuple order.
+- **B** — a QR payload spelling `taskType:"W"` lost the goal, the deadline, the earth model,
+  both takeoff times and every turnpoint radius in one round trip; a malformed `g` or `s`
+  was dropped where the optionality's docstring promised it was carried.
+- **D** — KML and GeoJSON named the same route differently, with a test in each file
+  pinning the divergence.
+- **I** — one task got 0.0 km with an empty turnpoint list from one front-door call and an
+  exception from another.
+
+### What the applied changes are worth
+
+Verified per commit against every task in `tests/data/reference_tasks/`:
+
+- **parser (A)**: all 24 tasks round-trip identically in all four input spellings.
+- **QR codec (B)**: every task's QR JSON, `XCTSK:`, `XCTSKZ:`, waypoints JSON and full
+  JSON **byte-identical**.
+- **export (D)**: GeoJSON **byte-identical**; KML differs by exactly one line per document,
+  which is the finding.
+- **distance (E, F, I, J)**: every distance report **byte-identical**, on WGS84 *and* on
+  the FAI sphere.
+- **rendering (H)**: every format byte-identical to the call it replaced, and the CLI's
+  four formats byte-identical to what they printed.
+
+### Breaking changes this produced
+
+1. `parse_task` refuses a JSON object matching neither format (was: an invented empty task).
+2. `parse_task` refuses a malformed payload of a recognized format (was: fall-through).
+3. `TaskTurnpoint.goal_type` and the `goal_type=` constructor argument are gone.
+4. `TaskTurnpoint.optimal_point` is gone; use `turnpoint.boundary_point`, plane required.
+5. KML names the optimized route "Optimized Route", not "Course Line".
+6. `calculate_task_distances` and `task_distances_from` raise `TooFewTurnpointsError`
+   for a task with fewer than two turnpoints; `TaskDistanceTable.empty()` is gone.
+7. `TooFewTurnpointsError` is now a `pyXCTSKError` as well as a `ValueError`.
+8. `LocalPlane.around` raises on an earth-model value it does not know.
+9. `QRCodeTask.from_dict` reduces a legacy `taskType:"W"` payload to the waypoints value.
+
+### Smaller findings addressed in passing
+
+1 (`route()` rows), 3 (`TaskDrawing.from_measured_task`) and 12–14 were **not** taken on —
+they are independent of the ten and stand as written. Fixed alongside their candidate: 10
+(the axis flip, with D), and the untested `pyxctsk --version` and `_FORMAT_PARSERS`
+(with G and A).
