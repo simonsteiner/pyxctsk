@@ -130,11 +130,15 @@ class Optionality:
         omit: Over the model value — True means write no key at all.
         required: If True the key must be present; its absence is a
             ``KeyError`` naming it, not a default.
+        carry_unreadable: If True, a *present, non-null* value this field
+            declines to read is carried into ``unknown`` instead of being
+            dropped — see :meth:`Field.unread`.
     """
 
     absent: Callable[[Any], bool]
     omit: Callable[[Any], bool]
     required: bool = False
+    carry_unreadable: bool = False
 
 
 #: The key must be there, and is always written.
@@ -189,6 +193,24 @@ class Field(ABC):
             result: The payload so far, appended to in place.
         """
 
+    def unread(self, data: Mapping[str, Any]) -> tuple[str, ...]:
+        """Declared keys this row left alone for *this* payload.
+
+        The third state a key can be in, and the one :attr:`Shape.keys` alone
+        cannot express. A row's keys are its keys whatever a given payload
+        holds, so a row that declares ``g`` and then declines to read a ``g``
+        of the wrong shape leaves the value nowhere: the passthrough excludes
+        every declared key by construction, so it is neither read nor carried.
+        A malformed nested section was therefore *dropped* while the
+        optionality declaring it said, in as many words, that it "lands in
+        ``unknown`` and travels back out untouched".
+
+        Returns:
+            The keys to hand to the passthrough after all. Empty by default,
+            which is right for every row that reads whatever it declares.
+        """
+        return ()
+
 
 @dataclass(frozen=True)
 class Value(Field):
@@ -226,6 +248,20 @@ class Value(Field):
         if self.optionality.omit(value):
             return
         result[self.key] = self.codec.to_wire(value)
+
+    def unread(self, data: Mapping[str, Any]) -> tuple[str, ...]:
+        """This key, when it holds a value present but unreadable.
+
+        Null is not unreadable — for an optional section it is exactly how the
+        format says "not there" — so only a present, non-null value the
+        optionality calls absent is carried.
+        """
+        if not self.optionality.carry_unreadable or self.key not in data:
+            return ()
+        raw = data[self.key]
+        if raw is None or not self.optionality.absent(raw):
+            return ()
+        return (self.key,)
 
 
 @dataclass(frozen=True)
@@ -312,10 +348,17 @@ class Shape(Generic[T]):
             KeyError: If a required key is missing.
         """
         kwargs: dict[str, Any] = {}
+        unread: set[str] = set()
         for field in self.fields:
             kwargs.update(field.read(data))
+            unread.update(field.unread(data))
         if self.carries_unknown:
-            extensions, unknown = read_passthrough(dict(data), self.keys, self.ext_key)
+            # The allow-list is what this shape read *from this payload*, not
+            # what it declares: a row that declined a value of the wrong shape
+            # hands its key back so the value is carried rather than eaten.
+            extensions, unknown = read_passthrough(
+                dict(data), self.keys - unread, self.ext_key
+            )
             if self.ext_key is not None:
                 kwargs["extensions"] = extensions
             kwargs["unknown"] = unknown

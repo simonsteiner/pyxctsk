@@ -198,8 +198,23 @@ class QRCodeTask:
         is measured against the keys it actually reads: a competition key in a
         waypoints payload is unknown here, and is carried through rather than
         silently dropped.
+
+        **The shape is decided once.** It used to be decided twice, on two
+        different inputs — here on the payload's keys, and in :meth:`to_dict`
+        on :attr:`task_type` — and :class:`_CompetitionTaskType` can put the
+        two into disagreement, because it reads the legacy ``"W"`` spelling
+        that the competition shape's ``taskType`` sometimes carried. A payload
+        read in one shape then wrote itself in the other, so one round trip
+        dropped the goal, the earth model, the takeoff window and every
+        turnpoint radius, silently. Reducing the value here is what
+        :meth:`as_waypoints` already means by "the copy is reduced to what the
+        format can represent": an object must equal what re-reading its own
+        payload produces.
         """
-        return cls._shape_for("T" in data).read(data)
+        task = cls._shape_for("T" in data).read(data)
+        if task.task_type is QRCodeTaskType.WAYPOINTS and "T" not in data:
+            return task.as_waypoints()
+        return task
 
     def to_json(self) -> str:
         """Convert to JSON string.
@@ -449,13 +464,21 @@ _NON_DEFAULT_EARTH_MODEL = Optionality(
 #: shape is not read rather than raising: it lands in ``unknown`` and travels
 #: back out untouched, which is what this library does with anything it cannot
 #: interpret.
+#:
+#: ``carry_unreadable`` is what makes that sentence true. It was written before
+#: the mechanism existed and the mechanism could not deliver it: ``g`` and ``s``
+#: are declared keys, and the passthrough excludes every declared key by
+#: construction, so a malformed section was dropped on the way in and the
+#: payload came back out without it. See :meth:`Field.unread`.
 _A_DICT_OR_NOTHING = Optionality(
     absent=lambda raw: not isinstance(raw, dict),
     omit=lambda value: value is None,
+    carry_unreadable=True,
 )
 _A_LIST_OR_NOTHING = Optionality(
     absent=lambda raw: not isinstance(raw, list),
     omit=lambda value: not value,
+    carry_unreadable=True,
 )
 
 #: ``e`` is an integer a producer may have written as a string.
