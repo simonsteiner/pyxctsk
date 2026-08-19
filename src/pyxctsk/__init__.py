@@ -3,22 +3,28 @@
 This package implements XCTrack's task format for reading and writing .xctsk files,
 generating and parsing XCTSK: URLs, and encoding/decoding XCTSK: URLs as QR codes.
 
-This is the whole library's front door: every answer a caller needs is named
-here, and the four packages behind it hold the primitives those answers are
-built from. That distinction is the one this file got wrong — it exported
-``distance_through_centers``, whose own docstring says *"the primitive, not the
-published number… a caller producing a figure for a task board wants
-``center_distance(task)``"*, while ``center_distance`` itself was absent. It
-also exported ``OptimizedRoute`` and a function taking one without exporting
-anything that could construct one, which is why the S7F reference document had
-to reach past this module for four names.
+This is the whole library's front door: every **answer** a caller needs is
+named here — parse a task, convert it, measure it, draw it — while the four
+packages behind it hold the primitives those answers are built from. Reach into
+``pyxctsk.model``, ``pyxctsk.qrcode``, ``pyxctsk.distance`` and
+``pyxctsk.export`` for those: ``LocalPlane``, ``plane_circle`` and the
+optimizer's tuning constants are deliberately not re-exported here.
 
-Reach into ``pyxctsk.distance`` and friends for the pieces below the answers —
-``LocalPlane``, ``plane_circle``, the optimizer's tuning constants — which are
-deliberately not re-exported here.
+Start with :func:`parse_task` for reading, :class:`Task` for the model,
+:class:`DistanceReport` for every number S7F defines about a task, and
+:func:`task_to_kml` / :func:`generate_task_geojson` for a map.
 
 See http://xctrack.org/ and http://xctrack.org/Competition_Interfaces.html
 """
+
+# The answer/primitive split above is the rule this file once broke, and the
+# reason it is stated: ``distance_through_centers`` was exported while
+# ``center_distance`` — which that function's own docstring tells you to call
+# instead — was not, and ``OptimizedRoute`` was exported alongside a function
+# taking one but nothing that could construct one, which is why
+# ``docs/s7f-distance-reference.md`` had to reach past this module for four
+# names. ``tests/test_layering.py`` now asserts every documented name is
+# reachable from here.
 
 from importlib.metadata import version
 
@@ -92,55 +98,58 @@ VERSION = FULL_FORMAT_VERSION
 # Single source of truth: the version declared in pyproject.toml, read from the
 # installed package metadata.
 __version__ = version("pyxctsk")
+# Sorted, case-insensitively. It was in no discernible order, which is what
+# makes an accidental omission invisible; tests/test_layering.py checks the
+# contents, this checks that a reader can find a name in them.
 __all__ = [
-    "MissingQRCodeSupportError",
-    "task_to_turnpoints",
-    "geodesic_distance",
-    "center_distance_readings",
-    "center_distance",
     "calculate_iteratively_refined_route",
-    "TooFewTurnpointsError",
-    "PROPOSED_READING",
-    "GoalLineOrientation",
-    "GoalLine",
-    "CenterDistanceReading",
-    "SpeedSection",
     "calculate_task_distances",
+    "center_distance",
+    "center_distance_readings",
+    "CenterDistanceReading",
     "Direction",
     "distance_through_centers",
+    "DistanceReport",
     "drawing_to_geojson",
     "drawing_to_kml",
     "EarthModel",
     "EmptyInputError",
     "EXTENSION",
+    "FULL_FORMAT_VERSION",
     "generate_qrcode_image",
     "generate_task_geojson",
+    "geodesic_distance",
     "Goal",
+    "GoalLine",
+    "GoalLineOrientation",
     "GoalType",
     "InvalidFormatError",
     "InvalidTimeOfDayError",
     "MeasuredTask",
-    "DistanceReport",
     "MIME_TYPE",
+    "MissingQRCodeSupportError",
     "optimized_distance",
     "OptimizedRoute",
     "parse_task",
+    "PROPOSED_READING",
     "QRCodeTask",
+    "SpeedSection",
     "SSS",
     "SSSType",
     "Takeoff",
+    "Task",
     "task_distances_from",
     "task_to_kml",
-    "Task",
+    "task_to_turnpoints",
     "TaskDrawing",
     "TaskTurnpoint",
     "TaskType",
     "TaskValidationError",
     "TimeOfDay",
+    "TooFewTurnpointsError",
     "Turnpoint",
     "TurnpointType",
     "ValidationIssue",
-    "FULL_FORMAT_VERSION",
     "ValidationRule",
     "VERSION",
     "Waypoint",

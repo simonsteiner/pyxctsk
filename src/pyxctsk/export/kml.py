@@ -17,7 +17,13 @@ from .common import (
 # one radix so they can be compared at a glance.
 FILL_ALPHA = 0x64  # Cylinder and control-zone fills, 39% opaque
 ROUTE_ALPHA = 0xE6  # Course line, 90% opaque
-DEFAULT_ALTITUDE = 5000  # Default altitude for KML elements
+
+# Both are metres above ground, and both are presentation choices: the
+# cylinders are extruded high enough to read as volumes, the goal line low
+# enough to sit inside them rather than above. The second used to be a bare
+# `500` at the call site with a comment, beside a named constant for the first.
+TURNPOINT_ALTITUDE = 5000
+GOAL_LINE_ALTITUDE = 500
 
 
 def _create_turnpoint_style(color: Color) -> simplekml.Style:
@@ -198,17 +204,10 @@ def drawing_to_kml(drawing: TaskDrawing) -> str:
         A string containing the KML representation of the task.
     """
     kml = simplekml.Kml()
-    altitude = DEFAULT_ALTITUDE  # Default altitude for KML elements
 
-    # Create turnpoint elements
-    _create_turnpoint_elements(kml, drawing, altitude)
-
-    # Create course line
-    # line is created with clampToGround mode
+    _create_turnpoint_elements(kml, drawing, TURNPOINT_ALTITUDE)
+    # The course line is clamped to the ground; the goal line is not.
     _create_course_line(kml, drawing)
-
-    # Create goal line elements if applicable
-    # goal line elements are created 500m above the ground
-    _create_goal_line_elements(kml, drawing, 500)
+    _create_goal_line_elements(kml, drawing, GOAL_LINE_ALTITUDE)
 
     return str(kml.kml())

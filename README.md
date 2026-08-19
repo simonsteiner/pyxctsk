@@ -142,7 +142,7 @@ uv run lefthook run pre-commit
 # Or run the tools directly
 uv run ruff check --fix src/ tests/ scripts/
 uv run ruff format src/ tests/ scripts/
-uv run mypy src/
+uv run mypy src/ tests/
 ```
 
 ## Usage Examples

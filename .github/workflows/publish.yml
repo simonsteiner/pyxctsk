@@ -29,7 +29,7 @@ jobs:
           uv sync --all-extras
           uv run ruff check src/ tests/ scripts/
           uv run ruff format --check src/ tests/ scripts/
-          uv run mypy src/
+          uv run mypy src/ tests/
           uv run pytest
 
       - name: Verify the core install needs no `qr` extra

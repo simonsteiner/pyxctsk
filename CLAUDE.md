@@ -24,7 +24,7 @@ uv run pytest -m "not slow"                   # skip slow-marked tests (none at 
 # Lint / format / typecheck
 uv run ruff check --fix src/ tests/ scripts/   # lint (E/W/F/I/D) + autofix
 uv run ruff format src/ tests/ scripts/        # format (black-compatible)
-uv run mypy src/                               # type check (strict; config in pyproject.toml)
+uv run mypy src/ tests/                               # type check (strict; config in pyproject.toml)
 
 # Git hooks are managed by lefthook (config in lefthook.yml)
 uv run lefthook install                        # enable hooks on commit

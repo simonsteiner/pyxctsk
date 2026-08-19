@@ -301,10 +301,7 @@ class GoalLine:
     def _has_line_goal(task: Task) -> bool:
         """Whether this task has a LINE goal with enough turnpoints to orient one."""
         return bool(
-            task.goal
-            and task.goal.type == GoalType.LINE
-            and task.turnpoints
-            and len(task.turnpoints) >= 2
+            task.goal and task.goal.type == GoalType.LINE and len(task.turnpoints) >= 2
         )
 
     @staticmethod

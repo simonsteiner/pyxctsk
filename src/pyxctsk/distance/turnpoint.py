@@ -640,7 +640,11 @@ def distance_through_centers(
         return 0.0
 
     if earth_model is None:
-        earth_model = getattr(turnpoints[0], "earth_model", None)
+        # A plain attribute read, not `getattr(..., "earth_model", None)`:
+        # every TaskTurnpoint has one, and the defensive lookup is the exact
+        # shape `TurnpointGeometry` documents as the bug that let an interface
+        # deny having a value its implementation read.
+        earth_model = turnpoints[0].earth_model
 
     total = 0.0
     for i in range(len(turnpoints) - 1):
