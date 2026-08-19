@@ -51,7 +51,8 @@ class TaskDrawing:
         goal_line: The task's goal line, or None if it has none.
         measured: The task beside the optimized route through its cylinders.
             Read :attr:`route` for the route alone; hand the whole value to
-            ``task_distances_from`` for the table beside the map.
+            ``task_distances_from`` for the table beside the map, which is
+            that same measurement rendered rather than a second one.
     """
 
     task: Task

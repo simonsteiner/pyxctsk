@@ -85,7 +85,12 @@ from .route_optimization import (
     optimized_distance,
 )
 from .speed_section import SpeedSection
-from .task_distances import calculate_task_distances, task_distances_from
+from .task_distances import (
+    TaskDistanceTable,
+    TurnpointRow,
+    calculate_task_distances,
+    task_distances_from,
+)
 from .turnpoint import (
     FAI_SPHERE_RADIUS_M,
     LocalPlane,
@@ -122,6 +127,8 @@ __all__ = [
     "geodesic_distance",
     "calculate_task_distances",
     "task_distances_from",
+    "TaskDistanceTable",
+    "TurnpointRow",
     "task_to_turnpoints",
     # Configuration
     "CONVERGENCE_EPSILON_M",

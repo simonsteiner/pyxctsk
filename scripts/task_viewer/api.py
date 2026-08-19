@@ -186,7 +186,11 @@ def compare_task_api(task_name: str) -> Response | tuple[Response, int]:
         task = parse_task(str(xctsk_path))  # type: ignore
         # One drawing: the table and the map share a single optimized route.
         drawing = TaskDrawing.from_task(task)  # type: ignore
-        distance_results = task_distances_from(drawing.measured)  # type: ignore
+        # `.as_dict()`: the table is a value now, and this consumer wants the
+        # dictionary rendering it has always read.
+        distance_results = task_distances_from(  # type: ignore
+            drawing.measured
+        ).as_dict()
         xctrack_geojson = drawing_to_geojson(drawing)  # type: ignore
         comparison_data = prepare_comparison_data(json_data, distance_results, task)
 

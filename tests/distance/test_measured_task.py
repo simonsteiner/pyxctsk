@@ -116,7 +116,7 @@ class TestTheNumbersItProjects:
 
         assert measured.turnpoints == ()
         assert measured.cumulative_m() == []
-        assert task_distances_from(measured)["turnpoints"] == []
+        assert task_distances_from(measured).turnpoints == ()
 
 
 class TestTheMismatchIsGone:
@@ -151,6 +151,6 @@ class TestTheMismatchIsGone:
         duna = MeasuredTask.from_task(reference_task("task_duna").task)
 
         assert task_distances_from(bevo) != task_distances_from(duna)
-        assert task_distances_from(bevo)["optimized_distance_km"] == round(
+        assert task_distances_from(bevo).optimized_distance_km == round(
             bevo.total_m / 1000, 1
         )

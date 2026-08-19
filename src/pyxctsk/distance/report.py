@@ -26,7 +26,12 @@ from importlib.metadata import PackageNotFoundError, version
 from typing import Any
 
 from ..model.task import Task
-from .center_distance import PROPOSED_READING, center_distance, center_distance_readings
+from .center_distance import (
+    PROPOSED_READING,
+    center_distance,
+    center_distance_readings,
+    cumulative_center_m,
+)
 from .measured_task import MeasuredTask
 from .speed_section import SpeedSection
 
@@ -56,7 +61,8 @@ NOTES = {
     "route": (
         "The optimized crossing point per turnpoint. Exchange these "
         "rather than totals: a total says two implementations disagree, "
-        "these say where"
+        "these say where. cumulative_center_m is the prefix of the "
+        "center_distance_m reading above, so its last row equals it"
     ),
 }
 
@@ -186,9 +192,13 @@ class DistanceReport:
         Returns:
             A row per turnpoint, in task order, each carrying the turnpoint's
             centre and radius, the optimized crossing point, and the distance
-            along the route to it.
+            along the route to it — optimized, and through centres.
         """
         cumulative = self.measured.cumulative_m()
+        # The centre column's prefix, from the module that owns the convention.
+        # `task_distances` used to re-derive it leg by leg beside this one, so
+        # the two published shapes measured the same thing twice.
+        center_cumulative = cumulative_center_m(self.task)
         return [
             {
                 "index": i,
@@ -200,6 +210,7 @@ class DistanceReport:
                 "route_lat": point[0],
                 "route_lon": point[1],
                 "cumulative_m": cumulative[i],
+                "cumulative_center_m": center_cumulative[i],
             }
             for i, (tp, point) in enumerate(
                 zip(self.task.turnpoints, self.measured.route.points)

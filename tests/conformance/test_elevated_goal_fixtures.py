@@ -201,7 +201,7 @@ class TestSeeYouSemantics:
         task = parse_task((FIXTURES / f"{name}_qr_code.txt").read_text())
         result = calculate_task_distances(task)
 
-        assert result["center_distance_km"] == self.REFERENCE[name]["total_km"]
+        assert result.center_distance_km == self.REFERENCE[name]["total_km"]
 
     @pytest.mark.parametrize("name", ["seeyou-finish-1220", "seeyou-finish-auto"])
     def test_optimized_legs_match_seeyou_except_the_first(self, name):
@@ -310,4 +310,4 @@ class TestConformantElevatedGoal:
 
         assert task.turnpoints[-2].radius == 61600
         assert task.turnpoints[-1].radius == 400
-        assert result["optimized_distance_km"] > result["center_distance_km"]
+        assert result.optimized_distance_km > result.center_distance_km

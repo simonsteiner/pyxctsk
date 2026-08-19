@@ -19,6 +19,7 @@ import pytest
 
 from pyxctsk import Task, TaskType
 from pyxctsk.distance import (
+    DistanceReport,
     MeasuredTask,  # noqa: F401
     TaskTurnpoint,
     calculate_task_distances,
@@ -65,7 +66,7 @@ class TestDistanceComprehensive:
         if not ref_km:
             pytest.skip("the producer recorded no center distance")
 
-        calc_km = calculate_task_distances(reference.task)["center_distance_km"]
+        calc_km = calculate_task_distances(reference.task).center_distance_km
         difference = abs(calc_km - ref_km) / ref_km
 
         assert difference < 0.005, (
@@ -81,7 +82,7 @@ class TestDistanceComprehensive:
         itself: what is under test here is the wiring above it.
         """
         ref_km = reference.reference_optimized_km
-        calc_km = calculate_task_distances(reference.task)["optimized_distance_km"]
+        calc_km = calculate_task_distances(reference.task).optimized_distance_km
         difference = abs(calc_km - ref_km) / ref_km
 
         assert difference < TOLERANCE, (
@@ -95,14 +96,15 @@ class TestDistanceComprehensive:
         A claim about the corpus rather than any one task, so this one stays a
         loop.
         """
-        differences = [
-            abs(
-                calculate_task_distances(r.task)["optimized_distance_km"]
-                - r.reference_optimized_km
-            )
-            / r.reference_optimized_km
-            for r in WITH_REFERENCE
-        ]
+        differences = []
+        for r in WITH_REFERENCE:
+            # `tasks_with_reference_distance` is the subset that carries one;
+            # the accessor is still Optional because not every task does. The
+            # check used to be invisible because the table's values were `Any`.
+            reference_km = r.reference_optimized_km
+            assert reference_km is not None
+            calc_km = calculate_task_distances(r.task).optimized_distance_km
+            differences.append(abs(calc_km - reference_km) / reference_km)
 
         assert statistics.mean(differences) < TOLERANCE / 2
 
@@ -145,15 +147,15 @@ class TestDistanceComprehensive:
         route = MeasuredTask.from_task(task).route
 
         expected = [round(m / 1000.0, 1) for m in route.cumulative_m()]
-        actual = [tp["cumulative_optimized_km"] for tp in results["turnpoints"]]
+        actual = [tp.cumulative_optimized_km for tp in results.turnpoints]
         assert actual == expected, f"{stem}: cumulative column left the route"
 
         # The last turnpoint's cumulative distance is the task distance.
-        assert actual[-1] == results["optimized_distance_km"]
+        assert actual[-1] == results.optimized_distance_km
 
         # An optimized prefix never exceeds the same prefix through centers.
-        for tp in results["turnpoints"]:
-            assert tp["cumulative_optimized_km"] <= tp["cumulative_center_km"]
+        for tp in results.turnpoints:
+            assert tp.cumulative_optimized_km <= tp.cumulative_center_km
 
     def test_edge_cases_and_robustness(self):
         """Test algorithm robustness with edge cases."""
@@ -214,34 +216,20 @@ class TestDistanceComprehensive:
         results = calculate_task_distances(task)
 
         # Validate structure
-        assert "center_distance_km" in results
-        assert "optimized_distance_km" in results
-        assert "turnpoints" in results
-        assert len(results["turnpoints"]) == len(task.turnpoints)
+        assert len(results.turnpoints) == len(task.turnpoints)
 
         # Validate optimization effectiveness
-        center_km = results["center_distance_km"]
-        opt_km = results["optimized_distance_km"]
+        center_km = results.center_distance_km
+        opt_km = results.optimized_distance_km
 
         assert center_km > 0, f"{task_name}: Center distance should be positive"
         assert opt_km > 0, f"{task_name}: Optimized distance should be positive"
         assert opt_km < center_km, f"{task_name}: Optimization should reduce distance"
 
-        # Validate turnpoint data
-        for i, tp_result in enumerate(results["turnpoints"]):
-            assert "cumulative_center_km" in tp_result
-            assert "cumulative_optimized_km" in tp_result
-
-            # Cumulative distances should be non-decreasing
-            if i > 0:
-                prev_tp = results["turnpoints"][i - 1]
-                assert (
-                    tp_result["cumulative_center_km"] >= prev_tp["cumulative_center_km"]
-                )
-                assert (
-                    tp_result["cumulative_optimized_km"]
-                    >= prev_tp["cumulative_optimized_km"]
-                )
+        # Cumulative distances should be non-decreasing
+        for prev_tp, tp_result in zip(results.turnpoints, results.turnpoints[1:]):
+            assert tp_result.cumulative_center_km >= prev_tp.cumulative_center_km
+            assert tp_result.cumulative_optimized_km >= prev_tp.cumulative_optimized_km
 
 
 class TestProjectionFromARoute:
@@ -278,7 +266,7 @@ class TestProjectionFromARoute:
 
         assert len(calls) == 1
         # The table's total and the drawn line describe the same route.
-        assert table["optimized_distance_km"] == round(drawing.route.total_m / 1000, 1)
+        assert table.optimized_distance_km == round(drawing.route.total_m / 1000, 1)
         (line,) = [
             f
             for f in geojson["features"]
@@ -292,6 +280,58 @@ class TestProjectionFromARoute:
 
         result = task_distances_from(MeasuredTask.from_task(task))
 
-        assert result["center_distance_km"] == 0.0
-        assert result["optimized_distance_km"] == 0.0
-        assert result["turnpoints"] == []
+        assert result.center_distance_km == 0.0
+        assert result.optimized_distance_km == 0.0
+        assert result.turnpoints == ()
+
+
+class TestTheTableIsARenderingOfTheReport:
+    """One report, displayed — not a second measurement of the same task.
+
+    The table used to derive its centre column leg by leg while
+    ``DistanceReport`` asked ``center_distance``, and its rows carried
+    different keys and units from the report's. Two published shapes of one
+    task, disagreeing by up to 50 m by construction, with nothing saying which
+    was canonical.
+    """
+
+    @pytest.mark.parametrize("stem", ["task_bevo", "task_gibe", "task_fobe_line"])
+    def test_every_total_is_the_report_rounded(self, stem):
+        """Not "close to" — the same number, displayed."""
+        task = reference_task(stem).task
+        report = DistanceReport.from_task(task)
+        table = calculate_task_distances(task)
+
+        assert table.optimized_distance_km == round(report.task_distance_m / 1000, 1)
+        assert table.center_distance_km == round(
+            (report.center_distance_m or 0.0) / 1000, 1
+        )
+
+    @pytest.mark.parametrize("stem", ["task_bevo", "task_gibe", "task_fobe_line"])
+    def test_every_row_is_the_reports_row_rounded(self, stem):
+        """Including the centre column, which the table used to re-derive."""
+        task = reference_task(stem).task
+        rows = DistanceReport.from_task(task).route()
+        table = calculate_task_distances(task)
+
+        assert len(table.turnpoints) == len(rows)
+        for row, tp in zip(rows, table.turnpoints):
+            assert tp.index == row["index"]
+            assert tp.name == row["name"]
+            assert tp.cumulative_optimized_km == round(row["cumulative_m"] / 1000, 1)
+            assert tp.cumulative_center_km == round(
+                row["cumulative_center_m"] / 1000, 1
+            )
+
+    @pytest.mark.parametrize("stem", ["task_bevo", "task_pepi"])
+    def test_the_centre_column_ends_at_the_centre_total(self, stem):
+        """The prefix and the total are one polyline, so they must agree.
+
+        They are both ``PROPOSED_READING``. Deriving the column from a
+        different reading than the total printed above it would put a table in
+        disagreement with its own last row — which is why
+        ``cumulative_center_m`` lives in ``center_distance``.
+        """
+        table = calculate_task_distances(reference_task(stem).task)
+
+        assert table.turnpoints[-1].cumulative_center_km == table.center_distance_km

@@ -150,6 +150,33 @@ def center_distance(
     raise ValueError(f"not a center-distance reading: {reading!r}")
 
 
+def cumulative_center_m(task: Task) -> list[float]:
+    """Distance through centres to each turnpoint, in metres.
+
+    One entry per turnpoint, starting at 0.0, so the last equals
+    ``center_distance(task)`` under :data:`PROPOSED_READING` — which it must,
+    being the prefix of exactly that polyline. It lives here rather than beside
+    the table that displays it because the convention is this module's: a
+    cumulative column derived from a *different* reading than the total printed
+    above it would disagree with its own last row.
+
+    Args:
+        task: The task to measure.
+
+    Returns:
+        Cumulative distances in metres, one per turnpoint. Empty for a task
+        with no turnpoints; ``[0.0]`` for one with a single turnpoint.
+    """
+    centers = [(tp.waypoint.lat, tp.waypoint.lon) for tp in task.turnpoints]
+    cumulative = [0.0]
+    for i in range(1, len(centers)):
+        cumulative.append(
+            cumulative[-1]
+            + geodesic_distance(centers[i - 1], centers[i], task.earth_model)
+        )
+    return cumulative[: len(centers)]
+
+
 def center_distance_readings(task: Task) -> dict[str, float | None]:
     """Return every reading of a task's centre distance, keyed by name.
 

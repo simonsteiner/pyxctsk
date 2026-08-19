@@ -48,6 +48,7 @@ jsonify
 Jörg
 Karney
 KHTML
+kilometres
 Küçük
 LANCZOS
 latlng
