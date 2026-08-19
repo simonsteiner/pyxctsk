@@ -221,8 +221,9 @@ class TestOneSolverOneProjection:
         goal = task_to_turnpoints(line_task)[-1]
         plane = LocalPlane.around([goal.center])
 
+        # ``radius == 0`` is the whole of "this is a LINE goal" here — the
+        # cylinder carried a ``goal_type`` label beside it that nothing read.
         assert goal.radius == 0
-        assert goal.goal_type is GoalType.LINE
         assert plane_circle(goal, plane)[2] == 0.0
         assert goal.optimal_point((46.5, 8.0), (46.5, 8.0), plane) == goal.center
 
@@ -237,7 +238,6 @@ class TestOneSolverOneProjection:
         )[-1]
 
         assert goal.radius == 400
-        assert goal.goal_type is GoalType.CYLINDER
 
 
 class TestCrossingCase:
@@ -335,7 +335,7 @@ class TestGoalLine:
         The line is oriented perpendicular to the incoming leg (§6.2.3.1), so
         the perpendicular foot from the incoming point is the center itself.
         """
-        goal = TaskTurnpoint(47.0, 8.0, 0, goal_type=GoalType.LINE)
+        goal = TaskTurnpoint(47.0, 8.0, 0)
         prev_point = (46.9, 7.95)
         finish = goal.optimal_point(prev_point, prev_point)
         assert finish == goal.center

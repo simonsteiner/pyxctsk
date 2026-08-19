@@ -73,9 +73,6 @@ def task_to_turnpoints(task: Task) -> list[TaskTurnpoint]:
             lat=tp.waypoint.lat,
             lon=tp.waypoint.lon,
             radius=0 if (i == last and goal_type is GoalType.LINE) else tp.radius,
-            # The goal type is the last turnpoint's alone; it is what that
-            # turnpoint *is*, not something every turnpoint carries.
-            goal_type=goal_type if i == last else None,
             earth_model=task.earth_model,
         )
         for i, tp in enumerate(task.turnpoints)

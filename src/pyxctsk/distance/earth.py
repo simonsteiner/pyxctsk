@@ -62,6 +62,34 @@ def _is_fai_sphere(earth_model: EarthModelLike) -> bool:
     )
 
 
+def name_of(earth_model: EarthModelLike) -> str:
+    """Name an earth model for output, saying so when it is the default.
+
+    The report published this string, so it knew what the two earths are called
+    and that a missing value means WGS84 — knowledge belonging to the module
+    that owns the choice, not to the one rendering it. Raising on a value that
+    names no earth model comes with it: the report's ``model.value if model``
+    could not have been asked about a string.
+
+    Args:
+        earth_model: An ``EarthModel`` enum member, its string value, or None
+            for the WGS84 default.
+
+    Returns:
+        The model's name, or ``"WGS84 (default)"`` when none was declared.
+
+    Raises:
+        ValueError: If the value names no earth model this library knows.
+    """
+    if earth_model is None:
+        return f"{EarthModel.WGS84.value} (default)"
+    return (
+        EarthModel.FAI_SPHERE.value
+        if _is_fai_sphere(earth_model)
+        else (EarthModel.WGS84.value)
+    )
+
+
 def geod_for_earth_model(earth_model: EarthModelLike = None) -> Geod:
     """Return the geodesic engine for an earth model.
 

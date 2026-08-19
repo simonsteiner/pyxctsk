@@ -32,6 +32,7 @@ from .center_distance import (
     center_distance_readings,
     cumulative_center_m,
 )
+from .earth import name_of
 from .measured_task import MeasuredTask
 from .speed_section import SpeedSection
 
@@ -143,9 +144,18 @@ class DistanceReport:
 
     @property
     def earth_model(self) -> str:
-        """The earth model the distances were measured on, named for output."""
-        model = self.task.earth_model
-        return model.value if model else "WGS84 (default)"
+        """The earth model the distances were measured on, named for output.
+
+        Read off the *route*, which is where the legs were measured, rather
+        than off the task, which is only where the choice was declared. The two
+        agree for any measured task built by ``MeasuredTask.from_task``; when a
+        caller assembles one by hand they need not, and the report was then
+        naming a model its own numbers had not been computed on.
+
+        ``earth.name_of`` owns the two names and the "missing means WGS84"
+        rule, so this module does not have to know them.
+        """
+        return name_of(self.measured.route.earth_model)
 
     @property
     def task_distance_m(self) -> float:

@@ -16,7 +16,6 @@ name that covers one. The other three are now:
 
 from typing import Protocol, runtime_checkable
 
-from ..model.enums import GoalType
 from .earth import EarthModelLike, geodesic_distance, snap_to_boundary
 from .plane import LocalPlane
 from .solver import plane_optimal_point
@@ -38,13 +37,16 @@ class TurnpointGeometry(Protocol):
     while the protocol declared three attributes and its docstring said "only
     three things", so a fake that satisfied ``isinstance`` got a different
     distance for identical geometry, depending on an attribute the interface
-    denied having. ``goal_type`` has since gone the other way: it was declared
-    here because :func:`plane_circle` read it to collapse a LINE goal to a
-    zero-radius circle, but that rule belongs to — and is now applied only by —
-    ``task_to_turnpoints``, which is where the cylinders are built. A LINE goal
-    therefore arrives here already carrying ``radius=0``, and an interface
-    declaring a value nothing reads misleads a caller just as an interface
-    omitting one does.
+    denied having. ``goal_type`` went the other way and is now gone from the
+    concrete class too: it was declared because :func:`plane_circle` read it to
+    collapse a LINE goal to a zero-radius circle, but that rule belongs to —
+    and is applied only by — ``task_to_turnpoints``, which is where the
+    cylinders are built. A LINE goal arrives here already carrying
+    ``radius = 0``, which is the same fact losslessly, and is what
+    ``center_distance`` reads. An interface declaring a value nothing reads
+    misleads a caller just as an interface omitting one does; leaving the
+    attribute on ``TaskTurnpoint`` after removing it from the protocol left the
+    constructor taking four things where the interface declares three.
 
     Depending on this protocol instead of the concrete ``TaskTurnpoint`` lets
     the optimization core be exercised with lightweight fakes and lets new
@@ -95,7 +97,6 @@ class TaskTurnpoint:
         lat: float,
         lon: float,
         radius: float = 0,
-        goal_type: GoalType | None = None,
         earth_model: EarthModelLike = None,
     ):
         """Initialize a task turnpoint.
@@ -105,17 +106,11 @@ class TaskTurnpoint:
             lon (float): Longitude in degrees.
             radius (float): Cylinder radius in meters. A LINE goal is built
                 with 0 here — see ``task_to_turnpoints``, which owns that rule.
-            goal_type: Which goal this turnpoint is, for the last one of a
-                task; None for every other. A label recording where ``radius``
-                came from, not something the optimizer reads — it was a bare
-                ``str`` compared against ``"LINE"``, so a misspelling was
-                invisible to the type checker and silently meant "cylinder".
             earth_model: Earth model the turnpoint's task uses (``EarthModel``
                 member, its string value, or None for the WGS84 default).
         """
         self.center = (lat, lon)
         self.radius = radius
-        self.goal_type = goal_type
         self.earth_model = earth_model
 
     def optimal_point(
