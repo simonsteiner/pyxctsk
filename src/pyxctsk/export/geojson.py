@@ -12,6 +12,8 @@ All features include geometry and properties suitable for web map display, inclu
 Intended for use in web-based or desktop mapping tools to visualize XCTrack competition tasks.
 """
 
+from typing import Any
+
 from ..model.task import Task, Turnpoint
 from .common import (
     CONTROL_ZONE_EDGE_COLOR,
@@ -24,7 +26,7 @@ from .common import (
 
 def _create_turnpoint_feature(
     drawing: TaskDrawing, turnpoint: Turnpoint, index: int
-) -> dict:
+) -> dict[str, Any]:
     """Create a GeoJSON feature for a turnpoint.
 
     Args:
@@ -49,7 +51,11 @@ def _create_turnpoint_feature(
             "radius": turnpoint.radius,
             "description": drawing.description_of(turnpoint),
             "turnpoint_index": index,
-            "tp_type": drawing.role_of(turnpoint),
+            # ``.value``, not the member: every sibling accessor on the
+            # drawing returns a rendered primitive, and this is a JSON
+            # document. It worked only because ``TurnpointType`` subclasses
+            # ``str``, so the enum leaked into the output undetected.
+            "tp_type": drawing.role_of(turnpoint).value,
             "color": color,
             "fillColor": color,
             "fillOpacity": 0.1,
@@ -59,7 +65,7 @@ def _create_turnpoint_feature(
     }
 
 
-def _create_optimized_route_feature(drawing: TaskDrawing) -> dict | None:
+def _create_optimized_route_feature(drawing: TaskDrawing) -> dict[str, Any] | None:
     """Create a GeoJSON feature for the optimized route.
 
     Args:
@@ -95,7 +101,7 @@ def _create_optimized_route_feature(drawing: TaskDrawing) -> dict | None:
     }
 
 
-def _create_goal_line_features(drawing: TaskDrawing) -> list[dict]:
+def _create_goal_line_features(drawing: TaskDrawing) -> list[dict[str, Any]]:
     """Create goal line and control zone features for LINE type goals.
 
     Args:
@@ -110,7 +116,7 @@ def _create_goal_line_features(drawing: TaskDrawing) -> list[dict]:
 
     (lon1, lat1), (lon2, lat2), _ = goal_line.endpoints()
     goal_line_length = goal_line.length
-    features = []
+    features: list[dict[str, Any]] = []
 
     # Create goal line feature
     goal_line_feature = {
@@ -160,7 +166,7 @@ def _create_goal_line_features(drawing: TaskDrawing) -> list[dict]:
     return features
 
 
-def generate_task_geojson(task: Task) -> dict:
+def generate_task_geojson(task: Task) -> dict[str, Any]:
     """Generate GeoJSON data from pyxctsk task object.
 
     Args:
@@ -172,7 +178,7 @@ def generate_task_geojson(task: Task) -> dict:
     return drawing_to_geojson(TaskDrawing.from_task(task))
 
 
-def drawing_to_geojson(drawing: TaskDrawing) -> dict:
+def drawing_to_geojson(drawing: TaskDrawing) -> dict[str, Any]:
     """Generate GeoJSON from an already-derived task drawing.
 
     Use this to render one drawing in both formats without optimizing the route
@@ -184,7 +190,7 @@ def drawing_to_geojson(drawing: TaskDrawing) -> dict:
     Returns:
         A GeoJSON FeatureCollection.
     """
-    features = []
+    features: list[dict[str, Any]] = []
 
     # Create turnpoint features. The drawing has already dropped the last
     # turnpoint if a goal line replaces it.
