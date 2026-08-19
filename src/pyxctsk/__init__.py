@@ -68,7 +68,7 @@ from .model.task import (
     TurnpointType,
     Waypoint,
 )
-from .model.validation import ValidationIssue, ValidationRule
+from .model.validation import FULL_FORMAT_VERSION, ValidationIssue, ValidationRule
 from .parser import parse_task
 from .qrcode.image import generate_qrcode_image
 from .qrcode.task import QRCodeTask
@@ -76,7 +76,18 @@ from .qrcode.task import QRCodeTask
 # Constants
 EXTENSION = ".xctsk"
 MIME_TYPE = "application/xctsk"
-VERSION = 1
+
+#: The version the full JSON task format declares — an alias, not a fourth
+#: spelling. This was one of three independent literal ``1``s, beside
+#: ``model.validation.FULL_FORMAT_VERSION`` (what ``Task.validate()`` checks
+#: against) and ``qrcode.conversion.TASK_VERSION`` (what every converted task
+#: was stamped with), so the library could be made to write a version its own
+#: validator rejects by editing one of three files.
+#:
+#: Note this is the *format's* version and has nothing to do with
+#: :data:`__version__`, which is the library's. The QR format's counterpart is
+#: ``pyxctsk.qrcode.QR_CODE_TASK_VERSION``, which has always been declared once.
+VERSION = FULL_FORMAT_VERSION
 
 # Single source of truth: the version declared in pyproject.toml, read from the
 # installed package metadata.
@@ -129,6 +140,7 @@ __all__ = [
     "Turnpoint",
     "TurnpointType",
     "ValidationIssue",
+    "FULL_FORMAT_VERSION",
     "ValidationRule",
     "VERSION",
     "Waypoint",

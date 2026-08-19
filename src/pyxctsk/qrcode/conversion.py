@@ -42,7 +42,12 @@ from ..model.task import (
     TurnpointType,
     Waypoint,
 )
-from ..model.validation import TaskStructure, ValidationIssue, validate_structure
+from ..model.validation import (
+    FULL_FORMAT_VERSION,
+    TaskStructure,
+    ValidationIssue,
+    validate_structure,
+)
 from .enums import (
     QRCodeDirection,
     QRCodeEarthModel,
@@ -53,9 +58,6 @@ from .enums import (
 )
 from .models import QRCodeGoal, QRCodeSSS, QRCodeTakeoff, QRCodeTurnpoint
 from .task import QR_CODE_TASK_VERSION, QRCodeTask
-
-#: The task version the full JSON format carries.
-TASK_VERSION = 1
 
 #: What a carried unknown key may not occupy on the QR side. The QR task
 #: renders as either of its two shapes and keeps its unknown keys through
@@ -256,7 +258,7 @@ def qr_code_task_to_task(qr: QRCodeTask) -> Task:
 
     return Task(
         task_type=_FROM_QR_TASK_TYPE.get(qr.task_type, TaskType.CLASSIC),
-        version=TASK_VERSION,
+        version=FULL_FORMAT_VERSION,
         turnpoints=turnpoints,
         earth_model=_FROM_QR_EARTH_MODEL.get(qr.earth_model),
         takeoff=takeoff,

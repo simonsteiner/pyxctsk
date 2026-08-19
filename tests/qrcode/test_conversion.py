@@ -203,3 +203,18 @@ class TestValidatingWhatArrived:
         # The same task in the other format declares 1, and is equally valid.
         assert payload.to_task().version == 1
         assert payload.to_task().validate() == []
+
+    def test_the_full_formats_version_is_declared_once(self):
+        """The converter stamps the number the validator checks against.
+
+        There used to be three independent literal ``1``s: this module's
+        ``TASK_VERSION`` (stamped onto every converted task),
+        ``validation.FULL_FORMAT_VERSION`` (what ``Task.validate()`` checks),
+        and ``pyxctsk.VERSION``. Editing one of the three would have made the
+        library write a version its own validator rejects.
+        """
+        import pyxctsk
+        from pyxctsk.model.validation import FULL_FORMAT_VERSION
+
+        assert pyxctsk.VERSION is FULL_FORMAT_VERSION
+        assert self._payload(1, 2, 3).to_task().version == FULL_FORMAT_VERSION
