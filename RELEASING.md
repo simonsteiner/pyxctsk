@@ -40,9 +40,10 @@ fresh empty `## [Unreleased]` above it.
 ## Verifying a release
 
 Run `scripts/verify.sh` to execute the complete non-mutating gate: lockfile,
-lint, formatting, types, tests, spelling, artifact build, and a smoke test of
-the built wheel without the optional `qr` extra. Both release workflows run
-that gate on Python 3.11, 3.12, 3.13, and 3.14 before one publishing job runs.
+lint, formatting, types, spelling, artifact build, the full test suite from the
+built sdist, and a smoke test of the built wheel without the optional `qr`
+extra. Both release workflows run that gate on Python 3.11, 3.12, 3.13, and
+3.14 before one publishing job runs.
 
 - Check the [PyPI project page](https://pypi.org/project/pyxctsk/) and the
   [GitHub releases page](https://github.com/simonsteiner/pyxctsk/releases).

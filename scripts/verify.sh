@@ -16,7 +16,6 @@ uv sync --frozen --all-extras
 uv run ruff check src/ tests/ scripts/
 uv run ruff format --check src/ tests/ scripts/
 uv run mypy src/ tests/
-uv run pytest
 
 git ls-files -z '*.py' '*.md' '*.txt' '*.toml' '*.yml' '*.yaml' '*.json' '*.cfg' '*.ini' \
   | xargs -0 npx --yes cspell --no-progress --no-must-find-files --config cspell.json
@@ -28,6 +27,42 @@ if [ "${#wheel_paths[@]}" -ne 1 ] || [ ! -f "${wheel_paths[0]}" ]; then
   echo "Expected exactly one wheel in $verify_tmp_dir/dist." >&2
   exit 1
 fi
+
+sdist_paths=("$verify_tmp_dir/dist/"*.tar.gz)
+if [ "${#sdist_paths[@]}" -ne 1 ] || [ ! -f "${sdist_paths[0]}" ]; then
+  echo "Expected exactly one sdist in $verify_tmp_dir/dist." >&2
+  exit 1
+fi
+
+sdist_root="$(tar -tzf "${sdist_paths[0]}" | sed -n '1{s#/.*##;p;}')"
+if [ -z "$sdist_root" ]; then
+  echo "Could not identify the sdist root directory." >&2
+  exit 1
+fi
+
+git ls-files tests | sort -u > "$verify_tmp_dir/expected-tests.txt"
+tar -tzf "${sdist_paths[0]}" \
+  | sed "s#^$sdist_root/##" \
+  | sort -u > "$verify_tmp_dir/sdist-files.txt"
+comm -23 "$verify_tmp_dir/expected-tests.txt" "$verify_tmp_dir/sdist-files.txt" \
+  > "$verify_tmp_dir/missing-tests.txt"
+if [ -s "$verify_tmp_dir/missing-tests.txt" ]; then
+  echo "The sdist is missing tracked test files:" >&2
+  sed 's/^/  /' "$verify_tmp_dir/missing-tests.txt" >&2
+  exit 1
+fi
+
+mkdir "$verify_tmp_dir/source"
+tar -xzf "${sdist_paths[0]}" -C "$verify_tmp_dir/source"
+if [ ! -d "$verify_tmp_dir/source/$sdist_root" ]; then
+  echo "Expected sdist root $sdist_root was not extracted." >&2
+  exit 1
+fi
+(
+  cd "$verify_tmp_dir/source/$sdist_root"
+  uv sync --frozen --all-extras
+  uv run --frozen pytest
+)
 
 uv venv "$verify_tmp_dir/core-only"
 uv pip install --python "$verify_tmp_dir/core-only/bin/python" "${wheel_paths[0]}"
