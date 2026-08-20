@@ -14,11 +14,12 @@ Prerequisite: the `PYPI_API_TOKEN` secret must be set in the repository
 scripts/release.sh minor   # or: major | patch (default)
 ```
 
-The script runs on `main` with a clean tree. It verifies (ruff, mypy, pytest),
-bumps the version with `uv version`, refreshes `uv.lock`, updates the changelog,
-commits, and tags. It asks before pushing; pushing the tag triggers the
-**Publish** workflow, which re-runs the test gate, uploads to PyPI, and creates
-the GitHub Release.
+The script runs on `main` with a clean tree. It calls `scripts/verify.sh`, the
+same complete release gate used by both release workflows, then bumps the
+version with `uv version`, refreshes `uv.lock`, updates the changelog, commits,
+and tags. It asks before pushing; pushing the tag triggers the **Publish**
+workflow, which re-runs the gate, uploads to PyPI, and creates the GitHub
+Release.
 
 ## Option B — GitHub Actions
 
@@ -37,6 +38,10 @@ releases — the release tooling renames it to `## [vX.Y.Z] - <date>` and leaves
 fresh empty `## [Unreleased]` above it.
 
 ## Verifying a release
+
+Run `scripts/verify.sh` to execute the complete non-mutating gate: lockfile,
+lint, formatting, types, tests, spelling, artifact build, and a smoke test of
+the built wheel without the optional `qr` extra.
 
 - Check the [PyPI project page](https://pypi.org/project/pyxctsk/) and the
   [GitHub releases page](https://github.com/simonsteiner/pyxctsk/releases).
