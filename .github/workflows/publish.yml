@@ -13,22 +13,27 @@ permissions:
   contents: write
 
 jobs:
-  test:
+  verify:
+    name: Verify Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11', '3.12', '3.13', '3.14']
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install uv
+      - name: Install uv and Python
         uses: astral-sh/setup-uv@v5
         with:
-          python-version: '3.11'
+          python-version: ${{ matrix.python-version }}
 
       - name: Verify release inputs and artifacts
         run: scripts/verify.sh
 
   build-and-publish:
-    needs: test
+    needs: verify
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code

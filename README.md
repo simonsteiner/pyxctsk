@@ -229,7 +229,7 @@ See the CLI startup message (`pyxctsk --help` or running the CLI with no argumen
 
 ## Requirements
 
-- Python 3.11+
+- Python 3.11+ (release CI verifies 3.11 through 3.14)
 - Install `pyxctsk[qr]` for QR code images (PNG output and QR image input).
 - Development tooling lives in the `dev` dependency group and is installed by
   `uv sync`; `uv sync --all-extras` also installs QR image support.
