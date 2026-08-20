@@ -1,11 +1,9 @@
 """Unit tests for the Ding–Xie–Jiang alternating route optimizer.
 
-These tests exercise the planar GetOptPi primitive (crossing vs. reflection
-cases) and the alternating odd/even optimization core directly, plus the
-TurnpointGeometry seam that lets the optimizer run against lightweight fakes.
+These tests exercise the planar solver through its two entry points and the
+TurnpointGeometry seam that lets route orchestration use lightweight fakes.
 """
 
-import math
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -19,18 +17,7 @@ from pyxctsk.distance.earth import (
     geodesic_distance,
 )
 from pyxctsk.distance.plane import LocalPlane, ltm_scale_factor, task_area_center
-from pyxctsk.distance.route_optimization import (
-    _INITIAL_PLACEMENTS,
-    _boundary_toward,
-    _optimize_plane_points,
-    _place_at_centers,
-    _place_chained_backward,
-    _place_chained_forward,
-    _polyline_length,
-    _sweep_to_convergence,
-    calculate_iteratively_refined_route,
-)
-from pyxctsk.distance.solver import plane_optimal_point
+from pyxctsk.distance.route_optimization import calculate_iteratively_refined_route
 from pyxctsk.distance.turnpoint import (
     TaskTurnpoint,
     TurnpointGeometry,
@@ -104,136 +91,6 @@ def test_a_turnpoint_without_a_goal_type_is_enough_to_optimize():
 
     assert len(route.points) == 3
     assert route.total_m > 0
-
-
-class TestPlaneOptimalPoint:
-    """The planar GetOptPi primitive (Ding et al. Algorithm 1)."""
-
-    def test_zero_radius_returns_center(self):
-        """A zero-radius circle collapses to its center."""
-        assert plane_optimal_point((0, 0), (10, 0), (5.0, 5.0), 0.0) == (5.0, 5.0)
-
-    def test_crossing_both_outside(self):
-        """When the segment crosses the circle, the point adds no length."""
-        p = plane_optimal_point((-10.0, 0.0), (10.0, 0.0), (0.0, 0.0), 2.0)
-        # Entry intersection along the segment from prev.
-        assert p[0] == pytest.approx(-2.0, abs=1e-9)
-        assert p[1] == pytest.approx(0.0, abs=1e-9)
-
-    def test_crossing_prev_inside(self):
-        """With the previous point inside, the point is the segment-circle intersection."""
-        p = plane_optimal_point((1.0, 0.0), (10.0, 0.0), (0.0, 0.0), 5.0)
-        assert p == (pytest.approx(5.0), pytest.approx(0.0, abs=1e-9))
-
-    def test_crossing_next_inside(self):
-        """With the next point inside, the point is the segment-circle intersection."""
-        p = plane_optimal_point((10.0, 0.0), (1.0, 0.0), (0.0, 0.0), 5.0)
-        assert p == (pytest.approx(5.0), pytest.approx(0.0, abs=1e-9))
-
-    def test_reflection_both_outside(self):
-        """A symmetric no-crossing setup yields the reflection (bisector) point."""
-        p = plane_optimal_point((-10.0, 10.0), (10.0, 10.0), (0.0, 0.0), 2.0)
-        # By symmetry the optimal boundary point is straight "up" toward the pair.
-        assert p[0] == pytest.approx(0.0, abs=1e-6)
-        assert p[1] == pytest.approx(2.0, abs=1e-6)
-
-    def test_reflection_both_inside(self):
-        """Both neighbours inside (concentric case): the point stays on the boundary.
-
-        This is the mandatory "out and back" of touching semantics — the same
-        behaviour XCTrack exhibits for concentric turnpoints of different radii.
-        """
-        p = plane_optimal_point((0.5, 0.0), (0.25, 0.0), (0.0, 0.0), 5.0)
-        assert math.hypot(*p) == pytest.approx(5.0, abs=1e-9)
-        # By symmetry about the x-axis the optimum lies on it.
-        assert p[0] == pytest.approx(5.0, abs=1e-6)
-
-    def test_optimum_is_boundary_minimum(self):
-        """The returned point must beat every sampled boundary point."""
-        prev, nxt, center, radius = (-7.0, 3.0), (9.0, 6.0), (1.0, -2.0), 4.0
-
-        def total(point):
-            return math.hypot(point[0] - prev[0], point[1] - prev[1]) + math.hypot(
-                point[0] - nxt[0], point[1] - nxt[1]
-            )
-
-        best = plane_optimal_point(prev, nxt, center, radius)
-        for k in range(720):
-            theta = math.pi * k / 360.0
-            sample = (
-                center[0] + radius * math.cos(theta),
-                center[1] + radius * math.sin(theta),
-            )
-            assert total(best) <= total(sample) + 1e-6
-
-
-class TestBoundaryToward:
-    """The nearest-boundary rule, used both to place points and to finish."""
-
-    def test_outside(self):
-        """From outside, the nearest boundary point lies on the inbound radial."""
-        assert _boundary_toward((0.0, 0.0, 3.0), (10.0, 0.0)) == (
-            pytest.approx(3.0),
-            pytest.approx(0.0),
-        )
-
-    def test_inside(self):
-        """From inside, the point moves radially out to the boundary."""
-        p = _boundary_toward((0.0, 0.0, 3.0), (1.0, 0.0))
-        assert p == (pytest.approx(3.0), pytest.approx(0.0))
-
-    def test_zero_radius(self):
-        """A zero-radius circle collapses to its center."""
-        assert _boundary_toward((5.0, 5.0, 0.0), (10.0, 0.0)) == (5.0, 5.0)
-
-    def test_a_target_at_the_center_has_no_direction(self):
-        """The one input with no answer: any boundary point is as near.
-
-        Pinned because the two copies of this function that used to exist both
-        chose +x, and a caller relying on it would not have noticed if one
-        had changed.
-        """
-        assert _boundary_toward((0.0, 0.0, 3.0), (0.0, 0.0)) == (3.0, 0.0)
-
-
-class TestAlternatingOptimizer:
-    """The odd/even alternating sweep core (Ding et al. Algorithm 2)."""
-
-    def test_collinear_circles_converge_to_straight_line(self):
-        """Circles on a line: the optimal path is the straight segment."""
-        circles = [
-            (0.0, 0.0, 0.0),
-            (10_000.0, 0.0, 1_000.0),
-            (20_000.0, 0.0, 2_000.0),
-            (30_000.0, 0.0, 0.0),
-        ]
-        points = _optimize_plane_points(circles, max_sweeps=100)
-        # Middle circles are crossed by the straight line, so the total path
-        # equals the end-to-end distance minus the final radius... here the
-        # last circle has zero radius, so it is exactly the full 30 km.
-        assert _polyline_length(points) == pytest.approx(30_000.0, abs=0.1)
-        for point, circle in zip(points[1:-1], circles[1:-1]):
-            assert point[1] == pytest.approx(0.0, abs=1e-6)
-            assert abs(point[0] - circle[0]) == pytest.approx(circle[2], abs=1e-6)
-
-    def test_convergence_stops_below_epsilon(self):
-        """More sweeps than needed must not change the result beyond epsilon."""
-        circles = [
-            (0.0, 0.0, 0.0),
-            (10_000.0, 5_000.0, 3_000.0),
-            (20_000.0, -4_000.0, 2_000.0),
-            (35_000.0, 2_000.0, 4_000.0),
-            (45_000.0, 0.0, 400.0),
-        ]
-        short = _polyline_length(_optimize_plane_points(circles, max_sweeps=50))
-        long = _polyline_length(_optimize_plane_points(circles, max_sweeps=500))
-        assert abs(short - long) <= 0.1
-
-    def test_start_point_stays_fixed(self):
-        """The route must start at the first circle's center (takeoff center)."""
-        circles = [(0.0, 0.0, 5_000.0), (20_000.0, 0.0, 1_000.0)]
-        points = _optimize_plane_points(circles, max_sweeps=10)
-        assert points[0] == (0.0, 0.0)
 
 
 def test_route_through_fake_turnpoints():
@@ -364,94 +221,6 @@ class TestTaskAreaCenter:
     def test_wide_but_not_wrapping_span_uses_the_plain_box(self):
         """A gap under 180° leaves the box unwrapped."""
         assert task_area_center([(0.0, -80.0), (0.0, 40.0)]) == (0.0, -20.0)
-
-
-class TestInitialPlacements:
-    """The starting configurations the alternating sweep is run from."""
-
-    CIRCLES = [
-        (0.0, 0.0, 0.0),
-        (10_000.0, 3_000.0, 2_000.0),
-        (20_000.0, -4_000.0, 5_000.0),
-        (30_000.0, 0.0, 400.0),
-    ]
-
-    @pytest.mark.parametrize("place", _INITIAL_PLACEMENTS, ids=lambda f: f.__name__)
-    def test_one_point_per_circle(self, place):
-        """Every placement must seed the sweep with a full route."""
-        assert len(place(self.CIRCLES)) == len(self.CIRCLES)
-
-    @pytest.mark.parametrize("place", _INITIAL_PLACEMENTS, ids=lambda f: f.__name__)
-    def test_the_start_point_is_the_takeoff_centre(self, place):
-        """Index 0 is the launch point, never a boundary point."""
-        assert place(self.CIRCLES)[0] == (0.0, 0.0)
-
-    def _on_boundary(self, point, circle):
-        """Planar distance from the circle's centre, for boundary assertions."""
-        cx, cy, radius = circle
-        return math.hypot(point[0] - cx, point[1] - cy) == pytest.approx(radius)
-
-    def test_forward_chain_lands_every_later_point_on_its_boundary(self):
-        """Chaining from the launch puts each point where the answer lives.
-
-        The centres never can be an answer for a non-zero radius, which is why
-        seeding there alone left the sweep in the wrong basin.
-        """
-        points = _place_chained_forward(self.CIRCLES)
-
-        for point, circle in zip(points[1:], self.CIRCLES[1:]):
-            assert self._on_boundary(point, circle)
-
-    def test_backward_chain_seeds_from_the_last_centre(self):
-        """It has to start somewhere: the final circle's centre is that seed.
-
-        Every point it then derives — walking back toward the launch — is on a
-        boundary; only the seed itself is not.
-        """
-        points = _place_chained_backward(self.CIRCLES)
-
-        assert points[-1] == (self.CIRCLES[-1][0], self.CIRCLES[-1][1])
-        for point, circle in zip(points[1:-1], self.CIRCLES[1:-1]):
-            assert self._on_boundary(point, circle)
-
-    def test_centres_placement_is_the_centres(self):
-        """The original starting configuration, kept as one of the three."""
-        assert _place_at_centers(self.CIRCLES) == [(c[0], c[1]) for c in self.CIRCLES]
-
-    def test_a_zero_radius_circle_collapses_in_every_placement(self):
-        """A LINE goal has one possible point wherever it is seeded from."""
-        circles = [(0.0, 0.0, 0.0), (10_000.0, 0.0, 1_000.0), (20_000.0, 0.0, 0.0)]
-        for place in _INITIAL_PLACEMENTS:
-            assert place(circles)[2] == (20_000.0, 0.0)
-
-
-class TestMultiStart:
-    """S7F-04: one start finds *a* local optimum, not the shortest path."""
-
-    #: Two big cylinders either side of the direct line, which is what gives
-    #: the sweep more than one basin to fall into.
-    CIRCLES = [
-        (0.0, 0.0, 0.0),
-        (20_000.0, 18_000.0, 17_000.0),
-        (40_000.0, -18_000.0, 17_000.0),
-        (60_000.0, 0.0, 400.0),
-    ]
-
-    def test_the_result_is_the_shortest_of_the_placements(self):
-        """Whatever the sweep is seeded with, the shortest survives."""
-        shipped = _polyline_length(_optimize_plane_points(self.CIRCLES, max_sweeps=100))
-
-        for place in _INITIAL_PLACEMENTS:
-            single = _sweep_to_convergence(
-                list(self.CIRCLES), place(self.CIRCLES), 100, 0.1
-            )
-            assert shipped <= _polyline_length(single) + 1e-9
-
-    def test_placements_are_deterministic_and_ordered(self):
-        """The same task must always produce the same route."""
-        first = _optimize_plane_points(self.CIRCLES, max_sweeps=100)
-
-        assert _optimize_plane_points(self.CIRCLES, max_sweeps=100) == first
 
 
 class TestThePlaneCarriesItsEarthModel:
