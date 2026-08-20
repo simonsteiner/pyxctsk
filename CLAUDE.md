@@ -11,9 +11,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 This project uses [uv](https://docs.astral.sh/uv/). Run tools through `uv run` (which keeps the env in sync) rather than activating the venv or calling bare `python`. `requires-python` is `>=3.11` (raised from 3.10 because `scipy>=1.16` requires it). `.python-version` pins 3.11 for local dev.
 
 ```bash
-# One-time dev setup: creates .venv and installs the package (editable) plus the
-# `dev` dependency group and the `qr` + `web` + `analysis` extras.
+# One-time dev setup: creates .venv and installs the package (editable), the
+# `dev` dependency group, and the optional `qr` image-support extra.
 uv sync --all-extras
+
+# Add runtime dependencies for repository-only utilities under scripts/.
+uv sync --all-extras --group tools
 
 # Tests
 uv run pytest                                # full suite

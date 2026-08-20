@@ -23,7 +23,7 @@ Usage examples:
     python extract_qr_from_html.py downloaded_tasks/html/*.html -v
 
 Prerequisites:
-    pip install opencv-python zxing-cpp cairosvg
+    uv sync --group tools
 """
 
 import argparse
@@ -39,7 +39,7 @@ try:
     from cairosvg import svg2png
 except ImportError as e:
     print(f"Required package not installed: {e}")
-    print("Please install with: pip install opencv-python zxing-cpp cairosvg")
+    print("Please install with: uv sync --group tools")
     exit(1)
 
 
