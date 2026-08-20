@@ -12,7 +12,6 @@ at a tighter tolerance. The one reference check kept below runs through
 """
 
 import statistics
-from typing import List
 from unittest.mock import patch
 
 import pytest
@@ -42,6 +41,14 @@ WITH_REFERENCE = tasks_with_reference_distance()
 #: itself: what is under test here is the wiring above it.
 TOLERANCE = 0.02
 
+#: Synthetic route with enough cylinder radius for optimization to matter.
+TEST_TURNPOINTS = [
+    TaskTurnpoint(47.0, 8.0, 1000),
+    TaskTurnpoint(47.1, 8.0, 5000),
+    TaskTurnpoint(47.2, 8.1, 3000),
+    TaskTurnpoint(47.25, 8.2, 1000),
+]
+
 
 class TestDistanceComprehensive:
     """Comprehensive test suite for distance calculation algorithms.
@@ -50,16 +57,6 @@ class TestDistanceComprehensive:
     and edge cases using both reference tasks with known results and synthetic
     test data for controlled validation scenarios.
     """
-
-    @pytest.fixture(scope="class")
-    def test_turnpoints(self) -> List[TaskTurnpoint]:
-        """Create synthetic test turnpoints for unit tests with significant optimization potential."""
-        return [
-            TaskTurnpoint(47.0, 8.0, 1000),  # Takeoff - 1km radius
-            TaskTurnpoint(47.1, 8.0, 5000),  # Large radius target - 5km radius
-            TaskTurnpoint(47.2, 8.1, 3000),  # Medium radius target - 3km radius
-            TaskTurnpoint(47.25, 8.2, 1000),  # Goal - 1km radius
-        ]
 
     @pytest.mark.parametrize("reference", WITH_REFERENCE, ids=str)
     def test_center_distance_matches_reference(self, reference):
@@ -110,15 +107,15 @@ class TestDistanceComprehensive:
 
         assert statistics.mean(differences) < TOLERANCE / 2
 
-    def test_algorithm_core_functionality(self, test_turnpoints: List[TaskTurnpoint]):
+    def test_algorithm_core_functionality(self):
         """Test core algorithm functionality with synthetic data.
 
         Validates fundamental algorithm behavior, edge cases, and consistency
         using controlled synthetic turnpoint data.
         """
         # Test basic optimization effectiveness
-        center_dist = distance_through_centers(test_turnpoints)
-        opt_dist = optimized_distance(test_turnpoints)
+        center_dist = distance_through_centers(TEST_TURNPOINTS)
+        opt_dist = optimized_distance(TEST_TURNPOINTS)
 
         assert center_dist > 0, "Center distance should be positive"
         assert opt_dist > 0, "Optimized distance should be positive"
@@ -195,10 +192,10 @@ class TestDistanceComprehensive:
             "Zero radius should have minimal optimization difference"
         )
 
-    def test_optimization_is_deterministic(self, test_turnpoints: List[TaskTurnpoint]):
+    def test_optimization_is_deterministic(self):
         """Repeated runs must produce identical, converged results."""
-        center_dist = distance_through_centers(test_turnpoints)
-        results = [optimized_distance(test_turnpoints) for _ in range(3)]
+        center_dist = distance_through_centers(TEST_TURNPOINTS)
+        results = [optimized_distance(TEST_TURNPOINTS) for _ in range(3)]
 
         assert all(r == results[0] for r in results), "Optimization must be stable"
         assert results[0] < center_dist, "Optimization should reduce distance"
