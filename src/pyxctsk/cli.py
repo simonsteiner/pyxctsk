@@ -27,43 +27,60 @@ from .metadata import pyxctsk_version
 from .parser import parse_task
 from .renderer import OUTPUT_FORMATS, render_task
 
+_MAIN_HELP = """pyxctsk: Convert task files between formats.
 
-@click.group()
+\b
+Examples:
+  pyxctsk convert task.xctsk --format json
+  pyxctsk convert task.xctsk --format kml -o task.kml
+  pyxctsk convert --format png < task.xctsk > task.png
+  pyxctsk convert task.xctsk --format qrcode-json -z
+  pyxctsk convert task.xctsk --strict
+  pyxctsk distances task.xctsk --format text
+
+\b
+Formats:
+  Input:  .xctsk files, XCTSK:/XCTSKZ: URLs, QR code images (PNG)
+  Output: JSON, GeoJSON, KML, QR codes (PNG or XCTSK:/XCTSKZ: URL)
+
+See README for more examples and details.
+"""
+
+_CONVERT_HELP = """Convert an XCTrack task between supported formats.
+
+The input may be a task file, an XCTSK:/XCTSKZ: string, a QR image, or stdin.
+Parsing is lenient by default; --strict rejects structural spec violations.
+
+\b
+Examples:
+  pyxctsk convert task.xctsk --format json
+  pyxctsk convert task.xctsk --format geojson -o task.geojson
+  pyxctsk convert task.xctsk --format qrcode-json -z
+  pyxctsk convert --format png < task.xctsk > task.png
+"""
+
+_DISTANCES_HELP = """Report a task's FAI S7F distances and optimized route.
+
+The JSON form is the machine-readable reference surface for comparing another
+implementation. The text form includes the same values for a human reader.
+
+\b
+Examples:
+  pyxctsk distances task.xctsk
+  pyxctsk distances task.xctsk --format text
+  pyxctsk distances task.xctsk -o distances.json
+  pyxctsk distances < task.xctsk
+"""
+
+
+@click.group(help=_MAIN_HELP)
 @click.version_option(
     version=pyxctsk_version(),
     prog_name="pyxctsk",
     message="%(prog)s %(version)s",
 )
 def main() -> None:
-    r"""pyxctsk: Convert task files between formats.
-
-    \b
-    Parameter Options:
-      --format [json|kml|png|qrcode-json]  Output format (default: json)
-      --output, -o FILE                    Output file (default: stdout)
-      --compressed, -z                     Emit XCTSKZ: instead of XCTSK:
-      --strict                             Reject a structurally invalid task
-      --version                            Print the version and exit
-      INPUT_FILE                           Input file (optional, uses stdin)
-
-    \b
-    Examples:
-      pyxctsk convert task.xctsk --format json
-      pyxctsk convert task.xctsk --format kml -o task.kml
-      pyxctsk convert --format png < task.xctsk > task.png
-      pyxctsk convert task.xctsk --format qrcode-json
-      pyxctsk convert task.xctsk --format qrcode-json -z
-      pyxctsk convert task.xctsk --strict
-      pyxctsk distances task.xctsk
-      pyxctsk distances task.xctsk --format text
-
-    \b
-    Formats:
-      Input:  .xctsk files, XCTSK:/XCTSKZ: URLs, QR code images (PNG)
-      Output: JSON, KML, QR codes (PNG or XCTSK:/XCTSKZ: URL)
-
-    See README for more examples and details.
-    """
+    """Register the pyxctsk command group."""
 
 
 def _read_input(input_file: BinaryIO | None) -> bytes:
@@ -123,7 +140,7 @@ def _write_output(output_file: str | None, payload: str | bytes) -> None:
         click.echo(payload)
 
 
-@main.command()
+@main.command(help=_CONVERT_HELP)
 @click.argument("input_file", type=click.File("rb"), required=False)
 @click.option(
     "--format",
@@ -189,7 +206,7 @@ def convert(
         sys.exit(1)
 
 
-@main.command()
+@main.command(help=_DISTANCES_HELP)
 @click.argument("input_file", type=click.File("rb"), required=False)
 @click.option(
     "--format",
@@ -217,20 +234,13 @@ def distances(
     output_file: str | None,
     strict: bool,
 ) -> None:
-    r"""Report a task's FAI S7F distances, with the route that produced them.
+    """Report a task's FAI S7F distances, with the route that produced them.
 
     pyxctsk aims to be a reference implementation of the S7F distance
     calculations, so this is the command another implementation should diff
     against. It reports §7.2's two distances, the task-board "distance through
     centres" that S7F does *not* define — with every reading of it — and the
     optimized crossing point for each turnpoint.
-
-    \b
-    Examples:
-      pyxctsk distances task.xctsk
-      pyxctsk distances task.xctsk --format text
-      pyxctsk distances task.xctsk -o distances.json
-      pyxctsk distances < task.xctsk
 
     Args:
         input_file (file or None): Input file object opened in binary mode, or
