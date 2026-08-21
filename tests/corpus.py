@@ -8,7 +8,7 @@ which together describe one task in three representations.
 The pairing rule used to be re-implemented per consumer: the accuracy tests
 globbed and sorted, ``test_task_distances`` globbed unsorted into a
 differently-shaped dict, ``test_codec`` paired two directories inline twice, and
-``test_spec_conformance`` parametrized over the QR strings alone. Four
+the former monolithic conformance test parametrized over QR strings alone. Four
 discoveries, two sort orders, and nothing that could notice the corpus was not
 in step with itself — which it was not: ``qrcode_string/task_dami.txt`` was a
 byte-identical copy of ``task_dami_route.txt`` under a stem no task had, and

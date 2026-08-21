@@ -36,11 +36,7 @@ fi
 git pull --ff-only origin main
 
 # --- Verify ------------------------------------------------------------------
-uv sync --all-extras
-uv run ruff check src/ tests/ scripts/
-uv run ruff format --check src/ tests/ scripts/
-uv run mypy --config-file mypy.ini src/
-uv run pytest
+scripts/verify.sh
 
 # --- Bump version ------------------------------------------------------------
 uv version --bump "$BUMP"

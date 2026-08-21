@@ -1,17 +1,26 @@
-"""The planar GetOptPi primitive from Ding, Xie & Jiang.
+"""Pure planar route optimization from Ding, Xie & Jiang.
 
 "An Efficient Algorithm for Touring n Circles" (MATEC Web of Conferences 232,
-03027, EITCE 2018), Algorithm 1: the optimal point on a circle between two
-fixed neighbours, distinguishing the *crossing* case — the segment between the
-neighbours meets the circle — from the *reflection* (point-circle-point) case.
+03027, EITCE 2018). This module owns both Algorithm 1's optimal point on one
+circle and Algorithm 2's alternating route optimization through many circles.
 
 Pure planar geometry. It knows nothing about turnpoints, tasks or the earth:
-the caller projects into a plane, calls this, and projects back. That is why
-it is its own module rather than part of ``turnpoint.py``, where it used to sit
-beside three other subjects.
+the caller projects circles into a plane, calls :func:`optimize_plane_route`,
+and projects the result back. The route-level function is the module seam; its
+placement and sweep machinery stays private.
 """
 
 import math
+from collections.abc import Sequence
+
+#: The convergence threshold fixed by FAI Sporting Code S7F §7.1.3.
+CONVERGENCE_EPSILON_M = 0.1
+
+#: A planar circle represented as (x, y, radius), all in the same units.
+PlaneCircle = tuple[float, float, float]
+
+#: Consecutive circles within this tolerance are treated as identical.
+_SAME_CIRCLE_TOLERANCE_M = 1e-6
 
 
 def _segment_circle_intersections(
@@ -153,3 +162,157 @@ def plane_optimal_point(
 
     # Reflection case (also the numerically-degenerate tangent fallback).
     return _plane_pcp_point(prev_point, next_point, center, radius)
+
+
+def _same_circle(a: PlaneCircle, b: PlaneCircle) -> bool:
+    """Return True if two planar circles are the same circle."""
+    return (
+        math.hypot(a[0] - b[0], a[1] - b[1]) <= _SAME_CIRCLE_TOLERANCE_M
+        and abs(a[2] - b[2]) <= _SAME_CIRCLE_TOLERANCE_M
+    )
+
+
+def _collapse_duplicate_circles(
+    circles: Sequence[PlaneCircle],
+) -> tuple[list[PlaneCircle], list[int]]:
+    """Collapse consecutive identical circles while retaining input indexes."""
+    unique: list[PlaneCircle] = [circles[0]]
+    index_of: list[int] = [0]
+    for i, circle in enumerate(circles[1:], start=1):
+        # Index 1 is never collapsed into index 0: the route starts at the
+        # takeoff center, so touching its boundary remains a real leg.
+        if not (i > 1 and _same_circle(unique[-1], circle)):
+            unique.append(circle)
+        index_of.append(len(unique) - 1)
+    return unique, index_of
+
+
+def _polyline_length(points: Sequence[tuple[float, float]]) -> float:
+    """Return the total planar length of a polyline."""
+    return sum(
+        math.hypot(points[i + 1][0] - points[i][0], points[i + 1][1] - points[i][1])
+        for i in range(len(points) - 1)
+    )
+
+
+def _boundary_toward(
+    circle: PlaneCircle, target: tuple[float, float]
+) -> tuple[float, float]:
+    """Return the point of ``circle`` nearest ``target``."""
+    cx, cy, radius = circle
+    if radius <= 0.0:
+        return (cx, cy)
+    dx, dy = target[0] - cx, target[1] - cy
+    distance = math.hypot(dx, dy)
+    if distance == 0.0:
+        return (cx + radius, cy)
+    return (cx + radius * dx / distance, cy + radius * dy / distance)
+
+
+def _place_at_centers(circles: Sequence[PlaneCircle]) -> list[tuple[float, float]]:
+    """Start every point at its circle's center."""
+    return [(circle[0], circle[1]) for circle in circles]
+
+
+def _place_chained_forward(
+    circles: Sequence[PlaneCircle],
+) -> list[tuple[float, float]]:
+    """Start each point at the boundary nearest its predecessor."""
+    points = [(circles[0][0], circles[0][1])]
+    for circle in circles[1:]:
+        points.append(_boundary_toward(circle, points[-1]))
+    return points
+
+
+def _place_chained_backward(
+    circles: Sequence[PlaneCircle],
+) -> list[tuple[float, float]]:
+    """Start each point at the boundary nearest its successor."""
+    points: list[tuple[float, float]] = [(0.0, 0.0)] * len(circles)
+    points[-1] = (circles[-1][0], circles[-1][1])
+    for i in range(len(circles) - 2, -1, -1):
+        points[i] = _boundary_toward(circles[i], points[i + 1])
+    points[0] = (circles[0][0], circles[0][1])
+    return points
+
+
+#: Deterministic starting configurations; the shortest settled route wins.
+_INITIAL_PLACEMENTS = (
+    _place_at_centers,
+    _place_chained_forward,
+    _place_chained_backward,
+)
+
+
+def _sweep_to_convergence(
+    circles: Sequence[PlaneCircle],
+    points: list[tuple[float, float]],
+    max_sweeps: int,
+    epsilon: float,
+) -> list[tuple[float, float]]:
+    """Alternate odd/even updates until the route length settles."""
+    n = len(circles)
+    previous_length = _polyline_length(points)
+    for _ in range(max_sweeps):
+        for parity in (1, 0):
+            for i in range(1, n):
+                if i % 2 != parity:
+                    continue
+                cx, cy, radius = circles[i]
+                if i == n - 1:
+                    points[i] = _boundary_toward(circles[i], points[i - 1])
+                else:
+                    points[i] = plane_optimal_point(
+                        points[i - 1], points[i + 1], (cx, cy), radius
+                    )
+        current_length = _polyline_length(points)
+        if abs(previous_length - current_length) < epsilon:
+            break
+        previous_length = current_length
+    return points
+
+
+def optimize_plane_route(
+    circles: Sequence[PlaneCircle],
+    max_sweeps: int,
+    epsilon: float = CONVERGENCE_EPSILON_M,
+) -> list[tuple[float, float]]:
+    """Find the shortest planar route touching each circle in order.
+
+    The first point is fixed at the first circle's center. Later points touch
+    their circle boundaries. Three deterministic placements seed alternating
+    odd/even sweeps, and the shortest converged route wins. Consecutive
+    duplicate circles share one optimized point, except that the first
+    boundary touch is never collapsed into the takeoff center.
+
+    Args:
+        circles: Planar circles as (x, y, radius), in route order.
+        max_sweeps: Maximum alternating sweeps for each initial placement.
+        epsilon: Route-length convergence threshold in plane units.
+
+    Returns:
+        Optimized (x, y) route points, one per input circle.
+    """
+    if not circles:
+        return []
+
+    unique_circles, index_of = _collapse_duplicate_circles(circles)
+    if len(unique_circles) < 2:
+        centers = _place_at_centers(unique_circles)
+        return [centers[index] for index in index_of]
+
+    best: list[tuple[float, float]] | None = None
+    best_length = math.inf
+    for place in _INITIAL_PLACEMENTS:
+        points = _sweep_to_convergence(
+            unique_circles,
+            place(unique_circles),
+            max_sweeps,
+            epsilon,
+        )
+        length = _polyline_length(points)
+        if length < best_length:
+            best, best_length = points, length
+
+    assert best is not None  # _INITIAL_PLACEMENTS is never empty
+    return [best[index] for index in index_of]

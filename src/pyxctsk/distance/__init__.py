@@ -20,8 +20,8 @@ own. Everything a caller outside the package needs is named here —
   sphere) and geodesic distance upon them
 - :mod:`~pyxctsk.distance.plane` — ``LocalPlane``, the Transverse Mercator
   projection a route is solved in, and where §7.1.6 centres it
-- :mod:`~pyxctsk.distance.solver` — the planar GetOptPi primitive, which knows
-  nothing about turnpoints or the earth
+- :mod:`~pyxctsk.distance.solver` — the complete planar route solver behind
+  ``optimize_plane_route``; it knows nothing about turnpoints or the earth
 - :mod:`~pyxctsk.distance.route_optimization` — the shortest path through the
   cylinders
 - :mod:`~pyxctsk.distance.measured_task` — ``MeasuredTask``, a task beside the

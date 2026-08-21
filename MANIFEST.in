@@ -1,0 +1,2 @@
+include .python-version uv.lock
+recursive-include tests *.py *.json *.txt *.xctsk *.jpg *.png *.md

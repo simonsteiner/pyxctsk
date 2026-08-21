@@ -4,6 +4,18 @@ Python automation scripts for extracting, converting, and managing paragliding/h
 
 The scripts support workflows for extracting QR codes from HTML exports, parsing task metadata and turnpoints, and automating upload/download operations with the XContest web service. Designed for technical users working with large sets of competition tasks based on the XCTSK and XContest formats.
 
+## Setup
+
+These are repository utilities and are not included in the published
+`pyxctsk` wheel. From the repository root, install their dependencies with:
+
+```bash
+uv sync --group tools
+```
+
+Run commands through `uv run`, for example
+`uv run python scripts/extract_task_data.py`.
+
 ## Common Workflows
 
 1. **Upload and Download**: Use `xcontest_xctsk_tool.py process` to upload XCTSK files and download HTML pages

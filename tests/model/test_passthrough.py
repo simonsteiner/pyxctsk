@@ -3,7 +3,7 @@
 These three functions are the only implementation of the passthrough rules that
 every serializable shape relies on, so the rules are pinned here rather than
 re-tested once per shape. The model-level round-trips live in
-``test_spec_conformance.py`` and ``test_elevated_goal_fixtures.py``.
+``test_extension_conformance.py`` and ``test_elevated_goal_fixtures.py``.
 """
 
 import pytest
