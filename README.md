@@ -111,9 +111,12 @@ This project uses [uv](https://docs.astral.sh/uv/) for dependency management.
 git clone https://github.com/simonsteiner/pyxctsk.git
 cd pyxctsk
 
-# Create the virtual environment and install the project (editable) with the
-# dev dependency group plus the web and analysis extras.
+# Create the virtual environment and install the project (editable), the dev
+# dependency group, and the optional QR image support.
 uv sync --all-extras
+
+# Also install dependencies for the repository-only utilities under scripts/.
+uv sync --all-extras --group tools
 
 # Run tests
 uv run pytest
@@ -226,13 +229,12 @@ See the CLI startup message (`pyxctsk --help` or running the CLI with no argumen
 
 ## Requirements
 
-- Python 3.11+
-- Optional dependencies can be installed with extras:
-  - `pip install pyxctsk[qr]` for QR code images (PNG output, QR image input)
-  - `pip install pyxctsk[web]` for web interface components
-  - `pip install pyxctsk[analysis]` for analysis tools
-- Development tooling lives in the `dev` dependency group and is installed
-  automatically by `uv sync` (or `uv sync --all-extras` to include the extras).
+- Python 3.11+ (release CI verifies 3.11 through 3.14)
+- Install `pyxctsk[qr]` for QR code images (PNG output and QR image input).
+- Development tooling lives in the `dev` dependency group and is installed by
+  `uv sync`; `uv sync --all-extras` also installs QR image support.
+- Utilities under `scripts/` are source-checkout tools, not part of the
+  published package. Install their dependencies with `uv sync --group tools`.
 
 ## License
 

@@ -120,7 +120,7 @@ published values are XCTrack's displayed figures, rounded to 0.1 km, so every ro
 
 **Where pyxctsk is lower, we can prove the published number is not the optimum.** Every
 point of a pyxctsk route sits on its cylinder boundary, in order — that is asserted for
-all 22 tasks in `tests/conformance/test_spec_conformance.py::
+all 22 tasks in `tests/conformance/test_s7f_conformance.py::
 TestRouteOptimizerConformance::test_every_route_point_touches_its_cylinder`. A shorter
 route that touches every control zone in order is, by §7.2, the task distance. On `pepi`,
 `nubu` and `lorili` the published figure is 0.7–0.9 km above a demonstrably feasible path.

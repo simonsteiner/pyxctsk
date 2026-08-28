@@ -36,23 +36,10 @@ Task Viewer is a standalone Flask application for displaying and comparing XCTra
 
 ## Setup
 
-- Create and activate a virtual environment:
+- From the repository root, install the source-only utility dependencies:
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate  # Use .venv/bin/activate.fish for fish shell
-# Or activate a .venv from another location:
-source /path/to/your/.venv/bin/activate
-
-source /home/simon/git/pyxctsk/.venv/bin/activate
-source /Users/simon/DEV/git/pyxctsk/.venv/bin/activate
-```
-
-- Install required dependencies:
-
-```bash
-pip install flask
-# And any other dependencies listed in pyproject.toml
+uv sync --group tools
 ```
 
 ## Usage
@@ -62,8 +49,7 @@ pip install flask
 To start the task viewer application:
 
 ```bash
-cd scripts/task_viewer
-python app.py
+uv run python scripts/task_viewer/app.py
 ```
 
 This will start a development server on <http://localhost:5001>.

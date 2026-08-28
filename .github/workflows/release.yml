@@ -1,9 +1,9 @@
 name: Release 🚀
 
 # Manually triggered from the GitHub UI (Actions → Release → Run workflow).
-# Runs the test gate, bumps the version, updates the CHANGELOG, commits, tags,
-# pushes, and publishes to PyPI — all in one job, so it builds from the bumped
-# working tree.
+# Runs the test gate on every supported Python, then bumps the version, updates
+# the CHANGELOG, commits, tags, pushes, and publishes to PyPI. The release job
+# builds once from the bumped working tree after the matrix succeeds.
 
 on:
   workflow_dispatch:
@@ -21,7 +21,27 @@ permissions:
   contents: write
 
 jobs:
+  verify:
+    name: Verify Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11', '3.12', '3.13', '3.14']
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Verify release inputs and artifacts
+        run: scripts/verify.sh
+
   release:
+    needs: verify
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -33,20 +53,6 @@ jobs:
         uses: astral-sh/setup-uv@v5
         with:
           python-version: '3.11'
-
-      - name: Verify (lint, types, tests)
-        run: |
-          uv sync --all-extras
-          uv run ruff check src/ tests/ scripts/
-          uv run ruff format --check src/ tests/ scripts/
-          uv run mypy src/ tests/
-          uv run pytest
-
-      - name: Verify the core install needs no `qr` extra
-        run: |
-          uv venv /tmp/core-only
-          VIRTUAL_ENV=/tmp/core-only uv pip install .
-          /tmp/core-only/bin/python scripts/check_core_without_qr.py
 
       - name: Bump version
         id: bump

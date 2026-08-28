@@ -123,13 +123,28 @@ class TestCLIConvert:
         assert "error" in result.output.lower()
 
     def test_cli_main_command(self):
-        """Test the main CLI command shows help."""
+        """The main help preserves examples as separate readable lines."""
         runner = CliRunner()
         result = runner.invoke(main, ["--help"])
 
         assert result.exit_code == 0
         assert "pyxctsk" in result.output
         assert "convert" in result.output
+        assert r"\b" not in result.output
+        assert "  pyxctsk convert task.xctsk --format json\n" in result.output
+        assert "  pyxctsk distances task.xctsk --format text\n" in result.output
+
+    @pytest.mark.parametrize("command", ["convert", "distances"])
+    def test_command_help_does_not_leak_implementation_docs(self, command):
+        """Click help is a user interface, not the callback's Python docs."""
+        result = CliRunner().invoke(main, [command, "--help"])
+
+        assert result.exit_code == 0
+        assert r"\b" not in result.output
+        assert "Args:" not in result.output
+        assert "Returns:" not in result.output
+        assert "Raises:" not in result.output
+        assert f"  pyxctsk {command}" in result.output
 
 
 class TestStrictValidation:

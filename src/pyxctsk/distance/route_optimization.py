@@ -39,14 +39,14 @@ number; anything else — the points, the legs, a cumulative distance — is a f
 or method on the route rather than another function here.
 """
 
-import math
 from collections.abc import Sequence
 from dataclasses import dataclass
 from itertools import accumulate
 
 from .earth import EarthModelLike, geod_for_earth_model
 from .plane import LocalPlane
-from .solver import plane_optimal_point
+from .solver import CONVERGENCE_EPSILON_M as CONVERGENCE_EPSILON_M
+from .solver import optimize_plane_route
 from .turnpoint import TurnpointGeometry, plane_circle, point_on_boundary
 
 #: How many alternating sweeps to allow before giving up. A safety bound, not
@@ -54,27 +54,6 @@ from .turnpoint import TurnpointGeometry, plane_circle, point_on_boundary
 #: genuinely tunable number here: it is what ``num_iterations`` defaults to on
 #: :func:`calculate_iteratively_refined_route` and :func:`optimized_distance`.
 DEFAULT_NUM_ITERATIONS = 100
-
-#: The convergence threshold the spec fixes: iteration stops once a full sweep
-#: changes the total path length by less than this (FAI Sporting Code S7F
-#: §7.1.3: ε = 0.1 m).
-#:
-#: **Not a tuning knob.** ADR 0004 settled that "precision is governed by the
-#: spec's ε = 0.1 m, not by a sampling knob", which is why no public entry
-#: point forwards it. It is named rather than inlined because the citation is
-#: the payload — the same reason ``model/rounding.py`` exists. It lived in a
-#: module called ``config.py`` beside the tunable above, which said
-#: *configuration* about a value the spec settles.
-CONVERGENCE_EPSILON_M = 0.1
-
-#: A planar circle: (x, y, radius) in the local Transverse Mercator plane.
-PlaneCircle = tuple[float, float, float]
-
-#: Two circles closer than this in both center and radius are the same circle.
-#: Identical turnpoints project through the same transformer to bit-identical
-#: coordinates, so this only guards against float noise, not real geometry —
-#: concentric cylinders of *different* radii stay distinct (see ADR 0002).
-_SAME_CIRCLE_TOLERANCE_M = 1e-6
 
 
 @dataclass(frozen=True)
@@ -123,235 +102,6 @@ class OptimizedRoute:
         return list(accumulate(self.legs, initial=0.0))
 
 
-def _same_circle(a: PlaneCircle, b: PlaneCircle) -> bool:
-    """Return True if two planar circles are the same circle."""
-    return (
-        math.hypot(a[0] - b[0], a[1] - b[1]) <= _SAME_CIRCLE_TOLERANCE_M
-        and abs(a[2] - b[2]) <= _SAME_CIRCLE_TOLERANCE_M
-    )
-
-
-def _collapse_duplicate_circles(
-    circles: Sequence[PlaneCircle],
-) -> tuple[list[PlaneCircle], list[int]]:
-    """Collapse runs of consecutive identical circles into one.
-
-    Touching a circle and then touching the same circle again is satisfied by
-    a single touch, so duplicated turnpoints must contribute a zero-length
-    leg. Optimizing them as separate points instead creates a spurious local
-    minimum: once two route points on one circle coincide, moving either adds
-    length to the leg between them exactly as fast as it saves on the
-    neighbouring leg, so the alternating sweep freezes wherever it happens to
-    be rather than at the true optimum. Collapsing first removes the
-    degeneracy; the duplicate points are restored afterwards.
-
-    Index 0 is never collapsed: the route starts at the takeoff *center*, not
-    on its boundary, so a turnpoint repeating the takeoff circle is a real
-    center-to-boundary leg.
-
-    Concentric circles of *different* radii are left alone — their
-    out-and-back leg is required (ADR 0002).
-
-    Args:
-        circles: Planar circles (x, y, radius) in turnpoint order.
-
-    Returns:
-        Tuple of (deduplicated circles, index into that list for each input
-        circle).
-    """
-    unique: list[PlaneCircle] = [circles[0]]
-    index_of: list[int] = [0]
-    for i, circle in enumerate(circles[1:], start=1):
-        # ``i > 1``: index 1 is never collapsed into index 0, per the takeoff
-        # rule above. Every later circle may merge into its predecessor.
-        collapsible = i > 1 and _same_circle(unique[-1], circle)
-        if not collapsible:
-            unique.append(circle)
-        index_of.append(len(unique) - 1)
-    return unique, index_of
-
-
-def _polyline_length(points: Sequence[tuple[float, float]]) -> float:
-    """Total planar length of a polyline given as (x, y) points."""
-    return sum(
-        math.hypot(points[i + 1][0] - points[i][0], points[i + 1][1] - points[i][1])
-        for i in range(len(points) - 1)
-    )
-
-
-def _boundary_toward(
-    circle: PlaneCircle, target: tuple[float, float]
-) -> tuple[float, float]:
-    """Return the point of ``circle`` nearest ``target``, in the plane.
-
-    Two callers, one computation. The initial placements use it to start each
-    point on the boundary facing its neighbour; :func:`_sweep_to_convergence`
-    uses it for the *final* circle, which has no successor, so the shortest way
-    to touch it from the previous route point is the radially nearest boundary
-    point — whether that point lies inside the circle or outside it.
-
-    It was written twice, once per caller, under two names and with two
-    spellings of the same local; the copies were bit-identical over 5000
-    randomized circles and points.
-
-    Args:
-        circle: (x, y, radius) in the local plane.
-        target: (x, y) to face.
-
-    Returns:
-        (x, y) on the boundary, or the center for a zero-radius circle. A
-        target *at* the center has no direction, so the point due +x is used.
-    """
-    cx, cy, radius = circle
-    if radius <= 0.0:
-        return (cx, cy)
-    dx, dy = target[0] - cx, target[1] - cy
-    distance = math.hypot(dx, dy)
-    if distance == 0.0:
-        return (cx + radius, cy)
-    return (cx + radius * dx / distance, cy + radius * dy / distance)
-
-
-def _place_at_centers(circles: Sequence[PlaneCircle]) -> list[tuple[float, float]]:
-    """Start every point at its circle's center."""
-    return [(c[0], c[1]) for c in circles]
-
-
-def _place_chained_forward(
-    circles: Sequence[PlaneCircle],
-) -> list[tuple[float, float]]:
-    """Start each point at the boundary nearest its predecessor."""
-    points = [(circles[0][0], circles[0][1])]
-    for circle in circles[1:]:
-        points.append(_boundary_toward(circle, points[-1]))
-    return points
-
-
-def _place_chained_backward(
-    circles: Sequence[PlaneCircle],
-) -> list[tuple[float, float]]:
-    """Start each point at the boundary nearest its successor."""
-    points: list[tuple[float, float]] = [(0.0, 0.0)] * len(circles)
-    points[-1] = (circles[-1][0], circles[-1][1])
-    for i in range(len(circles) - 2, -1, -1):
-        points[i] = _boundary_toward(circles[i], points[i + 1])
-    points[0] = (circles[0][0], circles[0][1])
-    return points
-
-
-#: The starting configurations every optimization is run from, shortest wins.
-#:
-#: The alternating method converges to a *local* optimum — Ding et al. say so —
-#: and which one depends entirely on where the points start. Starting at the
-#: circle centers alone left ``task_bevo`` 98.6 m above a route that touches
-#: every one of its cylinders just as legitimately, so a single start does not
-#: deliver the shortest path §7 asks for. The two chained placements are what
-#: reach it: they begin on the boundaries, where the answer lives, rather than
-#: at the centers, where it never does.
-#:
-#: Deterministic and ordered, so the same task always yields the same route.
-#: Adding a placement costs one planar sweep and cannot make the result longer.
-_INITIAL_PLACEMENTS = (
-    _place_at_centers,
-    _place_chained_forward,
-    _place_chained_backward,
-)
-
-
-def _sweep_to_convergence(
-    circles: Sequence[PlaneCircle],
-    points: list[tuple[float, float]],
-    max_sweeps: int,
-    epsilon: float,
-) -> list[tuple[float, float]]:
-    """Alternate odd/even sweeps from ``points`` until the length settles.
-
-    Each sweep first updates all odd-indexed points (even ones fixed), then
-    all even-indexed points (odd ones fixed); every update places the point
-    with the exact GetOptPi solution between its two neighbours. The start
-    point (index 0, the takeoff center) stays fixed; the final point, having
-    no successor, is the boundary point nearest its predecessor.
-
-    Args:
-        circles: Planar circles (x, y, radius), already deduplicated.
-        points: One starting point per circle; mutated in place.
-        max_sweeps: Upper bound on alternating sweeps.
-        epsilon: Convergence threshold on total length change, in meters.
-
-    Returns:
-        The settled points — the same list that was passed in.
-    """
-    n = len(circles)
-    previous_length = _polyline_length(points)
-    for _ in range(max_sweeps):
-        for parity in (1, 0):
-            for i in range(1, n):
-                if i % 2 != parity:
-                    continue
-                cx, cy, radius = circles[i]
-                if i == n - 1:
-                    points[i] = _boundary_toward(circles[i], points[i - 1])
-                else:
-                    points[i] = plane_optimal_point(
-                        points[i - 1], points[i + 1], (cx, cy), radius
-                    )
-        current_length = _polyline_length(points)
-        if abs(previous_length - current_length) < epsilon:
-            break
-        previous_length = current_length
-    return points
-
-
-def _optimize_plane_points(
-    circles: Sequence[PlaneCircle],
-    max_sweeps: int,
-    epsilon: float = CONVERGENCE_EPSILON_M,
-) -> list[tuple[float, float]]:
-    """Run the Ding–Xie–Jiang alternating optimization in the plane.
-
-    One route point is kept per circle. The sweep runs once from each of
-    :data:`_INITIAL_PLACEMENTS` and the shortest result wins, because the
-    method finds a local optimum and the starting configuration decides which
-    one. Sweeps stop once the total path length changes by less than
-    ``epsilon``.
-
-    The winner is chosen on *planar* length, which is where the choice belongs:
-    §7.1.3's PathFinder selects a path in Cartesian space and §7.1.8 only then
-    measures it on the ellipsoid. Picking here also means the snapping and the
-    geodesic legs are paid for once rather than once per placement.
-
-    Consecutive identical circles are optimized as one point and duplicated
-    back afterwards (see :func:`_collapse_duplicate_circles`), so the returned
-    list always has one point per input circle.
-
-    Args:
-        circles: Planar circles (x, y, radius) in turnpoint order.
-        max_sweeps: Upper bound on alternating sweeps, per placement.
-        epsilon: Convergence threshold on total length change, in meters.
-
-    Returns:
-        The optimized (x, y) route points, one per input circle.
-    """
-    if not circles:
-        return []
-
-    circles, index_of = _collapse_duplicate_circles(circles)
-
-    if len(circles) < 2:
-        return [_place_at_centers(circles)[j] for j in index_of]
-
-    best: list[tuple[float, float]] | None = None
-    best_length = math.inf
-    for place in _INITIAL_PLACEMENTS:
-        points = _sweep_to_convergence(circles, place(circles), max_sweeps, epsilon)
-        length = _polyline_length(points)
-        if length < best_length:
-            best, best_length = points, length
-
-    assert best is not None  # _INITIAL_PLACEMENTS is never empty
-    return [best[j] for j in index_of]
-
-
 def _corrected_path(
     turnpoints: Sequence[TurnpointGeometry],
     plane: LocalPlane,
@@ -374,7 +124,7 @@ def _corrected_path(
         One (lat, lon) per turnpoint, each on its cylinder boundary.
     """
     circles = [plane_circle(tp, plane) for tp in turnpoints]
-    plane_points = _optimize_plane_points(circles, max_sweeps=max_sweeps)
+    plane_points = optimize_plane_route(circles, max_sweeps=max_sweeps)
 
     path: list[tuple[float, float]] = []
     for i, (xy, (_, _, radius), tp) in enumerate(
