@@ -28,7 +28,7 @@ except ImportError as e:
 
 # Check for zxing-cpp
 try:
-    import zxingcpp
+    import zxingcpp  # noqa: F401  (availability probe)
 
     zxing_ok = True
     print("✅ zxing-cpp imported successfully")
@@ -39,11 +39,11 @@ except ImportError as e:
 # Verify decoding actually works end to end
 if pillow_ok and zxing_ok:
     try:
-        import qrcode
+        from pyxctsk.qrcode.image import generate_qrcode_image, read_qrcode_image
 
-        img = qrcode.make("XCTSK:check").convert("L")
-        results = zxingcpp.read_barcodes(img, formats=zxingcpp.BarcodeFormat.QRCode)
-        decode_ok = any(r.text == "XCTSK:check" for r in results)
+        decode_ok = "XCTSK:check" in read_qrcode_image(
+            generate_qrcode_image("XCTSK:check")
+        )
         if decode_ok:
             print("✅ QR encode/decode roundtrip succeeded")
         else:

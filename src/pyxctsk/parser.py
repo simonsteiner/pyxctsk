@@ -39,7 +39,6 @@ Functions:
 
 import json
 from dataclasses import dataclass
-from io import BytesIO
 from typing import Any, Callable
 
 from .exceptions import (
@@ -47,9 +46,11 @@ from .exceptions import (
     EmptyInputError,
     InvalidFormatError,
     MalformedPayloadError,
+    MissingQRCodeSupportError,
     TaskValidationError,
 )
 from .model.task import TASK_SHAPE, Task
+from .qrcode.image import read_qrcode_image
 from .qrcode.task import (
     QR_CODE_SCHEME,
     QR_CODE_SCHEME_COMPRESSED,
@@ -61,18 +62,6 @@ from .qrcode.task import (
 # Both QR schemes the spec defines. XCTSKZ: is checked first because XCTSK: is
 # not a prefix of it, but keeping them ordered makes the intent obvious.
 _QR_SCHEMES = (QR_CODE_SCHEME_COMPRESSED, QR_CODE_SCHEME)
-
-# Optional QR code dependencies
-try:
-    import zxingcpp
-    from PIL import Image
-
-    QR_CODE_SUPPORT = True
-except ImportError:
-    Image = None  # type: ignore
-    zxingcpp = None  # type: ignore
-    QR_CODE_SUPPORT = False
-
 
 # File extensions that mark a string as a path to read rather than inline data.
 _FILE_EXTENSIONS = (".xctsk", ".json", ".png", ".jpg", ".jpeg")
@@ -317,36 +306,46 @@ def _is_qrcode_image(inp: Input) -> bool:
 def _read_qrcode_image(inp: Input) -> Arrived:
     """Read an image carrying an ``XCTSK:`` QR code.
 
+    Decoding is :func:`~pyxctsk.qrcode.image.read_qrcode_image`'s; reading the
+    text it finds is the URL adapter's. This adapter only chooses the code, so
+    a code that *is* an ``XCTSK:`` payload but a malformed one reports why,
+    exactly as the same string passed inline does. It used to be skipped, and
+    the image reported as carrying no code at all.
+
     Raises:
         InvalidFormatError: If QR image support is not installed, if the image
-            cannot be opened, or if it carries no XCTSK code. Each of these
-            used to be the same "invalid format", so a missing install was
-            indistinguishable from a corrupt file.
+            cannot be opened, if it carries no XCTSK code, or if the code it
+            carries cannot be read. Each of these used to be the same "invalid
+            format", so a missing install was indistinguishable from a corrupt
+            file.
     """
-    if not QR_CODE_SUPPORT:
+    try:
+        texts = read_qrcode_image(inp.raw)
+    except MissingQRCodeSupportError as exc:
         raise InvalidFormatError(
             "looks like an image, but QR image support is not installed "
             f"(pip install '{QR_EXTRA_INSTALL}')"
-        )
-    try:
-        image = Image.open(BytesIO(inp.raw))  # type: ignore
-        qr_codes = zxingcpp.read_barcodes(  # type: ignore
-            image,
-            formats=zxingcpp.BarcodeFormat.QRCode,  # type: ignore
-        )
-    except Exception as exc:
+        ) from exc
+    except MalformedPayloadError as exc:
         raise InvalidFormatError(
             f"looks like an image, but it could not be read: {exc}"
         ) from exc
 
-    for qr_code in qr_codes:
-        payload = qr_code.text
-        if payload.startswith(_QR_SCHEMES):
-            try:
-                return QRCodeTask.from_string(payload)
-            except MalformedPayloadError:
-                continue
-    raise InvalidFormatError("looks like an image, but it carries no XCTSK: QR code")
+    payloads = [Input.of(text) for text in texts if text.startswith(_QR_SCHEMES)]
+    if not payloads:
+        raise InvalidFormatError(
+            "looks like an image, but it carries no XCTSK: QR code"
+        )
+    # Several codes in one image: the first that reads wins, and if none does
+    # the first one's reason is the one reported.
+    first_error: InvalidFormatError | None = None
+    for payload in payloads:
+        try:
+            return _read_xctsk_url(payload)
+        except InvalidFormatError as exc:
+            first_error = first_error or exc
+    assert first_error is not None
+    raise first_error
 
 
 #: Ordered list of format adapters. At most one recognizes any given input, so

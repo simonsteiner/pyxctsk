@@ -11,8 +11,8 @@ import pytest
 from pyxctsk import (
     InvalidFormatError,
     parse_task,
-    parser,
 )
+from pyxctsk.qrcode import image
 
 
 class TestUnrecognizedInputSaysWhy:
@@ -69,7 +69,7 @@ class TestUnrecognizedInputSaysWhy:
         """The failure that most needed telling apart, and could not be."""
         png = tmp_path / "task.png"
         png.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 64)
-        monkeypatch.setattr(parser, "QR_CODE_SUPPORT", False)
+        monkeypatch.setattr(image, "QR_CODE_SUPPORT", False)
 
         with pytest.raises(InvalidFormatError, match=r"pyxctsk\[qr\]"):
             parse_task(str(png))

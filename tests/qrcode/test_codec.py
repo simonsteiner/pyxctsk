@@ -21,6 +21,8 @@ import pytest
 
 from pyxctsk import (
     EarthModel,
+    InvalidFormatError,
+    MalformedPayloadError,
     Task,
     TaskType,
     Turnpoint,
@@ -29,7 +31,7 @@ from pyxctsk import (
     parse_task,
 )
 from pyxctsk.qrcode.enums import QRCodeTaskType, QRCodeTurnpointType
-from pyxctsk.qrcode.image import generate_qrcode_image
+from pyxctsk.qrcode.image import generate_qrcode_image, read_qrcode_image
 from pyxctsk.qrcode.models import QRCodeTurnpoint
 from pyxctsk.qrcode.task import QRCodeTask
 from tests.corpus import reference_tasks
@@ -573,6 +575,38 @@ class TestQRSupportProbe:
         assert isinstance(QR_CODE_SUPPORT, bool)
 
 
+@pytest.mark.skipif(not QR_CODE_SUPPORT, reason="QR code dependencies not available")
+class TestReadingAnImage:
+    """The decoder beside the encoder, and the parser adapter composed on it."""
+
+    def test_what_is_written_reads_back(self):
+        """Encode and decode are one module's two directions."""
+        written = generate_qrcode_image("XCTSK:hello", size=256)
+        buffer = BytesIO()
+        written.save(buffer, format="PNG")
+
+        assert read_qrcode_image(buffer.getvalue()) == ["XCTSK:hello"]
+        assert read_qrcode_image(written) == ["XCTSK:hello"]
+
+    def test_bytes_that_are_not_an_image_are_malformed(self):
+        """Pillow's many failure types become the library's one."""
+        with pytest.raises(MalformedPayloadError, match="not a readable image"):
+            read_qrcode_image(b"\x89PNG\r\n\x1a\n" + b"\x00" * 64)
+
+    def test_a_malformed_payload_in_an_image_says_why(self):
+        """The same reason the string reports inline, not "no QR code".
+
+        The image adapter used to skip a code whose payload failed to parse,
+        and then report that the image carried no ``XCTSK:`` code at all.
+        """
+        bad = 'XCTSK:{"taskType":"CLASSIC","version":2,"t":[1]}'
+        buffer = BytesIO()
+        generate_qrcode_image(bad, size=512).save(buffer, format="PNG")
+
+        with pytest.raises(InvalidFormatError, match=r"t\[0\]: expected an object"):
+            parse_task(buffer.getvalue())
+
+
 class TestWithoutTheOptionalDependencies:
     """The documented behaviour when Pillow and zxing-cpp are absent.
 
@@ -600,10 +634,10 @@ class TestWithoutTheOptionalDependencies:
         which made a missing install indistinguishable from a corrupt file; it
         names the missing dependency now.
         """
-        from pyxctsk import parser
         from pyxctsk.exceptions import InvalidFormatError
+        from pyxctsk.qrcode import image
 
-        monkeypatch.setattr(parser, "QR_CODE_SUPPORT", False)
+        monkeypatch.setattr(image, "QR_CODE_SUPPORT", False)
 
         # Matched on the extra rather than the prose: naming the wrong extra
         # is the failure this message has actually had.
@@ -612,9 +646,9 @@ class TestWithoutTheOptionalDependencies:
 
     def test_the_text_formats_still_work(self, monkeypatch):
         """Everything but image decoding is unaffected by the extras."""
-        from pyxctsk import parser
+        from pyxctsk.qrcode import image
 
-        monkeypatch.setattr(parser, "QR_CODE_SUPPORT", False)
+        monkeypatch.setattr(image, "QR_CODE_SUPPORT", False)
         qr_string = QRCodeTask(version=2).to_string()
 
         assert parse_task(qr_string).version == 1

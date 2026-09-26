@@ -20,6 +20,7 @@ from pyxctsk import Task, TaskType, Turnpoint, TurnpointType, parse_task
 from pyxctsk.distance import calculate_iteratively_refined_route, optimized_distance
 from pyxctsk.distance.earth import geodesic_distance
 from pyxctsk.distance.measured_task import MeasuredTask, task_to_turnpoints
+from pyxctsk.qrcode import image
 from tests.builders import task as build_task
 from tests.builders import turnpoint as build_turnpoint
 from tests.paths import ESS_GOAL_DIR
@@ -186,14 +187,10 @@ def test_qr_payload_round_trips(name):
 @pytest.mark.parametrize("name", DUPLICATE_GOAL_TASKS)
 def test_png_and_text_payloads_agree(name):
     """The decoded .txt must stay in step with the .png it came from."""
-    zxingcpp = pytest.importorskip("zxingcpp")
-    pytest.importorskip("PIL")
-    from PIL import Image
+    if not image.QR_CODE_SUPPORT:
+        pytest.skip("QR image support is not installed")
 
-    codes = zxingcpp.read_barcodes(
-        Image.open(FIXTURES / f"{name}_qr_code.png"),
-        formats=zxingcpp.BarcodeFormat.QRCode,
-    )
+    codes = image.read_qrcode_image((FIXTURES / f"{name}_qr_code.png").read_bytes())
 
     assert codes, "QR code could not be decoded"
-    assert codes[0].text == (FIXTURES / f"{name}_qr_code.txt").read_text().strip()
+    assert codes[0] == (FIXTURES / f"{name}_qr_code.txt").read_text().strip()
