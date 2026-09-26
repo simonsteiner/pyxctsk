@@ -10,6 +10,7 @@ import pytest
 
 from pyxctsk import (
     Direction,
+    MalformedPayloadError,
     SSSType,
     Task,
     parse_task,
@@ -307,7 +308,7 @@ class TestTurnpointCoordinatesAreNeverInvented:
 
     def test_missing_z_raises(self):
         """No coordinates at all is malformed input."""
-        with pytest.raises(KeyError):
+        with pytest.raises(MalformedPayloadError, match="^z: required key"):
             self._from_dict({"n": "TP"})
 
     @pytest.mark.parametrize("count", [0, 1, 2, 5])

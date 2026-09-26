@@ -12,10 +12,17 @@ was also a valid input to it, and only the adapters' order kept the two apart.
 """
 
 import json
+import re
 
 import pytest
 
-from pyxctsk import InvalidFormatError, parse_task
+from pyxctsk import (
+    InvalidFormatError,
+    MalformedPayloadError,
+    QRCodeTask,
+    Task,
+    parse_task,
+)
 from pyxctsk.parser import (
     FORMAT_ADAPTERS,
     FULL_FORMAT_ONLY_KEYS,
@@ -154,6 +161,59 @@ class TestARecognizedPayloadThatCannotBeReadSaysSo:
         """These left the library as a bare ``TypeError``, past the CLI."""
         with pytest.raises(InvalidFormatError):
             parse_task(payload)
+
+
+class TestAMalformedPayloadIsOneError:
+    """Every one of these left ``parse_task`` as a bare built-in exception."""
+
+    @pytest.mark.parametrize(
+        "payload, where",
+        [
+            ("XCTSK:[]", "expected an object, got an array"),
+            ('XCTSK:"x"', "expected an object, got a string"),
+            (
+                'XCTSK:{"taskType":"CLASSIC","version":2,"t":[1]}',
+                "t[0]: expected an object",
+            ),
+            (
+                '{"taskType":"CLASSIC","version":1,"turnpoints":[],"goal":5}',
+                "goal: expected an object",
+            ),
+            (
+                '{"taskType":"CLASSIC","version":1,"turnpoints":[],'
+                '"sss":{"type":"RACE","direction":"ENTER","timeGates":"12:00:00Z"}}',
+                "sss.timeGates: expected an array",
+            ),
+            (
+                '{"taskType":"CLASSIC","version":1,'
+                '"turnpoints":[{"radius":400,"waypoint":[]}]}',
+                "turnpoints[0].waypoint: expected an object",
+            ),
+        ],
+        ids=["qr-array", "qr-string", "qr-turnpoint", "goal", "time-gates", "waypoint"],
+    )
+    def test_it_is_a_format_error_naming_where(self, payload, where):
+        """A format error with the path, rather than a traceback."""
+        with pytest.raises(InvalidFormatError, match=re.escape(where)) as caught:
+            parse_task(payload)
+
+        assert isinstance(caught.value.__cause__, MalformedPayloadError)
+
+    @pytest.mark.parametrize(
+        "read",
+        [
+            lambda: Task.from_json("not json"),
+            lambda: Task.from_dict([]),  # type: ignore[arg-type]
+            lambda: QRCodeTask.from_json("[]"),
+            lambda: QRCodeTask.from_string("XCTSKZ:!!"),
+            lambda: QRCodeTask.from_string("nope"),
+        ],
+        ids=["task-not-json", "task-array", "qr-array", "qr-bad-zlib", "qr-no-scheme"],
+    )
+    def test_the_public_constructors_raise_it_too(self, read):
+        """Not only through the parser: the constructors are the front door too."""
+        with pytest.raises(MalformedPayloadError):
+            read()
 
 
 class TestInputIsDecodedOnce:

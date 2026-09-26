@@ -46,6 +46,7 @@ from .exceptions import (
     QR_EXTRA_INSTALL,
     EmptyInputError,
     InvalidFormatError,
+    MalformedPayloadError,
     TaskValidationError,
 )
 from .model.task import TASK_SHAPE, Task
@@ -75,19 +76,6 @@ except ImportError:
 
 # File extensions that mark a string as a path to read rather than inline data.
 _FILE_EXTENSIONS = (".xctsk", ".json", ".png", ".jpg", ".jpeg")
-
-# JSON decoding failures share these exception types across every adapter.
-# ``TypeError`` is here because a JSON *array* or scalar reaches the shapes as
-# something that does not answer ``.get``: ``parse_task("[]")`` used to leave
-# the library as a bare ``TypeError``, past the CLI's error handling and into
-# the user's terminal as a traceback.
-_PARSE_ERRORS = (
-    json.JSONDecodeError,
-    ValueError,
-    KeyError,
-    TypeError,
-    UnicodeDecodeError,
-)
 
 #: What an adapter hands back: the payload as it arrived, in whichever format
 #: it arrived in. Both members answer ``validate()`` for themselves, and the
@@ -268,7 +256,7 @@ def _read_xctsk_url(inp: Input) -> Arrived:
     assert url is not None  # recognizes() said so
     try:
         return QRCodeTask.from_string(url)
-    except _PARSE_ERRORS as exc:
+    except MalformedPayloadError as exc:
         scheme = url.split(":", 1)[0]
         raise InvalidFormatError(
             f"recognized {scheme}: URL but its payload could not be parsed: {exc}"
@@ -290,7 +278,7 @@ def _read_task_json(inp: Input) -> Arrived:
     assert document is not None  # recognizes() said so
     try:
         return Task.from_dict(document)
-    except _PARSE_ERRORS as exc:
+    except MalformedPayloadError as exc:
         raise InvalidFormatError(
             f"recognized the task JSON format but could not read it: {exc}"
         ) from exc
@@ -311,7 +299,7 @@ def _read_qrcode_json(inp: Input) -> Arrived:
     assert document is not None  # recognizes() said so
     try:
         return QRCodeTask.from_dict(document)
-    except _PARSE_ERRORS as exc:
+    except MalformedPayloadError as exc:
         raise InvalidFormatError(
             f"recognized the QR JSON format but could not read it: {exc}"
         ) from exc
@@ -356,7 +344,7 @@ def _read_qrcode_image(inp: Input) -> Arrived:
         if payload.startswith(_QR_SCHEMES):
             try:
                 return QRCodeTask.from_string(payload)
-            except _PARSE_ERRORS:
+            except MalformedPayloadError:
                 continue
     raise InvalidFormatError("looks like an image, but it carries no XCTSK: QR code")
 

@@ -93,6 +93,47 @@ class TooFewTurnpointsError(pyXCTSKError, ValueError):
     """
 
 
+class MalformedPayloadError(pyXCTSKError, ValueError):
+    """Raised when a payload is JSON of the wrong shape for the format.
+
+    The one error reading a task raises, from either format, whatever went
+    wrong inside it. The field tables used to trust wire types: a list where
+    an object belongs reached ``.get`` and escaped as ``AttributeError``, a
+    string where a list belongs was read one character at a time, and the
+    parser kept a tuple of whichever built-in types had leaked out so far.
+    Now the table checks, and every failure carries where it happened.
+
+    Attributes:
+        reason: What was wrong, without the location.
+        path: Where, as keys and indices from the payload's root — e.g.
+            ``turnpoints[0].waypoint`` — or empty for the root itself.
+    """
+
+    def __init__(self, reason: str, path: str = ""):
+        """Initialize with a reason and the path it applies to."""
+        self.reason = reason
+        self.path = path
+        super().__init__(f"{path}: {reason}" if path else reason)
+
+    def inside(self, segment: str) -> "MalformedPayloadError":
+        """The same error, seen from one level further out.
+
+        Args:
+            segment: The key, or ``[i]`` index, holding the value this error
+                is about.
+
+        Returns:
+            A new error whose path starts with ``segment``.
+        """
+        if not self.path:
+            path = segment
+        elif self.path.startswith("["):
+            path = segment + self.path
+        else:
+            path = f"{segment}.{self.path}"
+        return MalformedPayloadError(self.reason, path)
+
+
 class MismatchedRouteError(pyXCTSKError, ValueError):
     """Raised when a route is paired with a task it was not flown for.
 

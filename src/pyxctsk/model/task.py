@@ -45,6 +45,7 @@ from .shape import (
     Value,
     enum_codec,
     list_codec,
+    load_json,
     shape_codec,
 )
 from .time_of_day import TimeOfDay
@@ -477,6 +478,9 @@ class Task:
 
         Returns:
             Task: Parsed Task object.
+
+        Raises:
+            MalformedPayloadError: If the dictionary is not a task.
         """
         return TASK_SHAPE.read(data)
 
@@ -497,9 +501,11 @@ class Task:
 
         Returns:
             Task: Parsed Task object.
+
+        Raises:
+            MalformedPayloadError: If the string is not JSON, or not a task.
         """
-        data = json.loads(json_str)
-        return cls.from_dict(data)
+        return cls.from_dict(load_json(json_str))
 
     def to_qr_code_task(self) -> "QRCodeTask":
         """Convert to QR code task format.

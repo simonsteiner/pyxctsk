@@ -32,6 +32,7 @@ import zlib
 from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Any, ClassVar, Mapping, MutableMapping
 
+from ..exceptions import MalformedPayloadError
 from ..model.passthrough import QR_EXTENSIONS_KEY
 from ..model.shape import (
     DEFAULTED,
@@ -43,6 +44,8 @@ from ..model.shape import (
     Shape,
     Value,
     list_codec,
+    load_json,
+    require_object,
     shape_codec,
 )
 from .enums import (
@@ -98,17 +101,22 @@ def decompress_payload(payload: str) -> str:
         str: The decompressed task JSON.
 
     Raises:
-        ValueError: If the payload is not valid base64 or not a zlib stream.
+        MalformedPayloadError: If the payload is not valid base64 or not a
+            zlib stream.
     """
     try:
         raw = base64.b64decode(payload, validate=True)
     except (binascii.Error, ValueError) as exc:
-        raise ValueError(f"XCTSKZ payload is not valid base64: {exc}") from exc
+        raise MalformedPayloadError(
+            f"XCTSKZ payload is not valid base64: {exc}"
+        ) from exc
 
     try:
         return zlib.decompress(raw).decode("utf-8")
     except (zlib.error, UnicodeDecodeError) as exc:
-        raise ValueError(f"XCTSKZ payload is not a zlib stream: {exc}") from exc
+        raise MalformedPayloadError(
+            f"XCTSKZ payload is not a zlib stream: {exc}"
+        ) from exc
 
 
 @dataclass
@@ -211,8 +219,9 @@ class QRCodeTask:
         format can represent": an object must equal what re-reading its own
         payload produces.
         """
-        task = cls._shape_for("T" in data).read(data)
-        if task.task_type is QRCodeTaskType.WAYPOINTS and "T" not in data:
+        document = require_object(data)
+        task = cls._shape_for("T" in document).read(document)
+        if task.task_type is QRCodeTaskType.WAYPOINTS and "T" not in document:
             return task.as_waypoints()
         return task
 
@@ -297,9 +306,12 @@ class QRCodeTask:
 
     @classmethod
     def from_json(cls, json_str: str) -> "QRCodeTask":
-        """Create from JSON string."""
-        data = json.loads(json_str)
-        return cls.from_dict(data)
+        """Create from JSON string.
+
+        Raises:
+            MalformedPayloadError: If the string is not JSON, or not a task.
+        """
+        return cls.from_dict(load_json(json_str))
 
     @classmethod
     def from_string(cls, url_str: str) -> "QRCodeTask":
@@ -314,8 +326,8 @@ class QRCodeTask:
             QRCodeTask instance
 
         Raises:
-            ValueError: If the string carries neither scheme, or if an
-                ``XCTSKZ:`` payload cannot be decompressed.
+            MalformedPayloadError: If the string carries neither scheme, or
+                its payload cannot be decompressed or read.
         """
         if url_str.startswith(QR_CODE_SCHEME_COMPRESSED):
             payload = url_str[len(QR_CODE_SCHEME_COMPRESSED) :]
@@ -324,7 +336,7 @@ class QRCodeTask:
         if url_str.startswith(QR_CODE_SCHEME):
             return cls.from_json(url_str[len(QR_CODE_SCHEME) :])
 
-        raise ValueError(
+        raise MalformedPayloadError(
             f"Invalid QR code scheme, expected {QR_CODE_SCHEME} "
             f"or {QR_CODE_SCHEME_COMPRESSED}"
         )
