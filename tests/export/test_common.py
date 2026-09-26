@@ -72,6 +72,13 @@ class TestTaskDrawing:
         assert drawing.is_goal(drawing.turnpoints[-1])
         assert not drawing.is_goal(drawing.turnpoints[0])
 
+    def test_the_task_is_the_measured_ones(self):
+        """One task per drawing: the one its route was measured for."""
+        drawing = TaskDrawing.from_task(_task(GoalType.CYLINDER))
+
+        assert drawing.task is drawing.measured.task
+        assert "task" not in TaskDrawing.__dataclass_fields__
+
     def test_goal_line_replaces_the_last_turnpoint(self):
         """A goal line is drawn instead of the goal cylinder, never as well as."""
         drawing = TaskDrawing.from_task(_task(GoalType.LINE))

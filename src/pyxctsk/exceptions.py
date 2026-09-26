@@ -93,6 +93,18 @@ class TooFewTurnpointsError(pyXCTSKError, ValueError):
     """
 
 
+class MismatchedRouteError(pyXCTSKError, ValueError):
+    """Raised when a route is paired with a task it was not flown for.
+
+    ``MeasuredTask`` exists to make that pairing unrepresentable, and its
+    constructor is public, so it is where the check lives: one route point per
+    turnpoint, each inside its turnpoint's cylinder, measured on the task's
+    earth model. Handing it another task's route used to return a fully formed
+    report — 47.8 km for a 94.0 km task — with no error. ``ValueError`` is kept
+    for the reason :class:`TooFewTurnpointsError` states.
+    """
+
+
 class InvalidTimeOfDayError(pyXCTSKError):
     """Raised when time of day format is invalid."""
 

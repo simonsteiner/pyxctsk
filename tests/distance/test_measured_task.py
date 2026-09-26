@@ -9,9 +9,18 @@ import inspect
 
 import pytest
 
-from pyxctsk import Goal, GoalType, Task, TaskType, TurnpointType
+from pyxctsk import (
+    EarthModel,
+    Goal,
+    GoalType,
+    MismatchedRouteError,
+    Task,
+    TaskType,
+    TurnpointType,
+)
 from pyxctsk.distance import (
     MeasuredTask,
+    OptimizedRoute,
     TooFewTurnpointsError,
     task_distances_from,
     task_to_turnpoints,
@@ -182,3 +191,70 @@ class TestTheMismatchIsGone:
         assert task_distances_from(bevo).optimized_distance_km == round(
             bevo.total_m / 1000, 1
         )
+
+
+class TestTheConstructorChecksThePair:
+    """The constructor is public, so it is where the pairing is enforced.
+
+    Only ``from_task`` used to pair a task with its own route. Calling the
+    dataclass directly checked nothing, and ``MeasuredTask(bevo, fobe's
+    route)`` reported 47.8 km for a 94.0 km task.
+    """
+
+    def test_another_tasks_route_is_refused(self):
+        """The reproduction: bevo's task, fobe's route."""
+        bevo = reference_task("task_bevo").task
+        fobe = MeasuredTask.from_task(reference_task("task_fobe_line").task)
+
+        with pytest.raises(MismatchedRouteError):
+            MeasuredTask(task=bevo, route=fobe.route)
+
+    def test_a_route_of_the_wrong_length_is_refused(self):
+        """One route point per turnpoint, or it is not this task's route."""
+        measured = MeasuredTask.from_task(_race_task())
+        short = OptimizedRoute(
+            points=measured.route.points[:-1],
+            legs=measured.route.legs[:-1],
+            earth_model=measured.route.earth_model,
+        )
+
+        with pytest.raises(MismatchedRouteError, match="3 points for 4"):
+            MeasuredTask(task=measured.task, route=short)
+
+    def test_a_route_on_another_earth_is_refused(self):
+        """The points may fit, but the legs were measured somewhere else."""
+        measured = MeasuredTask.from_task(_race_task())
+        sphere = OptimizedRoute(
+            points=measured.route.points,
+            legs=measured.route.legs,
+            earth_model=EarthModel.FAI_SPHERE,
+        )
+
+        with pytest.raises(MismatchedRouteError, match="FAI_SPHERE"):
+            MeasuredTask(task=measured.task, route=sphere)
+
+    def test_a_point_outside_its_cylinder_is_refused(self):
+        """Every point touches its own cylinder; a moved one does not."""
+        measured = MeasuredTask.from_task(_race_task())
+        points = list(measured.route.points)
+        points[2] = (points[2][0] + 0.5, points[2][1])
+        moved = OptimizedRoute(
+            points=tuple(points),
+            legs=measured.route.legs,
+            earth_model=measured.route.earth_model,
+        )
+
+        with pytest.raises(MismatchedRouteError, match="route point 2"):
+            MeasuredTask(task=measured.task, route=moved)
+
+    def test_its_own_route_is_accepted(self):
+        """Rebuilding from the parts ``from_task`` produced is allowed."""
+        measured = MeasuredTask.from_task(_race_task())
+
+        rebuilt = MeasuredTask(task=measured.task, route=measured.route)
+
+        assert rebuilt.total_m == measured.total_m
+
+    def test_the_cylinders_are_not_an_argument(self):
+        """Derived from the task, so they cannot come from somewhere else."""
+        assert "turnpoints" not in inspect.signature(MeasuredTask).parameters

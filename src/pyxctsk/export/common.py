@@ -45,7 +45,6 @@ class TaskDrawing:
     when it was built, so build it after the task is final.
 
     Attributes:
-        task: The task being drawn, for names, counts and descriptions.
         turnpoints: The turnpoints to draw, in order — the task's own, less the
             last one when a goal line replaces it.
         goal_line: The task's goal line, or None if it has none.
@@ -55,10 +54,19 @@ class TaskDrawing:
             that same measurement rendered rather than a second one.
     """
 
-    task: Task
     turnpoints: tuple[Turnpoint, ...]
     goal_line: GoalLine | None
     measured: MeasuredTask
+
+    @property
+    def task(self) -> Task:
+        """The task being drawn, for names, counts and descriptions.
+
+        Read through :attr:`measured` rather than held beside it: a second
+        field was a second place to put a task, and a drawing could then name
+        one task while routing another.
+        """
+        return self.measured.task
 
     @property
     def route(self) -> OptimizedRoute:
@@ -85,7 +93,6 @@ class TaskDrawing:
         # there is a line to draw in its place — one decision, made here.
         turnpoints = task.turnpoints[:-1] if goal_line else task.turnpoints
         return cls(
-            task=task,
             turnpoints=tuple(turnpoints),
             goal_line=goal_line,
             measured=measured,

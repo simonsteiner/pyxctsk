@@ -27,9 +27,11 @@ one way: ``goal_line`` and ``speed_section`` depend on this module, and it
 depends on neither.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
+from ..exceptions import MismatchedRouteError
 from ..model.task import GoalType, Task
+from .earth import EarthModelLike, canonical, geodesic_distance, name_of
 from .route_optimization import OptimizedRoute, calculate_iteratively_refined_route
 from .turnpoint import TaskTurnpoint
 
@@ -79,6 +81,14 @@ def task_to_turnpoints(task: Task) -> list[TaskTurnpoint]:
     ]
 
 
+#: How far outside its cylinder a route point may sit and still be that
+#: cylinder's. ProjectionCorrection (§7.1.7) snaps each point onto the true
+#: boundary, so the optimizer's own routes land within millimetres; a metre is
+#: slack for rounding, and nothing like the kilometres another task's route is
+#: off by.
+ROUTE_TOLERANCE_M = 1.0
+
+
 @dataclass(frozen=True)
 class MeasuredTask:
     """A task, its cylinders, and the optimized route through them.
@@ -87,20 +97,39 @@ class MeasuredTask:
     task *and* its route takes this rather than the two separately, which is
     what makes a mismatched pair unrepresentable.
 
+    **Unrepresentable, not merely undocumented.** The constructor is public —
+    a test rendering a drawing without the optimizer hands it a route of its
+    own choosing — so the constructor checks the pair rather than trusting
+    it. The cylinders are not an argument at all: they are derived from the
+    task, which is the one place the LINE-goal rule is applied. The route must
+    then fit them: one point per turnpoint, measured on the task's earth model,
+    and each point inside its cylinder. Another task's route fails the last
+    check by kilometres; it used to produce a report 46 km short, with no error.
+
     A measured task is a snapshot. It holds the turnpoints and route as they
     were when it was built, so build it after the task is final — the same
     contract ``TaskDrawing`` has, which now holds one.
 
     Attributes:
         task: The task that was measured.
-        turnpoints: The cylinders derived from it, in task order, one per
+        route: The optimized route through its cylinders.
+        turnpoints: The cylinders derived from the task, in task order, one per
             turnpoint. A LINE goal is a zero-radius point here.
-        route: The optimized route through those cylinders.
+
+    Raises:
+        MismatchedRouteError: If ``route`` was not flown through ``task``'s
+            cylinders on ``task``'s earth model.
     """
 
     task: Task
-    turnpoints: tuple[TaskTurnpoint, ...]
     route: OptimizedRoute
+    turnpoints: tuple[TaskTurnpoint, ...] = field(init=False)
+
+    def __post_init__(self) -> None:
+        """Derive the cylinders and check the route fits them."""
+        turnpoints = tuple(task_to_turnpoints(self.task))
+        _check_route_fits(turnpoints, self.route, self.task.earth_model)
+        object.__setattr__(self, "turnpoints", turnpoints)
 
     @classmethod
     def from_task(cls, task: Task) -> "MeasuredTask":
@@ -118,11 +147,9 @@ class MeasuredTask:
         Returns:
             The measured task.
         """
-        turnpoints = task_to_turnpoints(task)
         return cls(
             task=task,
-            turnpoints=tuple(turnpoints),
-            route=calculate_iteratively_refined_route(turnpoints),
+            route=calculate_iteratively_refined_route(task_to_turnpoints(task)),
         )
 
     @property
@@ -142,3 +169,36 @@ class MeasuredTask:
             Cumulative distances in meters, one per turnpoint, starting at 0.0.
         """
         return self.route.cumulative_m()
+
+
+def _check_route_fits(
+    turnpoints: tuple[TaskTurnpoint, ...],
+    route: OptimizedRoute,
+    earth_model: EarthModelLike,
+) -> None:
+    """Refuse a route that was not flown through these cylinders.
+
+    Args:
+        turnpoints: The task's cylinders.
+        route: The route claimed to be flown through them.
+        earth_model: The task's earth model.
+
+    Raises:
+        MismatchedRouteError: On a point count, an earth model, or a point
+            outside its cylinder that does not match.
+    """
+    if len(route.points) != len(turnpoints):
+        raise MismatchedRouteError(
+            f"route has {len(route.points)} points for {len(turnpoints)} turnpoints"
+        )
+    if canonical(route.earth_model) is not canonical(earth_model):
+        raise MismatchedRouteError(
+            f"route measured on {name_of(route.earth_model)}, "
+            f"task on {name_of(earth_model)}"
+        )
+    for i, (point, tp) in enumerate(zip(route.points, turnpoints)):
+        off = geodesic_distance(point, tp.center, earth_model) - tp.radius
+        if off > ROUTE_TOLERANCE_M:
+            raise MismatchedRouteError(
+                f"route point {i} is {off:.1f} m outside turnpoint {i}'s cylinder"
+            )
