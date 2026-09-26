@@ -98,6 +98,33 @@ def test_route_through_fake_turnpoints():
     assert optimized.cumulative_m()[-1] == optimized.total_m
 
 
+class TestTheTakeoffIsAPoint:
+    """ADR 0002's takeoff rule, stated once: at projection, not in the solver."""
+
+    def test_the_route_starts_at_the_takeoff_centre_whatever_its_radius(self):
+        """A 5 km takeoff cylinder is not touched; the route leaves its centre."""
+        route = calculate_iteratively_refined_route(
+            [
+                FakeTurnpoint((46.5, 8.0), radius=5_000.0),
+                FakeTurnpoint((46.8, 8.0), radius=1_000.0),
+            ]
+        )
+
+        assert route.points[0] == (46.5, 8.0)
+
+    def test_a_concentric_first_turnpoint_is_flown_out_to(self):
+        """Its boundary is a real leg, not merged into the takeoff."""
+        route = calculate_iteratively_refined_route(
+            [
+                FakeTurnpoint((46.5, 8.0), radius=3_000.0),
+                FakeTurnpoint((46.5, 8.0), radius=3_000.0),
+                FakeTurnpoint((46.8, 8.0), radius=0.0),
+            ]
+        )
+
+        assert route.legs[0] == pytest.approx(3_000.0, abs=0.01)
+
+
 def test_short_input_handling():
     """Fewer than two turnpoints yields a zero distance and pass-through path."""
     empty = calculate_iteratively_refined_route([])

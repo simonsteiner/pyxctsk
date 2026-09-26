@@ -178,10 +178,8 @@ def _collapse_duplicate_circles(
     """Collapse consecutive identical circles while retaining input indexes."""
     unique: list[PlaneCircle] = [circles[0]]
     index_of: list[int] = [0]
-    for i, circle in enumerate(circles[1:], start=1):
-        # Index 1 is never collapsed into index 0: the route starts at the
-        # takeoff center, so touching its boundary remains a real leg.
-        if not (i > 1 and _same_circle(unique[-1], circle)):
+    for circle in circles[1:]:
+        if not _same_circle(unique[-1], circle):
             unique.append(circle)
         index_of.append(len(unique) - 1)
     return unique, index_of
@@ -221,6 +219,7 @@ def _place_chained_forward(
     points = [(circles[0][0], circles[0][1])]
     for circle in circles[1:]:
         points.append(_boundary_toward(circle, points[-1]))
+    points[0] = _boundary_toward(circles[0], points[1])
     return points
 
 
@@ -232,7 +231,6 @@ def _place_chained_backward(
     points[-1] = (circles[-1][0], circles[-1][1])
     for i in range(len(circles) - 2, -1, -1):
         points[i] = _boundary_toward(circles[i], points[i + 1])
-    points[0] = (circles[0][0], circles[0][1])
     return points
 
 
@@ -255,11 +253,13 @@ def _sweep_to_convergence(
     previous_length = _polyline_length(points)
     for _ in range(max_sweeps):
         for parity in (1, 0):
-            for i in range(1, n):
+            for i in range(n):
                 if i % 2 != parity:
                     continue
                 cx, cy, radius = circles[i]
-                if i == n - 1:
+                if i == 0:
+                    points[i] = _boundary_toward(circles[i], points[i + 1])
+                elif i == n - 1:
                     points[i] = _boundary_toward(circles[i], points[i - 1])
                 else:
                     points[i] = plane_optimal_point(
@@ -279,11 +279,16 @@ def optimize_plane_route(
 ) -> list[tuple[float, float]]:
     """Find the shortest planar route touching each circle in order.
 
-    The first point is fixed at the first circle's center. Later points touch
-    their circle boundaries. Three deterministic placements seed alternating
-    odd/even sweeps, and the shortest converged route wins. Consecutive
-    duplicate circles share one optimized point, except that the first
-    boundary touch is never collapsed into the takeoff center.
+    Every point touches its own circle, the first and last included, and a
+    zero-radius circle is touched at its centre. **No circle is special**: a
+    route that must start at a centre — a task's takeoff, under ADR 0002 — is
+    asked for by passing that circle with radius 0, which is what
+    ``route_optimization`` does. The solver used to carry that rule itself,
+    fixing the first point at the first centre and refusing to merge the
+    second circle into the first, while the caller applied it a second time
+    after solving. Three deterministic placements seed alternating odd/even
+    sweeps, and the shortest converged route wins. Consecutive duplicate
+    circles share one optimized point.
 
     Args:
         circles: Planar circles as (x, y, radius), in route order.

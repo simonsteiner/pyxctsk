@@ -100,9 +100,17 @@ class TestOptimizePlaneRoute:
 
         assert abs(short - long) <= 0.1
 
-    def test_start_point_stays_at_takeoff_center(self):
-        """The first circle is a start center, not a boundary touch."""
+    def test_the_first_circle_is_touched_like_any_other(self):
+        """No circle is special: the takeoff rule belongs to the caller."""
         circles = [(0.0, 0.0, 5_000.0), (20_000.0, 0.0, 1_000.0)]
+
+        first = optimize_plane_route(circles, max_sweeps=10)[0]
+
+        assert first == pytest.approx((5_000.0, 0.0))
+
+    def test_a_zero_radius_first_circle_is_a_start_at_its_centre(self):
+        """How a caller asks for a route starting at a centre."""
+        circles = [(0.0, 0.0, 0.0), (20_000.0, 0.0, 1_000.0)]
 
         assert optimize_plane_route(circles, max_sweeps=10)[0] == (0.0, 0.0)
 

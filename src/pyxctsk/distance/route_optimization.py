@@ -124,21 +124,19 @@ def _corrected_path(
         One (lat, lon) per turnpoint, each on its cylinder boundary.
     """
     circles = [plane_circle(tp, plane) for tp in turnpoints]
+    # The takeoff is a point: the route starts at its centre whatever its
+    # radius, because the takeoff cylinder is not touched (ADR 0002). Stated
+    # once, here, as the circle the solver is handed — the solver has no rule
+    # about its first circle, and ProjectionCorrection puts a zero-radius
+    # solution back on the centre.
+    x, y, _ = circles[0]
+    circles[0] = (x, y, 0.0)
     plane_points = optimize_plane_route(circles, max_sweeps=max_sweeps)
 
-    path: list[tuple[float, float]] = []
-    for i, (xy, (_, _, radius), tp) in enumerate(
-        zip(plane_points, circles, turnpoints)
-    ):
-        # The takeoff start point sits on the centre whatever its radius: the
-        # takeoff cylinder is not touched (ADR 0002). Everything else goes
-        # through ProjectionCorrection (§7.1.7), which owns the zero-radius
-        # case — a LINE goal included.
-        if i == 0:
-            path.append((tp.center[0], tp.center[1]))
-            continue
-        path.append(point_on_boundary(tp, plane, xy, radius))
-    return path
+    return [
+        point_on_boundary(tp, plane, xy, radius)
+        for xy, (_, _, radius), tp in zip(plane_points, circles, turnpoints)
+    ]
 
 
 def calculate_iteratively_refined_route(
