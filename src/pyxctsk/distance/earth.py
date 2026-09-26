@@ -219,3 +219,41 @@ def snap_to_boundary(
     azimuth, _, _ = g.inv(center[1], center[0], point_lonlat[0], point_lonlat[1])
     lon, lat, _ = g.fwd(center[1], center[0], azimuth, radius)
     return (lat, lon)
+
+
+def geodesic_arc(
+    center: tuple[float, float],
+    radius: float,
+    start_azimuth: float,
+    sweep: float,
+    num_segments: int,
+    earth_model: EarthModelLike = None,
+) -> list[tuple[float, float]]:
+    """Points at a fixed geodesic distance from a centre, swept through an angle.
+
+    The one way this library draws a curve on the earth: a cylinder's outline
+    is a 360° sweep and a goal line's control zone a 180° one. Every point is
+    exactly ``radius`` from the centre on the chosen earth, so the outline a
+    map shows is the boundary the optimized route touches. The KML cylinder
+    used to be drawn with a fixed 111 320 m per degree instead, 129 m out at a
+    50 km radius, and the route visibly missed the cylinder it touched.
+
+    Args:
+        center: (lat, lon) in degrees.
+        radius: Distance from the centre in meters.
+        start_azimuth: Azimuth of the first point, in degrees.
+        sweep: Angle swept from there, in degrees (360 for a closed circle).
+        num_segments: Segments along the arc; one more point is returned, so a
+            full circle ends where it began.
+        earth_model: Earth model selector (``EarthModel`` member, its string
+            value, or None for WGS84).
+
+    Returns:
+        ``num_segments + 1`` (lon, lat) points.
+    """
+    geod = geod_for_earth_model(earth_model)
+    lat, lon = center
+    return [
+        geod.fwd(lon, lat, (start_azimuth + sweep * i / num_segments) % 360, radius)[:2]
+        for i in range(num_segments + 1)
+    ]

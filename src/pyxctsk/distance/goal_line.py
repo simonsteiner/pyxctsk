@@ -43,7 +43,7 @@ from enum import Enum
 from typing import Sequence
 
 from ..model.task import GoalType, Task, Turnpoint
-from .earth import EarthModelLike, geod_for_earth_model
+from .earth import EarthModelLike, geod_for_earth_model, geodesic_arc
 from .measured_task import MeasuredTask
 
 # Constants for goal line visualization
@@ -158,17 +158,9 @@ def _semicircle_arc(
     Returns:
         ``GOAL_LINE_NUM_POINTS + 1`` (lon, lat) points, endpoint included.
     """
-    geod = geod_for_earth_model(earth_model)
-    lat, lon = center
-    return [
-        geod.fwd(
-            lon,
-            lat,
-            (forward_azimuth - 90 + 180 * i / GOAL_LINE_NUM_POINTS) % 360,
-            radius,
-        )[:2]
-        for i in range(GOAL_LINE_NUM_POINTS + 1)
-    ]
+    return geodesic_arc(
+        center, radius, forward_azimuth - 90, 180, GOAL_LINE_NUM_POINTS, earth_model
+    )
 
 
 @dataclass(frozen=True)

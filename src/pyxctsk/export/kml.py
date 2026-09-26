@@ -10,7 +10,6 @@ from .common import (
     ROUTE_COLOR,
     Color,
     TaskDrawing,
-    generate_circle_coordinates_3d,
 )
 
 # Constants. Both alphas are opacity bytes, 0x00 transparent to 0xFF opaque, in
@@ -60,13 +59,9 @@ def _create_turnpoint_elements(
     for i, turnpoint in enumerate(drawing.turnpoints):
         coord = (turnpoint.waypoint.lon, turnpoint.waypoint.lat, task_altitude)
 
-        # Generate circle coordinates
-        circle_coords = generate_circle_coordinates_3d(
-            turnpoint.waypoint.lat,
-            turnpoint.waypoint.lon,
-            turnpoint.radius,
-            task_altitude,
-        )
+        circle_coords = [
+            (lon, lat, task_altitude) for lon, lat in drawing.outline_of(turnpoint)
+        ]
 
         # Create turnpoint circle as polygon
         circle_polygon = kml.newpolygon(
