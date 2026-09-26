@@ -16,12 +16,11 @@ from pyxctsk.distance.earth import (
     geodesic_distance,
 )
 from pyxctsk.distance.plane import LocalPlane, ltm_scale_factor, task_area_center
-from pyxctsk.distance.route_optimization import calculate_iteratively_refined_route
-from pyxctsk.distance.turnpoint import (
-    TaskTurnpoint,
-    TurnpointGeometry,
+from pyxctsk.distance.route_optimization import (
     boundary_point,
+    calculate_iteratively_refined_route,
 )
+from pyxctsk.distance.turnpoint import TaskTurnpoint, TurnpointGeometry
 
 
 @dataclass

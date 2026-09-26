@@ -76,6 +76,7 @@ from .center_distance import (
     CenterDistanceReading,
     center_distance,
     center_distance_readings,
+    distance_through_centers,
 )
 from .earth import FAI_SPHERE_RADIUS_M, geodesic_distance
 from .goal_line import (
@@ -92,6 +93,7 @@ from .route_optimization import (
     OptimizedRoute,
     calculate_iteratively_refined_route,
     optimized_distance,
+    plane_circle,
 )
 from .speed_section import SpeedSection
 from .task_distances import (
@@ -100,7 +102,7 @@ from .task_distances import (
     calculate_task_distances,
     task_distances_from,
 )
-from .turnpoint import TaskTurnpoint, distance_through_centers, plane_circle
+from .turnpoint import TaskTurnpoint
 
 # Export all the main public functions and classes
 __all__ = [

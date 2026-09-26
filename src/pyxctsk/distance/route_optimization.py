@@ -32,6 +32,12 @@ must be touched on its boundary, matching XCTrack's displayed optimized
 distance (including mandatory "out and back" legs between concentric
 cylinders of different radii).
 
+The two steps either side of the solver live here too: :func:`plane_circle`
+projects a turnpoint into the plane and :func:`point_on_boundary` corrects a
+planar solution back onto its cylinder. :func:`boundary_point` composes the
+three for one circle with fixed neighbours — the single-circle answer beside
+the joint one, which is how tests reach the solver through the earth.
+
 The main entry point is `calculate_iteratively_refined_route`, which returns an
 `OptimizedRoute` carrying the points *and* the per-leg distances it measured.
 `optimized_distance` is kept beside it for the common case of wanting only the
@@ -43,11 +49,11 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from itertools import accumulate
 
-from .earth import EarthModelLike, geod_for_earth_model
+from .earth import EarthModelLike, geod_for_earth_model, snap_to_boundary
 from .plane import LocalPlane
 from .solver import CONVERGENCE_EPSILON_M as CONVERGENCE_EPSILON_M
-from .solver import optimize_plane_route
-from .turnpoint import TurnpointGeometry, plane_circle, point_on_boundary
+from .solver import optimize_plane_route, plane_optimal_point
+from .turnpoint import TurnpointGeometry
 
 #: How many alternating sweeps to allow before giving up. A safety bound, not
 #: an accuracy setting — convergence normally stops far earlier — and the one
@@ -100,6 +106,105 @@ class OptimizedRoute:
         if not self.points:
             return []
         return list(accumulate(self.legs, initial=0.0))
+
+
+def plane_circle(
+    turnpoint: "TurnpointGeometry", plane: LocalPlane
+) -> tuple[float, float, float]:
+    """Return a turnpoint as the circle the solver sees: (x, y, radius).
+
+    A projection and nothing else. It used to also apply the rule that **a LINE
+    goal is a zero-radius circle at the goal center** — but so does
+    :func:`~pyxctsk.distance.measured_task.task_to_turnpoints`, which builds
+    every cylinder the library measures, and each docstring claimed to be the
+    only place that rule lived while a third module picked a side in prose. The
+    rule now belongs to the constructor: a LINE goal arrives here already
+    carrying ``radius=0``, which is also what
+    :func:`~pyxctsk.distance.center_distance.center_distance` reads it as.
+
+    Args:
+        turnpoint: Anything with a center and a radius.
+        plane: The plane to project into.
+
+    Returns:
+        (x, y, radius) with radius in meters; 0 collapses to the center.
+    """
+    x, y = plane.xy(turnpoint.center)
+    return (x, y, float(turnpoint.radius))
+
+
+def point_on_boundary(
+    turnpoint: TurnpointGeometry,
+    plane: LocalPlane,
+    plane_point: tuple[float, float],
+    radius: float,
+) -> tuple[float, float]:
+    """ProjectionCorrection (S7F §7.1.7): a planar solution put on the boundary.
+
+    **The one spelling of the rule.** It had two — this one and the loop body
+    of ``route_optimization._corrected_path`` — and they did not agree: one
+    guarded ``radius == 0.0`` where the other guarded ``<= 0.0``, and one
+    snapped against the turnpoint's own radius where the other snapped against
+    the projected one. Identical answers today, and two places to change
+    snapping policy, of which the product runs one.
+
+    Args:
+        turnpoint: The turnpoint whose circle the point belongs to.
+        plane: The projection the point was solved in, which carries the earth
+            model it is snapped back onto — so a planar solution and the
+            boundary it is corrected onto cannot be measured on different
+            earths.
+        plane_point: The planar (x, y) solution.
+        radius: The circle's radius in the plane. Zero collapses to the centre,
+            which is what a LINE goal arrives here as.
+
+    Returns:
+        (lat, lon) on the true boundary, or the centre for a zero radius.
+    """
+    if radius <= 0.0:
+        return turnpoint.center
+    return snap_to_boundary(
+        plane.lon_lat(plane_point), turnpoint.center, radius, plane.earth_model
+    )
+
+
+def boundary_point(
+    turnpoint: TurnpointGeometry,
+    prev_point: tuple[float, float],
+    next_point: tuple[float, float],
+    plane: LocalPlane,
+) -> tuple[float, float]:
+    """Where a route touches one circle, given fixed neighbours (GetOptPi).
+
+    The single-circle answer, as against
+    :func:`~pyxctsk.distance.route_optimization.calculate_iteratively_refined_route`,
+    which solves every circle jointly and is what a task's route is measured
+    with. Both project, solve and correct; only the solve differs.
+
+    **The plane is required.** It used to default to one centred on this
+    turnpoint — a projection no shipped code path ever builds — and the
+    crossing-case tests took that default, so a fix to the projection the
+    product does use could go green and ship nothing. ``plane.py`` records
+    that failure as fixed; the default was the half of it left in place.
+
+    Args:
+        turnpoint: The circle to touch.
+        prev_point: (lat, lon) of the previous point on the route.
+        next_point: (lat, lon) of the next point on the route.
+        plane: The projection to solve in — the task's own, from
+            ``LocalPlane.around`` over every turnpoint centre, unless the
+            caller means something else and says so.
+
+    Returns:
+        (lat, lon) on the cylinder boundary, or the centre for a LINE goal.
+    """
+    cx, cy, radius = plane_circle(turnpoint, plane)
+    if radius <= 0.0:
+        return turnpoint.center
+    xy = plane_optimal_point(
+        plane.xy(prev_point), plane.xy(next_point), (cx, cy), radius
+    )
+    return point_on_boundary(turnpoint, plane, xy, radius)
 
 
 def _corrected_path(

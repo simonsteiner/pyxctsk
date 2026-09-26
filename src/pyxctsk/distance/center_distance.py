@@ -38,12 +38,14 @@ ellipsoid alone. And whether a leg is measured on the ellipsoid or a sphere is a
 property of that choice, not a separate convention.
 """
 
+from collections.abc import Sequence
 from enum import Enum
 
 from ..model.task import Task
 from .earth import EarthModelLike, geodesic_distance
 from .measured_task import task_to_turnpoints
 from .speed_section import speed_section_indices
+from .turnpoint import TurnpointGeometry
 
 
 class CenterDistanceReading(str, Enum):
@@ -83,6 +85,29 @@ def _polyline(points: list[tuple[float, float]], earth_model: EarthModelLike) ->
         geodesic_distance(points[i], points[i + 1], earth_model)
         for i in range(len(points) - 1)
     )
+
+
+def distance_through_centers(
+    turnpoints: Sequence[TurnpointGeometry], earth_model: EarthModelLike = None
+) -> float:
+    """Sum the geodesic legs between consecutive turnpoint centers.
+
+    The primitive, not the published number. **S7F defines no "distance
+    through centres"**, so which points to include and where to stop is a
+    convention — see :func:`center_distance` below, which owns that decision.
+    It lived in ``turnpoint.py`` beside a second copy of the same loop here. A caller producing a figure for a task board
+    wants ``center_distance(task)``; a caller who already knows exactly which
+    turnpoints it means wants this.
+
+    Args:
+        turnpoints: The turnpoints whose centres to join.
+        earth_model: Earth model selector (``EarthModel`` member, its string
+            value, or None for WGS84).
+
+    Returns:
+        float: Distance through centers in meters.
+    """
+    return _polyline([tp.center for tp in turnpoints], earth_model)
 
 
 def _goal_radius(task: Task) -> float:
