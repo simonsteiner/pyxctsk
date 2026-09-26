@@ -375,39 +375,35 @@ class TestEarthModel:
 
     def test_fai_sphere_great_circle_distance(self):
         """Zero-radius points 1° apart along a meridian: exactly R·π/180."""
-        turnpoints = [
-            TaskTurnpoint(0.0, 8.0, 0, earth_model=EarthModel.FAI_SPHERE),
-            TaskTurnpoint(1.0, 8.0, 0, earth_model=EarthModel.FAI_SPHERE),
-        ]
+        turnpoints = [TaskTurnpoint(0.0, 8.0, 0), TaskTurnpoint(1.0, 8.0, 0)]
+        sphere = EarthModel.FAI_SPHERE
         sphere_deg = 6_371_000.0 * math.pi / 180.0  # 111194.93 m
-        assert optimized_distance(turnpoints) == pytest.approx(sphere_deg, abs=1.0)
-        assert distance_through_centers(turnpoints) == pytest.approx(
+        assert optimized_distance(turnpoints, earth_model=sphere) == pytest.approx(
+            sphere_deg, abs=1.0
+        )
+        assert distance_through_centers(turnpoints, sphere) == pytest.approx(
             sphere_deg, abs=1.0
         )
 
     def test_wgs84_differs_from_sphere(self):
         """The same task measures differently on the two earth models."""
-        wgs84_tps = [TaskTurnpoint(0.0, 8.0, 0), TaskTurnpoint(1.0, 8.0, 0)]
-        sphere_tps = [
-            TaskTurnpoint(0.0, 8.0, 0, earth_model="FAI_SPHERE"),
-            TaskTurnpoint(1.0, 8.0, 0, earth_model="FAI_SPHERE"),
-        ]
-        wgs = optimized_distance(wgs84_tps)
-        sph = optimized_distance(sphere_tps)
+        turnpoints = [TaskTurnpoint(0.0, 8.0, 0), TaskTurnpoint(1.0, 8.0, 0)]
+        wgs = optimized_distance(turnpoints)
+        sph = optimized_distance(turnpoints, earth_model="FAI_SPHERE")
         # A meridian degree at the equator is ~110.57 km on WGS84.
         assert wgs == pytest.approx(110_574.4, abs=10.0)
         assert abs(wgs - sph) > 500.0
 
     def test_task_earth_model_propagates(self):
-        """task_to_turnpoints carries the task's earthModel to every turnpoint."""
+        """The measured task hands the task's earthModel to the optimizer."""
         task = reference_task("task_bevo").task
-        object.__setattr__(task, "earth_model", EarthModel.FAI_SPHERE)
-        turnpoints = task_to_turnpoints(task)
-        assert all(tp.earth_model == EarthModel.FAI_SPHERE for tp in turnpoints)
-        # And the sphere distance differs measurably from the WGS84 one.
-        object.__setattr__(task, "earth_model", None)
-        wgs_tps = task_to_turnpoints(task)
-        assert abs(optimized_distance(turnpoints) - optimized_distance(wgs_tps)) > 50.0
+        task.earth_model = EarthModel.FAI_SPHERE
+        sphere = MeasuredTask.from_task(task)
+        task.earth_model = None
+        wgs = MeasuredTask.from_task(task)
+
+        assert sphere.route.earth_model is EarthModel.FAI_SPHERE
+        assert abs(sphere.total_m - wgs.total_m) > 50.0
 
 
 class TestTheEarthModelSelector:

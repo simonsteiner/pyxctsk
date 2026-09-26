@@ -248,12 +248,10 @@ class TestTheConstructorChecksThePair:
             MeasuredTask(task=measured.task, route=moved)
 
     def test_its_own_route_is_accepted(self):
-        """Rebuilding from the parts ``from_task`` produced is allowed."""
+        """Rebuilding from the parts ``from_task`` produced is the same value."""
         measured = MeasuredTask.from_task(_race_task())
 
-        rebuilt = MeasuredTask(task=measured.task, route=measured.route)
-
-        assert rebuilt.total_m == measured.total_m
+        assert MeasuredTask(task=measured.task, route=measured.route) == measured
 
     def test_the_cylinders_are_not_an_argument(self):
         """Derived from the task, so they cannot come from somewhere else."""

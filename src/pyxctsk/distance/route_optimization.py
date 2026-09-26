@@ -156,9 +156,9 @@ def calculate_iteratively_refined_route(
     Args:
         turnpoints (Sequence[TurnpointGeometry]): The task turnpoints.
         num_iterations (Optional[int]): Maximum number of alternating sweeps.
-        earth_model: Earth model selector (``EarthModel`` member, its string
-            value, or None). None falls back to the first turnpoint's
-            ``earth_model`` attribute, defaulting to WGS84.
+        earth_model: The earth to measure on (``EarthModel`` member, its
+            string value, or None for WGS84). The whole route's, not any one
+            turnpoint's — ``MeasuredTask.from_task`` passes the task's.
 
     Returns:
         OptimizedRoute: The route points, its per-leg distances, and the earth
@@ -167,11 +167,6 @@ def calculate_iteratively_refined_route(
     max_sweeps = (
         num_iterations if num_iterations is not None else DEFAULT_NUM_ITERATIONS
     )
-    if earth_model is None and turnpoints:
-        # Declared on TurnpointGeometry, so this is a protocol attribute now
-        # rather than a getattr against an interface that denied having it.
-        earth_model = turnpoints[0].earth_model
-
     if len(turnpoints) < 2:
         return OptimizedRoute(
             points=tuple((tp.center[0], tp.center[1]) for tp in turnpoints),
@@ -216,8 +211,7 @@ def optimized_distance(
     Args:
         turnpoints: The task turnpoints.
         num_iterations: Maximum number of alternating sweeps.
-        earth_model: Earth model selector (None uses the turnpoints' model,
-            defaulting to WGS84).
+        earth_model: Earth model selector (None for WGS84).
 
     Returns:
         Optimized distance in meters.

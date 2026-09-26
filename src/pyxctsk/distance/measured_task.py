@@ -43,8 +43,9 @@ def task_to_turnpoints(task: Task) -> list[TaskTurnpoint]:
     geometry**, and now genuinely the only one: a LINE goal's cylinder is built
     with ``radius=0`` — the line is centred on the goal and perpendicular to
     the approach, so its optimal crossing is the goal center, degenerate
-    approach included (S7F §6.2.3.1). Anything else stays a cylinder, and every
-    turnpoint inherits the task's earth model.
+    approach included (S7F §6.2.3.1). Anything else stays a cylinder. The
+    earth model is not copied onto the cylinders: it is the task's, and it is
+    handed to the optimizer once.
 
     ``plane_circle`` used to apply the same rule a second time, from the goal
     type carried on each cylinder, and both docstrings claimed sole ownership
@@ -75,7 +76,6 @@ def task_to_turnpoints(task: Task) -> list[TaskTurnpoint]:
             lat=tp.waypoint.lat,
             lon=tp.waypoint.lon,
             radius=0 if (i == last and goal_type is GoalType.LINE) else tp.radius,
-            earth_model=task.earth_model,
         )
         for i, tp in enumerate(task.turnpoints)
     ]
@@ -149,7 +149,9 @@ class MeasuredTask:
         """
         return cls(
             task=task,
-            route=calculate_iteratively_refined_route(task_to_turnpoints(task)),
+            route=calculate_iteratively_refined_route(
+                task_to_turnpoints(task), earth_model=task.earth_model
+            ),
         )
 
     @property

@@ -159,7 +159,9 @@ class SpeedSection:
             return None
 
         return cls(
-            route=calculate_iteratively_refined_route(turnpoints),
+            route=calculate_iteratively_refined_route(
+                turnpoints, earth_model=task.earth_model
+            ),
             start_index=start,
         )
 
