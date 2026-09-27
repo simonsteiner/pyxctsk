@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A turnpoint radius written as a string is read again.** Burnair writes `"radius": "700"`. 0.5 passed the value through; 0.6.0's field table rounds radii and `altSmoothed` to whole metres with `ROUNDED_INT`, which added `0.5` to the string, so the whole file was refused with `turnpoints[0].radius: can only concatenate str (not "float") to str`. `ROUNDED_INT` now reads a numeric string as the number it spells, and writes it back as a number. A string that is not a number is still a `MalformedPayloadError` naming where.
+
 ## [v0.6.0] - 2026-09-27
 
 ### Changed

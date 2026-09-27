@@ -9,6 +9,8 @@ This test suite covers:
 
 """
 
+import json
+
 import pytest
 
 from pyxctsk import (
@@ -19,6 +21,7 @@ from pyxctsk import (
     Goal,
     GoalType,
     InvalidFormatError,
+    MalformedPayloadError,
     QRCodeTask,
     SSSType,
     Takeoff,
@@ -200,6 +203,24 @@ class TestTaskParsing:
         task = load_task(reference_task("task_gibe").xctsk_path)
         assert task.task_type == TaskType.CLASSIC
         assert len(task.turnpoints) > 0
+
+    def test_a_radius_written_as_a_string_is_read_as_a_number(self):
+        """Burnair writes ``"radius": "700"``; 0.5 read it and 0.6.0 refused."""
+        doc = json.loads(reference_task("task_gibe").xctsk_path.read_text())
+        doc["turnpoints"][0]["radius"] = "700"
+
+        task = parse_task(json.dumps(doc))
+
+        assert task.turnpoints[0].radius == 700
+        assert task.to_dict()["turnpoints"][0]["radius"] == 700
+
+    def test_a_radius_that_is_not_a_number_names_where(self):
+        """Leniency covers a spelling, not a value that is not a number."""
+        doc = json.loads(reference_task("task_gibe").xctsk_path.read_text())
+        doc["turnpoints"][0]["radius"] = "wide"
+
+        with pytest.raises(MalformedPayloadError, match=r"turnpoints\[0\]\.radius"):
+            Task.from_dict(doc)
 
     def test_parse_task_empty_input(self):
         """Test parsing with empty input."""
