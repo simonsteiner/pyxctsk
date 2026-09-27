@@ -227,12 +227,14 @@ class TestValidatingWhatArrived:
         ``TASK_VERSION`` (stamped onto every converted task),
         ``validation.FULL_FORMAT_VERSION`` (what ``Task.validate()`` checks),
         and ``pyxctsk.VERSION``. Editing one of the three would have made the
-        library write a version its own validator rejects.
+        library write a version its own validator rejects. ``VERSION`` was an
+        alias by then, and is gone: one number, one name.
         """
         import pyxctsk
         from pyxctsk.model.validation import FULL_FORMAT_VERSION
 
-        assert pyxctsk.VERSION is FULL_FORMAT_VERSION
+        assert pyxctsk.FULL_FORMAT_VERSION is FULL_FORMAT_VERSION
+        assert not hasattr(pyxctsk, "VERSION")
         assert self._payload(1, 2, 3).to_task().version == FULL_FORMAT_VERSION
 
 

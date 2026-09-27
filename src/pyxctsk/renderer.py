@@ -23,7 +23,7 @@ caller does. Each row carries what a caller has to know to *deliver* the bytes
 as well as make them — the media type, the file extension, and whether the
 payload is text or binary — because those were spelled at each site too, and
 ``pyxctsk.EXTENSION`` and ``pyxctsk.MIME_TYPE`` were exported for the job and
-read by nothing.
+read by nothing; read ``OUTPUT_FORMATS["json"]`` instead.
 
 ``export/common.py`` argues the policy this follows, for the palette: "spelled
 out rather than defaulted… a lookup with a default is what the old KML writer

@@ -56,12 +56,13 @@ class TestTheTableIsTheOnlyStatementOfTheFormats:
 
         assert list(choices or []) == list(OUTPUT_FORMATS)
 
-    def test_the_task_files_extension_and_media_type_are_the_json_row(self):
-        """Two literals at the front door, exported and read by nothing."""
+    def test_the_task_files_extension_and_media_type_are_the_json_row_only(self):
+        """No second name for them at the front door, which nothing read."""
         import pyxctsk
 
-        assert pyxctsk.EXTENSION == OUTPUT_FORMATS["json"].extension
-        assert pyxctsk.MIME_TYPE == OUTPUT_FORMATS["json"].media_type
+        assert not hasattr(pyxctsk, "EXTENSION")
+        assert not hasattr(pyxctsk, "MIME_TYPE")
+        assert OUTPUT_FORMATS["json"].extension == ".xctsk"
 
 
 class TestTheRenderingsAreWhatTheyAlwaysWere:
