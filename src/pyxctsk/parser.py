@@ -7,7 +7,14 @@ Supports:
 - JSON string/bytes with task data
 - XCTSK: URL string/bytes (compact QR code format)
 - Image bytes containing a QR code (if QR code dependencies are available)
-- File path (str) to any of the above (auto-detected)
+
+**Reading a file is a separate entry point**, :func:`load_task`. ``parse_task``
+used to guess whether a string was a path or a payload — a slash, or a known
+extension, meant "open this" — so ``parse_task(Path(...))`` failed as "invalid
+format", an existing ``task.txt`` was never opened, nine call sites wrapped
+paths in ``str()`` to steer the guess, and any caller handing it untrusted text
+let that text read local files and learn from the error which of them exist.
+Now ``parse_task`` never touches the filesystem, and ``load_task`` always does.
 
 The auto-detection works by trying an ordered list of focused format adapters,
 one per supported format. **Each adapter answers two questions independently:
@@ -30,14 +37,15 @@ Two rules follow, and each was a defect before:
   :data:`QR_FORMAT_ONLY_KEYS`), not listed here, so they cannot disagree with
   what the shapes actually read — the same reason ``KNOWN_KEYS`` is derived.
 - **A recognized input that cannot be read raises**, naming the reason, rather
-  than falling through to an adapter whose format it is not. Only the file-path
-  heuristic still falls through, because it genuinely is a heuristic.
+  than falling through to an adapter whose format it is not.
 
 Functions:
-    parse_task(data: bytes | str) -> Task: Auto-detect and parse task from supported formats.
+    parse_task(data: bytes | str) -> Task: Auto-detect and parse a payload.
+    load_task(path: str | os.PathLike) -> Task: Read a file, then parse it.
 """
 
 import json
+import os
 from dataclasses import dataclass
 from typing import Any, Callable
 
@@ -63,8 +71,11 @@ from .qrcode.task import (
 # not a prefix of it, but keeping them ordered makes the intent obvious.
 _QR_SCHEMES = (QR_CODE_SCHEME_COMPRESSED, QR_CODE_SCHEME)
 
-# File extensions that mark a string as a path to read rather than inline data.
+# File extensions a task is commonly saved under. Used only to hint, when a
+# string handed to parse_task is not a payload, that it may have been meant as
+# a path — never to decide to open it.
 _FILE_EXTENSIONS = (".xctsk", ".json", ".png", ".jpg", ".jpeg")
+
 
 #: What an adapter hands back: the payload as it arrived, in whichever format
 #: it arrived in. Both members answer ``validate()`` for themselves, and the
@@ -87,38 +98,6 @@ QR_FORMAT_ONLY_KEYS = (
 #: caller their PNG failed for want of a dependency rather than for being
 #: unreadable. The two used to be separate lists that could disagree.
 _IMAGE_MAGIC = (b"\x89PNG\r\n\x1a\n", b"\xff\xd8\xff")
-
-
-def _looks_like_file_path(data: str) -> bool:
-    """Return True if a string should be treated as a path to read.
-
-    QR code URLs are excluded because they may contain path-like characters
-    but are never files. Base64 in an XCTSKZ: payload routinely contains "/".
-    """
-    if data.startswith(_QR_SCHEMES):
-        return False
-    return "/" in data or "\\" in data or data.endswith(_FILE_EXTENSIONS)
-
-
-def _read_file(path: str) -> tuple[bytes | None, str | None]:
-    """Read a file path to bytes.
-
-    Args:
-        path: The path to read.
-
-    Returns:
-        ``(contents, None)`` on success, or ``(None, reason)`` where reason is
-        the OS's own description. The reason is carried rather than discarded
-        because a path that cannot be read still falls through to the inline
-        adapters — ``_looks_like_file_path`` is a heuristic, and a JSON payload
-        containing a "/" trips it — so the only place it can be reported is the
-        error raised when everything else has also failed.
-    """
-    try:
-        with open(path, "rb") as f:
-            return f.read(), None
-    except OSError as exc:
-        return None, exc.strerror or str(exc)
 
 
 #: What :attr:`Input.document` holds when the input is not JSON at all. A
@@ -360,7 +339,7 @@ FORMAT_ADAPTERS = (
 )
 
 
-def _unrecognized(inp: Input, path_error: str | None) -> InvalidFormatError:
+def _unrecognized(inp: Input) -> InvalidFormatError:
     """Build the error for input no adapter recognized.
 
     Every failure used to raise ``InvalidFormatError("invalid format")`` — a
@@ -369,30 +348,36 @@ def _unrecognized(inp: Input, path_error: str | None) -> InvalidFormatError:
     produced the identical message, so a missing install was indistinguishable
     from a corrupt file.
 
-    The image cases now belong to the image adapter, which recognizes those
-    bytes and says which of them it was. What is left here is what genuinely
-    reached the end: a path that would not open, and JSON that is not a task.
+    The image cases belong to the image adapter and the file cases to
+    :func:`load_task`. What is left here is JSON that is not a task, and text
+    that reads like a file name — which is worth saying, because it is what
+    ``parse_task`` used to open.
 
     Args:
         inp: The input nothing recognized.
-        path_error: Why the input failed to open as a path, if it looked like
-            one and did not open.
 
     Returns:
         The error to raise.
     """
-    if path_error is not None:
-        return InvalidFormatError(f"could not read it as a file ({path_error})")
     if inp.looks_like_json:
         return InvalidFormatError("looks like JSON, but it is not a task in any format")
+    if inp.text is not None and inp.text.strip().lower().endswith(_FILE_EXTENSIONS):
+        return InvalidFormatError(
+            "invalid format — this looks like a file name; "
+            "parse_task reads payloads, load_task reads files"
+        )
     return InvalidFormatError("invalid format")
 
 
 def parse_task(data: bytes | str, strict: bool = False) -> Task:
-    """Parse a XCTrack Task from a variety of input formats.
+    """Parse a XCTrack Task from a payload in any supported format.
+
+    Never reads a file: a string is always the payload itself. Use
+    :func:`load_task` for a path.
 
     Args:
-        data: Input data as bytes, string, or file path.
+        data: The payload — task JSON, an ``XCTSK:``/``XCTSKZ:`` string, or
+            the bytes of a QR code image.
         strict: If True, validate the payload *as it arrived* — through
             :meth:`Task.validate` for the full format or
             :meth:`QRCodeTask.validate` for the compact one — and reject
@@ -406,22 +391,16 @@ def parse_task(data: bytes | str, strict: bool = False) -> Task:
         EmptyInputError: If input is empty.
         InvalidFormatError: If no adapter recognizes the input, or if the one
             that does cannot read it. The message names which failure it was —
-            an unreadable path, an image with no QR code, an image with the
-            optional QR dependencies missing, JSON that is not a task, or a
-            recognized format whose payload is malformed.
+            an image with no QR code, an image with the optional QR
+            dependencies missing, JSON that is not a task, or a recognized
+            format whose payload is malformed.
         TaskValidationError: If ``strict`` and the task is structurally invalid.
+        TypeError: If handed a path object, which is :func:`load_task`'s.
     """
+    if isinstance(data, os.PathLike):
+        raise TypeError("parse_task reads payloads; use load_task for a path")
     if not data:
         raise EmptyInputError("empty input")
-
-    # A string that names a readable file is replaced by its contents. A
-    # failure here is not fatal — the heuristic also matches inline payloads —
-    # so the reason is kept for the error at the end.
-    path_error: str | None = None
-    if isinstance(data, str) and _looks_like_file_path(data):
-        file_data, path_error = _read_file(data)
-        if file_data is not None:
-            return parse_task(file_data, strict=strict)
 
     inp = Input.of(data)
 
@@ -432,7 +411,7 @@ def parse_task(data: bytes | str, strict: bool = False) -> Task:
             arrived = adapter.read(inp)
             break
     else:
-        raise _unrecognized(inp, path_error)
+        raise _unrecognized(inp)
 
     # Validate what arrived, before converting it. Each format answers for
     # itself — Task.validate() and QRCodeTask.validate() both present a
@@ -444,3 +423,33 @@ def parse_task(data: bytes | str, strict: bool = False) -> Task:
             raise TaskValidationError(issues)
 
     return arrived if isinstance(arrived, Task) else arrived.to_task()
+
+
+def load_task(path: str | os.PathLike[str], strict: bool = False) -> Task:
+    """Read a task file in any supported format.
+
+    The file's bytes go to :func:`parse_task`, so a ``.xctsk`` document, a text
+    file holding an ``XCTSK:`` string and a QR code image are all read the same
+    way — by what they contain, not by their extension.
+
+    Args:
+        path: The file to read.
+        strict: As for :func:`parse_task`.
+
+    Returns:
+        Task: Parsed Task object.
+
+    Raises:
+        InvalidFormatError: If the file cannot be read — naming the OS's
+            reason — or does not hold a task.
+        EmptyInputError: If the file is empty.
+        TaskValidationError: If ``strict`` and the task is structurally invalid.
+    """
+    try:
+        with open(path, "rb") as f:
+            data = f.read()
+    except OSError as exc:
+        raise InvalidFormatError(
+            f"could not read {os.fspath(path)!r} ({exc.strerror or exc})"
+        ) from exc
+    return parse_task(data, strict=strict)

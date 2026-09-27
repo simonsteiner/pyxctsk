@@ -24,7 +24,7 @@ from functools import cached_property
 from pathlib import Path
 from typing import Any
 
-from pyxctsk import Task, parse_task
+from pyxctsk import Task, load_task
 from tests.paths import (
     REFERENCE_JSON_DIR,
     REFERENCE_QRCODE_DIR,
@@ -59,7 +59,7 @@ class ReferenceTask:
     @cached_property
     def task(self) -> Task:
         """The parsed task."""
-        return parse_task(str(self.xctsk_path))
+        return load_task(self.xctsk_path)
 
     @cached_property
     def reference(self) -> dict[str, Any]:

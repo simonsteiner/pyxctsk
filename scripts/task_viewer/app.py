@@ -6,7 +6,7 @@ This is a standalone application for testing purposes, to compare xcontest data 
 
 import sys
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Callable, Dict, Optional
 
 from api import api_bp
 from flask import (
@@ -26,7 +26,7 @@ from shared import (
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 # Initialize function variables with proper typing
-parse_task: Optional[Callable[[Union[bytes, str]], Any]] = None
+load_task: Optional[Callable[[Any], Any]] = None
 task_distances_from: Optional[Callable[..., Dict[str, Any]]] = None
 generate_task_geojson: Optional[Callable[[Any], Dict[Any, Any]]] = None
 drawing_to_geojson: Optional[Callable[[Any], Dict[Any, Any]]] = None
@@ -37,7 +37,7 @@ try:
         TaskDrawing,
         drawing_to_geojson,
         generate_task_geojson,
-        parse_task,
+        load_task,
         task_distances_from,
     )
 
@@ -162,7 +162,7 @@ def compare_task(task_name: str):
 
     try:
         # Parse task using xctrack
-        task = parse_task(str(xctsk_path))  # type: ignore
+        task = load_task(xctsk_path)  # type: ignore
 
         # One drawing: the table and the map share a single optimized route.
         drawing = TaskDrawing.from_task(task)  # type: ignore
@@ -229,7 +229,7 @@ def geojson_debug_task(task_name: str):
 
     try:
         # Parse task using xctrack
-        task = parse_task(str(xctsk_path))  # type: ignore
+        task = load_task(xctsk_path)  # type: ignore
 
         # Generate XCTrack GeoJSON data with debug information
         xctrack_geojson = generate_task_geojson(task)  # type: ignore
@@ -281,7 +281,7 @@ def airscore_task(task_name: str):
 
     try:
         # Parse task using xctrack
-        task = parse_task(str(xctsk_path))  # type: ignore
+        task = load_task(xctsk_path)  # type: ignore
 
         # Calculate distances using AirScore clone
         airscore_results = calculate_airscore_distances(task)  # type: ignore

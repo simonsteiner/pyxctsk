@@ -28,6 +28,7 @@ from pyxctsk import (
     Turnpoint,
     TurnpointType,
     Waypoint,
+    load_task,
     parse_task,
 )
 from pyxctsk.qrcode.enums import QRCodeTaskType, QRCodeTurnpointType
@@ -213,7 +214,7 @@ def test_qr_code_roundtrip_comprehensive():
 
     try:
         # Parse back from image file
-        parsed_task = parse_task(tmp_path)
+        parsed_task = load_task(tmp_path)
 
         # Verify the roundtrip
         assert parsed_task.task_type == original_task.task_type

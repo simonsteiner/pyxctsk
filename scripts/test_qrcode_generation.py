@@ -18,7 +18,7 @@ script_dir = Path(__file__).parent
 src_dir = script_dir.parent / "src"
 sys.path.insert(0, str(src_dir))
 
-from pyxctsk import parse_task  # noqa: E402
+from pyxctsk import load_task, parse_task  # noqa: E402
 from pyxctsk.qrcode.image import (  # noqa: E402
     QR_CODE_SUPPORT,
     generate_qrcode_image,
@@ -116,7 +116,7 @@ def test_qr_code_generation(
         result.expected_png_exists = expected_png.exists()
 
         # Parse the task
-        task = parse_task(str(xctsk_file))
+        task = load_task(xctsk_file)
 
         # Check if original file is in waypoints format by reading it
         is_waypoints_format = False

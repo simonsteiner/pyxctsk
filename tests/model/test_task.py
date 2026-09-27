@@ -28,6 +28,7 @@ from pyxctsk import (
     Turnpoint,
     TurnpointType,
     Waypoint,
+    load_task,
     parse_task,
 )
 from pyxctsk.exceptions import InvalidTimeOfDayError
@@ -194,9 +195,9 @@ class TestTaskParsing:
         assert task.earth_model == EarthModel.WGS84
         assert len(task.turnpoints) == 17  # Based on the test file
 
-    def test_parse_task_from_file_path(self):
-        """Test parsing task directly from file path."""
-        task = parse_task(str(reference_task("task_gibe").xctsk_path))
+    def test_load_task_from_file_path(self):
+        """A path is load_task's, and a Path object is fine."""
+        task = load_task(reference_task("task_gibe").xctsk_path)
         assert task.task_type == TaskType.CLASSIC
         assert len(task.turnpoints) > 0
 

@@ -10,9 +10,11 @@ import pytest
 
 from pyxctsk import (
     InvalidFormatError,
+    load_task,
     parse_task,
 )
 from pyxctsk.qrcode import image
+from tests.corpus import reference_task
 
 
 class TestUnrecognizedInputSaysWhy:
@@ -27,12 +29,12 @@ class TestUnrecognizedInputSaysWhy:
     def test_a_missing_file_says_so(self):
         """The path case was lost when _read_file swallowed the OSError."""
         with pytest.raises(InvalidFormatError, match="No such file or directory"):
-            parse_task("/no/such/task.xctsk")
+            load_task("/no/such/task.xctsk")
 
     def test_a_directory_says_so(self, tmp_path):
         """A different OS error, reported as itself."""
         with pytest.raises(InvalidFormatError, match="Is a directory"):
-            parse_task(f"{tmp_path}/")
+            load_task(tmp_path)
 
     def test_truncated_json_is_named_as_json(self):
         """It parsed as far as being JSON-shaped; that is worth saying."""
@@ -53,7 +55,7 @@ class TestUnrecognizedInputSaysWhy:
         Image.new("RGB", (32, 32), "white").save(png)
 
         with pytest.raises(InvalidFormatError, match="no XCTSK: QR code"):
-            parse_task(str(png))
+            load_task(png)
 
     def test_an_unreadable_image_is_told_apart_from_a_blank_one(self, tmp_path):
         """The distinction the magic-byte guess could not make."""
@@ -61,7 +63,7 @@ class TestUnrecognizedInputSaysWhy:
         png.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 64)
 
         with pytest.raises(InvalidFormatError, match="could not be read"):
-            parse_task(str(png))
+            load_task(png)
 
     def test_a_missing_dependency_is_not_reported_as_a_bad_file(
         self, tmp_path, monkeypatch
@@ -72,14 +74,10 @@ class TestUnrecognizedInputSaysWhy:
         monkeypatch.setattr(image, "QR_CODE_SUPPORT", False)
 
         with pytest.raises(InvalidFormatError, match=r"pyxctsk\[qr\]"):
-            parse_task(str(png))
+            load_task(png)
 
     def test_inline_json_containing_a_slash_still_parses(self):
-        """The path heuristic matches it, so the fallthrough must survive.
-
-        `_looks_like_file_path` is `"/" in data`, so a waypoint name with a
-        slash trips it. Reading has to stay non-fatal.
-        """
+        """A slash used to make parse_task try to open the payload as a file."""
         task = parse_task(
             json.dumps(
                 {
@@ -101,6 +99,20 @@ class TestUnrecognizedInputSaysWhy:
         )
 
         assert task.turnpoints[0].waypoint.name == "A/B"
+
+    def test_parse_task_never_opens_a_file(self, tmp_path):
+        """A path string is a payload to parse_task — and says so."""
+        path = tmp_path / "task.xctsk"
+        path.write_text(reference_task("task_bevo").task.to_json())
+
+        with pytest.raises(InvalidFormatError, match="load_task reads files"):
+            parse_task(str(path))
+        assert load_task(path).turnpoints
+
+    def test_a_path_object_is_refused_by_name(self, tmp_path):
+        """It used to be read as the bytes of its own name: "invalid format"."""
+        with pytest.raises(TypeError, match="load_task"):
+            parse_task(tmp_path / "task.xctsk")  # type: ignore[arg-type]
 
     def test_unrecognized_bytes_still_fall_back_to_the_plain_message(self):
         """Nothing to say beyond "not a format I know"."""

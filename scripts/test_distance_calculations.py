@@ -32,7 +32,7 @@ from pyxctsk.distance import (
     distance_through_centers,
 )
 from pyxctsk.distance.task_distances import task_to_turnpoints
-from pyxctsk.parser import parse_task
+from pyxctsk.parser import load_task
 
 # Add task_viewer and its subdirectories to path to import AirScore utilities
 task_viewer_path = Path(__file__).parent / "task_viewer"
@@ -95,7 +95,7 @@ def load_all_tasks(tasks_dir: str) -> Dict[str, Any]:
     print(f"🔎 Found {len(task_files)} task files in '{tasks_dir}'")
     for task_file in task_files:
         try:
-            tasks[task_file.name] = parse_task(str(task_file))
+            tasks[task_file.name] = load_task(task_file)
         except Exception as e:
             print(f"❌ Failed to load {task_file.name}: {e}")
 

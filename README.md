@@ -151,12 +151,12 @@ uv run mypy src/ tests/
 ## Usage Examples
 
 ```python
-from pyxctsk import parse_task, Task, TaskType, Turnpoint, Waypoint
+from pyxctsk import load_task, parse_task, Task, TaskType, Turnpoint, Waypoint
 
 # Parse from file, URL, or QR code
-task = parse_task('task.xctsk')              # From .xctsk file
+task = load_task('task.xctsk')               # From a .xctsk file (or a QR image file)
 task = parse_task('XCTSK:{...}')             # From XCTrack URL
-task = parse_task('qr_code.png')             # From QR code image
+task = parse_task(open('qr.png', 'rb').read())  # From QR code image bytes
 
 # Access task data
 print(f"Task type: {task.task_type}")

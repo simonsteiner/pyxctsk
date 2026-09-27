@@ -244,7 +244,7 @@ From Python, if you prefer — the same report the CLI renders, as a value:
 from pathlib import Path
 from pyxctsk import DistanceReport, parse_task
 
-report = DistanceReport.from_task(parse_task(Path("your-task.xctsk").read_text()))
+report = DistanceReport.from_task(load_task("your-task.xctsk"))
 
 print(report.task_distance_m)           # S7F §7.2 task distance, metres
 print(report.speed_section_distance_m)  # S7F §7.2 speed section — None if no SSS/ESS pair

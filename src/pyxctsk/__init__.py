@@ -10,8 +10,9 @@ packages behind it hold the primitives those answers are built from. Reach into
 ``pyxctsk.export`` for those: ``LocalPlane``, ``plane_circle`` and the
 optimizer's tuning constants are deliberately not re-exported here.
 
-Start with :func:`parse_task` for reading, :class:`Task` for the model,
-:class:`DistanceReport` for every number S7F defines about a task, and
+Start with :func:`parse_task` for reading a payload (:func:`load_task` for a
+file), :class:`Task` for the model, :class:`DistanceReport` for every number
+S7F defines about a task, and
 :func:`task_to_kml` / :func:`generate_task_geojson` for a map.
 
 See http://xctrack.org/ and http://xctrack.org/Competition_Interfaces.html
@@ -83,7 +84,7 @@ from .model.task import (
     Waypoint,
 )
 from .model.validation import FULL_FORMAT_VERSION, ValidationIssue, ValidationRule
-from .parser import parse_task
+from .parser import load_task, parse_task
 from .qrcode.image import generate_qrcode_image
 from .qrcode.task import QRCodeTask
 from .renderer import OUTPUT_FORMATS, OutputFormat, render_task
@@ -150,6 +151,7 @@ __all__ = [
     "OUTPUT_FORMATS",
     "OutputFormat",
     "OptimizedRoute",
+    "load_task",
     "parse_task",
     "PROPOSED_READING",
     "pyXCTSKError",
