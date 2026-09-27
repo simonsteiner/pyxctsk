@@ -44,9 +44,24 @@ scripts/verify.sh
 VERSION="$(uv version --bump "$BUMP" --dry-run --short)"
 TAG="v${VERSION}"
 if git rev-parse "$TAG" >/dev/null 2>&1; then
-  echo "Tag $TAG already exists; aborting." >&2
+  echo "Tag $TAG already exists locally; aborting." >&2
   exit 1
 fi
+# `git pull` does not fetch every tag, so ask origin as well. ls-remote exits 2
+# when the tag is absent; anything else but 0 means origin was not reached.
+remote_status=0
+git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null || remote_status=$?
+case "$remote_status" in
+  0)
+    echo "Tag $TAG already exists on origin; aborting." >&2
+    exit 1
+    ;;
+  2) ;;
+  *)
+    echo "Could not check origin for tag $TAG; aborting." >&2
+    exit 1
+    ;;
+esac
 python3 scripts/changelog_extract.py roll "$VERSION"
 uv version --bump "$BUMP" --no-sync
 
