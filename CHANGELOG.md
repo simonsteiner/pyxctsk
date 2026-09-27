@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **Releases publish to PyPI with trusted publishing, from one workflow.** `publish.yml` is the only workflow that uploads: it runs at a `vX.Y.Z` tag — pushed by `scripts/release.sh`, or dispatched at the tag by `release.yml` — checks that the tag matches the package version and has a dated changelog section, runs the CI gate, builds once, attests build provenance, and uploads through PyPI's OIDC trusted publishing instead of a stored API token. Run from a branch, it is a dry run that builds and publishes nothing. `release.yml` and `publish.yml` call `ci.yml` rather than copying its matrix, `main` and the tag are pushed atomically, and `scripts/changelog_extract.py roll <version>` is the one place the changelog is rolled — it refuses an empty `[Unreleased]` section or a version that already has one. See `RELEASING.md`.
+
 ## [v0.6.1] - 2026-09-27
 
 ### Fixed
