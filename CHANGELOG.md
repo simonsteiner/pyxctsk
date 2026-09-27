@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [v0.6.0] - 2026-09-27
+
 ### Changed
 
 - **Breaking (API): `pyxctsk.distance` no longer exports `CONVERGENCE_EPSILON_M` or `DEFAULT_NUM_ITERATIONS`.** Nothing outside the modules defining them read either — the optimizer's tuning constants, which the top-level `pyxctsk` interface already declined to re-export. They remain importable from `pyxctsk.distance.solver` and `pyxctsk.distance.route_optimization`.
