@@ -99,7 +99,7 @@ def test_a_zero_turnpoint_type_is_an_ordinary_turnpoint():
 def test_both_formats_hold_the_same_enums():
     """Crossing the seam copies values; there is nothing left to translate."""
     task = reference_task("task_bevo").task
-    qr = QRCodeTask.from_task(task)
+    qr = task.to_qr_code_task()
 
     assert qr.task_type is task.task_type is TaskType.CLASSIC
     assert [tp.type for tp in qr.turnpoints] == [tp.type for tp in task.turnpoints]
@@ -117,7 +117,6 @@ class TestValidatingWhatArrived:
     def _payload(self, *types):
         """A competition QR task whose turnpoints carry these ``t`` values."""
         from pyxctsk.qrcode.encoding import encode_competition_turnpoint
-        from pyxctsk.qrcode.task import QRCodeTask
 
         turnpoints = []
         for i, tp_type in enumerate(types):
@@ -156,8 +155,6 @@ class TestValidatingWhatArrived:
 
     def test_a_waypoints_payload_is_exempt(self):
         """A route without cylinders has no speed section to constrain."""
-        from pyxctsk.qrcode.task import QRCodeTask
-
         waypoints = QRCodeTask.from_string(reference_task("task_dami_route").qr_string)
 
         assert waypoints.task_type is TaskType.WAYPOINTS

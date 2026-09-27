@@ -39,7 +39,6 @@ that reason, and for no other.
 from .conversion import (
     qr_code_task_to_task,
     task_to_qr_code_task,
-    task_to_qr_code_waypoints,
 )
 from .image import generate_qrcode_image
 from .models import QRCodeGoal, QRCodeSSS, QRCodeTakeoff, QRCodeTurnpoint
@@ -62,5 +61,4 @@ __all__ = [
     "QRCodeTask",
     "QRCodeTurnpoint",
     "task_to_qr_code_task",
-    "task_to_qr_code_waypoints",
 ]

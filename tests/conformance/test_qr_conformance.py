@@ -52,7 +52,7 @@ class TestCompressedQRScheme:
 
         qr = original.to_qr_code_task()
         compressed = (
-            qr.to_waypoints_string(compressed=True)
+            qr.as_waypoints().to_string(compressed=True)
             if waypoints
             else qr.to_string(compressed=True)
         )
@@ -138,7 +138,7 @@ class TestEachQRShapeIsMeasuredAgainstItsOwnKeys:
 
     def test_the_waypoints_roundtrip_keeps_them(self):
         """The whole payload comes back, which it did not before."""
-        emitted = json.loads(self._parsed().to_waypoints_json())
+        emitted = json.loads(self._parsed().as_waypoints().to_json())
 
         assert emitted == self.SOURCE
 
@@ -184,7 +184,7 @@ class TestWaypointsTaskEncoding:
         reference = reference_task(stem)
         task = parse_task(reference.qr_string)
 
-        assert task.to_qr_code_task().to_waypoints_string() == reference.qr_string
+        assert task.to_qr_code_task().as_waypoints().to_string() == reference.qr_string
 
     def test_competition_z_keeps_its_radius(self):
         """The four-number competition encoding must be left alone."""

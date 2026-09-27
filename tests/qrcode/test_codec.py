@@ -52,9 +52,7 @@ def test_qr_code_string_matches_the_expected_one(reference):
     encoder at all.
     """
     qr = reference.task.to_qr_code_task()
-    emitted = (
-        qr.to_waypoints_string() if reference.is_waypoints_format else qr.to_string()
-    )
+    emitted = qr.to_string()
 
     assert emitted.startswith("XCTSK:")
     assert emitted == reference.qr_string
@@ -443,7 +441,7 @@ def test_waypoints_format():
     )
 
     # Test simplified format
-    simplified_json = task.to_waypoints_json()
+    simplified_json = task.as_waypoints().to_json()
 
     # Parse the JSON to verify structure
     data = json.loads(simplified_json)
@@ -496,7 +494,7 @@ def test_waypoints_round_trip():
     )
 
     # Test round-trip conversion
-    simplified_json = task.to_waypoints_json()
+    simplified_json = task.as_waypoints().to_json()
     parsed_task = QRCodeTask.from_json(simplified_json)
 
     assert parsed_task.task_type == TaskType.WAYPOINTS
@@ -547,7 +545,7 @@ def test_waypoints_url_format():
     )
 
     # Test URL format
-    url_string = task.to_waypoints_string()
+    url_string = task.as_waypoints().to_string()
     assert url_string.startswith("XCTSK:"), "URL should start with XCTSK:"
 
     # Parse from URL

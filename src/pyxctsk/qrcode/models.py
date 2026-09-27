@@ -233,33 +233,25 @@ class QRCodeTurnpoint:
     #: :data:`QR_TURNPOINT_SHAPE`; everything else lands in ``unknown``.
     KNOWN_KEYS: ClassVar[frozenset[str]]
 
-    #: Keys the simplified XC/Waypoints shape understands, derived from
-    #: :data:`QR_WAYPOINT_TURNPOINT_SHAPE`. A description or a type in such a
-    #: payload is a key that shape does not define, so it is carried verbatim
-    #: rather than read into an attribute the shape would never write back.
-    SIMPLIFIED_KEYS: ClassVar[frozenset[str]]
-
-    def to_dict(self, simplified: bool = False) -> dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
 
         Uses custom polyline encoding for turnpoint coordinates (lon, lat, alt, radius)
         following XCTrack's implementation. The encoding is lossy with ~0.8m precision
         but well within FAI 5m tolerance.
 
-        Args:
-            simplified: If True, use simplified XC/Waypoints format with only "z" and "n"
+        The competition shape. The XC/Waypoints one is written by the task,
+        which chooses a shape once for all its turnpoints; a ``simplified``
+        flag here was a third place that choice could be made, and nothing
+        ever set it.
 
         Returns:
             Dictionary with fields: d (description), n (name), t (type), z (encoded coords)
-            For simplified format: only n (name) and z (encoded coords)
         """
-        shape = QR_WAYPOINT_TURNPOINT_SHAPE if simplified else QR_TURNPOINT_SHAPE
-        return shape.write(self)
+        return QR_TURNPOINT_SHAPE.write(self)
 
     @classmethod
-    def from_dict(
-        cls, data: dict[str, Any], simplified: bool = False
-    ) -> "QRCodeTurnpoint":
+    def from_dict(cls, data: dict[str, Any]) -> "QRCodeTurnpoint":
         """Create from dictionary.
 
         The ``z`` field is the only source of coordinates, and its length says
@@ -273,20 +265,16 @@ class QRCodeTurnpoint:
         the task in the Gulf of Guinea and report it as read successfully.
 
         Args:
-            data: Dictionary with turnpoint data
-            simplified: If True, read the simplified XC/Waypoints shape, which
-                defines only ``n`` and ``z``. Mirrors :meth:`to_dict`, so what
-                each shape reads is exactly what it writes.
+            data: Dictionary with turnpoint data, in the competition shape.
 
         Returns:
             QRCodeTurnpoint instance
 
         Raises:
-            KeyError: If ``z`` or ``n`` is missing.
-            ValueError: If ``z`` does not decode to three or four numbers.
+            MalformedPayloadError: If ``z`` or ``n`` is missing, or ``z`` does
+                not decode to three or four numbers.
         """
-        shape = QR_WAYPOINT_TURNPOINT_SHAPE if simplified else QR_TURNPOINT_SHAPE
-        return shape.read(data)
+        return QR_TURNPOINT_SHAPE.read(data)
 
 
 @dataclass(frozen=True)
@@ -376,4 +364,3 @@ QR_WAYPOINT_TURNPOINT_SHAPE = Shape(
     ),
     ext_key=QR_EXTENSIONS_KEY,
 )
-QRCodeTurnpoint.SIMPLIFIED_KEYS = QR_WAYPOINT_TURNPOINT_SHAPE.keys

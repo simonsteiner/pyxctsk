@@ -259,35 +259,24 @@ class TestTaskTypeValue:
         in-memory copy kept radii, turnpoint types and the timing sections that
         the simplified payload has nowhere to store. Serialized output was
         right either way, but ``.as_waypoints().to_task()`` and
-        ``parse_task(.to_waypoints_string())`` described different tasks.
+        ``parse_task(.as_waypoints().to_string())`` described different tasks.
         """
         qr = parse_task(reference_task("task_bevo").qr_string).to_qr_code_task()
 
         direct = qr.as_waypoints().to_task()
-        round_tripped = parse_task(qr.to_waypoints_string())
+        round_tripped = parse_task(qr.as_waypoints().to_string())
 
         assert direct.to_json() == round_tripped.to_json()
         assert all(tp.radius == 0 for tp in direct.turnpoints)
         assert all(tp.type is None for tp in direct.turnpoints)
         assert direct.sss is None
 
-    def test_both_waypoints_entry_points_agree(self):
-        """from_task_waypoints() and to_waypoints_string() are one definition."""
-        from pyxctsk.qrcode.task import QRCodeTask
-
-        task = parse_task(reference_task("task_bevo").qr_string)
-
-        assert (
-            QRCodeTask.from_task_waypoints(task).to_string()
-            == task.to_qr_code_task().to_waypoints_string()
-        )
-
     def test_as_waypoints_does_not_mutate_the_original(self):
         """Downgrading to waypoints returns a copy, so the source is reusable."""
         qr = parse_task(reference_task("task_bevo").qr_string).to_qr_code_task()
 
         before = qr.to_json()
-        qr.to_waypoints_json()
+        qr.as_waypoints().to_json()
 
         assert qr.to_json() == before
 

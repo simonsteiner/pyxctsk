@@ -53,7 +53,7 @@ LEAVES = {"exceptions", "metadata"}
 EXPECTED_DEFERRED_IMPORTS = {
     # Task.to_qr_code_task: conversion imports model.task to build a Task.
     ("model/task.py", "qrcode.conversion"),
-    # QRCodeTask.from_task / .from_task_waypoints / .to_task: conversion
+    # QRCodeTask.to_task: conversion
     # imports qrcode.task for QRCodeTask, so this one is a cycle inside the
     # qrcode package rather than between two of them.
     ("qrcode/task.py", "qrcode.conversion"),

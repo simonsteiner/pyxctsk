@@ -62,8 +62,7 @@ from .qrcode.image import read_qrcode_image
 from .qrcode.task import (
     QR_CODE_SCHEME,
     QR_CODE_SCHEME_COMPRESSED,
-    QR_TASK_SHAPE,
-    QR_WAYPOINTS_TASK_SHAPE,
+    QR_FORMAT_KEYS,
     QRCodeTask,
 )
 
@@ -84,14 +83,10 @@ Arrived = Task | QRCodeTask
 
 #: The top-level keys only the full format has. Derived from the shapes rather
 #: than listed, so an adapter cannot recognize a key its shape does not read.
-FULL_FORMAT_ONLY_KEYS = (
-    TASK_SHAPE.keys - QR_TASK_SHAPE.keys - QR_WAYPOINTS_TASK_SHAPE.keys
-)
+FULL_FORMAT_ONLY_KEYS = TASK_SHAPE.keys - QR_FORMAT_KEYS
 
 #: The top-level keys only the QR format has, across both of its shapes.
-QR_FORMAT_ONLY_KEYS = (
-    QR_TASK_SHAPE.keys | QR_WAYPOINTS_TASK_SHAPE.keys
-) - TASK_SHAPE.keys
+QR_FORMAT_ONLY_KEYS = QR_FORMAT_KEYS - TASK_SHAPE.keys
 
 #: Magic bytes for the image formats the QR adapter can read. This is the one
 #: list of them: it is what the image adapter recognizes *and* what tells a

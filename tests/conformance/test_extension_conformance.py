@@ -328,20 +328,20 @@ class TestWaypointsFormatPreservesExtras:
 
     def test_root_extensions_are_written(self):
         """...and come back out again."""
-        emitted = json.loads(self._parsed().to_waypoints_json())
+        emitted = json.loads(self._parsed().as_waypoints().to_json())
 
         assert emitted["x"] == [{"id": "ACME", "a": "1"}]
 
     def test_turnpoint_extensions_and_unknown_are_written(self):
         """Per-turnpoint "x" and unknown keys were read but never re-emitted."""
-        emitted = json.loads(self._parsed().to_waypoints_json())
+        emitted = json.loads(self._parsed().as_waypoints().to_json())
 
         assert emitted["t"][0]["x"] == [{"k": "v"}]
         assert emitted["t"][0]["zz"] == "turnpoint-extra"
 
     def test_simplified_roundtrip_is_lossless(self):
         """Nothing in the source may be dropped."""
-        emitted = json.loads(self._parsed().to_waypoints_json())
+        emitted = json.loads(self._parsed().as_waypoints().to_json())
 
         assert emitted == self.SOURCE
 
@@ -350,6 +350,6 @@ class TestWaypointsFormatPreservesExtras:
         from pyxctsk.qrcode.task import QRCodeTask
 
         plain = {"T": "W", "V": 2, "t": [{"n": "WPT1", "z": "|dz~FligrB?"}]}
-        emitted = json.loads(QRCodeTask.from_dict(plain).to_waypoints_json())
+        emitted = json.loads(QRCodeTask.from_dict(plain).as_waypoints().to_json())
 
         assert emitted == plain

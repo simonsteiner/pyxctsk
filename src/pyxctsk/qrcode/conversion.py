@@ -40,12 +40,7 @@ from ..model.task import (
 )
 from ..model.validation import FULL_FORMAT_VERSION
 from .models import QRCodeGoal, QRCodeSSS, QRCodeTakeoff, QRCodeTurnpoint
-from .task import QR_CODE_TASK_VERSION, QRCodeTask
-
-#: What a carried unknown key may not occupy on the QR side. The QR task
-#: renders as either of its two shapes and keeps its unknown keys through
-#: ``as_waypoints()``, so both shapes' keys are reserved for it.
-_QR_TASK_KEYS = QRCodeTask.COMPETITION_KEYS | QRCodeTask.SIMPLIFIED_KEYS
+from .task import QR_CODE_TASK_VERSION, QR_FORMAT_KEYS, QRCodeTask
 
 
 def task_to_qr_code_task(task: Task) -> QRCodeTask:
@@ -112,26 +107,8 @@ def task_to_qr_code_task(task: Task) -> QRCodeTask:
         sss=qr_sss,
         goal=qr_goal,
         extensions=task.extensions,
-        unknown=strip_foreign_keys(task.unknown, _QR_TASK_KEYS),
+        unknown=strip_foreign_keys(task.unknown, QR_FORMAT_KEYS),
     )
-
-
-def task_to_qr_code_waypoints(task: Task) -> QRCodeTask:
-    """Convert a Task to the XC/Waypoints simplified QR format.
-
-    The simplified format is "a simple route from waypoints without cylinders".
-    Reducing a task to what it can represent is
-    :meth:`QRCodeTask.as_waypoints`'s job, so this is the ordinary conversion
-    followed by that — rather than a second, subtly different idea of what a
-    waypoints task keeps.
-
-    Args:
-        task: Task object to convert.
-
-    Returns:
-        QRCodeTask: A WAYPOINTS task holding only the essential turnpoint data.
-    """
-    return task_to_qr_code_task(task).as_waypoints()
 
 
 def qr_code_task_to_task(qr: QRCodeTask) -> Task:

@@ -30,7 +30,7 @@ import binascii
 import json
 import zlib
 from dataclasses import dataclass, field, replace
-from typing import TYPE_CHECKING, Any, ClassVar, Mapping, MutableMapping
+from typing import TYPE_CHECKING, Any, Mapping, MutableMapping
 
 from ..exceptions import MalformedPayloadError
 from ..model.enums import EarthModel, TaskType
@@ -150,19 +150,6 @@ class QRCodeTask:
     extensions: list[dict[str, Any]] = field(default_factory=list)
     unknown: dict[str, Any] = field(default_factory=dict)
 
-    #: Keys the competition shape reads, derived from
-    #: :data:`QR_TASK_SHAPE`; everything else lands in ``unknown``.
-    COMPETITION_KEYS: ClassVar[frozenset[str]]
-
-    #: Keys the simplified XC/Waypoints shape reads, derived from
-    #: :data:`QR_WAYPOINTS_TASK_SHAPE`. Deliberately *not* the union with
-    #: :attr:`COMPETITION_KEYS`: a single allow-list spanning both shapes told
-    #: the passthrough that a competition key in a waypoints payload was
-    #: understood, when this shape neither reads nor writes it, so ``e``,
-    #: ``to`` and ``g`` were swallowed instead of carried through. With two
-    #: tables there is no one place that union could be written down.
-    SIMPLIFIED_KEYS: ClassVar[frozenset[str]]
-
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
 
@@ -173,7 +160,7 @@ class QRCodeTask:
         simplified XC/Waypoints form, identified by ``"T": "W"``; anything else
         is the competition form, whose only defined ``taskType`` is
         ``"CLASSIC"``. To render a task in the other shape, change its type —
-        see :meth:`to_waypoints_json`.
+        see :meth:`as_waypoints`.
 
         Returns:
             Dictionary with QR code task format fields
@@ -266,14 +253,6 @@ class QRCodeTask:
             goal=None,
         )
 
-    def to_waypoints_json(self) -> str:
-        """Convert to XC/Waypoints simplified JSON format.
-
-        Returns:
-            Compact JSON string in XC/Waypoints format
-        """
-        return self.as_waypoints().to_json()
-
     def to_string(self, compressed: bool = False) -> str:
         """Convert to a QR code URL string.
 
@@ -288,17 +267,6 @@ class QRCodeTask:
         if compressed:
             return QR_CODE_SCHEME_COMPRESSED + compress_payload(self.to_json())
         return QR_CODE_SCHEME + self.to_json()
-
-    def to_waypoints_string(self, compressed: bool = False) -> str:
-        """Convert to an XC/Waypoints QR code URL string.
-
-        Args:
-            compressed: If True, emit the ``XCTSKZ:`` form.
-
-        Returns:
-            Complete QR code string in simplified format
-        """
-        return self.as_waypoints().to_string(compressed=compressed)
 
     @classmethod
     def from_json(cls, json_str: str) -> "QRCodeTask":
@@ -336,34 +304,6 @@ class QRCodeTask:
             f"Invalid QR code scheme, expected {QR_CODE_SCHEME} "
             f"or {QR_CODE_SCHEME_COMPRESSED}"
         )
-
-    @classmethod
-    def from_task(cls, task: "Task") -> "QRCodeTask":
-        """Convert from regular Task format.
-
-        Args:
-            task: Task object to convert
-
-        Returns:
-            QRCodeTask instance optimized for QR code embedding
-        """
-        from .conversion import task_to_qr_code_task
-
-        return task_to_qr_code_task(task)
-
-    @classmethod
-    def from_task_waypoints(cls, task: "Task") -> "QRCodeTask":
-        """Convert from regular Task format to XC/Waypoints simplified format.
-
-        Args:
-            task: Task object to convert
-
-        Returns:
-            QRCodeTask instance optimized for XC/Waypoints format
-        """
-        from .conversion import task_to_qr_code_waypoints
-
-        return task_to_qr_code_waypoints(task)
 
     def validate(self) -> "list[ValidationIssue]":
         """Check this payload against the spec's structural rules.
@@ -523,7 +463,6 @@ QR_TASK_SHAPE = Shape(
     ),
     ext_key=QR_EXTENSIONS_KEY,
 )
-QRCodeTask.COMPETITION_KEYS = QR_TASK_SHAPE.keys
 
 #: The simplified XC/Waypoints shape: a task type, a version, and a route.
 QR_WAYPOINTS_TASK_SHAPE = Shape(
@@ -540,4 +479,9 @@ QR_WAYPOINTS_TASK_SHAPE = Shape(
     ),
     ext_key=QR_EXTENSIONS_KEY,
 )
-QRCodeTask.SIMPLIFIED_KEYS = QR_WAYPOINTS_TASK_SHAPE.keys
+
+#: Every key either of this format's two shapes defines. What a carried
+#: unknown key may not occupy when a task crosses into this format, and what
+#: the parser subtracts the full format's keys from to recognize this one. It
+#: was computed twice, in each of those places.
+QR_FORMAT_KEYS = QR_TASK_SHAPE.keys | QR_WAYPOINTS_TASK_SHAPE.keys
