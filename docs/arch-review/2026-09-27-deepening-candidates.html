@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Architecture review — pyxctsk — 2026-09-27</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+</script>
+<style>
+  .seam { border-style: dashed; }
+  .deep { background: linear-gradient(135deg, #0f172a, #1e293b); color: #e2e8f0; }
+  .lbl { font-size: .68rem; letter-spacing: .08em; text-transform: uppercase; }
+  .mermaid { display:flex; justify-content:center; }
+</style>
+</head>
+<body class="bg-stone-50 text-slate-900 font-sans">
+<main class="max-w-6xl mx-auto px-6 py-12 space-y-12">
+
+<header class="space-y-3">
+  <h1 class="font-serif text-4xl">pyxctsk — deepening candidates</h1>
+  <p class="text-slate-500 text-sm">2026-09-27 · at <span class="font-mono">0b2ad41</span> (<span class="font-mono">main</span>) · scoped by churn since the 08-19 review: <span class="font-mono">distance/</span> after the solver deepening (589b5c8), the shape layer and the parser. None of these repeats an applied 08-19 candidate.</p>
+  <div class="flex flex-wrap gap-4 text-xs text-slate-600 pt-2">
+    <span class="flex items-center gap-2"><span class="inline-block w-5 h-4 border-2 border-slate-500 bg-white"></span>module</span>
+    <span class="flex items-center gap-2"><span class="inline-block w-8 border-t-2 border-dashed border-slate-500"></span>seam</span>
+    <span class="flex items-center gap-2"><span class="inline-block w-8 border-t-2 border-red-600"></span>leak</span>
+    <span class="flex items-center gap-2"><span class="inline-block w-5 h-4 deep rounded-sm"></span>deep module</span>
+  </div>
+</header>
+
+<section id="candidates" class="space-y-10">
+
+<!-- 1 -->
+<article id="c1" class="rounded-xl bg-white border border-slate-200 shadow-sm p-6 space-y-5">
+  <div class="flex items-start justify-between gap-4">
+    <h2 class="font-serif text-2xl">1 · Make the measured task's invariant hold</h2>
+    <div class="flex gap-2 shrink-0"><span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-xs font-semibold">Strong</span><span class="px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-xs">in-process</span><span class="px-2 py-0.5 rounded bg-red-100 text-red-700 text-xs">live defect</span></div>
+  </div>
+  <p class="font-mono text-sm text-slate-600">distance/measured_task.py:81-127 · distance/report.py:117-129, 190-219 · export/common.py:58-61 · tests/export/test_geojson.py:34-64,149</p>
+  <div class="grid md:grid-cols-2 gap-4">
+    <div class="rounded-lg border border-slate-200 p-4"><div class="lbl text-slate-500 mb-2">Before</div>
+      <pre class="mermaid">
+flowchart TB
+  FT[from_task] --> MT
+  CTOR["MeasuredTask(task, turnpoints, route)<br/>public · unchecked"] --> MT[Measured task]
+  MT --> R[DistanceReport<br/>zip drops extras]
+  TD[TaskDrawing<br/>task + measured.task] --> MT
+  T[geojson tests<br/>turnpoints=()] --> CTOR
+  classDef leak stroke:#dc2626,stroke-width:2px,color:#991b1b;
+  class CTOR,T,TD leak
+      </pre>
+      <p class="text-xs text-red-700 mt-2">task A + task B's route → 47.8 km reported where 94.0 km is true. No error.</p>
+    </div>
+    <div class="rounded-lg border border-slate-200 p-4"><div class="lbl text-slate-500 mb-2">After</div>
+      <div class="deep rounded-lg p-5 space-y-3">
+        <div class="lbl text-slate-400">Measured task</div>
+        <div class="border border-dashed border-slate-400 rounded p-2 text-sm">from_task(task)</div>
+        <div class="border border-dashed border-slate-400 rounded p-2 text-sm">a checked, named seam for tests (task + prebuilt route)</div>
+        <div class="text-xs text-slate-400">__post_init__: turnpoints derive from task · route length matches</div>
+      </div>
+      <div class="mt-3 text-sm text-slate-600">TaskDrawing.task → reads <span class="font-mono">measured.task</span>; no second copy.</div>
+    </div>
+  </div>
+  <div class="grid md:grid-cols-3 gap-4 text-sm">
+    <div><div class="lbl text-slate-500">Problem</div>The value built to make a mismatched pair unrepresentable is represented by any caller of its public constructor. The 12.8 km bug is still reachable.</div>
+    <div><div class="lbl text-slate-500">Solution</div>The measured task checks its own invariant. Tests get a named seam instead of constructing a half-empty one.</div>
+    <div><div class="lbl text-slate-500">Wins</div><ul class="list-disc ml-4"><li>Locality: invariant lives in one module</li><li>Docstring promise becomes true</li><li>Tests stop testing past the interface</li></ul></div>
+  </div>
+</article>
+
+<!-- 2 -->
+<article id="c2" class="rounded-xl bg-white border border-slate-200 shadow-sm p-6 space-y-5">
+  <div class="flex items-start justify-between gap-4">
+    <h2 class="font-serif text-2xl">2 · Let the field table refuse a malformed payload</h2>
+    <div class="flex gap-2 shrink-0"><span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-xs font-semibold">Strong</span><span class="px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-xs">in-process</span><span class="px-2 py-0.5 rounded bg-red-100 text-red-700 text-xs">live defect</span></div>
+  </div>
+  <p class="font-mono text-sm text-slate-600">model/shape.py:104-116, 236-243 · parser.py:84-90 (_PARSE_ERRORS) · qrcode/task.py:214, 298-302 · cli.py:204</p>
+  <div class="grid md:grid-cols-2 gap-4">
+    <div class="rounded-lg border border-slate-200 p-4"><div class="lbl text-slate-500 mb-2">Before: a cross-section, errors leak upward</div>
+      <div class="space-y-1 text-sm">
+        <div class="border-l-4 border-slate-400 bg-slate-50 px-3 py-2">cli · catches <span class="font-mono">pyXCTSKError, OSError</span></div>
+        <div class="border-l-4 border-slate-400 bg-slate-50 px-3 py-2">parser · <span class="font-mono">_PARSE_ERRORS</span> = whatever leaked last time</div>
+        <div class="border-l-4 border-slate-400 bg-slate-50 px-3 py-2">Task.from_json · QRCodeTask.from_string · raise ValueError / KeyError</div>
+        <div class="border-l-4 border-red-500 bg-red-50 px-3 py-2">Field table · <span class="font-mono">data.get(…)</span> on a list, an int, a str</div>
+      </div>
+      <p class="text-xs text-red-700 mt-2 font-mono">echo -n 'XCTSK:[]' | pyxctsk convert → AttributeError traceback<br/>"timeGates":"12:00:00Z" → "Invalid time string: 1"</p>
+    </div>
+    <div class="rounded-lg border border-slate-200 p-4"><div class="lbl text-slate-500 mb-2">After</div>
+      <div class="space-y-1 text-sm">
+        <div class="border-l-4 border-slate-300 px-3 py-2 text-slate-500">cli · unchanged</div>
+        <div class="border-l-4 border-slate-300 px-3 py-2 text-slate-500">parser · catches one type</div>
+        <div class="deep rounded px-3 py-4">Field table · checks container types · raises <span class="font-mono">MalformedPayloadError</span> with a key path: <span class="font-mono">turnpoints[0].waypoint</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="grid md:grid-cols-3 gap-4 text-sm">
+    <div><div class="lbl text-slate-500">Problem</div>The shape layer trusts wire types. The parser keeps a list of error types that grows each time a new one leaks out, and the public constructors sit outside the one-<span class="font-mono">except</span> hierarchy.</div>
+    <div><div class="lbl text-slate-500">Solution</div>The field table's read traversal owns type checking and raises one error from the hierarchy, which names where in the payload it failed.</div>
+    <div><div class="lbl text-slate-500">Wins</div><ul class="list-disc ml-4"><li>Leverage: every shape guarded at once</li><li>Delete _PARSE_ERRORS</li><li>Errors name the key path</li></ul></div>
+  </div>
+</article>
+
+<!-- 3 -->
+<article id="c3" class="rounded-xl bg-white border border-slate-200 shadow-sm p-6 space-y-5">
+  <div class="flex items-start justify-between gap-4">
+    <h2 class="font-serif text-2xl">3 · One earth model per route, not one per turnpoint</h2>
+    <div class="flex gap-2 shrink-0"><span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-xs font-semibold">Strong</span><span class="px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-xs">in-process</span></div>
+  </div>
+  <p class="font-mono text-sm text-slate-600">distance/turnpoint.py (TaskTurnpoint.earth_model, TurnpointGeometry, :215-220) · route_optimization.py:170-173 · goal_line.py:293 · report.py:149 · measured_task.py:76</p>
+  <div class="grid md:grid-cols-2 gap-4">
+    <div class="rounded-lg border border-slate-200 p-4"><div class="lbl text-slate-500 mb-2">Before: five holders, one reader</div>
+      <svg viewBox="0 0 420 230" class="w-full h-56">
+        <g font-size="11" font-family="monospace">
+          <rect x="10" y="10" width="70" height="30" fill="#fff" stroke="#dc2626" stroke-width="2"/><text x="18" y="29">tp[0].em</text>
+          <rect x="90" y="10" width="70" height="30" fill="#f1f5f9" stroke="#94a3b8"/><text x="98" y="29" fill="#64748b">tp[1].em</text>
+          <rect x="170" y="10" width="70" height="30" fill="#f1f5f9" stroke="#94a3b8"/><text x="178" y="29" fill="#64748b">tp[2].em</text>
+          <text x="250" y="29" fill="#64748b">… ignored</text>
+          <rect x="10" y="80" width="150" height="30" fill="#fff" stroke="#64748b"/><text x="18" y="99">optimizer earth_model=</text>
+          <text x="170" y="99" fill="#64748b">0 callers</text>
+          <rect x="10" y="130" width="120" height="30" fill="#fff" stroke="#64748b"/><text x="18" y="149">LocalPlane.em</text>
+          <rect x="150" y="130" width="130" height="30" fill="#fff" stroke="#64748b"/><text x="158" y="149">OptimizedRoute.em</text>
+          <rect x="300" y="130" width="110" height="30" fill="#fff" stroke="#dc2626" stroke-width="2"/><text x="306" y="149">GoalLine ← task</text>
+          <line x1="45" y1="40" x2="70" y2="130" stroke="#dc2626" stroke-width="2"/>
+          <text x="10" y="195" fill="#991b1b">"WSG84" on tp[1]: accepted. On tp[0]: raises.</text>
+          <text x="10" y="213" fill="#991b1b">[FAI,WGS,WGS] vs [WGS,FAI,FAI]: 278 m apart</text>
+        </g>
+      </svg>
+    </div>
+    <div class="rounded-lg border border-slate-200 p-4"><div class="lbl text-slate-500 mb-2">After</div>
+      <pre class="mermaid">
+flowchart LR
+  T[task.earth_model] --> MT[Measured task]
+  MT -->|one argument| O[Route optimizer]
+  O --> P[LocalPlane] --> R[OptimizedRoute.earth_model]
+  R --> G[GoalLine]
+  R --> DR[DistanceReport]
+  classDef deep fill:#0f172a,color:#e2e8f0,stroke:#0f172a;
+  class MT deep
+      </pre>
+    </div>
+  </div>
+  <div class="grid md:grid-cols-3 gap-4 text-sm">
+    <div><div class="lbl text-slate-500">Problem</div>A property of the task is copied onto every turnpoint and read from the first. That reopens the misspelling bug <span class="font-mono">EarthModelLike</span> was built to close, and the goal line and the report ask two different places.</div>
+    <div><div class="lbl text-slate-500">Solution</div>The optimizer takes one earth model, supplied by the measured task. <span class="font-mono">TurnpointGeometry</span> drops back to position and radius, and everything downstream reads the route.</div>
+    <div><div class="lbl text-slate-500">Wins</div><ul class="list-disc ml-4"><li>Interface shrinks: TurnpointGeometry −1 attr</li><li>Locality: one answer to "which earth"</li><li>Mixed-model state unrepresentable</li></ul></div>
+  </div>
+  <div class="rounded bg-amber-50 border border-amber-200 px-4 py-2 text-sm text-amber-900">⚠ Revisits ADR 0003's <em>mechanism</em>, not its decision. It chose a per-turnpoint attribute "without signature churn" for the CLI and export callers. All of those callers now go through <span class="font-mono">MeasuredTask.from_task</span>, so that reason no longer applies.</div>
+</article>
+
+<!-- 4 -->
+<article id="c4" class="rounded-xl bg-white border border-slate-200 shadow-sm p-6 space-y-5">
+  <div class="flex items-start justify-between gap-4">
+    <h2 class="font-serif text-2xl">4 · Finish the solver seam: takeoff is a point, projection is the plane's</h2>
+    <div class="flex gap-2 shrink-0"><span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-xs font-semibold">Strong</span><span class="px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-xs">in-process</span></div>
+  </div>
+  <p class="font-mono text-sm text-slate-600">distance/solver.py:182-184, 282-286 · route_optimization.py:133-139 · turnpoint.py (plane_circle, point_on_boundary, boundary_point, distance_through_centers) · plane.py:153-154</p>
+  <div class="grid md:grid-cols-2 gap-4">
+    <div class="rounded-lg border border-slate-200 p-4"><div class="lbl text-slate-500 mb-2">Before: reading one pass = six stops</div>
+      <pre class="mermaid">
+flowchart LR
+  RO[route_optimization<br/>_corrected_path<br/>i==0 takeoff rule] --> PC[turnpoint.plane_circle]
+  RO --> LP[plane.xy / lon_lat]
+  RO --> S[solver<br/>i&gt;1 takeoff rule]
+  RO --> PB[turnpoint.point_on_boundary]
+  PB --> SB[earth.snap_to_boundary]
+  BP[turnpoint.boundary_point<br/>tests only] --> S
+  classDef leak stroke:#dc2626,stroke-width:2px,color:#991b1b;
+  class RO,S,BP leak
+      </pre>
+    </div>
+    <div class="rounded-lg border border-slate-200 p-4"><div class="lbl text-slate-500 mb-2">After</div>
+      <div class="deep rounded-lg p-5 space-y-2 text-sm">
+        <div class="lbl text-slate-400">route optimization · project → solve → correct</div>
+        <div class="text-slate-400 text-xs">takeoff projected once as a zero-radius circle</div>
+        <div class="grid grid-cols-2 gap-2 text-xs">
+          <div class="border border-dashed border-slate-500 rounded p-2 text-slate-300">LocalPlane.circle()</div>
+          <div class="border border-dashed border-slate-500 rounded p-2 text-slate-300">snap onto boundary</div>
+        </div>
+        <div class="border border-slate-500 rounded p-2 text-xs text-slate-300">solver: circles in, points out, no turnpoint rules</div>
+      </div>
+      <p class="text-xs text-emerald-700 mt-2">Probe: both takeoff rules deleted and takeoff projected as a radius 0 circle. 52 corpus routes identical; suite green.</p>
+    </div>
+  </div>
+  <div class="grid md:grid-cols-3 gap-4 text-sm">
+    <div><div class="lbl text-slate-500">Problem</div>The solver says it "knows nothing of turnpoints" but carries ADR 0002's takeoff rule, and the orchestration applies it again. <span class="font-mono">turnpoint.py</span> is a grab-bag holding projection helpers and a test-only <span class="font-mono">boundary_point</span>.</div>
+    <div><div class="lbl text-slate-500">Solution</div>State the takeoff rule once, at projection. Projection and correction become <span class="font-mono">LocalPlane</span> methods or private to route optimization. <span class="font-mono">turnpoint.py</span> shrinks to the protocol and the value.</div>
+    <div><div class="lbl text-slate-500">Wins</div><ul class="list-disc ml-4"><li>Solver seam becomes true</li><li>Behaviour-preserving, corpus-proven</li><li>Delete an untested special case</li></ul></div>
+  </div>
+  <div class="rounded bg-amber-50 border border-amber-200 px-4 py-2 text-sm text-amber-900">Consistent with ADR 0002: the takeoff still counts as a point to touch. The change is where that rule is written, not what it says.</div>
+</article>
+
+<!-- 5 -->
+<article id="c5" class="rounded-xl bg-white border border-slate-200 shadow-sm p-6 space-y-5">
+  <div class="flex items-start justify-between gap-4">
+    <h2 class="font-serif text-2xl">5 · One QR image module: encode and decode side by side</h2>
+    <div class="flex gap-2 shrink-0"><span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-xs font-semibold">Worth exploring</span><span class="px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-xs">local-substitutable</span></div>
+  </div>
+  <p class="font-mono text-sm text-slate-600">parser.py:64-73, 329-361 · qrcode/image.py · tests/qr_test_utils.py · tests/conformance/*_fixtures.py · scripts/check_qr_deps.py, extract_qr_from_html.py, test_qrcode_generation.py</p>
+  <div class="grid md:grid-cols-2 gap-4">
+    <div class="rounded-lg border border-slate-200 p-4"><div class="lbl text-slate-500 mb-2">Before</div>
+      <pre class="mermaid">
+flowchart TB
+  subgraph parser.py
+    IA[image adapter<br/>QR_CODE_SUPPORT #1<br/>zxingcpp] -->|except _PARSE_ERRORS: continue| UA[URL adapter]
+  end
+  subgraph qrcode/image.py
+    ENC[encoder<br/>QR_CODE_SUPPORT #2<br/>qrcode+PIL]
+  end
+  X[8 direct zxingcpp.read_barcodes<br/>in tests + scripts]
+  classDef leak stroke:#dc2626,stroke-width:2px,color:#991b1b;
+  class IA,X leak
+      </pre>
+      <p class="text-xs text-red-700 mt-2">A PNG with a malformed payload reports "carries no XCTSK: QR code" and loses the real reason.</p>
+    </div>
+    <div class="rounded-lg border border-slate-200 p-4"><div class="lbl text-slate-500 mb-2">After</div>
+      <div class="deep rounded-lg p-5 space-y-2 text-sm">
+        <div class="lbl text-slate-400">qrcode/image.py · one support flag</div>
+        <div class="border border-dashed border-slate-500 rounded p-2">generate_qrcode_image(text)</div>
+        <div class="border border-dashed border-slate-500 rounded p-2">read_qrcode_image(bytes) → list[str]</div>
+      </div>
+      <div class="mt-3 text-sm text-slate-600">The image adapter is decode, then the URL adapter. Its errors pass through. Tests and scripts call the library.</div>
+    </div>
+  </div>
+  <div class="grid md:grid-cols-3 gap-4 text-sm">
+    <div><div class="lbl text-slate-500">Problem</div>The QR image codec is split between the front door and the <span class="font-mono">qrcode</span> package, with two dependency flags that check different libraries. With no decode function in the library, eight callers use zxing directly.</div>
+    <div><div class="lbl text-slate-500">Solution</div>Put the decoder beside the encoder behind one flag. The parser adapter composes it with the URL adapter.</div>
+    <div><div class="lbl text-slate-500">Wins</div><ul class="list-disc ml-4"><li>Locality: optional deps in one module</li><li>Leverage: 8 call sites use the library</li><li>Real error reasons survive</li></ul></div>
+  </div>
+</article>
+
+<!-- 6 -->
+<article id="c6" class="rounded-xl bg-white border border-slate-200 shadow-sm p-6 space-y-5">
+  <div class="flex items-start justify-between gap-4">
+    <h2 class="font-serif text-2xl">6 · The cylinder outline belongs beside the goal line</h2>
+    <div class="flex gap-2 shrink-0"><span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-xs font-semibold">Worth exploring</span><span class="px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-xs">in-process</span></div>
+  </div>
+  <p class="font-mono text-sm text-slate-600">export/common.py:30-31, 361-403 (METERS_PER_DEGREE = 111320) · export/kml.py:64 · export/geojson.py:44-51 · distance/goal_line.py (_semicircle_arc)</p>
+  <div class="grid md:grid-cols-2 gap-4">
+    <div class="rounded-lg border border-slate-200 p-4"><div class="lbl text-slate-500 mb-2">Before: two formats, two cylinders</div>
+      <svg viewBox="0 0 420 200" class="w-full h-52">
+        <g font-size="11" font-family="monospace">
+          <ellipse cx="110" cy="95" rx="80" ry="60" fill="none" stroke="#dc2626" stroke-width="2"/>
+          <circle cx="110" cy="95" r="70" fill="none" stroke="#0f172a" stroke-dasharray="4 4"/>
+          <circle cx="180" cy="95" r="4" fill="#0f172a"/>
+          <text x="30" y="178" fill="#991b1b">KML: flat 111 320 m/°, ignores earthModel</text>
+          <text x="30" y="194" fill="#475569">route touches the true radius (dashed)</text>
+          <circle cx="330" cy="95" r="4" fill="#475569"/>
+          <text x="275" y="75" fill="#475569">GeoJSON:</text>
+          <text x="275" y="120" fill="#475569">Point + radius</text>
+          <text x="275" y="135" fill="#475569">(Leaflet draws)</text>
+          <text x="210" y="30" fill="#991b1b">129 m off at 50 km</text>
+        </g>
+      </svg>
+    </div>
+    <div class="rounded-lg border border-slate-200 p-4"><div class="lbl text-slate-500 mb-2">After</div>
+      <pre class="mermaid">
+flowchart LR
+  subgraph distance
+    CO[cylinder outline<br/>on task earth model]
+    GL[GoalLine<br/>control zone arc]
+  end
+  CO --> D[TaskDrawing.outline_of]
+  GL --> D
+  D --> K[KML]
+  D --> G[GeoJSON]
+  classDef deep fill:#0f172a,color:#e2e8f0,stroke:#0f172a;
+  class D deep
+      </pre>
+    </div>
+  </div>
+  <div class="grid md:grid-cols-3 gap-4 text-sm">
+    <div><div class="lbl text-slate-500">Problem</div>Export draws cylinders with its own flat-earth approximation, so a KML route visibly misses the cylinder it touches. GeoJSON leaves the drawing to the client, which breaks the drawing's promise that the two formats agree. CLAUDE.md says cylinders come from <span class="font-mono">distance/</span>, but they don't.</div>
+    <div><div class="lbl text-slate-500">Solution</div>A geodesic cylinder outline in <span class="font-mono">distance/</span> next to the control zone arc. The drawing answers for it once.</div>
+    <div><div class="lbl text-slate-500">Wins</div><ul class="list-disc ml-4"><li>Delete METERS_PER_DEGREE and 2 generators</li><li>Formats agree on the cylinder</li><li>Honors ADR 0003 in export</li></ul></div>
+  </div>
+</article>
+
+<!-- 7 -->
+<article id="c7" class="rounded-xl bg-white border border-slate-200 shadow-sm p-6 space-y-5">
+  <div class="flex items-start justify-between gap-4">
+    <h2 class="font-serif text-2xl">7 · QR integer enums as a codec, not a second type system</h2>
+    <div class="flex gap-2 shrink-0"><span class="px-2 py-0.5 rounded bg-slate-200 text-slate-700 text-xs font-semibold">Speculative</span><span class="px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-xs">in-process</span></div>
+  </div>
+  <p class="font-mono text-sm text-slate-600">qrcode/enums.py (6 IntEnums) · qrcode/conversion.py:70-124 (12 tables), :143/232/299, :278 validate_qr_code_task · qrcode/task.py:360-380 · tests/qrcode/test_conversion.py:1-100</p>
+  <div class="grid md:grid-cols-2 gap-4">
+    <div class="rounded-lg border border-slate-200 p-4"><div class="lbl text-slate-500 mb-2">Before: mass diagram</div>
+      <div class="flex items-end gap-6 h-44">
+        <div class="flex flex-col items-center gap-1"><div class="w-16 bg-red-200 border border-red-400" style="height:120px"></div><div class="w-16 bg-slate-300" style="height:30px"></div><span class="text-xs">enums + tables</span></div>
+        <div class="text-xs text-slate-600 space-y-1"><div>6 enums × 2 directions = 12 tables</div><div>3 inverse/totality tests</div><div>unknown TurnpointType → NONE / None</div><div>validation pinned in conversion.py → deferred import</div></div>
+      </div>
+      <p class="text-xs text-slate-500">interface (red) ≈ implementation (grey)</p>
+    </div>
+    <div class="rounded-lg border border-slate-200 p-4"><div class="lbl text-slate-500 mb-2">After</div>
+      <div class="flex items-end gap-6 h-44">
+        <div class="flex flex-col items-center gap-1"><div class="w-16 bg-emerald-200 border border-emerald-500" style="height:20px"></div><div class="w-16 deep" style="height:90px"></div><span class="text-xs">field codec</span></div>
+        <div class="text-xs text-slate-600 space-y-1"><div class="font-mono">int_enum_codec(TurnpointType, {TAKEOFF:1, SSS:2, ESS:3})</div><div>QR dataclasses hold the model's enums</div><div>QR validation moves into qrcode/task.py</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="grid md:grid-cols-3 gap-4 text-sm">
+    <div><div class="lbl text-slate-500">Problem</div>A wire spelling was promoted to a type. The QR enums are used nowhere outside <span class="font-mono">qrcode/</span>, yet translating them costs 12 tables and leaves a totality hole that is still open.</div>
+    <div><div class="lbl text-slate-500">Solution</div>The integer mapping becomes a field codec in the QR field tables. The QR values hold the model's enums.</div>
+    <div><div class="lbl text-slate-500">Wins</div><ul class="list-disc ml-4"><li>Delete 12 tables + qrcode/enums.py</li><li>One deferred import fewer</li><li>Wire mapping lives in the field table</li></ul></div>
+  </div>
+  <div class="rounded bg-slate-50 border border-slate-200 px-4 py-2 text-sm text-slate-700">Breaking for anyone importing <span class="font-mono">QRCode*Type</span>. This is not the 08-19 card C: the hand-written conversion stays.</div>
+</article>
+
+<!-- 8 -->
+<article id="c8" class="rounded-xl bg-white border border-slate-200 shadow-sm p-6 space-y-5">
+  <div class="flex items-start justify-between gap-4">
+    <h2 class="font-serif text-2xl">8 · Separate "load a file" from "parse a payload"</h2>
+    <div class="flex gap-2 shrink-0"><span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-xs font-semibold">Worth exploring</span><span class="px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-xs">in-process</span></div>
+  </div>
+  <p class="font-mono text-sm text-slate-600">parser.py:77, 115-123, 433-437 · tests/corpus.py:62 · tests/conformance/test_parser_diagnostics.py · scripts/task_viewer (×5)</p>
+  <div class="grid md:grid-cols-2 gap-4">
+    <div class="rounded-lg border border-slate-200 p-4"><div class="lbl text-slate-500 mb-2">Before</div>
+      <pre class="mermaid">
+flowchart LR
+  S["parse_task(str)"] --> G{looks like<br/>a path?}
+  G -->|slash / ext| F[read file]
+  G -->|else| P[payload]
+  PA["Path(...)"] -.->|bytes of the path| P
+  classDef leak stroke:#dc2626,stroke-width:2px,color:#991b1b;
+  class G,PA leak
+      </pre>
+      <p class="text-xs text-red-700 mt-2">parse_task(Path(...)) → "invalid format". Untrusted text can probe for files.</p>
+    </div>
+    <div class="rounded-lg border border-slate-200 p-4"><div class="lbl text-slate-500 mb-2">After</div>
+      <div class="grid grid-cols-2 gap-3 text-sm">
+        <div class="deep rounded p-3">load_task(path: str | PathLike)<div class="text-xs text-slate-400 mt-1">reads, then parses</div></div>
+        <div class="deep rounded p-3">parse_task(data: str | bytes)<div class="text-xs text-slate-400 mt-1">never touches the filesystem</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="grid md:grid-cols-3 gap-4 text-sm">
+    <div><div class="lbl text-slate-500">Problem</div>One <span class="font-mono">str</span> parameter means two things, and the module guesses which. Nine call sites wrap the path in <span class="font-mono">str()</span> to steer the guess.</div>
+    <div><div class="lbl text-slate-500">Solution</div>Two entry points. Each has a single meaning for its input.</div>
+    <div><div class="lbl text-slate-500">Wins</div><ul class="list-disc ml-4"><li>Interface says what it does</li><li>No filesystem probe from payloads</li><li>Delete the path heuristic</li></ul></div>
+  </div>
+</article>
+
+<section class="rounded-xl bg-white border border-slate-200 p-6 space-y-2 text-sm">
+  <h3 class="font-serif text-xl">Smaller, not carded</h3>
+  <ul class="list-disc ml-5 space-y-1 text-slate-700">
+    <li><span class="font-mono">DistanceReport</span> always optimizes the speed section, and the distance table throws it away: about 45 ms per drawing. It also reads the rows through 8 string keys (08-19 smaller finding 1, still open).</li>
+    <li>The crossing between the formats is too wide. <span class="font-mono">QRCodeTask.from_task</span> has 0 callers; <span class="font-mono">from_task_waypoints</span>, <span class="font-mono">to_waypoints_json</span> and <span class="font-mono">to_waypoints_string</span> are used only by tests; <span class="font-mono">simplified=</span> is never <span class="font-mono">True</span>.</li>
+    <li><span class="font-mono">distance.__all__</span> has 29 names, 11 of them used only by tests or scripts. <span class="font-mono">VERSION</span> and <span class="font-mono">FULL_FORMAT_VERSION</span> are the same value.</li>
+    <li>Stale docs: the <span class="font-mono">Goal</span> docstring points at <span class="font-mono">pyxctsk.goal_line</span> and the 2024 rule; <span class="font-mono">plane.py:153</span>; CLAUDE.md on where cylinders come from.</li>
+    <li><span class="font-mono">Task.to_json</span> escapes non-ASCII and <span class="font-mono">QRCodeTask.to_json</span> doesn't.</li>
+  </ul>
+  <p class="text-slate-500 pt-2">Holding up well: the layering guard, the corpus, <span class="font-mono">FormatAdapter</span> recognition, <span class="font-mono">OUTPUT_FORMATS</span>, the validation rules, passthrough, the solver's interface, and <span class="font-mono">task_viewer</span> as a consumer.</p>
+</section>
+
+</section>
+
+<section id="top-recommendation" class="rounded-xl deep p-8 space-y-3">
+  <div class="lbl text-emerald-300">Top recommendation</div>
+  <h2 class="font-serif text-3xl"><a href="#c1" class="underline decoration-emerald-400">1 · Make the measured task's invariant hold</a>, together with <a href="#c3" class="underline decoration-emerald-400">3</a></h2>
+  <p class="text-slate-300">The measured task is the module every S7F number flows through, and its one promise can be broken silently: 47.8 km reported where 94.0 km is true. Deepening its constructor is also the natural place to take the earth model off the turnpoints, because both changes land on the same seam and the same tests. Candidate 2 is the strongest defect on the input side and can be done independently.</p>
+</section>
+
+</main>
+</body>
+</html>
