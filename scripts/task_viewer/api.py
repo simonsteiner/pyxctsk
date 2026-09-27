@@ -10,8 +10,7 @@ try:
         OUTPUT_FORMATS,
         TaskDrawing,
         drawing_to_geojson,
-        parse_task,
-        render_task,
+        load_task,
         task_distances_from,
     )
 
@@ -69,7 +68,7 @@ def qrcode_image(task_name: str) -> Response | tuple[Response, int]:
     # media type, which is the duplication `pyxctsk/renderer.py` exists to hold.
     fmt = OUTPUT_FORMATS["png"]
     try:
-        payload = render_task(parse_task(str(xctsk_path)), fmt.name)
+        payload = fmt.render(load_task(xctsk_path), False)
     except Exception as e:
         import traceback
 
@@ -129,8 +128,8 @@ def kml_task_api(task_name: str) -> Response | tuple[Response, int]:
 
     fmt = OUTPUT_FORMATS["kml"]  # type: ignore
     try:
-        task = parse_task(str(xctsk_path))  # type: ignore
-        response = make_response(render_task(task, fmt.name))  # type: ignore
+        task = load_task(xctsk_path)  # type: ignore
+        response = make_response(fmt.render(task, False))  # type: ignore
         response.mimetype = fmt.media_type
         response.headers["Content-Disposition"] = (
             f"attachment; filename={task_name}{fmt.extension}"
@@ -167,7 +166,7 @@ def compare_task_api(task_name: str) -> Response | tuple[Response, int]:
         return json_error("XCTSK file not found", 404)
 
     try:
-        task = parse_task(str(xctsk_path))  # type: ignore
+        task = load_task(xctsk_path)  # type: ignore
         # One drawing: the table and the map share a single optimized route.
         drawing = TaskDrawing.from_task(task)  # type: ignore
         # `.as_dict()`: the table is a value now, and this consumer wants the

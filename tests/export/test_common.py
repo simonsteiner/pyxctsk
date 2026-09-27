@@ -17,8 +17,18 @@ from pathlib import Path
 
 import pytest
 
-from pyxctsk import Goal, GoalType, Task, TaskType, Turnpoint, TurnpointType, Waypoint
+from pyxctsk import (
+    EarthModel,
+    Goal,
+    GoalType,
+    Task,
+    TaskType,
+    Turnpoint,
+    TurnpointType,
+    Waypoint,
+)
 from pyxctsk.distance import GoalLine, GoalLineOrientation
+from pyxctsk.distance.earth import geodesic_distance
 from pyxctsk.export import common
 from pyxctsk.export.common import (
     CONTROL_ZONE_EDGE_COLOR,
@@ -71,6 +81,13 @@ class TestTaskDrawing:
         assert len(drawing.turnpoints) == 3
         assert drawing.is_goal(drawing.turnpoints[-1])
         assert not drawing.is_goal(drawing.turnpoints[0])
+
+    def test_the_task_is_the_measured_ones(self):
+        """One task per drawing: the one its route was measured for."""
+        drawing = TaskDrawing.from_task(_task(GoalType.CYLINDER))
+
+        assert drawing.task is drawing.measured.task
+        assert "task" not in TaskDrawing.__dataclass_fields__
 
     def test_goal_line_replaces_the_last_turnpoint(self):
         """A goal line is drawn instead of the goal cylinder, never as well as."""
@@ -144,6 +161,40 @@ class TestTaskDrawing:
         coordinates = drawing.route_coordinates()
         assert coordinates is not None
         assert len(coordinates) == 3
+
+
+class TestTheCylinderOutline:
+    """Drawn on the task's earth, at exactly the radius the route touches.
+
+    It was a planar polygon from a fixed 111 320 m per degree, 129 m out at a
+    50 km radius, so the KML route visibly missed the cylinder it touched.
+    """
+
+    @pytest.mark.parametrize("model", [None, EarthModel.FAI_SPHERE])
+    @pytest.mark.parametrize("radius", [400, 5_000, 50_000])
+    def test_every_point_is_on_the_boundary(self, model, radius):
+        """On the earth the task declares, not a flat one."""
+        task = _task()
+        task.earth_model = model
+        task.turnpoints[1].radius = radius
+        drawing = TaskDrawing.from_task(task)
+        centre = (46.0, 8.0)
+
+        ring = drawing.outline_of(task.turnpoints[1])
+
+        assert ring[0] == ring[-1]
+        for lon, lat in ring:
+            assert geodesic_distance(centre, (lat, lon), model) == pytest.approx(
+                radius, abs=1e-6
+            )
+
+    def test_the_kml_polygon_is_the_outline(self):
+        """The writer renders the drawing's answer rather than its own."""
+        drawing = TaskDrawing.from_task(_task(GoalType.CYLINDER))
+        kml = drawing_to_kml(drawing)
+        lon, lat = drawing.outline_of(drawing.turnpoints[1])[5]
+
+        assert f"{lon},{lat}," in kml
 
 
 class TestOneDrawingTwoFormats:

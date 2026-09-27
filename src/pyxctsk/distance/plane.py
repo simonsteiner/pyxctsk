@@ -150,8 +150,8 @@ class LocalPlane:
 
     Making the plane a value the caller passes is what lets both go through
     one solver: the optimizer builds one for the task and reuses it across
-    every sweep, and a caller asking about a single turnpoint gets a plane
-    around that turnpoint unless it says otherwise.
+    every sweep, and a caller asking about a single turnpoint
+    (``boundary_point``) must pass the plane it means.
 
     The plane keeps the earth model it was built from. It has to: a planar
     solution is snapped back onto a cylinder boundary measured on that model

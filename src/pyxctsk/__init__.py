@@ -10,8 +10,9 @@ packages behind it hold the primitives those answers are built from. Reach into
 ``pyxctsk.export`` for those: ``LocalPlane``, ``plane_circle`` and the
 optimizer's tuning constants are deliberately not re-exported here.
 
-Start with :func:`parse_task` for reading, :class:`Task` for the model,
-:class:`DistanceReport` for every number S7F defines about a task, and
+Start with :func:`parse_task` for reading a payload (:func:`load_task` for a
+file), :class:`Task` for the model, :class:`DistanceReport` for every number
+S7F defines about a task, and
 :func:`task_to_kml` / :func:`generate_task_geojson` for a map.
 
 See http://xctrack.org/ and http://xctrack.org/Competition_Interfaces.html
@@ -57,6 +58,8 @@ from .exceptions import (
     EmptyInputError,
     InvalidFormatError,
     InvalidTimeOfDayError,
+    MalformedPayloadError,
+    MismatchedRouteError,
     MissingQRCodeSupportError,
     TaskValidationError,
     pyXCTSKError,
@@ -81,30 +84,10 @@ from .model.task import (
     Waypoint,
 )
 from .model.validation import FULL_FORMAT_VERSION, ValidationIssue, ValidationRule
-from .parser import parse_task
+from .parser import load_task, parse_task
 from .qrcode.image import generate_qrcode_image
 from .qrcode.task import QRCodeTask
 from .renderer import OUTPUT_FORMATS, OutputFormat, render_task
-
-#: The task file's extension and media type — aliases onto the ``json`` row of
-#: :data:`~pyxctsk.renderer.OUTPUT_FORMATS`, not a second statement of them.
-#: They were two literals here, exported and read by *nothing*, while the CLI
-#: and ``scripts/task_viewer`` each spelled their own media types and
-#: ``parser.py`` kept its own extension list.
-EXTENSION = OUTPUT_FORMATS["json"].extension
-MIME_TYPE = OUTPUT_FORMATS["json"].media_type
-
-#: The version the full JSON task format declares — an alias, not a fourth
-#: spelling. This was one of three independent literal ``1``s, beside
-#: ``model.validation.FULL_FORMAT_VERSION`` (what ``Task.validate()`` checks
-#: against) and ``qrcode.conversion.TASK_VERSION`` (what every converted task
-#: was stamped with), so the library could be made to write a version its own
-#: validator rejects by editing one of three files.
-#:
-#: Note this is the *format's* version and has nothing to do with
-#: :data:`__version__`, which is the library's. The QR format's counterpart is
-#: ``pyxctsk.qrcode.QR_CODE_TASK_VERSION``, which has always been declared once.
-VERSION = FULL_FORMAT_VERSION
 
 # Single source of truth: the version declared in pyproject.toml, read from the
 # installed package metadata. Through `metadata.pyxctsk_version`, which is also
@@ -128,7 +111,6 @@ __all__ = [
     "drawing_to_kml",
     "EarthModel",
     "EmptyInputError",
-    "EXTENSION",
     "FULL_FORMAT_VERSION",
     "generate_qrcode_image",
     "generate_task_geojson",
@@ -139,13 +121,15 @@ __all__ = [
     "GoalType",
     "InvalidFormatError",
     "InvalidTimeOfDayError",
+    "MalformedPayloadError",
     "MeasuredTask",
-    "MIME_TYPE",
+    "MismatchedRouteError",
     "MissingQRCodeSupportError",
     "optimized_distance",
     "OUTPUT_FORMATS",
     "OutputFormat",
     "OptimizedRoute",
+    "load_task",
     "parse_task",
     "PROPOSED_READING",
     "pyXCTSKError",
@@ -170,6 +154,5 @@ __all__ = [
     "TurnpointType",
     "ValidationIssue",
     "ValidationRule",
-    "VERSION",
     "Waypoint",
 ]

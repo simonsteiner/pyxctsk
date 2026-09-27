@@ -76,6 +76,7 @@ from .center_distance import (
     CenterDistanceReading,
     center_distance,
     center_distance_readings,
+    distance_through_centers,
 )
 from .earth import FAI_SPHERE_RADIUS_M, geodesic_distance
 from .goal_line import (
@@ -85,13 +86,18 @@ from .goal_line import (
 )
 from .measured_task import MeasuredTask, task_to_turnpoints
 from .plane import LocalPlane
-from .report import NOTES, S7F_EDITION, DistanceReport, TooFewTurnpointsError
+from .report import (
+    NOTES,
+    S7F_EDITION,
+    DistanceReport,
+    RouteRow,
+    TooFewTurnpointsError,
+)
 from .route_optimization import (
-    CONVERGENCE_EPSILON_M,
-    DEFAULT_NUM_ITERATIONS,
     OptimizedRoute,
     calculate_iteratively_refined_route,
     optimized_distance,
+    plane_circle,
 )
 from .speed_section import SpeedSection
 from .task_distances import (
@@ -100,13 +106,14 @@ from .task_distances import (
     calculate_task_distances,
     task_distances_from,
 )
-from .turnpoint import TaskTurnpoint, distance_through_centers, plane_circle
+from .turnpoint import TaskTurnpoint
 
 # Export all the main public functions and classes
 __all__ = [
     # Core classes
     "MeasuredTask",
     "DistanceReport",
+    "RouteRow",
     "LocalPlane",
     "plane_circle",
     "TaskTurnpoint",
@@ -133,8 +140,6 @@ __all__ = [
     "TurnpointRow",
     "task_to_turnpoints",
     # Configuration
-    "CONVERGENCE_EPSILON_M",
-    "DEFAULT_NUM_ITERATIONS",
     "FAI_SPHERE_RADIUS_M",
     # Advanced functions
     "calculate_iteratively_refined_route",

@@ -31,19 +31,21 @@ from tests.builders import turnpoint
 
 def _route(points) -> OptimizedRoute:
     """An OptimizedRoute through exactly these (lat, lon) points."""
-    return OptimizedRoute(
-        points=tuple(points), legs=(0.0,) * max(0, len(tuple(points)) - 1)
-    )
+    points = tuple(points)
+    return OptimizedRoute(points=points, legs=(0.0,) * max(0, len(points) - 1))
 
 
-def _measured(task: Task, points) -> MeasuredTask:
-    """A measured task whose route is exactly these (lat, lon) points.
+def _through_centres(task: Task) -> MeasuredTask:
+    """A measured task whose route runs through its turnpoint centres.
 
-    The writers never look at the cylinders, only the route, so this leaves
-    them empty rather than deriving them — the point of the seam is to render
-    without running the optimizer.
+    The point of the seam is to render without running the optimizer. A centre
+    is inside its own cylinder, so this is a route the measured task accepts
+    for this task — and only for this one.
     """
-    return MeasuredTask(task=task, turnpoints=(), route=_route(points))
+    return MeasuredTask(
+        task=task,
+        route=_route((tp.waypoint.lat, tp.waypoint.lon) for tp in task.turnpoints),
+    )
 
 
 def _drawing_of(turnpoints: list, goal: Goal | None = None) -> TaskDrawing:
@@ -57,10 +59,9 @@ def _drawing_of(turnpoints: list, goal: Goal | None = None) -> TaskDrawing:
     """
     task = Task(task_type=TaskType.CLASSIC, version=1, turnpoints=turnpoints, goal=goal)
     return TaskDrawing(
-        task=task,
         turnpoints=tuple(turnpoints),
         goal_line=None,
-        measured=_measured(task, ()),
+        measured=_through_centres(task),
     )
 
 
@@ -144,11 +145,17 @@ class TestCreateTurnpointFeature:
 
 
 def _route_drawing(points) -> TaskDrawing:
-    """A drawing whose route is exactly these (lat, lon) points."""
-    task = Task(task_type=TaskType.CLASSIC, version=1, turnpoints=[])
-    return TaskDrawing(
-        task=task, turnpoints=(), goal_line=None, measured=_measured(task, points)
+    """A drawing whose route is exactly these (lat, lon) points.
+
+    Its task has one zero-radius turnpoint on each, which is what makes these
+    points the route through it.
+    """
+    task = Task(
+        task_type=TaskType.CLASSIC,
+        version=1,
+        turnpoints=[turnpoint("TP", lat, lon, radius=0) for lat, lon in points],
     )
+    return TaskDrawing(turnpoints=(), goal_line=None, measured=_through_centres(task))
 
 
 class TestCreateOptimizedRouteFeature:

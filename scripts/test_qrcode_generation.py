@@ -18,19 +18,15 @@ script_dir = Path(__file__).parent
 src_dir = script_dir.parent / "src"
 sys.path.insert(0, str(src_dir))
 
-from pyxctsk import parse_task  # noqa: E402
-from pyxctsk.qrcode.image import generate_qrcode_image  # noqa: E402
+from pyxctsk import load_task, parse_task  # noqa: E402
+from pyxctsk.qrcode.image import (  # noqa: E402
+    QR_CODE_SUPPORT,
+    generate_qrcode_image,
+    read_qrcode_image,
+)
 
-try:
-    import zxingcpp
-    from PIL import Image
-
-    QR_CODE_SUPPORT = True
-except ImportError:
-    Image = None
-    zxingcpp = None
-    QR_CODE_SUPPORT = False
-    print("Warning: QR code dependencies (PIL, zxing-cpp) not available")
+if not QR_CODE_SUPPORT:
+    print("Warning: QR code dependencies (the `qr` extra) not available")
 
 
 class QRCodeTestResult:
@@ -120,7 +116,7 @@ def test_qr_code_generation(
         result.expected_png_exists = expected_png.exists()
 
         # Parse the task
-        task = parse_task(str(xctsk_file))
+        task = load_task(xctsk_file)
 
         # Check if original file is in waypoints format by reading it
         is_waypoints_format = False
@@ -163,7 +159,7 @@ def test_qr_code_generation(
             result.qr_string_matches = generated_qr_string == expected_qr_string
 
         # Generate QR code PNG if QR code support is available
-        if QR_CODE_SUPPORT and Image is not None and zxingcpp is not None:
+        if QR_CODE_SUPPORT:
             output_png = output_dir / f"{task_name}_generated.png"
             qr_image = generate_qrcode_image(generated_qr_string, size=512)
             qr_image.save(output_png, format="PNG")
@@ -173,12 +169,9 @@ def test_qr_code_generation(
             # Test if the generated QR code can be parsed back
             try:
                 # Read the QR code from the generated image
-                image = Image.open(output_png)
-                decoded_objects = zxingcpp.read_barcodes(
-                    image, formats=zxingcpp.BarcodeFormat.QRCode
-                )
+                decoded_objects = read_qrcode_image(output_png.read_bytes())
                 if decoded_objects:
-                    decoded_string = decoded_objects[0].text
+                    decoded_string = decoded_objects[0]
                     result.qr_png_parsable = True
 
                     # Test roundtrip: parse the decoded string back to a task

@@ -21,15 +21,17 @@ import pytest
 
 from pyxctsk import (
     EarthModel,
+    InvalidFormatError,
+    MalformedPayloadError,
     Task,
     TaskType,
     Turnpoint,
     TurnpointType,
     Waypoint,
+    load_task,
     parse_task,
 )
-from pyxctsk.qrcode.enums import QRCodeTaskType, QRCodeTurnpointType
-from pyxctsk.qrcode.image import generate_qrcode_image
+from pyxctsk.qrcode.image import generate_qrcode_image, read_qrcode_image
 from pyxctsk.qrcode.models import QRCodeTurnpoint
 from pyxctsk.qrcode.task import QRCodeTask
 from tests.corpus import reference_tasks
@@ -50,9 +52,7 @@ def test_qr_code_string_matches_the_expected_one(reference):
     encoder at all.
     """
     qr = reference.task.to_qr_code_task()
-    emitted = (
-        qr.to_waypoints_string() if reference.is_waypoints_format else qr.to_string()
-    )
+    emitted = qr.to_string()
 
     assert emitted.startswith("XCTSK:")
     assert emitted == reference.qr_string
@@ -211,7 +211,7 @@ def test_qr_code_roundtrip_comprehensive():
 
     try:
         # Parse back from image file
-        parsed_task = parse_task(tmp_path)
+        parsed_task = load_task(tmp_path)
 
         # Verify the roundtrip
         assert parsed_task.task_type == original_task.task_type
@@ -321,7 +321,7 @@ def test_qr_turnpoint_field_order():
         radius=400,
         name="SSS",
         alt_smoothed=100,
-        type=QRCodeTurnpointType.SSS,
+        type=TurnpointType.SSS,
         description="Start of Speed Section",
     )
 
@@ -343,7 +343,7 @@ def test_qr_turnpoint_field_order():
         radius=1000,
         name="ESS",
         alt_smoothed=200,
-        type=QRCodeTurnpointType.ESS,
+        type=TurnpointType.ESS,
         description="End of Speed Section",
     )
 
@@ -436,12 +436,12 @@ def test_waypoints_format():
 
     task = QRCodeTask(
         version=2,
-        task_type=QRCodeTaskType.WAYPOINTS,
+        task_type=TaskType.WAYPOINTS,
         turnpoints=turnpoints,
     )
 
     # Test simplified format
-    simplified_json = task.to_waypoints_json()
+    simplified_json = task.as_waypoints().to_json()
 
     # Parse the JSON to verify structure
     data = json.loads(simplified_json)
@@ -489,15 +489,15 @@ def test_waypoints_round_trip():
 
     task = QRCodeTask(
         version=2,
-        task_type=QRCodeTaskType.WAYPOINTS,
+        task_type=TaskType.WAYPOINTS,
         turnpoints=turnpoints,
     )
 
     # Test round-trip conversion
-    simplified_json = task.to_waypoints_json()
+    simplified_json = task.as_waypoints().to_json()
     parsed_task = QRCodeTask.from_json(simplified_json)
 
-    assert parsed_task.task_type == QRCodeTaskType.WAYPOINTS
+    assert parsed_task.task_type == TaskType.WAYPOINTS
     assert len(parsed_task.turnpoints) == 3
 
     # Verify turnpoints were parsed correctly
@@ -540,18 +540,18 @@ def test_waypoints_url_format():
 
     task = QRCodeTask(
         version=2,
-        task_type=QRCodeTaskType.WAYPOINTS,
+        task_type=TaskType.WAYPOINTS,
         turnpoints=turnpoints,
     )
 
     # Test URL format
-    url_string = task.to_waypoints_string()
+    url_string = task.as_waypoints().to_string()
     assert url_string.startswith("XCTSK:"), "URL should start with XCTSK:"
 
     # Parse from URL
     parsed_from_url = QRCodeTask.from_string(url_string)
     assert len(parsed_from_url.turnpoints) == 3, "Should have 3 turnpoints from URL"
-    assert parsed_from_url.task_type == QRCodeTaskType.WAYPOINTS
+    assert parsed_from_url.task_type == TaskType.WAYPOINTS
 
 
 class TestQRSupportProbe:
@@ -571,6 +571,38 @@ class TestQRSupportProbe:
     def test_support_flag_is_a_bool(self):
         """The probe answers True or False, never an exception or None."""
         assert isinstance(QR_CODE_SUPPORT, bool)
+
+
+@pytest.mark.skipif(not QR_CODE_SUPPORT, reason="QR code dependencies not available")
+class TestReadingAnImage:
+    """The decoder beside the encoder, and the parser adapter composed on it."""
+
+    def test_what_is_written_reads_back(self):
+        """Encode and decode are one module's two directions."""
+        written = generate_qrcode_image("XCTSK:hello", size=256)
+        buffer = BytesIO()
+        written.save(buffer, format="PNG")
+
+        assert read_qrcode_image(buffer.getvalue()) == ["XCTSK:hello"]
+        assert read_qrcode_image(written) == ["XCTSK:hello"]
+
+    def test_bytes_that_are_not_an_image_are_malformed(self):
+        """Pillow's many failure types become the library's one."""
+        with pytest.raises(MalformedPayloadError, match="not a readable image"):
+            read_qrcode_image(b"\x89PNG\r\n\x1a\n" + b"\x00" * 64)
+
+    def test_a_malformed_payload_in_an_image_says_why(self):
+        """The same reason the string reports inline, not "no QR code".
+
+        The image adapter used to skip a code whose payload failed to parse,
+        and then report that the image carried no ``XCTSK:`` code at all.
+        """
+        bad = 'XCTSK:{"taskType":"CLASSIC","version":2,"t":[1]}'
+        buffer = BytesIO()
+        generate_qrcode_image(bad, size=512).save(buffer, format="PNG")
+
+        with pytest.raises(InvalidFormatError, match=r"t\[0\]: expected an object"):
+            parse_task(buffer.getvalue())
 
 
 class TestWithoutTheOptionalDependencies:
@@ -600,10 +632,10 @@ class TestWithoutTheOptionalDependencies:
         which made a missing install indistinguishable from a corrupt file; it
         names the missing dependency now.
         """
-        from pyxctsk import parser
         from pyxctsk.exceptions import InvalidFormatError
+        from pyxctsk.qrcode import image
 
-        monkeypatch.setattr(parser, "QR_CODE_SUPPORT", False)
+        monkeypatch.setattr(image, "QR_CODE_SUPPORT", False)
 
         # Matched on the extra rather than the prose: naming the wrong extra
         # is the failure this message has actually had.
@@ -612,9 +644,9 @@ class TestWithoutTheOptionalDependencies:
 
     def test_the_text_formats_still_work(self, monkeypatch):
         """Everything but image decoding is unaffected by the extras."""
-        from pyxctsk import parser
+        from pyxctsk.qrcode import image
 
-        monkeypatch.setattr(parser, "QR_CODE_SUPPORT", False)
+        monkeypatch.setattr(image, "QR_CODE_SUPPORT", False)
         qr_string = QRCodeTask(version=2).to_string()
 
         assert parse_task(qr_string).version == 1
@@ -703,7 +735,7 @@ class TestTheShapeIsDecidedOnce:
         """`as_waypoints` is where "reduced to what the format can represent" lives."""
         task = QRCodeTask.from_dict(self.LEGACY)
 
-        assert task.task_type is QRCodeTaskType.WAYPOINTS
+        assert task.task_type is TaskType.WAYPOINTS
         # Not carried in the object either, so nothing can be lost between
         # holding it and writing it — which is what "silently" meant.
         assert task.goal is None and task.earth_model is None

@@ -41,7 +41,9 @@ print("✅ the `qr` extra is absent, as this check requires")
 import pyxctsk  # noqa: E402
 
 check("import pyxctsk", True)
-check("QR image support reports itself absent", not pyxctsk.parser.QR_CODE_SUPPORT)
+check(
+    "QR image support reports itself absent", not pyxctsk.qrcode.image.QR_CODE_SUPPORT
+)
 
 TASK = (
     '{"taskType":"CLASSIC","version":1,"turnpoints":['

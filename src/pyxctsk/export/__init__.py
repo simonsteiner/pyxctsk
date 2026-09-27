@@ -15,10 +15,10 @@ draw, the goal line, the optimized route — and both writers render that value.
 Rendering one task in both formats therefore optimizes the route once, and the
 two formats cannot disagree about the task's shape.
 
-The geometry itself is not here: cylinders come from
-:mod:`pyxctsk.distance.turnpoint` and the goal line from
-:mod:`pyxctsk.distance.goal_line`, because distance calculation needs the same
-shapes and must not depend on the format they are drawn in.
+The geometry itself is not here: cylinder outlines and the control zone are
+drawn with :func:`pyxctsk.distance.earth.geodesic_arc` and the goal line comes
+from :mod:`pyxctsk.distance.goal_line`, because distance calculation needs the
+same shapes and must not depend on the format they are drawn in.
 
 Modules inside the package import each other directly rather than through this
 file; the re-exports below are for callers outside it.

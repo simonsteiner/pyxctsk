@@ -60,10 +60,10 @@ class TestTheNumbersItPublishes:
 
         assert len(report.route()) == len(report.task.turnpoints)
         first, last = report.route()[0], report.route()[-1]
-        assert first["cumulative_m"] == 0.0
-        assert last["cumulative_m"] == pytest.approx(report.task_distance_m)
-        for point in report.route():
-            assert {"route_lat", "route_lon", "center_lat", "center_lon"} <= set(point)
+        assert first.cumulative_m == 0.0
+        assert last.cumulative_m == pytest.approx(report.task_distance_m)
+        for row in report.as_dict()["route"]:
+            assert {"route_lat", "route_lon", "center_lat", "center_lon"} <= set(row)
 
     def test_it_names_the_version_and_the_spec_edition(self):
         """A number without a provenance cannot be compared later."""

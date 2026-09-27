@@ -15,6 +15,7 @@ from typing import Any
 import pytest
 
 from pyxctsk import GoalType, Task, parse_task
+from pyxctsk.qrcode import image
 from tests.paths import ELEVATED_GOAL_DIR
 
 FIXTURES = ELEVATED_GOAL_DIR
@@ -148,17 +149,13 @@ def test_roundtrip_matches_the_source(name):
 @pytest.mark.parametrize("name", TASKS)
 def test_jpg_and_text_payloads_agree(name):
     """The decoded .txt must stay in step with the photo it came from."""
-    zxingcpp = pytest.importorskip("zxingcpp")
-    pytest.importorskip("PIL")
-    from PIL import Image
+    if not image.QR_CODE_SUPPORT:
+        pytest.skip("QR image support is not installed")
 
-    codes = zxingcpp.read_barcodes(
-        Image.open(FIXTURES / f"{name}_qr_code.jpg"),
-        formats=zxingcpp.BarcodeFormat.QRCode,
-    )
+    codes = image.read_qrcode_image((FIXTURES / f"{name}_qr_code.jpg").read_bytes())
 
     assert codes, "QR code could not be decoded"
-    assert codes[0].text == payload(name)
+    assert codes[0] == payload(name)
 
 
 def test_unknown_fields_never_shadow_spec_fields():

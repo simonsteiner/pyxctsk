@@ -10,25 +10,26 @@ goal with no usable approach direction lost its goal from both outputs. There is
 no free function beside the drawing that answers any of those a second way.
 
 Also here: the palette, as :class:`Color` values that each writer renders with a
-total function of its own format, and the polygon that approximates a cylinder.
-That circle is planar — a fixed metres-per-degree constant, not a
-geodesic — because it draws a decorative outline, not a measured shape. Anything
-a distance depends on is computed properly in
-:mod:`pyxctsk.distance.plane` and :mod:`pyxctsk.distance.goal_line`, and
-this module must not grow a second opinion about task geometry.
+total function of its own format. The cylinder outline is *not* computed here:
+:meth:`TaskDrawing.outline_of` asks :func:`~pyxctsk.distance.earth.geodesic_arc`,
+on the task's earth model, the same primitive the goal line's control zone is
+drawn with. It used to be a planar polygon built from a fixed 111 320 m per
+degree — "a decorative outline, not a measured shape", as this docstring put
+it — and at a 50 km radius the decoration was 129 m from the boundary the
+route is measured to, so the route visibly missed the cylinder it touched. This
+module must not grow a second opinion about task geometry.
 """
 
-import math
 from dataclasses import dataclass
 
+from ..distance.earth import geodesic_arc
 from ..distance.goal_line import GoalLine
 from ..distance.measured_task import MeasuredTask
 from ..distance.route_optimization import OptimizedRoute
 from ..model.task import Task, Turnpoint, TurnpointType
 
-# Constants for visualization
-CIRCLE_POINTS = 64  # Number of points to approximate circle
-METERS_PER_DEGREE = 111320.0  # 1 degree ≈ 111.32 km at equator
+#: Segments in a drawn cylinder outline.
+CIRCLE_POINTS = 64
 
 
 @dataclass(frozen=True)
@@ -45,7 +46,6 @@ class TaskDrawing:
     when it was built, so build it after the task is final.
 
     Attributes:
-        task: The task being drawn, for names, counts and descriptions.
         turnpoints: The turnpoints to draw, in order — the task's own, less the
             last one when a goal line replaces it.
         goal_line: The task's goal line, or None if it has none.
@@ -55,10 +55,19 @@ class TaskDrawing:
             that same measurement rendered rather than a second one.
     """
 
-    task: Task
     turnpoints: tuple[Turnpoint, ...]
     goal_line: GoalLine | None
     measured: MeasuredTask
+
+    @property
+    def task(self) -> Task:
+        """The task being drawn, for names, counts and descriptions.
+
+        Read through :attr:`measured` rather than held beside it: a second
+        field was a second place to put a task, and a drawing could then name
+        one task while routing another.
+        """
+        return self.measured.task
 
     @property
     def route(self) -> OptimizedRoute:
@@ -85,7 +94,6 @@ class TaskDrawing:
         # there is a line to draw in its place — one decision, made here.
         turnpoints = task.turnpoints[:-1] if goal_line else task.turnpoints
         return cls(
-            task=task,
             turnpoints=tuple(turnpoints),
             goal_line=goal_line,
             measured=measured,
@@ -108,6 +116,31 @@ class TaskDrawing:
         if self.task.effective_goal is None:
             return False
         return bool(self.task.turnpoints) and turnpoint is self.task.turnpoints[-1]
+
+    def outline_of(self, turnpoint: Turnpoint) -> list[tuple[float, float]]:
+        """The boundary of this turnpoint's cylinder, as a closed ring.
+
+        Measured on the task's earth model, so every point is exactly the
+        turnpoint's radius from its centre — the boundary the optimized route
+        touches (§7.1.7), not an approximation of it.
+
+        Args:
+            turnpoint: One of the turnpoints being drawn.
+
+        Returns:
+            ``CIRCLE_POINTS + 1`` (lon, lat) points, the last equal to the
+            first.
+        """
+        ring = geodesic_arc(
+            (turnpoint.waypoint.lat, turnpoint.waypoint.lon),
+            turnpoint.radius,
+            0.0,
+            360.0,
+            CIRCLE_POINTS,
+            self.task.earth_model,
+        )
+        ring[-1] = ring[0]  # closed exactly, not to within float noise
+        return ring
 
     def color_of(self, turnpoint: Turnpoint) -> "Color":
         """The colour this turnpoint is drawn in, in either format.
@@ -356,48 +389,3 @@ def turnpoint_color(turnpoint_type: TurnpointType, is_goal: bool = False) -> Col
     if is_goal:
         return GOAL_COLOR
     return _TURNPOINT_COLORS[turnpoint_type]
-
-
-def generate_circle_coordinates_2d(
-    center_lat: float, center_lon: float, radius_meters: float
-) -> list[tuple[float, float]]:
-    """Generate 2D coordinates for a circular turnpoint zone.
-
-    Args:
-        center_lat: Latitude of the circle center.
-        center_lon: Longitude of the circle center.
-        radius_meters: Radius of the circle in meters.
-
-    Returns:
-        List of (longitude, latitude) tuples forming a circle.
-    """
-    coords = []
-    radius_deg = radius_meters / METERS_PER_DEGREE
-
-    for i in range(CIRCLE_POINTS + 1):  # +1 to close the circle
-        angle = 2 * math.pi * i / CIRCLE_POINTS
-        lat = center_lat + radius_deg * math.sin(angle)
-        lon = center_lon + radius_deg * math.cos(angle) / math.cos(
-            math.radians(center_lat)
-        )
-        coords.append((lon, lat))
-
-    return coords
-
-
-def generate_circle_coordinates_3d(
-    center_lat: float, center_lon: float, radius_meters: float, altitude: int
-) -> list[tuple[float, float, int]]:
-    """Generate 3D coordinates for a circular turnpoint zone.
-
-    Args:
-        center_lat: Latitude of the circle center.
-        center_lon: Longitude of the circle center.
-        radius_meters: Radius of the circle in meters.
-        altitude: Altitude for all points in meters.
-
-    Returns:
-        List of (longitude, latitude, altitude) tuples forming a circle.
-    """
-    coords_2d = generate_circle_coordinates_2d(center_lat, center_lon, radius_meters)
-    return [(lon, lat, altitude) for lon, lat in coords_2d]

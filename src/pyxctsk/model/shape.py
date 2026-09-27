@@ -43,15 +43,104 @@ those two answers are the ones that used to be written in different places and
 quietly stop matching.
 """
 
+import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Callable, Generic, Mapping, MutableMapping, TypeVar
 
+from ..exceptions import MalformedPayloadError, pyXCTSKError
 from .passthrough import read_passthrough, write_passthrough
 from .rounding import round_half_up
 from .time_of_day import TimeOfDay
 
 T = TypeVar("T")
+
+#: What a codec may raise when handed a wire value of the wrong type or
+#: spelling. Codecs are applied to untrusted input, so this is the one place
+#: these are expected rather than bugs: each is converted into a
+#: :class:`~pyxctsk.exceptions.MalformedPayloadError` naming where it happened.
+_READ_ERRORS = (KeyError, ValueError, TypeError, AttributeError, pyXCTSKError)
+
+
+def _json_type(value: Any) -> str:
+    """Name a decoded JSON value's type the way the format would."""
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "a boolean"
+    if isinstance(value, (int, float)):
+        return "a number"
+    if isinstance(value, str):
+        return "a string"
+    if isinstance(value, list):
+        return "an array"
+    if isinstance(value, Mapping):
+        return "an object"
+    return type(value).__name__
+
+
+def require_object(data: Any) -> Mapping[str, Any]:
+    """Return a wire value that must be a JSON object, or refuse it.
+
+    Args:
+        data: The decoded value.
+
+    Returns:
+        The same value, now known to be a mapping.
+
+    Raises:
+        MalformedPayloadError: If it is anything else.
+    """
+    if not isinstance(data, Mapping):
+        raise MalformedPayloadError(f"expected an object, got {_json_type(data)}")
+    return data
+
+
+def load_json(text: str | bytes) -> Any:
+    """Decode a JSON document, refusing one that is not JSON at all.
+
+    Args:
+        text: The document.
+
+    Returns:
+        The decoded value, of whatever JSON type it is.
+
+    Raises:
+        MalformedPayloadError: If it does not decode.
+    """
+    try:
+        return json.loads(text)
+    except ValueError as exc:
+        raise MalformedPayloadError(f"not JSON: {exc}") from exc
+
+
+def _read_at(segment: str, read: Callable[[Any], T], raw: Any) -> T:
+    """Run one step of a read, attributing any failure to ``segment``.
+
+    Args:
+        segment: The key, or ``[i]`` index, being read.
+        read: The step.
+        raw: What the step reads.
+
+    Returns:
+        What the step returned.
+
+    Raises:
+        MalformedPayloadError: Whatever the step raised, located.
+    """
+    try:
+        return read(raw)
+    except MalformedPayloadError as exc:
+        raise exc.inside(segment) from exc.__cause__
+    except KeyError as exc:
+        # A required key that is not there. The key itself is the location,
+        # which is one level deeper than ``segment`` only when a row reads a
+        # key it does not own — so name the key that was missing.
+        raise MalformedPayloadError(
+            "required key is missing", str(exc.args[0]) if exc.args else segment
+        ) from exc
+    except _READ_ERRORS as exc:
+        raise MalformedPayloadError(str(exc), segment) from exc
 
 
 @dataclass(frozen=True)
@@ -101,6 +190,37 @@ def enum_codec(enum_cls: Callable[[Any], Any]) -> Codec:
     return Codec(lambda member: member.value, enum_cls)
 
 
+def wire_int_codec(table: Mapping[Any, int], lenient: bool = False) -> Codec:
+    """Return a codec spelling constrained values as the integers a format uses.
+
+    The QR format writes a goal type as ``1`` or ``2`` where the full format
+    writes ``"LINE"`` or ``"CYLINDER"``. That is a spelling, not a second kind
+    of value, so the QR models hold the same enums as the full ones and this
+    codec is where the integers live. They used to be six ``IntEnum`` classes
+    and twelve translation tables between them and the model's enums, with a
+    default at every call site for whatever a table left out.
+
+    Args:
+        table: Each value's wire integer. Must be one-to-one.
+        lenient: Also accept an integer written as a string.
+
+    Returns:
+        Codec: Writing ``table[value]``, and reading its inverse.
+    """
+    inverse = {number: value for value, number in table.items()}
+    if len(inverse) != len(table):
+        raise ValueError(f"wire integers are not one-to-one: {dict(table)!r}")
+
+    def from_wire(raw: Any) -> Any:
+        number = LENIENT_INT.from_wire(raw) if lenient else raw
+        # ``True == 1`` in Python, and a JSON ``true`` is not the integer one.
+        if isinstance(number, bool) or number not in inverse:
+            raise ValueError(f"{raw!r} is not one of {sorted(inverse)}")
+        return inverse[number]
+
+    return Codec(lambda value: table[value], from_wire)
+
+
 def list_codec(item: Codec) -> Codec:
     """Return a codec for a JSON array of values.
 
@@ -110,10 +230,16 @@ def list_codec(item: Codec) -> Codec:
     Returns:
         Codec: Applying ``item`` element-wise.
     """
-    return Codec(
-        lambda values: [item.to_wire(v) for v in values],
-        lambda raw: [item.from_wire(r) for r in raw],
-    )
+
+    def from_wire(raw: Any) -> list[Any]:
+        # A list is required, not just an iterable: a string where an array
+        # belongs used to be read one character at a time, so a single time
+        # gate written as ``"12:00:00Z"`` reported "invalid time: '1'".
+        if not isinstance(raw, list):
+            raise MalformedPayloadError(f"expected an array, got {_json_type(raw)}")
+        return [_read_at(f"[{i}]", item.from_wire, r) for i, r in enumerate(raw)]
+
+    return Codec(lambda values: [item.to_wire(v) for v in values], from_wire)
 
 
 @dataclass(frozen=True)
@@ -236,6 +362,8 @@ class Value(Field):
     def read(self, data: Mapping[str, Any]) -> dict[str, Any]:
         """Read the key, or nothing if it counts as absent."""
         if self.optionality.required:
+            if self.key not in data:
+                raise MalformedPayloadError("required key is missing")
             return {self.attr: self.codec.from_wire(data[self.key])}
         raw: Any = data.get(self.key)
         if self.optionality.absent(raw):
@@ -345,12 +473,15 @@ class Shape(Generic[T]):
             An instance of :attr:`cls`.
 
         Raises:
-            KeyError: If a required key is missing.
+            MalformedPayloadError: If ``data`` is not an object, a required
+                key is missing, or a value cannot be read — whichever it is,
+                naming the path to it.
         """
+        data = require_object(data)
         kwargs: dict[str, Any] = {}
         unread: set[str] = set()
         for field in self.fields:
-            kwargs.update(field.read(data))
+            kwargs.update(_read_at(field.keys[0], field.read, data))
             unread.update(field.unread(data))
         if self.carries_unknown:
             # The allow-list is what this shape read *from this payload*, not

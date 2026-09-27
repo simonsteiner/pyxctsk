@@ -6,8 +6,8 @@ time rather than moving through the library as an unchecked string.
 
 Kept apart from ``task.py`` so the spec's structural rules can live in
 ``validation.py`` without importing the model they check — see that module.
-The QR format spells the same concepts with its own integer enums in
-``qrcode/enums.py``; ``qrcode/conversion.py`` translates between the two.
+The QR format holds these same enums and spells them as integers, through
+``wire_int_codec`` codecs in its own field tables.
 """
 
 from enum import Enum

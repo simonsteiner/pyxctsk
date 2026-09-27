@@ -13,36 +13,29 @@ from pyproj import CRS, Transformer
 from pyxctsk.distance import OptimizedRoute
 from pyxctsk.distance.earth import (
     FAI_SPHERE_RADIUS_M,
-    EarthModelLike,
     geodesic_distance,
 )
 from pyxctsk.distance.plane import LocalPlane, ltm_scale_factor, task_area_center
-from pyxctsk.distance.route_optimization import calculate_iteratively_refined_route
-from pyxctsk.distance.turnpoint import (
-    TaskTurnpoint,
-    TurnpointGeometry,
+from pyxctsk.distance.route_optimization import (
     boundary_point,
+    calculate_iteratively_refined_route,
 )
+from pyxctsk.distance.turnpoint import TaskTurnpoint, TurnpointGeometry
 
 
 @dataclass
 class FakeTurnpoint:
     """A minimal TurnpointGeometry stand-in for seam tests.
 
-    It declares ``earth_model`` because the protocol does. It did not, and the
-    optimizer read the attribute anyway through a ``getattr`` default — so this
-    fake satisfied ``isinstance`` while getting a different distance for
-    identical geometry than a ``TaskTurnpoint`` would.
-
-    It declares no ``goal_type`` for the same reason in reverse: the protocol
-    no longer does, because nothing in the optimizer reads one. A LINE goal is
-    a zero-radius circle by the time it gets here, which ``task_to_turnpoints``
-    arranges and this fake can express with ``radius=0``.
+    It declares no ``earth_model`` and no ``goal_type`` because the protocol
+    declares neither: the earth is an argument of the optimizer, and a LINE
+    goal is a zero-radius circle by the time it gets here, which
+    ``task_to_turnpoints`` arranges and this fake can express with
+    ``radius=0``.
     """
 
     center: tuple[float, float]
     radius: float = 0.0
-    earth_model: EarthModelLike = None
 
 
 def test_fake_turnpoint_satisfies_protocol():
@@ -54,13 +47,11 @@ def test_fake_turnpoint_satisfies_protocol():
 def test_the_protocol_declares_exactly_what_the_optimizer_reads():
     """Neither more nor less: both directions have been wrong here.
 
-    Too few: ``calculate_iteratively_refined_route`` picks the route's earth
-    model off the first turnpoint, and did it with a ``getattr`` against a
-    protocol declaring three attributes whose docstring said "only three
-    things" — so a fake satisfying ``isinstance`` got a different distance for
-    identical geometry.
-
-    Too many: ``goal_type`` was declared because ``plane_circle`` read it to
+    Too many, twice. ``earth_model`` was declared because the optimizer picked
+    the route's earth off the *first* turnpoint — so a misspelling on any
+    other was ignored, and a list mixing the two earths measured differently
+    depending on which came first. It is an argument of the optimizer now.
+    ``goal_type`` was declared because ``plane_circle`` read it to
     collapse a LINE goal to a zero-radius circle. That rule belongs to
     ``task_to_turnpoints``, which builds the cylinders, and stating it in both
     places left three modules disagreeing about which one owned it. A LINE goal
@@ -68,11 +59,7 @@ def test_the_protocol_declares_exactly_what_the_optimizer_reads():
     the goal type, and an interface declaring a value nothing reads misleads a
     caller as much as one omitting a value it needs.
     """
-    assert set(TurnpointGeometry.__annotations__) == {
-        "center",
-        "radius",
-        "earth_model",
-    }
+    assert set(TurnpointGeometry.__annotations__) == {"center", "radius"}
 
 
 def test_a_turnpoint_without_a_goal_type_is_enough_to_optimize():
@@ -108,6 +95,33 @@ def test_route_through_fake_turnpoints():
     # The legs are kept, and they are what the total is made of.
     assert len(optimized.legs) == 2
     assert optimized.cumulative_m()[-1] == optimized.total_m
+
+
+class TestTheTakeoffIsAPoint:
+    """ADR 0002's takeoff rule, stated once: at projection, not in the solver."""
+
+    def test_the_route_starts_at_the_takeoff_centre_whatever_its_radius(self):
+        """A 5 km takeoff cylinder is not touched; the route leaves its centre."""
+        route = calculate_iteratively_refined_route(
+            [
+                FakeTurnpoint((46.5, 8.0), radius=5_000.0),
+                FakeTurnpoint((46.8, 8.0), radius=1_000.0),
+            ]
+        )
+
+        assert route.points[0] == (46.5, 8.0)
+
+    def test_a_concentric_first_turnpoint_is_flown_out_to(self):
+        """Its boundary is a real leg, not merged into the takeoff."""
+        route = calculate_iteratively_refined_route(
+            [
+                FakeTurnpoint((46.5, 8.0), radius=3_000.0),
+                FakeTurnpoint((46.5, 8.0), radius=3_000.0),
+                FakeTurnpoint((46.8, 8.0), radius=0.0),
+            ]
+        )
+
+        assert route.legs[0] == pytest.approx(3_000.0, abs=0.01)
 
 
 def test_short_input_handling():
@@ -243,23 +257,10 @@ class TestThePlaneCarriesItsEarthModel:
         """Same default as everywhere else: None means the ellipsoid."""
         assert LocalPlane.around([(46.5, 8.0)]).earth_model is None
 
-    def test_the_point_lands_on_the_planes_model_not_the_turnpoints(self):
-        """The case the two used to disagree on."""
-        turnpoint = TaskTurnpoint(
-            lat=46.5, lon=8.0, radius=5000, earth_model="FAI_SPHERE"
-        )
-        plane = LocalPlane.around([turnpoint.center], "WGS84")
-
-        point = boundary_point(turnpoint, (46.0, 7.5), (47.0, 8.6), plane)
-
-        assert geodesic_distance(turnpoint.center, point, "WGS84") == pytest.approx(
-            5000.0, abs=1e-6
-        )
-
     @pytest.mark.parametrize("model", [None, "WGS84", "FAI_SPHERE"])
-    def test_an_agreeing_plane_is_unchanged(self, model):
-        """The ordinary case — plane and turnpoint on one model — still snaps there."""
-        turnpoint = TaskTurnpoint(lat=46.5, lon=8.0, radius=5000, earth_model=model)
+    def test_the_point_lands_on_the_planes_model(self, model):
+        """The plane is the only thing carrying an earth, so it decides."""
+        turnpoint = TaskTurnpoint(lat=46.5, lon=8.0, radius=5000)
         plane = LocalPlane.around([turnpoint.center], model)
 
         point = boundary_point(turnpoint, (46.0, 7.5), (47.0, 8.6), plane)

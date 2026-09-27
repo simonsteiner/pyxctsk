@@ -5,6 +5,20 @@ implements the [XCTrack Competition Interfaces](https://xctrack.org/Competition_
 specification and FAI Sporting Code S7F. Each file is dated and kept as written —
 superseded reviews stay for history rather than being edited. Newest first.
 
+- [2026-09-27 — Deepening candidates after the solver deepening](2026-09-27-deepening-candidates.md)
+  — **all eight candidates and all eight smaller findings applied;** a Progress table in
+  the file records each commit and which of them break the API. Scoped by churn since the
+  review below, it found the seams that review drew held by convention rather than
+  enforced. The headline is that **`MeasuredTask` — built to make a task paired with
+  another task's route unrepresentable — accepted one through its public constructor**,
+  reporting 47.8 km for a 94.0 km task. Also: the field tables trusted wire types, so
+  `XCTSK:[]` escaped the CLI as a traceback; the earth model lived on every turnpoint and
+  was read from the first (278 m between two orderings); the planar solver carried the
+  takeoff rule it claimed not to know; KML cylinders were flat circles up to 129 m off;
+  and the QR format's six integer enums were a second type system behind twelve
+  translation tables. Distance reports, QR strings and GeoJSON are byte-identical to
+  `main` across the corpus on both earth models. Companion visual report:
+  [`2026-09-27-deepening-candidates.html`](2026-09-27-deepening-candidates.html).
 - [2026-08-19 — Deepening candidates at the front door](2026-08-19-deepening-candidates-at-the-front-door.md)
   — **all ten candidates applied;** a Progress table in the file records each outcome, the
   three departures and the nine breaking changes they produced. The suite went from 995 to

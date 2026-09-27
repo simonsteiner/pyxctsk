@@ -43,7 +43,7 @@ from enum import Enum
 from typing import Sequence
 
 from ..model.task import GoalType, Task, Turnpoint
-from .earth import EarthModelLike, geod_for_earth_model
+from .earth import EarthModelLike, geod_for_earth_model, geodesic_arc
 from .measured_task import MeasuredTask
 
 # Constants for goal line visualization
@@ -158,17 +158,9 @@ def _semicircle_arc(
     Returns:
         ``GOAL_LINE_NUM_POINTS + 1`` (lon, lat) points, endpoint included.
     """
-    geod = geod_for_earth_model(earth_model)
-    lat, lon = center
-    return [
-        geod.fwd(
-            lon,
-            lat,
-            (forward_azimuth - 90 + 180 * i / GOAL_LINE_NUM_POINTS) % 360,
-            radius,
-        )[:2]
-        for i in range(GOAL_LINE_NUM_POINTS + 1)
-    ]
+    return geodesic_arc(
+        center, radius, forward_azimuth - 90, 180, GOAL_LINE_NUM_POINTS, earth_model
+    )
 
 
 @dataclass(frozen=True)
@@ -222,10 +214,11 @@ class GoalLine:
         Returns:
             A GoalLine if the task has a LINE goal with sufficient geometry, otherwise None.
         """
-        if not cls._has_line_goal(task):
-            return None
-        if orientation is GoalLineOrientation.TURNPOINT_CENTERS:
-            return cls._build(task, cls._center_candidates(task))
+        # Measure only when there is a line to orient and the rule needs a route.
+        if orientation is GoalLineOrientation.TURNPOINT_CENTERS or not (
+            cls._has_line_goal(task)
+        ):
+            return cls._build(task, orientation, route_points=())
         return cls.from_measured_task(MeasuredTask.from_task(task), orientation)
 
     @classmethod
@@ -249,15 +242,7 @@ class GoalLine:
         Returns:
             A GoalLine if the task has a LINE goal with sufficient geometry, otherwise None.
         """
-        task = measured.task
-        if not cls._has_line_goal(task):
-            return None
-
-        if orientation is GoalLineOrientation.TURNPOINT_CENTERS:
-            candidates = cls._center_candidates(task)
-        else:
-            candidates = list(measured.route.points[:-1])
-        return cls._build(task, candidates)
+        return cls._build(measured.task, orientation, measured.route.points)
 
     @staticmethod
     def _has_line_goal(task: Task) -> bool:
@@ -265,27 +250,43 @@ class GoalLine:
         goal = task.effective_goal
         return bool(goal and goal.type == GoalType.LINE and len(task.turnpoints) >= 2)
 
-    @staticmethod
-    def _center_candidates(task: Task) -> list[tuple[float, float]]:
-        """The 2024 rule's approach candidates: every turnpoint centre before goal."""
-        return [(tp.waypoint.lat, tp.waypoint.lon) for tp in task.turnpoints[:-1]]
-
     @classmethod
     def _build(
-        cls, task: Task, candidates: list[tuple[float, float]]
+        cls,
+        task: Task,
+        orientation: GoalLineOrientation,
+        route_points: Sequence[tuple[float, float]],
     ) -> "GoalLine | None":
-        """Assemble the line from its approach candidates, or None if it has none."""
+        """Assemble the line, or None if the task has no line to draw.
+
+        The one place both constructors reach: the LINE-goal guard, the choice
+        of approach candidates, and the rule that a candidate on the goal gives
+        no direction were each written in both, and ``_build`` checked for a
+        length that ``_has_line_goal`` had already made impossible to lack.
+
+        Args:
+            task: The task.
+            orientation: Which edition's rule picks the approach candidates.
+            route_points: The optimized route through the task. Read only for
+                the route orientation, which is the only caller that has one.
+        """
+        if not cls._has_line_goal(task):
+            return None
         last_tp = task.turnpoints[-1]
         center = (last_tp.waypoint.lat, last_tp.waypoint.lon)
 
+        if orientation is GoalLineOrientation.TURNPOINT_CENTERS:
+            candidates = [
+                (tp.waypoint.lat, tp.waypoint.lon) for tp in task.turnpoints[:-1]
+            ]
+        else:
+            candidates = list(route_points[:-1])
         approach_from = _last_distinct_point(candidates, center)
         if approach_from is None:
             return None
 
         length = goal_line_length_from_turnpoints(task.turnpoints)
-        if length is None:
-            return None
-
+        assert length is not None  # _has_line_goal: there are turnpoints
         return cls(
             center=center,
             approach_from=approach_from,

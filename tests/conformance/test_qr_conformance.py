@@ -52,7 +52,7 @@ class TestCompressedQRScheme:
 
         qr = original.to_qr_code_task()
         compressed = (
-            qr.to_waypoints_string(compressed=True)
+            qr.as_waypoints().to_string(compressed=True)
             if waypoints
             else qr.to_string(compressed=True)
         )
@@ -74,10 +74,8 @@ class TestCompressedQRScheme:
             == parse_task(qr.to_string(compressed=True)).to_json()
         )
 
-    def test_compressed_url_is_not_mistaken_for_a_file_path(self):
-        """Base64 contains "/", which the path heuristic used to trip over."""
-        from pyxctsk.parser import _looks_like_file_path
-
+    def test_compressed_url_with_a_slash_parses(self):
+        """Base64 contains "/", which the old path heuristic used to trip over."""
         payloads = [
             Task.from_json(
                 task_json(sss={"type": "RACE", "timeGates": [f"1{n}:00:00Z"]})
@@ -87,7 +85,7 @@ class TestCompressedQRScheme:
             for n in range(10)
         ]
         assert any("/" in p for p in payloads), "no sample exercised the '/' case"
-        assert not any(_looks_like_file_path(p) for p in payloads)
+        assert all(parse_task(p).turnpoints is not None for p in payloads)
 
     @pytest.mark.parametrize(
         "payload", ["XCTSKZ:not valid base64!!", "XCTSKZ:aGVsbG8=", "XCTSKZ:"]
@@ -140,7 +138,7 @@ class TestEachQRShapeIsMeasuredAgainstItsOwnKeys:
 
     def test_the_waypoints_roundtrip_keeps_them(self):
         """The whole payload comes back, which it did not before."""
-        emitted = json.loads(self._parsed().to_waypoints_json())
+        emitted = json.loads(self._parsed().as_waypoints().to_json())
 
         assert emitted == self.SOURCE
 
@@ -186,7 +184,7 @@ class TestWaypointsTaskEncoding:
         reference = reference_task(stem)
         task = parse_task(reference.qr_string)
 
-        assert task.to_qr_code_task().to_waypoints_string() == reference.qr_string
+        assert task.to_qr_code_task().as_waypoints().to_string() == reference.qr_string
 
     def test_competition_z_keeps_its_radius(self):
         """The four-number competition encoding must be left alone."""

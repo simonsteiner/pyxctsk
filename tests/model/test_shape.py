@@ -14,7 +14,8 @@ from typing import Any
 
 import pytest
 
-from pyxctsk import Task
+from pyxctsk import MalformedPayloadError, Task, TaskType
+from pyxctsk.exceptions import pyXCTSKError
 from pyxctsk.model.shape import (
     DEFAULTED,
     IDENTITY,
@@ -115,8 +116,8 @@ class TestReadAndWrite:
         assert TOY_SHAPE.write(toy)["n"] == "A"
 
     def test_a_missing_required_key_names_itself(self):
-        """A KeyError, which the parser treats as "not my format"."""
-        with pytest.raises(KeyError, match="n"):
+        """One error type for every malformed payload, naming the key."""
+        with pytest.raises(MalformedPayloadError, match="^n: required key"):
             TOY_SHAPE.read({"c": 1})
 
     def test_row_order_is_output_order(self):
@@ -279,6 +280,62 @@ ALL_SHAPES = [
     ("QRCodeSSS", QR_SSS_SHAPE),
     ("QRCodeGoal", QR_GOAL_SHAPE),
 ]
+
+
+class TestTheTableChecksWireTypes:
+    """A payload of the wrong shape is refused where it is read, and located.
+
+    The tables used to trust wire types, so a list where an object belongs
+    reached ``.get`` and left as ``AttributeError``, and a string where a list
+    belongs was read one character at a time. The parser kept a tuple of
+    whichever built-in types had leaked so far.
+    """
+
+    CHILD = Shape(Toy, (Value("name", "n", optionality=REQUIRED),))
+    PARENT = Shape(
+        Toy,
+        (
+            Value("name", "n", optionality=REQUIRED),
+            Value("children", "c", list_codec(shape_codec(CHILD))),
+        ),
+    )
+
+    @pytest.mark.parametrize(
+        "payload, kind", [([], "an array"), ("x", "a string"), (5, "a number")]
+    )
+    def test_a_shape_is_an_object(self, payload, kind):
+        """The root itself: no path, and the type that arrived."""
+        with pytest.raises(
+            MalformedPayloadError, match=f"^expected an object, got {kind}$"
+        ):
+            TOY_SHAPE.read(payload)
+
+    def test_a_list_is_a_list_not_any_iterable(self):
+        """A string is iterable; that is how it was read character by character."""
+        with pytest.raises(MalformedPayloadError, match="^c: expected an array"):
+            self.PARENT.read({"n": "A", "c": "AB"})
+
+    def test_the_path_reaches_into_lists_and_objects(self):
+        """Where it went wrong, spelled from the root."""
+        with pytest.raises(MalformedPayloadError) as caught:
+            self.PARENT.read({"n": "A", "c": [{"n": "B"}, {}]})
+
+        assert caught.value.path == "c[1].n"
+        assert caught.value.reason == "required key is missing"
+
+    def test_a_codec_failure_is_located_and_chained(self):
+        """The original error is the cause, not lost."""
+        shape = Shape(Toy, (Value("name", "n", enum_codec(TaskType)),))
+
+        with pytest.raises(MalformedPayloadError, match="^n: ") as caught:
+            shape.read({"n": "NOT_A_TYPE"})
+
+        assert isinstance(caught.value.__cause__, ValueError)
+
+    def test_it_is_in_the_hierarchy_and_a_value_error(self):
+        """One ``except`` for a caller; old ``except ValueError`` still works."""
+        assert issubclass(MalformedPayloadError, pyXCTSKError)
+        assert issubclass(MalformedPayloadError, ValueError)
 
 
 class TestEveryKeyBelongsToARow:

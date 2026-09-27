@@ -65,7 +65,7 @@ def strip_foreign_keys(
     key the *target* shape defines lands in a slot that already means something
     else. A full-format turnpoint carrying ``{"t": 99}`` becomes the QR
     format's turnpoint *type*, and the payload written from it cannot be read
-    back at all: ``99 is not a valid QRCodeTurnpointType``.
+    back at all: ``99 is not one of [1, 2, 3]``.
 
     ``write_passthrough``'s never-shadow rule cannot catch this, because it
     only protects keys already written: ``t`` is emitted for SSS and ESS

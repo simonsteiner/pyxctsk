@@ -21,7 +21,8 @@ for the diff surface and :meth:`DistanceReport.as_text` for a human. Both read
 the same fields, so they cannot disagree about a number or its absence.
 """
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
+from functools import cached_property
 from typing import Any
 
 from ..exceptions import TooFewTurnpointsError  # noqa: F401  (re-exported)
@@ -78,6 +79,40 @@ NOTES = {
 
 
 @dataclass(frozen=True)
+class RouteRow:
+    """One turnpoint of the report: where it is, and where the route crosses it.
+
+    A value rather than a dict, so its two readers — the JSON rendering and the
+    distance table — name its fields rather than spell them as string keys. The
+    table read eight of them by string, where a typo was a ``KeyError`` at
+    runtime. Field order is the JSON key order.
+
+    Attributes:
+        index: Position in the task, from 0.
+        name: The waypoint's name.
+        type: The turnpoint's role, or ``""`` for an ordinary one.
+        radius_m: Cylinder radius in metres.
+        center_lat: Latitude of the turnpoint centre.
+        center_lon: Longitude of the turnpoint centre.
+        route_lat: Latitude where the optimized route crosses it.
+        route_lon: Longitude where the optimized route crosses it.
+        cumulative_m: Distance along the optimized route to here, in metres.
+        cumulative_center_m: The same through centres, in metres.
+    """
+
+    index: int
+    name: str
+    type: str
+    radius_m: int
+    center_lat: float
+    center_lon: float
+    route_lat: float
+    route_lon: float
+    cumulative_m: float
+    cumulative_center_m: float
+
+
+@dataclass(frozen=True)
 class DistanceReport:
     """Every number pyxctsk publishes about one task, with its provenance.
 
@@ -87,12 +122,21 @@ class DistanceReport:
 
     Attributes:
         measured: The task and the route measured for it.
-        speed_section: §7.2's second distance, or None when the task has no
-            SSS/ESS pair to measure one between.
     """
 
     measured: MeasuredTask
-    speed_section: SpeedSection | None
+
+    @cached_property
+    def speed_section(self) -> SpeedSection | None:
+        """§7.2's second distance, or None when the task has no SSS/ESS pair.
+
+        Derived on first use rather than at construction. It is a second route
+        optimization — S7F measures ``taskToESS`` separately — and it used to
+        run for every report, including the ones behind a distance table that
+        never shows it: one extra optimizer run per drawing in the task viewer,
+        whose comments said one drawing meant one route.
+        """
+        return SpeedSection.from_measured_task(self.measured)
 
     @classmethod
     def from_task(cls, task: Task) -> "DistanceReport":
@@ -123,10 +167,7 @@ class DistanceReport:
         Returns:
             The report.
         """
-        return cls(
-            measured=measured,
-            speed_section=SpeedSection.from_measured_task(measured),
-        )
+        return cls(measured=measured)
 
     @property
     def task(self) -> Task:
@@ -139,9 +180,8 @@ class DistanceReport:
 
         Read off the *route*, which is where the legs were measured, rather
         than off the task, which is only where the choice was declared. The two
-        agree for any measured task built by ``MeasuredTask.from_task``; when a
-        caller assembles one by hand they need not, and the report was then
-        naming a model its own numbers had not been computed on.
+        cannot disagree now — ``MeasuredTask`` refuses a route measured on
+        another earth — but the route is still the honest source.
 
         ``earth.name_of`` owns the two names and the "missing means WGS84"
         rule, so this module does not have to know them.
@@ -187,7 +227,7 @@ class DistanceReport:
         """Every reading of the centre distance, for diagnosing a disagreement."""
         return center_distance_readings(self.task)
 
-    def route(self) -> list[dict[str, Any]]:
+    def route(self) -> list[RouteRow]:
         """One row per turnpoint: where it is, and where the route crosses it.
 
         Returns:
@@ -201,18 +241,18 @@ class DistanceReport:
         # the two published shapes measured the same thing twice.
         center_cumulative = cumulative_center_m(self.task)
         return [
-            {
-                "index": i,
-                "name": tp.waypoint.name,
-                "type": tp.type.value if tp.type else "",
-                "radius_m": tp.radius,
-                "center_lat": tp.waypoint.lat,
-                "center_lon": tp.waypoint.lon,
-                "route_lat": point[0],
-                "route_lon": point[1],
-                "cumulative_m": cumulative[i],
-                "cumulative_center_m": center_cumulative[i],
-            }
+            RouteRow(
+                index=i,
+                name=tp.waypoint.name,
+                type=tp.type.value if tp.type else "",
+                radius_m=tp.radius,
+                center_lat=tp.waypoint.lat,
+                center_lon=tp.waypoint.lon,
+                route_lat=point[0],
+                route_lon=point[1],
+                cumulative_m=cumulative[i],
+                cumulative_center_m=center_cumulative[i],
+            )
             for i, (tp, point) in enumerate(
                 zip(self.task.turnpoints, self.measured.route.points)
             )
@@ -238,7 +278,7 @@ class DistanceReport:
             "center_distance_m": self.center_distance_m,
             "center_distance_reading": self.center_distance_reading,
             "center_distance_readings_m": self.center_distance_readings_m,
-            "route": self.route(),
+            "route": [asdict(row) for row in self.route()],
             "notes": dict(NOTES),
         }
 
@@ -276,11 +316,11 @@ class DistanceReport:
             reading = f"{value / 1000:10.3f} km" if value is not None else "       n/a"
             lines.append(f"    {name:26s} {reading}")
         lines += ["", "  optimized route:"]
-        for point in self.route():
+        for row in self.route():
             lines.append(
-                f"    {point['index']:2d} {point['name']:<10s} {point['type']:<8s}"
-                f" r={point['radius_m']:>6} m"
-                f"  {point['route_lat']:>10.6f} {point['route_lon']:>11.6f}"
-                f"  {point['cumulative_m'] / 1000:8.3f} km"
+                f"    {row.index:2d} {row.name:<10s} {row.type:<8s}"
+                f" r={row.radius_m:>6} m"
+                f"  {row.route_lat:>10.6f} {row.route_lon:>11.6f}"
+                f"  {row.cumulative_m / 1000:8.3f} km"
             )
         return "\n".join(lines)

@@ -11,6 +11,8 @@ test session skips QR image tests instead of dying.
 import subprocess
 import sys
 
+from pyxctsk.qrcode.image import read_qrcode_image
+
 try:
     import zxingcpp
     from PIL import Image
@@ -22,10 +24,8 @@ except ImportError:
 # A trivial roundtrip exercised in a subprocess to confirm the decoder actually
 # works on this machine without risking the test process on a native crash.
 _SMOKE_TEST = """
-import qrcode, zxingcpp
-img = qrcode.make("XCTSK:smoke").convert("L")
-results = zxingcpp.read_barcodes(img, formats=zxingcpp.BarcodeFormat.QRCode)
-assert any(r.text == "XCTSK:smoke" for r in results)
+from pyxctsk.qrcode.image import generate_qrcode_image, read_qrcode_image
+assert "XCTSK:smoke" in read_qrcode_image(generate_qrcode_image("XCTSK:smoke"))
 """
 
 
@@ -66,9 +66,4 @@ def decode_qr(image) -> list[str]:
     Returns:
         The decoded text of each QR code found, in detection order.
     """
-    # BarcodeFormats, not BarcodeFormat: the two are interchangeable at
-    # runtime but zxing-cpp's own types distinguish them, and mypy follows this
-    # module in from test_cli.py.
-    formats = zxingcpp.BarcodeFormats(zxingcpp.BarcodeFormat.QRCode)
-    results = zxingcpp.read_barcodes(image, formats=formats)
-    return [barcode.text for barcode in results]
+    return read_qrcode_image(image)

@@ -35,3 +35,17 @@ measurement, boundary-point placement, and the optimization projection.
 - All 22 reference tasks declare WGS84, so reference accuracy is unchanged by this
   decision. Notably, computing them on the FAI sphere does *not* reproduce XCTrack's
   displayed values either (ruled out in `docs/arch-review/2026-07-07-optimized-distance-findings.md`).
+
+## Amendment (2026-09-27): the earth model is the route's, not each turnpoint's
+
+The decision stands; the per-turnpoint mechanism in the third bullet is withdrawn.
+`TaskTurnpoint.earth_model` copied a property of the task onto every turnpoint and the
+optimizer read it off the first, so a misspelled model on any other turnpoint was
+silently ignored and a list mixing the two earths measured 278 m differently depending
+on which came first. The reason for the mechanism — no signature churn for the CLI and
+the writers — no longer applied: all of them reach the optimizer through
+`MeasuredTask.from_task`. `calculate_iteratively_refined_route`, `optimized_distance`
+and `distance_through_centers` now take `earth_model` as an argument (None = WGS84) with
+no fallback, `MeasuredTask` and `SpeedSection` pass the task's, and `TurnpointGeometry`
+is a centre and a radius. Every distance report and KML output is byte-identical across
+the reference corpus on both earth models.

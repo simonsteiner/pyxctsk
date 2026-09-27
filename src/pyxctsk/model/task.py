@@ -45,6 +45,7 @@ from .shape import (
     Value,
     enum_codec,
     list_codec,
+    load_json,
     shape_codec,
 )
 from .time_of_day import TimeOfDay
@@ -307,9 +308,13 @@ class Goal:
 
     For goal type LINE, the radius of the last turnpoint represents half of the
     goal line's total length. The line itself is not stored here — it is derived
-    from that radius by :func:`~pyxctsk.goal_line.goal_line_length_from_turnpoints`,
-    which is the single source of that rule. The goal line orientation is
-    perpendicular to the azimuth to the last turnpoint center.
+    from that radius by
+    :func:`~pyxctsk.distance.goal_line.goal_line_length_from_turnpoints`, which
+    is the single source of that rule. Which way it faces is
+    :class:`~pyxctsk.distance.goal_line.GoalLine`'s question: under S7F 2025
+    and later it is perpendicular to the approach from the *optimized route
+    point* on the last control zone before goal, not from that turnpoint's
+    centre as in 2024.
 
     Attributes:
         type (Optional[GoalType]): Goal type.
@@ -477,6 +482,9 @@ class Task:
 
         Returns:
             Task: Parsed Task object.
+
+        Raises:
+            MalformedPayloadError: If the dictionary is not a task.
         """
         return TASK_SHAPE.read(data)
 
@@ -486,7 +494,10 @@ class Task:
         Returns:
             str: JSON string representation of the task.
         """
-        return json.dumps(self.to_dict(), separators=(",", ":"))
+        # Not ASCII-escaped, as the QR format's is not: a waypoint named
+        # "Zürich" is written as such rather than with a \u escape, and the
+        # CLI writes UTF-8 whatever the locale.
+        return json.dumps(self.to_dict(), separators=(",", ":"), ensure_ascii=False)
 
     @classmethod
     def from_json(cls, json_str: str) -> "Task":
@@ -497,9 +508,11 @@ class Task:
 
         Returns:
             Task: Parsed Task object.
+
+        Raises:
+            MalformedPayloadError: If the string is not JSON, or not a task.
         """
-        data = json.loads(json_str)
-        return cls.from_dict(data)
+        return cls.from_dict(load_json(json_str))
 
     def to_qr_code_task(self) -> "QRCodeTask":
         """Convert to QR code task format.
