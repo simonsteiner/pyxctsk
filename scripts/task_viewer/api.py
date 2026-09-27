@@ -11,7 +11,6 @@ try:
         TaskDrawing,
         drawing_to_geojson,
         load_task,
-        render_task,
         task_distances_from,
     )
 
@@ -69,7 +68,7 @@ def qrcode_image(task_name: str) -> Response | tuple[Response, int]:
     # media type, which is the duplication `pyxctsk/renderer.py` exists to hold.
     fmt = OUTPUT_FORMATS["png"]
     try:
-        payload = render_task(load_task(xctsk_path), fmt.name)
+        payload = fmt.render(load_task(xctsk_path), False)
     except Exception as e:
         import traceback
 
@@ -130,7 +129,7 @@ def kml_task_api(task_name: str) -> Response | tuple[Response, int]:
     fmt = OUTPUT_FORMATS["kml"]  # type: ignore
     try:
         task = load_task(xctsk_path)  # type: ignore
-        response = make_response(render_task(task, fmt.name))  # type: ignore
+        response = make_response(fmt.render(task, False))  # type: ignore
         response.mimetype = fmt.media_type
         response.headers["Content-Disposition"] = (
             f"attachment; filename={task_name}{fmt.extension}"
