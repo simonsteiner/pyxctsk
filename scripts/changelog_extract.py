@@ -35,7 +35,7 @@ def _heading(version: str) -> re.Pattern[str]:
 
 
 def extract(text: str, version: str) -> str:
-    """Return the CHANGELOG body for ``version`` (without its heading)."""
+    """Return the CHANGELOG body for a dated ``version`` (without its heading)."""
     heading = _heading(version)
     out: list[str] = []
     capturing = False
@@ -43,8 +43,8 @@ def extract(text: str, version: str) -> str:
         if line.startswith("## "):
             if capturing:
                 break
-            if heading.match(line):
-                capturing = True
+            match = heading.match(line)
+            capturing = bool(match and match["date"])
             continue
         if capturing:
             out.append(line)
@@ -102,6 +102,17 @@ def _read() -> str:
         return PATH.read_text(encoding="utf-8")
     except OSError as error:
         sys.exit(f"cannot read {PATH}: {error.strerror}")
+    except UnicodeDecodeError as error:
+        sys.exit(
+            f"cannot read {PATH}: not UTF-8 ({error.reason} at byte {error.start})"
+        )
+
+
+def _write(text: str) -> None:
+    try:
+        PATH.write_text(text, encoding="utf-8")
+    except OSError as error:
+        sys.exit(f"cannot write {PATH}: {error.strerror}")
 
 
 def main() -> None:
@@ -113,7 +124,7 @@ def main() -> None:
     version = args[0]
     text = _read()
     if command == "roll":
-        PATH.write_text(roll(text, version, datetime.date.today()), encoding="utf-8")
+        _write(roll(text, version, datetime.date.today()))
         return
     result = title(text, version) if command == "--title" else extract(text, version)
     if not result:
