@@ -86,7 +86,13 @@ from .goal_line import (
 )
 from .measured_task import MeasuredTask, task_to_turnpoints
 from .plane import LocalPlane
-from .report import NOTES, S7F_EDITION, DistanceReport, TooFewTurnpointsError
+from .report import (
+    NOTES,
+    S7F_EDITION,
+    DistanceReport,
+    RouteRow,
+    TooFewTurnpointsError,
+)
 from .route_optimization import (
     CONVERGENCE_EPSILON_M,
     DEFAULT_NUM_ITERATIONS,
@@ -109,6 +115,7 @@ __all__ = [
     # Core classes
     "MeasuredTask",
     "DistanceReport",
+    "RouteRow",
     "LocalPlane",
     "plane_circle",
     "TaskTurnpoint",

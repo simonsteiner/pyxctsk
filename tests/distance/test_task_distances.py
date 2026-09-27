@@ -324,12 +324,10 @@ class TestTheTableIsARenderingOfTheReport:
 
         assert len(table.turnpoints) == len(rows)
         for row, tp in zip(rows, table.turnpoints):
-            assert tp.index == row["index"]
-            assert tp.name == row["name"]
-            assert tp.cumulative_optimized_km == round(row["cumulative_m"] / 1000, 1)
-            assert tp.cumulative_center_km == round(
-                row["cumulative_center_m"] / 1000, 1
-            )
+            assert tp.index == row.index
+            assert tp.name == row.name
+            assert tp.cumulative_optimized_km == round(row.cumulative_m / 1000, 1)
+            assert tp.cumulative_center_km == round(row.cumulative_center_m / 1000, 1)
 
     @pytest.mark.parametrize("stem", ["task_bevo", "task_pepi"])
     def test_the_centre_column_ends_at_the_centre_total(self, stem):

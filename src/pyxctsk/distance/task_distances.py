@@ -135,14 +135,14 @@ class TaskDistanceTable:
             ),
             turnpoints=tuple(
                 TurnpointRow(
-                    index=row["index"],
-                    name=row["name"],
-                    lat=row["center_lat"],
-                    lon=row["center_lon"],
-                    radius=row["radius_m"],
-                    type=row["type"],
-                    cumulative_center_km=_km(row["cumulative_center_m"]),
-                    cumulative_optimized_km=_km(row["cumulative_m"]),
+                    index=row.index,
+                    name=row.name,
+                    lat=row.center_lat,
+                    lon=row.center_lon,
+                    radius=row.radius_m,
+                    type=row.type,
+                    cumulative_center_km=_km(row.cumulative_center_m),
+                    cumulative_optimized_km=_km(row.cumulative_m),
                 )
                 for row in report.route()
             ),
