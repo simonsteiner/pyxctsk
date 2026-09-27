@@ -1,9 +1,10 @@
 name: Release 🚀
 
-# Manually triggered from the GitHub UI (Actions → Release → Run workflow).
-# Runs the test gate on every supported Python, then bumps the version, updates
-# the CHANGELOG, commits, tags, pushes, and publishes to PyPI. The release job
-# builds once from the bumped working tree after the matrix succeeds.
+# Manually triggered from the GitHub UI (Actions → Release → Run workflow) on
+# main. Runs the CI gate, bumps the version, rolls the CHANGELOG, commits, tags
+# and pushes, then dispatches publish.yml at the tag. Publishing lives only in
+# publish.yml: a tag pushed with GITHUB_TOKEN does not start workflows, but a
+# workflow_dispatch does, so the PyPI trusted publisher covers publish.yml alone.
 
 on:
   workflow_dispatch:
@@ -18,36 +19,33 @@ on:
         default: patch
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
-  verify:
-    name: Verify Python ${{ matrix.python-version }}
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ['3.11', '3.12', '3.13', '3.14']
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-
-      - name: Install uv and Python
-        uses: astral-sh/setup-uv@v10.2.0
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Verify release inputs and artifacts
-        run: scripts/verify.sh
+  ci:
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/ci.yml
 
   release:
-    needs: verify
+    needs: ci
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      # Push the release commit and tag.
+      contents: write
+      # Dispatch publish.yml.
+      actions: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          # This job pushes the release commit and tag.
+          persist-credentials: true
 
       - name: Install uv
         uses: astral-sh/setup-uv@v10.2.0
@@ -56,58 +54,41 @@ jobs:
 
       - name: Bump version
         id: bump
+        env:
+          BUMP: ${{ inputs.bump }}
         run: |
-          uv version --bump ${{ inputs.bump }}
-          uv lock
-          echo "version=$(uv version --short)" >> "$GITHUB_OUTPUT"
+          uv version --bump "$BUMP" --no-sync
+          version="$(uv version --short)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
+      # Before anything is pushed: an empty [Unreleased] section, or a version
+      # that already has one, stops the release here, and the notes and title
+      # publish.yml will need must be readable.
       - name: Roll CHANGELOG [Unreleased] into a dated release
+        env:
+          VERSION: ${{ steps.bump.outputs.version }}
         run: |
-          python3 - "${{ steps.bump.outputs.version }}" <<'PY'
-          import datetime
-          import pathlib
-          import sys
+          python3 scripts/changelog_extract.py roll "$VERSION"
+          python3 scripts/changelog_extract.py "$VERSION" > /dev/null
+          python3 scripts/changelog_extract.py --title "$VERSION"
 
-          version = sys.argv[1]
-          path = pathlib.Path("CHANGELOG.md")
-          text = path.read_text()
-          marker = "## [Unreleased]"
-          if marker not in text:
-              sys.exit("CHANGELOG.md has no '## [Unreleased]' section.")
-          dated = f"## [v{version}] - {datetime.date.today().isoformat()}"
-          path.write_text(text.replace(marker, f"{marker}\n\n{dated}", 1))
-          PY
-
-      - name: Extract GitHub Release notes and title
-        # Before anything is pushed or published: an undated or missing
-        # CHANGELOG section must stop the job while nothing is out yet. A
-        # `$(...)` in `gh release create`'s arguments would not fail the step.
-        run: |
-          python3 scripts/changelog_extract.py "${{ steps.bump.outputs.version }}" > "$RUNNER_TEMP/release-notes.md"
-          python3 scripts/changelog_extract.py --title "${{ steps.bump.outputs.version }}" > "$RUNNER_TEMP/release-title.txt"
-
+      # --atomic: main and the tag land together or not at all. The push is
+      # rejected if main moved since this run started.
       - name: Commit, tag, and push
+        env:
+          VERSION: ${{ steps.bump.outputs.version }}
         run: |
           git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add pyproject.toml uv.lock CHANGELOG.md
-          git commit -m "release v${{ steps.bump.outputs.version }}"
-          git tag -a "v${{ steps.bump.outputs.version }}" -m "Version ${{ steps.bump.outputs.version }}"
-          git push --follow-tags origin HEAD:main
+          git commit -m "release v$VERSION"
+          git tag -a "v$VERSION" -m "Version $VERSION"
+          git push --atomic origin HEAD:main "v$VERSION"
 
-      - name: Build package
-        run: uv build
-
-      - name: Publish to PyPI
-        env:
-          UV_PUBLISH_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
-        run: uv publish
-
-      - name: Create GitHub Release
+      - name: Dispatch publish
         env:
           GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.bump.outputs.version }}
         run: |
-          gh release create "v${{ steps.bump.outputs.version }}" \
-            --title "$(cat "$RUNNER_TEMP/release-title.txt")" \
-            --notes-file "$RUNNER_TEMP/release-notes.md" \
-            ./dist/*
+          gh workflow run publish.yml --ref "v$VERSION"
+          echo "Released v$VERSION; publishing in [publish.yml]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/workflows/publish.yml)." >> "$GITHUB_STEP_SUMMARY"
