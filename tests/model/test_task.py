@@ -303,3 +303,14 @@ class TestTheGoalDefaultIsDerivedNotStored:
             Task(task_type=TaskType.CLASSIC, version=1, turnpoints=[]).effective_goal
             is None
         )
+
+
+def test_both_formats_write_non_ascii_names_as_they_are():
+    r"""One format escaped ``ü`` to a ``\u`` sequence and the other did not."""
+    from tests.builders import task, turnpoint
+
+    built = task(turnpoint("Zürich", 47.4, 8.5), turnpoint("Küçük", 47.5, 8.6))
+
+    assert "Zürich" in built.to_json()
+    assert "Zürich" in built.to_qr_code_task().to_json()
+    assert Task.from_json(built.to_json()).turnpoints[1].waypoint.name == "Küçük"
