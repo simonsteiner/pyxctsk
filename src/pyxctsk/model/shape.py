@@ -166,7 +166,11 @@ IDENTITY = Codec(_identity, _identity)
 #: A number the spec types loosely but this library holds as ``int``. The QR
 #: encoding can only carry whole metres, so a fractional radius or altitude is
 #: rounded on the way in — see :mod:`pyxctsk.model.rounding` for which way.
-ROUNDED_INT = Codec(_identity, round_half_up)
+#: A producer may write it as a string — Burnair writes ``"radius": "700"`` —
+#: and it is written back as a number.
+ROUNDED_INT = Codec(
+    _identity, lambda raw: round_half_up(float(raw) if isinstance(raw, str) else raw)
+)
 
 #: An integer a producer may have written as a string.
 LENIENT_INT = Codec(

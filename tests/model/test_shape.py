@@ -179,6 +179,11 @@ class TestOptionality:
         """Producers have written the QR version and earth model as strings."""
         assert LENIENT_INT.from_wire(raw) == 2
 
+    @pytest.mark.parametrize("raw", ["700", "699.5", 700, 699.5])
+    def test_rounded_int_accepts_either_spelling(self, raw):
+        """Burnair writes a turnpoint radius as a string."""
+        assert ROUNDED_INT.from_wire(raw) == 700
+
 
 class TestCodecs:
     """The value spellings both formats share."""
