@@ -94,8 +94,6 @@ from .report import (
     TooFewTurnpointsError,
 )
 from .route_optimization import (
-    CONVERGENCE_EPSILON_M,
-    DEFAULT_NUM_ITERATIONS,
     OptimizedRoute,
     calculate_iteratively_refined_route,
     optimized_distance,
@@ -142,8 +140,6 @@ __all__ = [
     "TurnpointRow",
     "task_to_turnpoints",
     # Configuration
-    "CONVERGENCE_EPSILON_M",
-    "DEFAULT_NUM_ITERATIONS",
     "FAI_SPHERE_RADIUS_M",
     # Advanced functions
     "calculate_iteratively_refined_route",

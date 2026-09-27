@@ -51,7 +51,6 @@ from itertools import accumulate
 
 from .earth import EarthModelLike, geod_for_earth_model, snap_to_boundary
 from .plane import LocalPlane
-from .solver import CONVERGENCE_EPSILON_M as CONVERGENCE_EPSILON_M
 from .solver import optimize_plane_route, plane_optimal_point
 from .turnpoint import TurnpointGeometry
 
