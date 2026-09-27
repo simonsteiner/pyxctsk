@@ -177,7 +177,7 @@ task = Task(
 )
 
 # Save as JSON
-with open('task.xctsk', 'w') as f:
+with open('task.xctsk', 'w', encoding='utf-8') as f:
     f.write(task.to_json())
 
 # Generate QR code

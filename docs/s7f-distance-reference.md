@@ -241,8 +241,7 @@ whole corpus goes through it in a loop.
 From Python, if you prefer — the same report the CLI renders, as a value:
 
 ```python
-from pathlib import Path
-from pyxctsk import DistanceReport, parse_task
+from pyxctsk import DistanceReport, load_task
 
 report = DistanceReport.from_task(load_task("your-task.xctsk"))
 
