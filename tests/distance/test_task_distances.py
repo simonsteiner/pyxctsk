@@ -343,3 +343,21 @@ class TestTheTableIsARenderingOfTheReport:
         table = calculate_task_distances(reference_task(stem).task)
 
         assert table.turnpoints[-1].cumulative_center_km == table.center_distance_km
+
+
+def test_the_table_does_not_optimize_the_speed_section():
+    """The table never shows §7.2's second distance, so it must not pay for it.
+
+    ``DistanceReport`` used to optimize ``taskToESS`` at construction — a
+    second route per table, which the task viewer's "one drawing, one route"
+    comments said did not happen.
+    """
+    from pyxctsk.distance import DistanceReport, MeasuredTask, TaskDistanceTable
+
+    report = DistanceReport.from_measured_task(
+        MeasuredTask.from_task(reference_task("task_bevo").task)
+    )
+    TaskDistanceTable.from_report(report)
+
+    assert "speed_section" not in report.__dict__
+    assert report.speed_section is not None  # still there when asked for

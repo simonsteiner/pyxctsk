@@ -22,6 +22,7 @@ the same fields, so they cannot disagree about a number or its absence.
 """
 
 from dataclasses import dataclass
+from functools import cached_property
 from typing import Any
 
 from ..exceptions import TooFewTurnpointsError  # noqa: F401  (re-exported)
@@ -87,12 +88,21 @@ class DistanceReport:
 
     Attributes:
         measured: The task and the route measured for it.
-        speed_section: §7.2's second distance, or None when the task has no
-            SSS/ESS pair to measure one between.
     """
 
     measured: MeasuredTask
-    speed_section: SpeedSection | None
+
+    @cached_property
+    def speed_section(self) -> SpeedSection | None:
+        """§7.2's second distance, or None when the task has no SSS/ESS pair.
+
+        Derived on first use rather than at construction. It is a second route
+        optimization — S7F measures ``taskToESS`` separately — and it used to
+        run for every report, including the ones behind a distance table that
+        never shows it: one extra optimizer run per drawing in the task viewer,
+        whose comments said one drawing meant one route.
+        """
+        return SpeedSection.from_measured_task(self.measured)
 
     @classmethod
     def from_task(cls, task: Task) -> "DistanceReport":
@@ -123,10 +133,7 @@ class DistanceReport:
         Returns:
             The report.
         """
-        return cls(
-            measured=measured,
-            speed_section=SpeedSection.from_measured_task(measured),
-        )
+        return cls(measured=measured)
 
     @property
     def task(self) -> Task:
@@ -139,9 +146,8 @@ class DistanceReport:
 
         Read off the *route*, which is where the legs were measured, rather
         than off the task, which is only where the choice was declared. The two
-        agree for any measured task built by ``MeasuredTask.from_task``; when a
-        caller assembles one by hand they need not, and the report was then
-        naming a model its own numbers had not been computed on.
+        cannot disagree now — ``MeasuredTask`` refuses a route measured on
+        another earth — but the route is still the honest source.
 
         ``earth.name_of`` owns the two names and the "missing means WGS84"
         rule, so this module does not have to know them.
