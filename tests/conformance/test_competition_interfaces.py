@@ -13,6 +13,7 @@ from pyxctsk import (
     MalformedPayloadError,
     SSSType,
     Task,
+    TaskType,
     parse_task,
 )
 from pyxctsk.distance.goal_line import (
@@ -72,12 +73,11 @@ class TestObsoleteSSSDirection:
     def test_both_readers_agree_on_the_fallback(self):
         """The QR reader and the full-JSON reader must not diverge here."""
         from pyxctsk.model.task import OBSOLETE_DIRECTION_DEFAULT
-        from pyxctsk.qrcode.enums import QRCodeDirection
         from pyxctsk.qrcode.models import QRCodeSSS
 
         qr_fallback = QRCodeSSS.from_dict({"t": 1, "g": ["12:00:00Z"]}).direction
 
-        assert qr_fallback == QRCodeDirection.EXIT
+        assert qr_fallback is OBSOLETE_DIRECTION_DEFAULT
         assert OBSOLETE_DIRECTION_DEFAULT == Direction.EXIT
         assert qr_fallback.name == OBSOLETE_DIRECTION_DEFAULT.name
 
@@ -233,12 +233,11 @@ class TestTaskTypeValue:
         came out unset and ``T`` was swallowed as an unknown key, which then
         re-serialized in the wrong shape.
         """
-        from pyxctsk.qrcode.enums import QRCodeTaskType
         from pyxctsk.qrcode.task import QRCodeTask
 
         qr = QRCodeTask.from_dict({"T": "W", "t": [{"n": "A", "z": "|dz~FligrB?"}]})
 
-        assert qr.task_type == QRCodeTaskType.WAYPOINTS
+        assert qr.task_type is TaskType.WAYPOINTS
         assert qr.unknown == {}
         assert json.loads(qr.to_json()) == {
             "T": "W",

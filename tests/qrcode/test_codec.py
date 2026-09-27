@@ -31,7 +31,6 @@ from pyxctsk import (
     load_task,
     parse_task,
 )
-from pyxctsk.qrcode.enums import QRCodeTaskType, QRCodeTurnpointType
 from pyxctsk.qrcode.image import generate_qrcode_image, read_qrcode_image
 from pyxctsk.qrcode.models import QRCodeTurnpoint
 from pyxctsk.qrcode.task import QRCodeTask
@@ -324,7 +323,7 @@ def test_qr_turnpoint_field_order():
         radius=400,
         name="SSS",
         alt_smoothed=100,
-        type=QRCodeTurnpointType.SSS,
+        type=TurnpointType.SSS,
         description="Start of Speed Section",
     )
 
@@ -346,7 +345,7 @@ def test_qr_turnpoint_field_order():
         radius=1000,
         name="ESS",
         alt_smoothed=200,
-        type=QRCodeTurnpointType.ESS,
+        type=TurnpointType.ESS,
         description="End of Speed Section",
     )
 
@@ -439,7 +438,7 @@ def test_waypoints_format():
 
     task = QRCodeTask(
         version=2,
-        task_type=QRCodeTaskType.WAYPOINTS,
+        task_type=TaskType.WAYPOINTS,
         turnpoints=turnpoints,
     )
 
@@ -492,7 +491,7 @@ def test_waypoints_round_trip():
 
     task = QRCodeTask(
         version=2,
-        task_type=QRCodeTaskType.WAYPOINTS,
+        task_type=TaskType.WAYPOINTS,
         turnpoints=turnpoints,
     )
 
@@ -500,7 +499,7 @@ def test_waypoints_round_trip():
     simplified_json = task.to_waypoints_json()
     parsed_task = QRCodeTask.from_json(simplified_json)
 
-    assert parsed_task.task_type == QRCodeTaskType.WAYPOINTS
+    assert parsed_task.task_type == TaskType.WAYPOINTS
     assert len(parsed_task.turnpoints) == 3
 
     # Verify turnpoints were parsed correctly
@@ -543,7 +542,7 @@ def test_waypoints_url_format():
 
     task = QRCodeTask(
         version=2,
-        task_type=QRCodeTaskType.WAYPOINTS,
+        task_type=TaskType.WAYPOINTS,
         turnpoints=turnpoints,
     )
 
@@ -554,7 +553,7 @@ def test_waypoints_url_format():
     # Parse from URL
     parsed_from_url = QRCodeTask.from_string(url_string)
     assert len(parsed_from_url.turnpoints) == 3, "Should have 3 turnpoints from URL"
-    assert parsed_from_url.task_type == QRCodeTaskType.WAYPOINTS
+    assert parsed_from_url.task_type == TaskType.WAYPOINTS
 
 
 class TestQRSupportProbe:
@@ -738,7 +737,7 @@ class TestTheShapeIsDecidedOnce:
         """`as_waypoints` is where "reduced to what the format can represent" lives."""
         task = QRCodeTask.from_dict(self.LEGACY)
 
-        assert task.task_type is QRCodeTaskType.WAYPOINTS
+        assert task.task_type is TaskType.WAYPOINTS
         # Not carried in the object either, so nothing can be lost between
         # holding it and writing it — which is what "silently" meant.
         assert task.goal is None and task.earth_model is None

@@ -190,6 +190,37 @@ def enum_codec(enum_cls: Callable[[Any], Any]) -> Codec:
     return Codec(lambda member: member.value, enum_cls)
 
 
+def wire_int_codec(table: Mapping[Any, int], lenient: bool = False) -> Codec:
+    """Return a codec spelling constrained values as the integers a format uses.
+
+    The QR format writes a goal type as ``1`` or ``2`` where the full format
+    writes ``"LINE"`` or ``"CYLINDER"``. That is a spelling, not a second kind
+    of value, so the QR models hold the same enums as the full ones and this
+    codec is where the integers live. They used to be six ``IntEnum`` classes
+    and twelve translation tables between them and the model's enums, with a
+    default at every call site for whatever a table left out.
+
+    Args:
+        table: Each value's wire integer. Must be one-to-one.
+        lenient: Also accept an integer written as a string.
+
+    Returns:
+        Codec: Writing ``table[value]``, and reading its inverse.
+    """
+    inverse = {number: value for value, number in table.items()}
+    if len(inverse) != len(table):
+        raise ValueError(f"wire integers are not one-to-one: {dict(table)!r}")
+
+    def from_wire(raw: Any) -> Any:
+        number = LENIENT_INT.from_wire(raw) if lenient else raw
+        # ``True == 1`` in Python, and a JSON ``true`` is not the integer one.
+        if isinstance(number, bool) or number not in inverse:
+            raise ValueError(f"{raw!r} is not one of {sorted(inverse)}")
+        return inverse[number]
+
+    return Codec(lambda value: table[value], from_wire)
+
+
 def list_codec(item: Codec) -> Codec:
     """Return a codec for a JSON array of values.
 

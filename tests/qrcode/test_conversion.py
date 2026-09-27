@@ -1,17 +1,16 @@
-"""Tests for the Task <-> QRCodeTask translation tables.
+"""Tests for the Task <-> QRCodeTask crossing and the QR wire integers.
 
 The conversion itself is exercised end-to-end by the reference round-trips in
-``test_qrcode.py`` and ``test_distance_reference.py``. What those cannot catch
-is a value added to one enum and mapped in only one direction, so the tables'
-symmetry is pinned here.
+``test_codec.py``. What those cannot catch is an enum member with no wire
+integer, so each table's totality is pinned here.
 """
 
 from typing import Any
 
 import pytest
 
+from pyxctsk.model.shape import wire_int_codec
 from pyxctsk.model.task import (
-    OBSOLETE_DIRECTION_DEFAULT,
     Direction,
     EarthModel,
     GoalType,
@@ -19,86 +18,91 @@ from pyxctsk.model.task import (
     TaskType,
     TurnpointType,
 )
-from pyxctsk.qrcode.conversion import (
-    _FROM_QR_DIRECTION,
-    _FROM_QR_EARTH_MODEL,
-    _FROM_QR_GOAL_TYPE,
-    _FROM_QR_SSS_TYPE,
-    _FROM_QR_TASK_TYPE,
-    _FROM_QR_TURNPOINT_TYPE,
-    _TO_QR_DIRECTION,
-    _TO_QR_EARTH_MODEL,
-    _TO_QR_GOAL_TYPE,
-    _TO_QR_SSS_TYPE,
-    _TO_QR_TASK_TYPE,
-    _TO_QR_TURNPOINT_TYPE,
+from pyxctsk.qrcode.models import (
+    DIRECTION_WIRE,
+    GOAL_TYPE_WIRE,
+    SSS_TYPE_WIRE,
+    TURNPOINT_TYPE_WIRE,
+    QRCodeTurnpoint,
 )
-from pyxctsk.qrcode.enums import (
-    QR_OBSOLETE_DIRECTION_DEFAULT,
-    QRCodeDirection,
-    QRCodeEarthModel,
-    QRCodeGoalType,
-    QRCodeSSSType,
-    QRCodeTaskType,
-)
+from pyxctsk.qrcode.task import EARTH_MODEL_WIRE, QRCodeTask
 from tests.corpus import reference_task
 
-TABLE_PAIRS = [
-    ("task type", _TO_QR_TASK_TYPE, _FROM_QR_TASK_TYPE),
-    ("earth model", _TO_QR_EARTH_MODEL, _FROM_QR_EARTH_MODEL),
-    ("turnpoint type", _TO_QR_TURNPOINT_TYPE, _FROM_QR_TURNPOINT_TYPE),
-    ("direction", _TO_QR_DIRECTION, _FROM_QR_DIRECTION),
-    ("SSS type", _TO_QR_SSS_TYPE, _FROM_QR_SSS_TYPE),
-    ("goal type", _TO_QR_GOAL_TYPE, _FROM_QR_GOAL_TYPE),
-]
-
-
-@pytest.mark.parametrize("name, to_qr, from_qr", TABLE_PAIRS)
-def test_tables_are_mutual_inverses(name, to_qr, from_qr):
-    """Every mapping must round-trip, in both directions."""
-    assert {v: k for k, v in to_qr.items()} == from_qr, f"{name} tables disagree"
-
 
 @pytest.mark.parametrize(
     "enum, table",
     [
-        # TurnpointType.NONE has no QR counterpart: the QR format's own NONE is
-        # the default for anything unmapped, so it is deliberately absent here.
-        (TaskType, _TO_QR_TASK_TYPE),
-        (EarthModel, _TO_QR_EARTH_MODEL),
-        (Direction, _TO_QR_DIRECTION),
-        (SSSType, _TO_QR_SSS_TYPE),
-        (GoalType, _TO_QR_GOAL_TYPE),
+        (EarthModel, EARTH_MODEL_WIRE),
+        (Direction, DIRECTION_WIRE),
+        (SSSType, SSS_TYPE_WIRE),
+        (GoalType, GOAL_TYPE_WIRE),
     ],
+    ids=["earth model", "direction", "SSS type", "goal type"],
 )
-def test_every_domain_value_is_mapped(enum, table):
-    """A new enum member must not silently fall through to a default."""
-    assert set(enum) == set(table)
+def test_every_value_has_a_wire_integer(enum, table):
+    """A new enum member must not silently fall through to a default.
 
-
-@pytest.mark.parametrize(
-    "enum, table",
-    [
-        (QRCodeTaskType, _FROM_QR_TASK_TYPE),
-        (QRCodeEarthModel, _FROM_QR_EARTH_MODEL),
-        (QRCodeDirection, _FROM_QR_DIRECTION),
-        (QRCodeSSSType, _FROM_QR_SSS_TYPE),
-        (QRCodeGoalType, _FROM_QR_GOAL_TYPE),
-    ],
-)
-def test_every_qr_value_is_mapped(enum, table):
-    """The same, coming back the other way."""
-    assert set(enum) == set(table)
-
-
-def test_the_two_obsolete_direction_defaults_agree():
-    """Each layer names the fallback beside its own enum; they must match.
-
-    ``sss.direction`` is obsolete and ignored on read, so both readers invent a
-    value when a task omits it. If they invented different ones, the same task
-    would export differently depending on which format it arrived in.
+    This is the totality the twelve translation tables used to be tested for,
+    now asked of the one table each field has.
     """
-    assert _TO_QR_DIRECTION[OBSOLETE_DIRECTION_DEFAULT] == QR_OBSOLETE_DIRECTION_DEFAULT
+    assert set(enum) == set(table)
+
+
+def test_every_turnpoint_role_has_a_wire_integer():
+    """``TurnpointType.NONE`` is the one without: the format writes no ``t``.
+
+    A new role used to become ``NONE`` going out and ``None`` coming back,
+    silently. Now it has no wire integer, which this test turns into a failure.
+    """
+    assert set(TurnpointType) - set(TURNPOINT_TYPE_WIRE) == {TurnpointType.NONE}
+
+
+@pytest.mark.parametrize(
+    "table",
+    [
+        EARTH_MODEL_WIRE,
+        DIRECTION_WIRE,
+        SSS_TYPE_WIRE,
+        GOAL_TYPE_WIRE,
+        TURNPOINT_TYPE_WIRE,
+    ],
+)
+def test_every_wire_integer_reads_back(table):
+    """Each table is one-to-one, so reading is the inverse of writing."""
+    codec = wire_int_codec(table)
+
+    assert all(codec.from_wire(codec.to_wire(value)) is value for value in table)
+
+
+def test_an_unknown_wire_integer_is_refused():
+    """A value outside the table is an error, not a default."""
+    with pytest.raises(ValueError, match="99 is not one of"):
+        wire_int_codec(GOAL_TYPE_WIRE).from_wire(99)
+
+
+def test_a_json_boolean_is_not_the_integer_one():
+    """``True == 1`` in Python; ``true`` on the wire is not a goal type."""
+    with pytest.raises(ValueError):
+        wire_int_codec(GOAL_TYPE_WIRE).from_wire(True)
+
+
+def test_a_zero_turnpoint_type_is_an_ordinary_turnpoint():
+    """The format's "no type" reads as no type, as ``"type": ""`` does."""
+    from pyxctsk.qrcode.encoding import encode_competition_turnpoint
+
+    z = encode_competition_turnpoint(8.0, 46.5, 1000, 400)
+    tp = QRCodeTurnpoint.from_dict({"n": "A", "z": z, "t": 0})
+
+    assert tp.type is None
+
+
+def test_both_formats_hold_the_same_enums():
+    """Crossing the seam copies values; there is nothing left to translate."""
+    task = reference_task("task_bevo").task
+    qr = QRCodeTask.from_task(task)
+
+    assert qr.task_type is task.task_type is TaskType.CLASSIC
+    assert [tp.type for tp in qr.turnpoints] == [tp.type for tp in task.turnpoints]
 
 
 class TestValidatingWhatArrived:
@@ -156,7 +160,7 @@ class TestValidatingWhatArrived:
 
         waypoints = QRCodeTask.from_string(reference_task("task_dami_route").qr_string)
 
-        assert waypoints.task_type is QRCodeTaskType.WAYPOINTS
+        assert waypoints.task_type is TaskType.WAYPOINTS
         assert waypoints.validate() == []
 
     def test_nothing_is_invented_to_check_it(self):

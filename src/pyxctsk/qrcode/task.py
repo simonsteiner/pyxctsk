@@ -33,11 +33,11 @@ from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Any, ClassVar, Mapping, MutableMapping
 
 from ..exceptions import MalformedPayloadError
+from ..model.enums import EarthModel, TaskType
 from ..model.passthrough import QR_EXTENSIONS_KEY
 from ..model.shape import (
     DEFAULTED,
     LENIENT_INT,
-    Codec,
     Discriminator,
     Field,
     Optionality,
@@ -47,12 +47,9 @@ from ..model.shape import (
     load_json,
     require_object,
     shape_codec,
+    wire_int_codec,
 )
-from .enums import (
-    QRCodeEarthModel,
-    QRCodeTaskType,
-    QRCodeTurnpointType,
-)
+from ..model.validation import TaskStructure, ValidationIssue, validate_structure
 from .models import (
     QR_GOAL_SHAPE,
     QR_SSS_SHAPE,
@@ -67,7 +64,6 @@ from .models import (
 
 if TYPE_CHECKING:
     from ..model.task import Task
-    from ..model.validation import ValidationIssue
 
 # Constants
 QR_CODE_SCHEME = "XCTSK:"
@@ -145,8 +141,8 @@ class QRCodeTask:
     """
 
     version: int = QR_CODE_TASK_VERSION
-    task_type: QRCodeTaskType | None = None
-    earth_model: QRCodeEarthModel | None = None
+    task_type: TaskType | None = None
+    earth_model: EarthModel | None = None
     turnpoints: list[QRCodeTurnpoint] = field(default_factory=list)
     takeoff: QRCodeTakeoff | None = None
     sss: QRCodeSSS | None = None
@@ -182,7 +178,7 @@ class QRCodeTask:
         Returns:
             Dictionary with QR code task format fields
         """
-        return self._shape_for(self.task_type == QRCodeTaskType.WAYPOINTS).write(self)
+        return self._shape_for(self.task_type is TaskType.WAYPOINTS).write(self)
 
     @staticmethod
     def _shape_for(simplified: bool) -> "Shape[QRCodeTask]":
@@ -221,7 +217,7 @@ class QRCodeTask:
         """
         document = require_object(data)
         task = cls._shape_for("T" in document).read(document)
-        if task.task_type is QRCodeTaskType.WAYPOINTS and "T" not in document:
+        if task.task_type is TaskType.WAYPOINTS and "T" not in document:
             return task.as_waypoints()
         return task
 
@@ -254,12 +250,12 @@ class QRCodeTask:
         """
         return replace(
             self,
-            task_type=QRCodeTaskType.WAYPOINTS,
+            task_type=TaskType.WAYPOINTS,
             turnpoints=[
                 replace(
                     tp,
                     radius=0,
-                    type=QRCodeTurnpointType.NONE,
+                    type=None,
                     description=None,
                 )
                 for tp in self.turnpoints
@@ -377,19 +373,29 @@ class QRCodeTask:
         never carried, so a report on the converted task is partly a report on
         the converter.
 
-        The check lives in :mod:`pyxctsk.qrcode.conversion` because it needs
-        both vocabularies — this format's turnpoint types and the rules'. It is
-        reached through a function-local import for the same reason the
-        conversion methods below are: importing that module here at module
-        level would make the two a cycle.
+        This is the QR format's adapter onto the rules, which read a
+        :class:`~pyxctsk.model.validation.TaskStructure`. It used to live in
+        ``conversion.py``, reached through a function-local import, because the
+        turnpoint roles had to be translated out of this format's own integer
+        enum first; the models hold the model's enums now, so there is nothing
+        to translate.
 
         Returns:
             list[ValidationIssue]: One issue per violated rule; empty if this
             payload is structurally valid. Each stringifies to its message.
         """
-        from .conversion import validate_qr_code_task
-
-        return validate_qr_code_task(self)
+        return validate_structure(
+            TaskStructure(
+                roles=[tp.type for tp in self.turnpoints],
+                radii=[tp.radius for tp in self.turnpoints],
+                turnpoint_extensions=[tp.extensions for tp in self.turnpoints],
+                root_extensions=self.extensions,
+                version=self.version,
+                expected_version=QR_CODE_TASK_VERSION,
+                is_waypoints_task=self.task_type is TaskType.WAYPOINTS,
+                finish_altitude=self.goal.finish_altitude if self.goal else None,
+            )
+        )
 
     def to_task(self) -> "Task":
         """Convert to regular Task format.
@@ -421,9 +427,9 @@ class _CompetitionTaskType(Field):
         """Accept either spelling of either type, or neither."""
         raw = data.get("taskType")
         if raw == "CLASSIC":
-            return {"task_type": QRCodeTaskType.CLASSIC}
+            return {"task_type": TaskType.CLASSIC}
         if raw in ("WAYPOINTS", "W"):
-            return {"task_type": QRCodeTaskType.WAYPOINTS}
+            return {"task_type": TaskType.WAYPOINTS}
         return {}
 
     def write(self, obj: Any, result: MutableMapping[str, Any]) -> None:
@@ -469,7 +475,7 @@ class _TakeoffTimes(Field):
 #: WGS84 is the default, so the format omits it rather than spelling it out.
 _NON_DEFAULT_EARTH_MODEL = Optionality(
     absent=lambda raw: raw is None,
-    omit=lambda value: value is None or value == QRCodeEarthModel.WGS84,
+    omit=lambda value: value is None or value is EarthModel.WGS84,
 )
 
 #: The nested sections are objects or they are not there. A value of the wrong
@@ -493,11 +499,10 @@ _A_LIST_OR_NOTHING = Optionality(
     carry_unreadable=True,
 )
 
-#: ``e`` is an integer a producer may have written as a string.
-_EARTH_MODEL = Codec(
-    lambda model: model.value,
-    lambda raw: QRCodeEarthModel(LENIENT_INT.from_wire(raw)),
-)
+#: ``e``: WGS84 is 0 (the default, so never written) and the FAI sphere 1 — an
+#: integer a producer may have written as a string.
+EARTH_MODEL_WIRE = {EarthModel.WGS84: 0, EarthModel.FAI_SPHERE: 1}
+_EARTH_MODEL = wire_int_codec(EARTH_MODEL_WIRE, lenient=True)
 
 #: The competition shape, in the key order tools.xcontest.org emits.
 QR_TASK_SHAPE = Shape(
@@ -524,7 +529,7 @@ QRCodeTask.COMPETITION_KEYS = QR_TASK_SHAPE.keys
 QR_WAYPOINTS_TASK_SHAPE = Shape(
     QRCodeTask,
     (
-        Discriminator("T", "W", "task_type", QRCodeTaskType.WAYPOINTS),
+        Discriminator("T", "W", "task_type", TaskType.WAYPOINTS),
         Value("version", "V", LENIENT_INT, DEFAULTED),
         Value(
             "turnpoints",
