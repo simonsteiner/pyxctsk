@@ -78,6 +78,14 @@ jobs:
           path.write_text(text.replace(marker, f"{marker}\n\n{dated}", 1))
           PY
 
+      - name: Extract GitHub Release notes and title
+        # Before anything is pushed or published: an undated or missing
+        # CHANGELOG section must stop the job while nothing is out yet. A
+        # `$(...)` in `gh release create`'s arguments would not fail the step.
+        run: |
+          python3 scripts/changelog_extract.py "${{ steps.bump.outputs.version }}" > "$RUNNER_TEMP/release-notes.md"
+          python3 scripts/changelog_extract.py --title "${{ steps.bump.outputs.version }}" > "$RUNNER_TEMP/release-title.txt"
+
       - name: Commit, tag, and push
         run: |
           git config user.name "github-actions[bot]"
@@ -99,8 +107,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          python3 scripts/changelog_extract.py "${{ steps.bump.outputs.version }}" > release-notes.md
           gh release create "v${{ steps.bump.outputs.version }}" \
-            --title "$(python3 scripts/changelog_extract.py --title "${{ steps.bump.outputs.version }}")" \
-            --notes-file release-notes.md \
+            --title "$(cat "$RUNNER_TEMP/release-title.txt")" \
+            --notes-file "$RUNNER_TEMP/release-notes.md" \
             ./dist/*
