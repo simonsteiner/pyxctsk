@@ -43,6 +43,10 @@ The backlog, in rank order. After the scan only three parts of this file change:
 | [S6](#s6--four-hand-written-format-lists-all-missing-geojson) | Four hand-written format lists, all missing `geojson` | — | maintainability | todo | `refactor/smaller-findings-2026-10-02` | | | |
 | [S7](#s7--changelog_extract-stops-at-any---heading) | `changelog_extract` stops at any `## ` heading | — | maintainability | todo | rides with C6 | | | |
 | [S8](#s8--task_viewer-guards-an-import-that-cannot-fail) | `task_viewer` guards an import that cannot fail | — | maintainability | todo | `refactor/smaller-findings-2026-10-02` | | | |
+| [S9](#s9--a-negative-radius-is-reported-as-a-mismatched-route) | A negative radius is reported as a mismatched route | — | maintainability | todo | `refactor/smaller-findings-2026-10-02` | | | found in C1 and C3 |
+| [S10](#s10--a-qr-turnpoint-type-refuses-a-numeric-string) | A QR turnpoint type refuses a numeric string | — | maintainability | todo | `refactor/smaller-findings-2026-10-02` | | | found in C1 |
+| [S11](#s11--centre-distance-restates-the-two-turnpoint-minimum) | Centre distance restates the two-turnpoint minimum | — | maintainability | todo | `refactor/smaller-findings-2026-10-02` | | | found in C2 |
+| [S12](#s12--the-solver-warns-before-the-plane-refuses) | The solver warns before the plane refuses | — | maintainability | todo | `refactor/smaller-findings-2026-10-02` | | | found in C4 |
 
 Strength: 🟢 Strong · 🟡 Worth exploring · ⚪ Speculative · 🔴 live defect (a bug reproduced during the scan).
 Status: `todo` · `in-progress` · `pr-open` · `merged` · `blocked` · `dropped`. `blocked` and `dropped` always carry a reason in Notes.
@@ -429,6 +433,30 @@ The docstring says a section runs to the next `## [` heading; the code stops at 
 `scripts/task_viewer/api.py:8-20,121,155` · rides with `refactor/smaller-findings-2026-10-02`
 
 `XCTRACK_AVAILABLE` guards importing pyxctsk inside a tool that exists to display it, costs seven `# type: ignore`, and is checked in two of the three routes that need it. Import unconditionally and delete the flag.
+
+### S9 · A negative radius is reported as a mismatched route
+
+`src/pyxctsk/model/shape.py` (`WHOLE_METRES`) · `src/pyxctsk/distance/measured_task.py` · rides with `refactor/smaller-findings-2026-10-02` · *found while implementing C1 and C3*
+
+`"radius": -11` is read in both formats, and `pyxctsk distances` then raises `MismatchedRouteError: route point 1 is 11.0 m outside turnpoint 1's cylinder`, which blames the route; only `--strict` names the radius. Refuse a negative radius where it is read, or name it where it is measured.
+
+### S10 · A QR turnpoint type refuses a numeric string
+
+`src/pyxctsk/qrcode/models.py` (`t`) · rides with `refactor/smaller-findings-2026-10-02` · *found while implementing C1*
+
+After C1 every wire integer accepts a numeric string except the QR turnpoint's `t`: `"t": "0"` is refused while `"t": 0` reads as no type. Read it through the same rule as the others.
+
+### S11 · Centre distance restates the two-turnpoint minimum
+
+`src/pyxctsk/distance/center_distance.py:153` · rides with `refactor/smaller-findings-2026-10-02` · *found while implementing C2*
+
+`if len(turnpoints) < 2: return None` hard-codes the threshold C2 gave one owner (`MIN_TURNPOINTS_FOR_DISTANCE`). Returning `None` ("n/a") may be deliberate; read the constant or say why it is a separate rule. Also: a stale `# noqa: F401` on a used `MeasuredTask` import at `tests/distance/test_task_distances.py:22`.
+
+### S12 · The solver warns before the plane refuses
+
+`src/pyxctsk/distance/solver.py` · rides with `refactor/smaller-findings-2026-10-02` · *found while implementing C4*
+
+With a `1e300` radius scipy emits `OptimizeWarning: NaN result encountered` from inside the solver before `UnmeasurableRouteError` is raised, so a refused task still prints a warning to stderr. Refuse before the solver runs, or suppress the warning where the refusal follows.
 
 ## Recommendation
 
