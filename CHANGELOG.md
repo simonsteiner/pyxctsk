@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [v0.7.0] - 2026-10-02
+
 ### Upgrading
 
 Valid tasks read, convert and measure as in v0.6.1: every corpus conversion and distance report is byte-identical, except that the `distances` JSON report writes `§` where it wrote `\u00a7` (the same JSON value; see the GeoJSON entry under Fixed). Outside the corpus, a number spelled as a string or an integer written as a double is now written back as a number — `"version": "1"` and `"version": 1.0` both come out as `1` — where it used to be copied as it arrived. Otherwise what changes is malformed input, and the errors it raises.
