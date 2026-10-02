@@ -162,6 +162,15 @@ class TestARecognizedPayloadThatCannotBeReadSaysSo:
         with pytest.raises(InvalidFormatError):
             parse_task(payload)
 
+    def test_a_qr_scheme_that_is_not_utf8_is_a_format_error(self):
+        r"""S2: ``XCTSK:\xff`` escaped the recognizer as ``UnicodeDecodeError``.
+
+        The recognizer re-decoded the bytes strictly after ``Input.of`` had
+        already found they were not UTF-8, so it was not total.
+        """
+        with pytest.raises(InvalidFormatError, match="XCTSK: .*not UTF-8"):
+            parse_task(b"XCTSK:\xff")
+
 
 class TestAMalformedPayloadIsOneError:
     """Every one of these left ``parse_task`` as a bare built-in exception."""

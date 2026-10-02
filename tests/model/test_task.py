@@ -10,6 +10,7 @@ This test suite covers:
 """
 
 import json
+from typing import Any
 
 import pytest
 
@@ -67,12 +68,15 @@ class TestTimeOfDay:
         TimeOfDay(hour=0, minute=0, second=0)  # Midnight
         TimeOfDay(hour=23, minute=59, second=59)  # End of day
 
-        for fields, message in [
+        cases: list[tuple[tuple[Any, Any, Any], str]] = [
             ((24, 0, 0), "invalid time '24:00:00Z': hour must be between 0 and 23"),
             ((-1, 0, 0), "invalid time '-1:00:00Z': hour must be between 0 and 23"),
             ((0, 60, 0), "invalid time '00:60:00Z': minute must be between 0 and 59"),
             ((0, 0, 60), "invalid time '00:00:60Z': second must be between 0 and 59"),
-        ]:
+            # Not checked to be integers, so not spelled with ``02d`` either.
+            ((24.5, 0, 0), "invalid time '24.5:00:00Z': hour must be between 0 and 23"),
+        ]
+        for fields, message in cases:
             with pytest.raises(InvalidTimeOfDayError) as caught:
                 TimeOfDay(*fields)
             assert str(caught.value) == message

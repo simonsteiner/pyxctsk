@@ -26,7 +26,7 @@ All notable changes to this project will be documented in this file.
 
 - **A negative radius is named where the task is measured, not blamed on the route.** `"radius": -11` made `distances`, and `convert` to KML or GeoJSON, report `route point 0 is 11.0 m outside turnpoint 0's cylinder` as a `MismatchedRouteError`. Measuring now refuses with the issue `--strict` already reported — `TaskValidationError: turnpoint 0 has a negative radius (-11)` — for every role, takeoff and LINE goal included. Reading stays lenient, so the task still converts to JSON and the QR formats, and `--strict` still names it.
 
-- **A QR turnpoint type of `"0"` reads as no type, as `0` does.** Since every wire integer accepts a numeric string, `"t": "2"` read as SSS while `"t": "0"` was refused as `'0' is not one of [1, 2, 3]`; "no type" now goes through the same integer rule.
+- **A QR turnpoint type of `"0"` reads as no type, as `0` does.** Since every wire integer accepts a numeric string, `"t": "2"` read as SSS while `"t": "0"` was refused as `'0' is not one of [1, 2, 3]`; "no type" now goes through the same integer rule — which also means `"t": 0.0`, read as no type before, is refused like `2.0` is for every other wire integer.
 
 - **Also:** the README, CLAUDE.md and the `convert` docstrings list `geojson` among the output formats — `renderer.OUTPUT_FORMATS` is the one table, and a test holds the README's list to it. `scripts/task_viewer` imports pyxctsk unconditionally, dropping its `XCTRACK_AVAILABLE` flag and the `# type: ignore` comments it cost.
 

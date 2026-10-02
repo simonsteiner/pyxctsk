@@ -128,20 +128,19 @@ def compare_task(task_name: str):
 
     Raises:
         werkzeug.exceptions.NotFound: If the task or XCTSK file is missing.
-        werkzeug.exceptions.InternalServerError: If the XCTrack module is not available.
     """
     # Load original task data
     json_data, geojson_data = load_task_data(task_name)
     if not json_data:
         abort(404, "Task data not found")
 
-    # Load and parse XCTSK file using xctrack module
+    # Load and parse the XCTSK file
     xctsk_path = XCTSK_DIR / f"{task_name}.xctsk"
     if not xctsk_path.exists():
         abort(404, "XCTSK file not found")
 
     try:
-        # Parse task using xctrack
+        # Parse the task with pyxctsk
         task = load_task(xctsk_path)
 
         # One drawing: the table and the map share a single optimized route.
@@ -190,20 +189,19 @@ def geojson_debug_task(task_name: str):
 
     Raises:
         werkzeug.exceptions.NotFound: If the task or XCTSK file is missing.
-        werkzeug.exceptions.InternalServerError: If the XCTrack module is not available.
     """
     # Load original task data
     json_data, geojson_data = load_task_data(task_name)
     if not json_data:
         abort(404, "Task data not found")
 
-    # Load and parse XCTSK file using xctrack module
+    # Load and parse the XCTSK file
     xctsk_path = XCTSK_DIR / f"{task_name}.xctsk"
     if not xctsk_path.exists():
         abort(404, "XCTSK file not found")
 
     try:
-        # Parse task using xctrack
+        # Parse the task with pyxctsk
         task = load_task(xctsk_path)
 
         # Generate XCTrack GeoJSON data with debug information
@@ -249,13 +247,13 @@ def airscore_task(task_name: str):
             url_prefix="task_viewer.",
         )
 
-    # Load and parse XCTSK file using xctrack module
+    # Load and parse the XCTSK file
     xctsk_path = XCTSK_DIR / f"{task_name}.xctsk"
     if not xctsk_path.exists():
         abort(404, "XCTSK file not found")
 
     try:
-        # Parse task using xctrack
+        # Parse the task with pyxctsk
         task = load_task(xctsk_path)
 
         # Calculate distances using AirScore clone

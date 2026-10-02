@@ -44,8 +44,11 @@ class TimeOfDay:
             ("second", self.second, 59),
         ):
             if not 0 <= value <= limit:
+                # ``02`` rather than ``__str__``'s ``02d``: the fields are not
+                # checked to be integers, and 24.5 must not fail to format.
+                spelled = f"{self.hour:02}:{self.minute:02}:{self.second:02}Z"
                 raise InvalidTimeOfDayError(
-                    str(self), f"{name} must be between 0 and {limit}"
+                    spelled, f"{name} must be between 0 and {limit}"
                 )
 
     def to_json_string(self) -> str:

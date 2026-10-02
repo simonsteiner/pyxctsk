@@ -66,11 +66,13 @@ from .qrcode.task import (
     QRCodeTask,
 )
 
-# Both QR schemes the spec defines. XCTSKZ: is checked first because XCTSK: is
-# not a prefix of it, but keeping them ordered makes the intent obvious.
-_QR_SCHEMES = (QR_CODE_SCHEME_COMPRESSED, QR_CODE_SCHEME)
-#: The same, as the bytes the URL adapter recognizes.
-_QR_SCHEME_PREFIXES = tuple(scheme.encode("ascii") for scheme in _QR_SCHEMES)
+# Both QR schemes the spec defines, as the bytes the URL adapter recognizes —
+# bytes, so recognizing one never needs the payload to be text. XCTSKZ: is
+# checked first because XCTSK: is not a prefix of it, but keeping them ordered
+# makes the intent obvious.
+_QR_SCHEMES = tuple(
+    scheme.encode("ascii") for scheme in (QR_CODE_SCHEME_COMPRESSED, QR_CODE_SCHEME)
+)
 
 # File extensions a task is commonly saved under. Used only to hint, when a
 # string handed to parse_task is not a payload, that it may have been meant as
@@ -204,7 +206,7 @@ def _is_xctsk_url(inp: Input) -> bool:
     cannot be read. It used to re-decode them strictly here, and
     ``XCTSK:\xff`` escaped the CLI as a ``UnicodeDecodeError`` traceback.
     """
-    return inp.raw.startswith(_QR_SCHEME_PREFIXES)
+    return inp.raw.startswith(_QR_SCHEMES)
 
 
 def _read_xctsk_url(inp: Input) -> Arrived:
@@ -306,7 +308,7 @@ def _read_qrcode_image(inp: Input) -> Arrived:
             f"looks like an image, but it could not be read: {exc}"
         ) from exc
 
-    payloads = [Input.of(text) for text in texts if text.startswith(_QR_SCHEMES)]
+    payloads = [p for p in map(Input.of, texts) if _is_xctsk_url(p)]
     if not payloads:
         raise InvalidFormatError(
             "looks like an image, but it carries no XCTSK: QR code"
