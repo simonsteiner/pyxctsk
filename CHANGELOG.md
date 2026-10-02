@@ -18,6 +18,18 @@ All notable changes to this project will be documented in this file.
 
 - **Every way of building a `DistanceReport` refuses a task too short to have a distance.** The two-turnpoint rule was a copy in `DistanceReport.from_task` and another in `task_distances_from`, and the third public entry point had neither: `DistanceReport.from_measured_task(MeasuredTask.from_task(task))` — or `DistanceReport(measured=...)` — on a one-turnpoint task reported a task distance of `0.0` m, the answer the rule exists to prevent. The report's constructor now checks it, and the copies are gone; `calculate_task_distances` and `task_distances_from` refuse because the report they render does. `MeasuredTask` is unchanged and still measures a one-turnpoint task, so `convert --format kml`/`geojson` of one keeps working. The CLI's message and exit code, and every corpus conversion and distance report, are byte-identical.
 
+- **An `XCTSK:` payload that is not UTF-8 is a format error, not a `UnicodeDecodeError` traceback.** `printf 'XCTSK:\xff' | pyxctsk convert` crashed in the URL adapter's recognizer, which decoded the bytes a second time, strictly, after the parser had already found they were not UTF-8. The recognizer now asks the bytes for the scheme, and the reader says `recognized XCTSK: URL but its payload is not UTF-8 text`.
+
+- **A name holding a character XML cannot carry no longer breaks KML.** A waypoint named `"a\u0001"` is valid JSON and is read as such, but KML is XML 1.0, which cannot spell most C0 controls even as a character reference, so `convert --format kml` raised simplekml's `xml.parsers.expat.ExpatError` — outside the library's error hierarchy, as a traceback from the CLI. The KML writer replaces each such character with U+FFFD; GeoJSON, which is JSON, carries the name unchanged.
+
+- **A bad time of day says so once, in one style.** `"timeGates": ["12:00Z"]` reported `invalid time: 'Invalid time string: 12:00Z'`, an out-of-range `"deadline": "25:00:00Z"` reported `Hour must be between 0 and 23` from a bare `ValueError`, and a number where a time belongs leaked `'int' object has no attribute 'startswith'`. All three are now `InvalidTimeOfDayError` — `invalid time '25:00:00Z': hour must be between 0 and 23` — which is also a `ValueError`, so `TimeOfDay(24, 0, 0)` still raises one; it gains a `reason` attribute.
+
+- **A negative radius is named where the task is measured, not blamed on the route.** `"radius": -11` made `distances`, and `convert` to KML or GeoJSON, report `route point 0 is 11.0 m outside turnpoint 0's cylinder` as a `MismatchedRouteError`. Measuring now refuses with the issue `--strict` already reported — `TaskValidationError: turnpoint 0 has a negative radius (-11)` — for every role, takeoff and LINE goal included. Reading stays lenient, so the task still converts to JSON and the QR formats, and `--strict` still names it.
+
+- **A QR turnpoint type of `"0"` reads as no type, as `0` does.** Since every wire integer accepts a numeric string, `"t": "2"` read as SSS while `"t": "0"` was refused as `'0' is not one of [1, 2, 3]`; "no type" now goes through the same integer rule.
+
+- **Also:** the README, CLAUDE.md and the `convert` docstrings list `geojson` among the output formats — `renderer.OUTPUT_FORMATS` is the one table, and a test holds the README's list to it. `scripts/task_viewer` imports pyxctsk unconditionally, dropping its `XCTRACK_AVAILABLE` flag and the `# type: ignore` comments it cost.
+
 ## [v0.6.1] - 2026-09-27
 
 ### Fixed
