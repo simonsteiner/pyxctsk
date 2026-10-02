@@ -19,6 +19,11 @@ _FIRST_CHAR = 63
 _LAST_CHAR = _FIRST_CHAR + 0x3F
 #: The largest final chunk; one above it carries the continuation bit.
 _MAX_FINAL_CHUNK = 0x1F
+#: The most chunks one number takes: the reference format's numbers are
+#: 32-bit, and 33 bits (the sign folded in) fit in seven 5-bit chunks.
+#: Without a bound, a run of continuation chunks is an integer no float can
+#: hold, read in quadratic time.
+_MAX_CHUNKS = 7
 
 
 def encode_num(num: int) -> str:
@@ -98,8 +103,9 @@ def decode_nums(encoded_str: str) -> list[int]:
 
     Reads exactly what :func:`encode_num` writes: every character is a chunk
     from ``?`` to ``~`` (63–126), and the string ends on a final chunk
-    (``?`` to ``^``). Anything else is refused rather than decoded, because
-    the reference decoder reads any character as a chunk and drops an
+    (``?`` to ``^``), and no number takes more than the seven chunks a 32-bit
+    integer does. Anything else is refused rather than decoded, because the
+    reference decoder reads any character as a chunk and drops an
     unterminated tail — junk becomes numbers, and a truncated string becomes
     a shorter list that still looks like a turnpoint.
 
@@ -111,9 +117,10 @@ def decode_nums(encoded_str: str) -> list[int]:
 
     Raises:
         MalformedPayloadError: If a character is outside the polyline
-            alphabet, or the last number is unterminated.
+            alphabet, a number is longer than a 32-bit integer encodes to,
+            or the last number is unterminated.
     """
-    result = []
+    result: list[int] = []
     current = 0
     pos = 0
 
@@ -126,6 +133,11 @@ def decode_nums(encoded_str: str) -> list[int]:
         current |= (c & 0x1F) << pos
         pos += 5
 
+        if c > _MAX_FINAL_CHUNK and pos >= _MAX_CHUNKS * 5:
+            raise MalformedPayloadError(
+                f"number {len(result)} is longer than {_MAX_CHUNKS} chunks, "
+                "more than a 32-bit integer"
+            )
         if c <= _MAX_FINAL_CHUNK:
             # Extract the value (undo the encoding)
             tmp_res = current >> 1

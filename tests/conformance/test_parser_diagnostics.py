@@ -313,6 +313,14 @@ class TestAMalformedScalarIsRefusedWhereItIsRead:
         with pytest.raises(InvalidFormatError, match=r"t\[0\]\.z"):
             parse_task("XCTSK:" + json.dumps(payload))
 
+    def test_a_qr_number_longer_than_32_bits_names_where(self):
+        """``~`` * 400 passed the decoder and overflowed dividing it by 1e5."""
+        payload = _qr_payload()
+        payload["t"][0]["z"] = "~" * 400 + "????"
+
+        with pytest.raises(InvalidFormatError, match=r"t\[0\]\.z: number 0"):
+            parse_task("XCTSK:" + json.dumps(payload))
+
     @pytest.mark.parametrize("path", _FULL_SCALAR_PATHS, ids=str)
     @pytest.mark.parametrize("raw", _JUNK, ids=repr)
     def test_every_full_format_scalar_is_refused_or_safe(self, path, raw):
