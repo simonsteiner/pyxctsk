@@ -5,7 +5,8 @@ Tools for parsing, converting, and measuring XCTrack task files
 
 Features:
 - Parse XCTrack task files from file or stdin
-- Convert tasks to JSON, KML, PNG QR code, or compact QR string
+- Convert tasks to any format in ``renderer.OUTPUT_FORMATS`` (``--help``
+  lists them)
 - Report the FAI S7F distances, including the route points another
   implementation needs to diff against
 - Output to file or stdout
@@ -179,13 +180,13 @@ def convert(
     """Convert XCTrack task files between supported formats.
 
     Reads an XCTrack task from a file or stdin, parses it, and outputs the
-    converted result in the specified format (JSON, KML, PNG QR code, or compact
-    QR string) to a file or stdout. Both XCTSK: and XCTSKZ: inputs are accepted
+    converted result in the specified format — one of
+    ``renderer.OUTPUT_FORMATS`` — to a file or stdout. Both XCTSK: and XCTSKZ: inputs are accepted
     regardless of this flag.
 
     Args:
         input_file (file or None): Input file object opened in binary mode, or None to read from stdin.
-        output_format (str): Output format ('json', 'kml', 'png', or 'qrcode-json').
+        output_format (str): Output format, a key of ``OUTPUT_FORMATS``.
         output_file (str): Output file path, or None to write to stdout.
         compressed (bool): Emit the XCTSKZ: encoding for QR output formats.
         strict (bool): Reject a structurally invalid task instead of converting
