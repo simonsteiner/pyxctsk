@@ -41,8 +41,11 @@ scripts/release.sh minor   # or: major | patch (default)
 The script runs on `main` with a clean tree, pulls, and calls
 `scripts/verify.sh`, the same gate CI runs. It then makes the release commit and
 tag with `scripts/prepare_release.sh`, and asks before pushing `main` and the
-tag in one atomic push; the tag push triggers **Publish**. If you decline, or
-the push is rejected, it prints the commands to push later or to abort.
+tag in one atomic push; the tag push triggers **Publish**. If you decline, it
+prints the commands to push later or to abort. If the push fails, it prints
+both with the case each is for: retry if origin was unreachable, or abort and
+re-run the script if `main` moved on, since the release commit must then be
+remade on top of it.
 
 ## The release sequence
 

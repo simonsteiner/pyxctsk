@@ -54,11 +54,15 @@ if [ "$reply" = "y" ] || [ "$reply" = "Y" ]; then
     exit 0
   fi
   echo "Push failed; neither main nor ${TAG} reached origin."
-  status=1
-else
-  echo "Not pushed."
-  status=0
+  # Retrying only helps if origin was not reached. If main moved on, the
+  # release commit is no longer a fast-forward of it, and the CHANGELOG roll
+  # and version have to be redone on top of the new main.
+  echo "If origin was unreachable, retry:"
+  echo "  git push --atomic origin HEAD:main ${TAG}"
+  echo "If it was rejected because main moved on, abort and re-run scripts/release.sh:"
+  echo "  git tag -d ${TAG} && git reset --hard HEAD~1"
+  exit 1
 fi
+echo "Not pushed."
 echo "To publish later:  git push --atomic origin HEAD:main ${TAG}"
 echo "To abort:          git tag -d ${TAG} && git reset --hard HEAD~1"
-exit "$status"
