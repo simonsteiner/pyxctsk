@@ -26,7 +26,7 @@ The library implements the XCTrack Competition Interfaces specification: both ta
 
 ## Technical Highlights
 
-- **Typed Data Model**: Core domain objects are dataclasses with constrained values modelled as enums, so unknown task/turnpoint/goal types are rejected at parse time. `Task.validate()` additionally reports violations of the spec's structural rules — TAKEOFF only first, SSS and ESS exactly once, SSS before ESS — and `parse_task(data, strict=True)` turns them into an error ([model/task.py](./src/pyxctsk/model/task.py))
+- **Typed Data Model**: Core domain objects are dataclasses with constrained values modelled as enums, so unknown task/turnpoint/goal types are rejected at parse time. `Task.validate()` additionally reports violations of the spec's structural rules — TAKEOFF only first, SSS and ESS exactly once, SSS before ESS — and `parse_task(data, strict=True)` turns them into an error ([model/task.py](./src/pyxctsk/model/task.py)). Lenient reading covers only that structure: a value of the wrong kind — a boolean latitude, a latitude off the earth, a QR `z` that is not a polyline — is refused on every read as a `MalformedPayloadError` naming where, such as `turnpoints[1].waypoint.lat`
 - **S7F-conformant Distance Calculation**: The Ding–Xie–Jiang path finder in a localized Transverse Mercator plane, converged to the spec's ε = 0.1 m and multi-started so the answer is the task's shortest path rather than the projection's local optimum; the two-pass task-area centre of §7.1.6; and both of §7.2's distances, the task's and the speed section's ([distance/](./src/pyxctsk/distance/__init__.py), [route_optimization.py](./src/pyxctsk/distance/route_optimization.py))
 - **Efficient QR Code Representation**: Implements XCTrack's compact QR code format with polyline compression for efficient task sharing via small QR codes that work well in direct sunlight ([qrcode/task.py](./src/pyxctsk/qrcode/task.py))
 - **Flexible Parsing Pipeline**: Single entry point that intelligently detects and parses multiple input formats (JSON, URL, QR code image) ([parser.py](./src/pyxctsk/parser.py))
@@ -204,6 +204,10 @@ The `pyxctsk` CLI enables conversion and inspection of XCTrack task files in mul
   Default: `json`
 - `--output, -o <file>`  
   Output file (default: stdout). For `png`, writes a PNG image; for others, writes text.
+- `--compressed, -z`  
+  Emit the compressed `XCTSKZ:` encoding (`png` and `qrcode-json` only).
+- `--strict`  
+  Reject a task that breaks the spec's structural rules instead of converting it. A malformed value is refused with or without it.
 - `<input_file>`  
   Input file (optional). If omitted, reads from stdin. Accepts `.xctsk` files or QR code images.
 
