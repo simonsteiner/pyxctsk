@@ -30,7 +30,7 @@ The backlog, in rank order. After the scan only three parts of this file change:
 | ID | Deepening | Strength | Lens | Status | Branch | PR | Breaking | Notes |
 |---|---|---|---|---|---|---|---|---|
 | [C1](#c1--one-owner-for-a-wire-scalar) | One owner for a wire scalar | 🟢 Strong · 🔴 live defect | deepening | pr-open | `refactor/wire-scalars` | [#29](https://github.com/simonsteiner/pyxctsk/pull/29) | yes | batch 2026-10-02: C1 → C2 → C3 → C4 |
-| [C2](#c2--the-distance-report-owns-the-two-turnpoint-minimum) | The distance report owns the two-turnpoint minimum | 🟢 Strong · 🔴 live defect | deepening | pr-open | `refactor/report-owns-minimum` | | no | |
+| [C2](#c2--the-distance-report-owns-the-two-turnpoint-minimum) | The distance report owns the two-turnpoint minimum | 🟢 Strong · 🔴 live defect | deepening | pr-open | `refactor/report-owns-minimum` | [#30](https://github.com/simonsteiner/pyxctsk/pull/30) | no | |
 | [C3](#c3--the-polyline-decoder-owns-its-own-validity) | The polyline decoder owns its own validity | 🟢 Strong · 🔴 live defect | deepening | todo | `refactor/polyline-decoder-validity` | | | |
 | [C4](#c4--the-solver-refuses-a-route-it-cannot-measure) | The solver refuses a route it cannot measure | 🟢 Strong · 🔴 live defect | deepening | todo | `refactor/unmeasurable-route` | | | builds on C1 |
 | [C5](#c5--one-json-writer) | One JSON writer | 🟡 Worth exploring | maintainability | todo | `refactor/one-json-writer` | | | |
