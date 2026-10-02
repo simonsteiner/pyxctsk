@@ -332,3 +332,45 @@ class TestAMalformedScalarIsRefusedWhereItIsRead:
         except InvalidFormatError:
             return
         _survives_every_output(task)
+
+
+class TestAPolylineIsReadOnlyIfItIsOne:
+    """A QR ``z`` that is not a polyline is refused at ``t[i].z``, not decoded.
+
+    The decoder read any character as a number and dropped an unterminated
+    final one, so the only check left to its caller — three numbers or four —
+    passed on garbage. Each test is a reproduction from the 2026-10-02
+    review's C3 card.
+    """
+
+    def test_junk_is_not_a_turnpoint_in_the_gulf_of_guinea(self):
+        """``"1234"`` was read as lat -0.0001, lon 0.00009, radius -11."""
+        payload = _qr_payload()
+        payload["t"][0]["z"] = "1234"
+
+        with pytest.raises(
+            InvalidFormatError, match=r"t\[0\]\.z: '1' at index 0 is not a polyline"
+        ):
+            parse_task("XCTSK:" + json.dumps(payload))
+
+    def test_a_truncated_competition_turnpoint_is_not_a_waypoint(self):
+        """Losing the radius's last character read it as radius 0, exit 0."""
+        payload = _qr_payload()
+        payload["t"][1]["z"] = "_d{r@_fn~Go}@_"  # the card's: "X" lost from the end
+
+        with pytest.raises(
+            InvalidFormatError, match=r"t\[1\]\.z: .*number is unterminated"
+        ):
+            parse_task("XCTSK:" + json.dumps(payload))
+
+    @pytest.mark.parametrize("raw", [["?", "?", "?"], 5])
+    def test_a_z_that_is_not_a_string_is_refused(self, raw):
+        """``["?", "?", "?"]`` iterated like a string: a turnpoint at 0°N 0°E.
+
+        And ``5`` leaked ``'int' object is not iterable``.
+        """
+        payload = _qr_payload()
+        payload["t"][0]["z"] = raw
+
+        with pytest.raises(InvalidFormatError, match=r"t\[0\]\.z: expected a string"):
+            parse_task("XCTSK:" + json.dumps(payload))

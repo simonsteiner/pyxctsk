@@ -276,8 +276,9 @@ class QRCodeTurnpoint:
             QRCodeTurnpoint instance
 
         Raises:
-            MalformedPayloadError: If ``z`` or ``n`` is missing, or ``z`` does
-                not decode to three or four numbers.
+            MalformedPayloadError: If ``z`` or ``n`` is missing, ``z`` is
+                not a polyline string, or it does not decode to three or four
+                numbers.
         """
         return QR_TURNPOINT_SHAPE.read(data)
 
@@ -293,7 +294,10 @@ class _PolylineCoordinates(Field):
 
     Reading does not depend on which shape asked: the number count says which
     encoding it is, so a three-number ``z`` in a competition payload is a
-    waypoint turnpoint with radius 0 rather than an error.
+    waypoint turnpoint with radius 0 rather than an error. The count is the
+    only check made here — whether ``z`` is a polyline at all is the
+    decoder's, so a truncated competition turnpoint is refused there rather
+    than counted as a waypoint.
 
     Attributes:
         with_radius: Whether this shape's ``z`` carries the fourth number.
@@ -308,7 +312,7 @@ class _PolylineCoordinates(Field):
 
     def read(self, data: Mapping[str, Any]) -> dict[str, Any]:
         """Decode ``z`` into the four coordinate attributes."""
-        nums = decode_nums(data["z"])
+        nums = decode_nums(TEXT.from_wire(data["z"]))
         if len(nums) == 4:
             lon, lat, alt_smoothed, radius = (
                 nums[0] / 1e5,
