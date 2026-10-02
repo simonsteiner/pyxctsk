@@ -23,14 +23,13 @@ every job is skipped.
 `release.yml` then:
 
 1. runs the CI gate (`ci.yml`) on the commit being released
-2. bumps the version in `pyproject.toml` and `uv.lock` (`uv version --bump`)
-3. rolls the changelog, stopping here if `[Unreleased]` is empty
-4. commits `release vX.Y.Z`, tags `vX.Y.Z`, and pushes both to `main` in one
-   atomic push — rejected if `main` moved since the run started
-5. dispatches `publish.yml` at the tag
+2. makes the release commit and tag with `scripts/prepare_release.sh` (below)
+3. pushes both to `main` in one atomic push — rejected if `main` moved since
+   the run started
+4. dispatches `publish.yml` at the tag
 
 A tag pushed with `GITHUB_TOKEN` does not start workflows, but a
-`workflow_dispatch` does, which is why step 5 exists and why the trusted
+`workflow_dispatch` does, which is why step 4 exists and why the trusted
 publisher only needs to name `publish.yml`. Releases run one at a time.
 
 ## Option B — Local script
@@ -39,10 +38,30 @@ publisher only needs to name `publish.yml`. Releases run one at a time.
 scripts/release.sh minor   # or: major | patch (default)
 ```
 
-The script runs on `main` with a clean tree. It calls `scripts/verify.sh`, the
-same gate CI runs, works out the new version, rolls the changelog, bumps the
-version and lockfile, commits, and tags. It asks before pushing `main` and the
-tag in one atomic push; the tag push triggers **Publish**.
+The script runs on `main` with a clean tree, pulls, and calls
+`scripts/verify.sh`, the same gate CI runs. It then makes the release commit and
+tag with `scripts/prepare_release.sh`, and asks before pushing `main` and the
+tag in one atomic push; the tag push triggers **Publish**. If you decline, or
+the push is rejected, it prints the commands to push later or to abort.
+
+## The release sequence
+
+Both options make the release commit and tag with one script,
+`scripts/prepare_release.sh [major|minor|patch]`, so a fix to the sequence
+lands once. It pushes nothing; the gate before it and the push after it are the
+caller's. In order, it:
+
+1. refuses a dirty working tree
+2. works out the new version once (`uv version --bump <level> --dry-run --short`)
+3. refuses a `vX.Y.Z` tag that already exists, locally or on origin
+4. rolls the changelog, stopping here if `[Unreleased]` is empty
+5. sets that version in `pyproject.toml` and `uv.lock` (`uv version X.Y.Z`)
+6. checks the release notes and title **Publish** will read are there
+7. commits `release vX.Y.Z` and tags `vX.Y.Z`
+
+If any step fails, it puts the branch back where it started, so a failed
+release leaves nothing to clean up. On success it prints the version alone on
+stdout.
 
 ## Dry run
 
@@ -70,8 +89,8 @@ protection, allow GitHub Actions to bypass it.
 ## What "version" means
 
 `pyproject.toml` is the single source of truth; `pyxctsk.__version__` reads it at
-runtime via `importlib.metadata`. `uv version --bump <level>` updates it (and the
-lockfile).
+runtime via `importlib.metadata`. The release sequence sets it (and the
+lockfile) with `uv version X.Y.Z`.
 
 ## Verifying a release
 

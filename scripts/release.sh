@@ -2,10 +2,11 @@
 #
 # Release helper for pyxctsk.
 #
-# Verifies the tree, rolls the CHANGELOG's [Unreleased] section into a dated
-# release, bumps the version and the lockfile, commits, tags, and — after an
-# explicit confirmation — pushes main and the tag atomically. Pushing the tag
-# triggers the Publish workflow, which runs the test gate and uploads to PyPI.
+# Runs the verification gate on an up-to-date main, then has
+# scripts/prepare_release.sh — the release sequence release.yml runs too —
+# roll the CHANGELOG, set the version, commit and tag. After an explicit
+# confirmation it pushes main and the tag atomically. Pushing the tag triggers
+# the Publish workflow, which runs the test gate and uploads to PyPI.
 #
 # Usage:
 #   scripts/release.sh [major|minor|patch]   # default: patch
@@ -38,46 +39,26 @@ git pull --ff-only origin main
 # --- Verify ------------------------------------------------------------------
 scripts/verify.sh
 
-# --- Version and CHANGELOG ---------------------------------------------------
-# The version is worked out before anything is written, so an existing tag or
-# a CHANGELOG that cannot be rolled stops here with the tree still clean.
-VERSION="$(uv version --bump "$BUMP" --dry-run --short)"
-TAG="v${VERSION}"
-if git rev-parse "$TAG" >/dev/null 2>&1; then
-  echo "Tag $TAG already exists locally; aborting." >&2
-  exit 1
-fi
-# `git pull` does not fetch every tag, so ask origin as well. ls-remote exits 2
-# when the tag is absent; anything else but 0 means origin was not reached.
-remote_status=0
-git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null || remote_status=$?
-case "$remote_status" in
-  0)
-    echo "Tag $TAG already exists on origin; aborting." >&2
-    exit 1
-    ;;
-  2) ;;
-  *)
-    echo "Could not check origin for tag $TAG; aborting." >&2
-    exit 1
-    ;;
-esac
-python3 scripts/changelog_extract.py roll "$VERSION"
-uv version --bump "$BUMP" --no-sync
-
 # --- Commit and tag ----------------------------------------------------------
-git add pyproject.toml uv.lock CHANGELOG.md
-git commit -m "release ${TAG}"
-git tag -a "$TAG" -m "Version ${VERSION}"
+VERSION="$(scripts/prepare_release.sh "$BUMP")"
+TAG="v${VERSION}"
 
+# --- Push, after confirmation ------------------------------------------------
 echo
-echo "Prepared ${TAG}. Pushing will trigger the PyPI publish (irreversible)."
+echo "Pushing ${TAG} will trigger the PyPI publish (irreversible)."
 read -r -p "Push main and ${TAG} to origin now? [y/N] " reply
 if [ "$reply" = "y" ] || [ "$reply" = "Y" ]; then
   # --atomic: main and the tag land together or not at all.
-  git push --atomic origin HEAD:main "$TAG"
-  echo "Pushed ${TAG}. Track the Publish workflow on GitHub."
+  if git push --atomic origin HEAD:main "$TAG"; then
+    echo "Pushed ${TAG}. Track the Publish workflow on GitHub."
+    exit 0
+  fi
+  echo "Push failed; neither main nor ${TAG} reached origin."
+  status=1
 else
-  echo "Not pushed. To publish later:  git push --atomic origin HEAD:main ${TAG}"
-  echo "To abort:                      git tag -d ${TAG} && git reset --hard HEAD~1"
+  echo "Not pushed."
+  status=0
 fi
+echo "To publish later:  git push --atomic origin HEAD:main ${TAG}"
+echo "To abort:          git tag -d ${TAG} && git reset --hard HEAD~1"
+exit "$status"
