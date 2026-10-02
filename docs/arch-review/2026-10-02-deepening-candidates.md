@@ -41,7 +41,7 @@ The backlog, in rank order. After the scan only three parts of this file change:
 | [S4](#s4--timeofday-raises-two-types-and-wraps-its-message-twice) | `TimeOfDay` raises two types and wraps its message twice | — | maintainability | todo | `refactor/smaller-findings-2026-10-02` | | | |
 | [S5](#s5--the-goal-default-is-applied-twice) | The goal default is applied twice | — | maintainability | todo | `refactor/smaller-findings-2026-10-02` | | | |
 | [S6](#s6--four-hand-written-format-lists-all-missing-geojson) | Four hand-written format lists, all missing `geojson` | — | maintainability | todo | `refactor/smaller-findings-2026-10-02` | | | |
-| [S7](#s7--changelog_extract-stops-at-any--heading) | `changelog_extract` stops at any `## ` heading | — | maintainability | todo | rides with C6 | | | |
+| [S7](#s7--changelog_extract-stops-at-any---heading) | `changelog_extract` stops at any `## ` heading | — | maintainability | todo | rides with C6 | | | |
 | [S8](#s8--task_viewer-guards-an-import-that-cannot-fail) | `task_viewer` guards an import that cannot fail | — | maintainability | todo | `refactor/smaller-findings-2026-10-02` | | | |
 
 Strength: 🟢 Strong · 🟡 Worth exploring · ⚪ Speculative · 🔴 live defect (a bug reproduced during the scan).
@@ -281,7 +281,8 @@ flowchart LR
   style after fill:#fafaf9,stroke:#e2e8f0
 ```
 
-Four `json.dumps` call sites choose their own options: a waypoint named `Château` is written as-is by `json` and `qrcode-json`, and as `Château` by `geojson` and `distances`.
+<!-- `Ch\u00e2teau` is an escape, not a word. cspell:ignore teau -->
+Four `json.dumps` call sites choose their own options: a waypoint named `Château` is written as-is by `json` and `qrcode-json`, and as `Ch\u00e2teau` by `geojson` and `distances`.
 
 | Problem | Solution | Wins |
 |---|---|---|
