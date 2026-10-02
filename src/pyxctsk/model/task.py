@@ -452,10 +452,10 @@ class Task:
         passthrough design exists so that what arrives is what leaves. It went
         unnoticed because every reference task carries a goal.
 
-        Ask for this wherever the *flown* goal is meant — the cylinders, the
-        goal line, the drawing, the QR conversion. Read :attr:`goal` where what
-        the file said is meant, which is :mod:`~pyxctsk.model.validation`'s
-        whole job.
+        Ask for this wherever the *flown* goal is meant — the cylinders and the
+        goal line. Read :attr:`goal` where what the file said is meant, which
+        is :mod:`~pyxctsk.model.validation`'s whole job and the QR conversion's
+        too: it writes no ``g`` object for a task that never spelled one out.
 
         Returns:
             The goal with defaults applied, or None for a task with no

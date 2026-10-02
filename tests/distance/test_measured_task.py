@@ -16,6 +16,7 @@ from pyxctsk import (
     MismatchedRouteError,
     Task,
     TaskType,
+    TaskValidationError,
     TurnpointType,
     UnmeasurableRouteError,
 )
@@ -29,6 +30,7 @@ from pyxctsk.distance import (
 from pyxctsk.distance.earth import geodesic_distance
 from pyxctsk.distance.goal_line import GoalLine
 from pyxctsk.distance.speed_section import SpeedSection
+from pyxctsk.model.validation import ValidationRule
 from tests.builders import task, turnpoint
 from tests.corpus import reference_task
 
@@ -434,3 +436,35 @@ class TestACylinderPastTheFarSideOfTheEarthIsRefused:
             MeasuredTask.from_task(huge).route.total_m
             == MeasuredTask.from_task(small).route.total_m
         )
+
+
+class TestANegativeRadiusIsNamed:
+    """S9: ``"radius": -11`` was reported as a route that does not fit.
+
+    ``MismatchedRouteError`` said route point 0 was 11.0 m outside turnpoint
+    0's cylinder — blaming the optimizer for the task. A cylinder cannot have a
+    negative radius, which is the rule ``Task.validate()`` already states, so
+    measuring refuses with that rule's issue rather than a second wording.
+    """
+
+    @pytest.mark.parametrize("index", [0, 1, 3])
+    def test_every_role_is_refused_with_the_validation_rule(self, index):
+        """The takeoff and the goal too: no role makes a negative size mean one."""
+        measured = _race_task()
+        measured.turnpoints[index].radius = -11
+
+        with pytest.raises(TaskValidationError) as caught:
+            MeasuredTask.from_task(measured)
+
+        (issue,) = caught.value.issues
+        assert issue.rule is ValidationRule.NEGATIVE_RADIUS
+        assert str(issue) == f"turnpoint {index} has a negative radius (-11)"
+
+    def test_a_negative_line_goal_is_refused_too(self):
+        """Its cylinder is a point, but the radius it declares is still a size."""
+        line = _race_task()
+        line.goal = Goal(type=GoalType.LINE)
+        line.turnpoints[-1].radius = -400
+
+        with pytest.raises(TaskValidationError, match="negative radius"):
+            task_to_turnpoints(line)

@@ -29,8 +29,9 @@ depends on neither.
 
 from dataclasses import dataclass, field
 
-from ..exceptions import MismatchedRouteError
+from ..exceptions import MismatchedRouteError, TaskValidationError
 from ..model.task import GoalType, Task
+from ..model.validation import ValidationRule
 from .earth import EarthModelLike, canonical, geodesic_distance, name_of
 from .route_optimization import OptimizedRoute, calculate_iteratively_refined_route
 from .turnpoint import TaskTurnpoint
@@ -54,28 +55,48 @@ def task_to_turnpoints(task: Task) -> list[TaskTurnpoint]:
     rather than re-deriving it, and what makes ``MeasuredTask.turnpoints``
     mean what it says.
 
+    **A negative radius is refused here**, with the issue
+    :meth:`Task.validate` reports for it, because this is where a radius
+    becomes a size. Reading stays lenient — the full and QR formats both carry
+    one, and ``--strict`` names it — but it cannot be measured: it used to
+    surface as :class:`~pyxctsk.MismatchedRouteError` saying the *route* point
+    was 11.0 m outside a cylinder of radius -11, blaming the optimizer for the
+    task. Every role is refused alike, a takeoff and a LINE goal included,
+    whose radius the route does not touch: no role makes a negative size mean
+    one, and the drawing outlines it.
+
     Args:
         task (Task): Task object.
 
     Returns:
         List[TaskTurnpoint]: One cylinder per turnpoint, in task order.
+
+    Raises:
+        TaskValidationError: If a turnpoint's radius is negative, carrying one
+            :attr:`~pyxctsk.model.validation.ValidationRule.NEGATIVE_RADIUS`
+            issue per such turnpoint.
     """
+    negative = [
+        issue
+        for issue in task.validate()
+        if issue.rule is ValidationRule.NEGATIVE_RADIUS
+    ]
+    if negative:
+        raise TaskValidationError(negative)
+
     # ``effective_goal``, not ``goal``: the cylinders are the task as *flown*,
-    # so the format's CYLINDER default applies here. ``goal`` is what the file
+    # so the format's CYLINDER default applies here — and it guarantees a type
+    # whenever there is a turnpoint to be the goal. ``goal`` is what the file
     # said, which is validation's question rather than geometry's.
     goal = task.effective_goal
-    # Parenthesized rather than left to precedence. A conditional expression
-    # binds less tightly than ``or``, so the unparenthesized form means the
-    # same thing — but it reads as though ``goal.type`` were evaluated before
-    # the ``if goal`` guard, and a reviewer of this line read it that way.
-    goal_type = (goal.type or GoalType.CYLINDER) if goal else None
+    line_goal = goal is not None and goal.type is GoalType.LINE
 
     last = len(task.turnpoints) - 1
     return [
         TaskTurnpoint(
             lat=tp.waypoint.lat,
             lon=tp.waypoint.lon,
-            radius=0 if (i == last and goal_type is GoalType.LINE) else tp.radius,
+            radius=0 if (i == last and line_goal) else tp.radius,
         )
         for i, tp in enumerate(task.turnpoints)
     ]
