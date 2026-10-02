@@ -192,9 +192,16 @@ class TestWireScalars:
         """Producers have written the QR version and earth model as strings."""
         assert INTEGER.from_wire(raw) == 2
 
-    @pytest.mark.parametrize("raw", [True, 2.0, "2.5", None, [2]])
+    @pytest.mark.parametrize("raw", [2.0, "2.0", "2e0"])
+    def test_an_integral_float_is_the_integer_it_spells(self, raw):
+        """A producer holding a double writes ``2.0``; it is read back as 2."""
+        value = INTEGER.from_wire(raw)
+        assert value == 2
+        assert type(value) is int
+
+    @pytest.mark.parametrize("raw", [True, 2.5, "2.5", None, [2]])
     def test_an_integer_is_nothing_else(self, raw):
-        """``True == 1`` in Python, and ``2.0`` was never an integer here."""
+        """``True == 1`` in Python, and ``2.5`` is not a whole number."""
         with pytest.raises(MalformedPayloadError, match="expected an integer"):
             INTEGER.from_wire(raw)
 

@@ -246,8 +246,14 @@ def _read_number(raw: Any) -> int | float:
 
 
 def _read_integer(raw: Any) -> int:
-    """An integer, or a string spelling one. ``2.0`` and ``true`` are not."""
+    """An integer, or a string spelling one; ``2.0`` reads as 2, ``true`` never.
+
+    A producer holding a double writes ``1.0``; it is read as the integer it
+    is, and so written back as ``1``.
+    """
     value = _wire_number(raw)
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
     if not isinstance(value, int):
         raise MalformedPayloadError(f"expected an integer, got {_describe(raw)}")
     return value

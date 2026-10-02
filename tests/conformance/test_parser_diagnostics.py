@@ -11,6 +11,7 @@ import pytest
 
 from pyxctsk import (
     DistanceReport,
+    GoalType,
     InvalidFormatError,
     Task,
     load_task,
@@ -266,6 +267,23 @@ class TestAMalformedScalarIsRefusedWhereItIsRead:
         task = parse_task(task_json(version="1"), strict=True)
 
         assert task.version == 1
+
+    def test_a_version_written_as_a_double_is_the_version(self):
+        """A producer holding a double writes ``1.0``; it read before C1."""
+        task = parse_task(task_json(version=1.0), strict=True)
+
+        assert task.version == 1
+        assert '"version":1,' in task.to_json()
+
+    def test_a_qr_wire_integer_written_as_a_double_is_read(self):
+        """The QR goal ``t`` accepted ``2.0`` before C1, as ``CYLINDER``."""
+        payload = _qr_payload()
+        payload["g"] = {"t": 2.0}
+
+        task = parse_task("XCTSK:" + json.dumps(payload))
+
+        assert task.goal is not None
+        assert task.goal.type is GoalType.CYLINDER
 
     def test_an_unknown_qr_task_type_is_refused(self):
         """S1: ``"taskType": "FOO"`` was re-written as ``CLASSIC``, value lost.
