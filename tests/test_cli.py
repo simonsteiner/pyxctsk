@@ -316,6 +316,28 @@ class TestCLIDistances:
         assert "Error:" in result.output
         assert "Transverse Mercator" in result.output
 
+    @pytest.mark.parametrize(
+        ("command", "options"),
+        [
+            (distances, []),
+            (distances, ["--format", "text"]),
+            (convert, ["--format", "kml"]),
+            (convert, ["--format", "geojson"]),
+        ],
+    )
+    def test_a_cylinder_past_the_far_side_is_an_error(self, command, options):
+        """A 10^300 m goal: reported, not measured as 2 941 637 m with exit 0."""
+        payload = task(
+            turnpoint("A", 46.0, 8.0, radius=400),
+            turnpoint("B", 46.1, 8.0, radius=10**300),
+        ).to_json()
+
+        result = CliRunner().invoke(command, options, input=payload.encode())
+
+        assert result.exit_code == 1
+        assert "Error:" in result.output
+        assert "far side of the earth" in result.output
+
     def test_input_that_cannot_be_parsed_is_an_error(self):
         """Not a traceback."""
         result = CliRunner().invoke(distances, input=b"not a task")

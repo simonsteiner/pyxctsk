@@ -13,7 +13,12 @@ caller projects a point, solves, and projects back.
 :meth:`LocalPlane.lon_lat` are the only ways into and out of the plane, so they
 are where a point it cannot represent is refused, with
 :class:`~pyxctsk.exceptions.UnmeasurableRouteError`, rather than handed on as
-``inf`` for the solver to choke on.
+``inf`` for the solver to choke on. That is not the same as refusing a cylinder
+larger than the earth: along the central meridian the inverse projection wraps
+round the globe and stays finite, so such a cylinder can pass through the
+plane — it is refused where a point is placed on its boundary, by
+:func:`~pyxctsk.distance.earth.geodesic_destination`, which owns the earth's
+far side.
 """
 
 import math

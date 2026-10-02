@@ -15,12 +15,23 @@ model live here now: :func:`geod_for_earth_model` for measuring on it, and
 
 Split out of ``turnpoint.py``, which had grown to hold four unrelated things
 under a name that covered one of them.
+
+**An earth has a far side, and this module owns it.** Every point placed at a
+distance from a centre — a route point snapped onto its cylinder (§7.1.7), a
+cylinder's outline, a goal line's end — goes through
+:func:`geodesic_destination`, which refuses a distance no point on this earth
+lies at, with :class:`~pyxctsk.exceptions.UnmeasurableRouteError`. pyproj
+walks a geodesic past the antipode and round again for as long as it is asked,
+so a cylinder reaching past the far side used to come back as a finite point
+somewhere else, and a distance that was simply wrong.
 """
 
+import math
 from functools import lru_cache
 
 from pyproj import CRS, Geod
 
+from ..exceptions import UnmeasurableRouteError
 from ..model.enums import EarthModel
 
 #: Radius of the FAI sphere earth model in meters (FAI Sporting Code S7F).
@@ -192,6 +203,61 @@ def geodesic_distance(
     return float(dist)
 
 
+def geodesic_destination(
+    center: tuple[float, float],
+    azimuth: float,
+    distance: float,
+    earth_model: EarthModelLike = None,
+) -> tuple[float, float]:
+    """The point ``distance`` metres from a centre along an azimuth.
+
+    The one way this library places a point at a distance on the earth: the
+    ProjectionCorrection snap (§7.1.7), a cylinder's outline and a goal line's
+    ends all ask here, because all three promise a point that far from the
+    centre and pyproj does not check that promise. It walks the geodesic for
+    as long as it is told — past the antipode and round again — and returns
+    wherever it stopped: 10^300 m due north of the equator lands 2 924 km away. A
+    cylinder that size has no boundary, and the route snapped onto "it" used
+    to be measured with exit 0.
+
+    So the point is measured back. A distance past the far side of the earth
+    — πR on the FAI sphere, about half the meridian (20 004 km) on WGS84, a
+    little less for an azimuth that misses the antipode on the ellipsoid —
+    does not come back as itself, and is refused. A negative distance walks
+    the opposite azimuth, and is measured back as its magnitude: what a
+    negative radius means is not this function's question.
+
+    Args:
+        center: (lat, lon) in degrees.
+        azimuth: Direction from the centre, in degrees.
+        distance: How far from the centre, in meters.
+        earth_model: Earth model selector (``EarthModel`` member, its string
+            value, or None for WGS84).
+
+    Returns:
+        (lon, lat) of the point, in degrees — pyproj's order, which is what the
+        drawing callers write out and :func:`snap_to_boundary` flips.
+
+    Raises:
+        UnmeasurableRouteError: If no point on this earth lies ``distance``
+            metres from the centre along ``azimuth``: the distance reaches past
+            the far side of the earth.
+    """
+    geod = geod_for_earth_model(earth_model)
+    lat, lon = center
+    to_lon, to_lat, _ = geod.fwd(lon, lat, azimuth, distance)
+    _, _, reached = geod.inv(lon, lat, to_lon, to_lat)
+    if not math.isclose(reached, abs(distance), rel_tol=1e-9, abs_tol=1e-3):
+        raise UnmeasurableRouteError(
+            f"no point on the {canonical(earth_model).value} earth model lies "
+            f"{distance:.6g} m from lat {lat}, lon {lon} along azimuth "
+            f"{azimuth:.1f}°: that reaches past the far side of the earth, so a "
+            f"cylinder or goal line that large has no boundary there (the point "
+            f"reached is {reached:.0f} m away)"
+        )
+    return (to_lon, to_lat)
+
+
 def snap_to_boundary(
     point_lonlat: tuple[float, float],
     center: tuple[float, float],
@@ -214,10 +280,15 @@ def snap_to_boundary(
     Returns:
         (lat, lon) of the corrected point at exactly ``radius`` meters from
         the center.
+
+    Raises:
+        UnmeasurableRouteError: If the cylinder reaches past the far side of
+            the earth, so it has no boundary in that direction to snap onto
+            (see :func:`geodesic_destination`).
     """
     g = geod_for_earth_model(earth_model)
     azimuth, _, _ = g.inv(center[1], center[0], point_lonlat[0], point_lonlat[1])
-    lon, lat, _ = g.fwd(center[1], center[0], azimuth, radius)
+    lon, lat = geodesic_destination(center, azimuth, radius, earth_model)
     return (lat, lon)
 
 
@@ -250,10 +321,18 @@ def geodesic_arc(
 
     Returns:
         ``num_segments + 1`` (lon, lat) points.
+
+    Raises:
+        UnmeasurableRouteError: If ``radius`` reaches past the far side of the
+            earth, where there is no boundary to draw (see
+            :func:`geodesic_destination`).
     """
-    geod = geod_for_earth_model(earth_model)
-    lat, lon = center
     return [
-        geod.fwd(lon, lat, (start_azimuth + sweep * i / num_segments) % 360, radius)[:2]
+        geodesic_destination(
+            center,
+            (start_azimuth + sweep * i / num_segments) % 360,
+            radius,
+            earth_model,
+        )
         for i in range(num_segments + 1)
     ]

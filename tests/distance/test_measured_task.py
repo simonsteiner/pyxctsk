@@ -26,6 +26,7 @@ from pyxctsk.distance import (
     task_distances_from,
     task_to_turnpoints,
 )
+from pyxctsk.distance.earth import geodesic_distance
 from pyxctsk.distance.goal_line import GoalLine
 from pyxctsk.distance.speed_section import SpeedSection
 from tests.builders import task, turnpoint
@@ -328,3 +329,108 @@ class TestARouteThePlaneCannotHoldIsRefused:
             MeasuredTask.from_task(unmeasurable)
 
         assert "Transverse Mercator" in str(raised.value)
+
+
+class TestACylinderPastTheFarSideOfTheEarthIsRefused:
+    """A cylinder reaching past the far side of the earth has no boundary.
+
+    The plane refuses what it cannot represent, but a route point placed far
+    out *along its central meridian* is representable: a meridian is a closed
+    curve, so the inverse projection wraps round it and returns a finite point.
+    The snap onto the boundary (§7.1.7) then walked the radius round the earth
+    too. Every shape here used to report a finite distance with exit 0.
+    """
+
+    @pytest.mark.parametrize("model", [None, EarthModel.FAI_SPHERE])
+    @pytest.mark.parametrize(
+        "course",
+        [
+            pytest.param([(46.0, 8.0, 400), (46.1, 8.0, 10**300)], id="goal-1e300"),
+            pytest.param(
+                [(46.0, 8.0, 400), (46.1, 8.0, 25_000_000)], id="goal-25000km"
+            ),
+            pytest.param(
+                [(46.0, 8.0, 400), (46.1, 8.0, 400), (46.2, 8.0, 30_000_000)],
+                id="third-of-three-30000km",
+            ),
+        ],
+    )
+    def test_it_is_refused(self, course, model):
+        """Not 2 941 637 m, nor any other number."""
+        unmeasurable = task(
+            *(
+                turnpoint(
+                    f"P{i}",
+                    lat,
+                    lon,
+                    radius=radius,
+                    type=(
+                        TurnpointType.SSS
+                        if i == 0
+                        else TurnpointType.ESS
+                        if i == len(course) - 1
+                        else None
+                    ),
+                )
+                for i, (lat, lon, radius) in enumerate(course)
+            )
+        )
+        unmeasurable.earth_model = model
+        assert unmeasurable.validate() == []
+
+        with pytest.raises(UnmeasurableRouteError, match="far side of the earth"):
+            MeasuredTask.from_task(unmeasurable)
+
+    @pytest.mark.parametrize("radius", [45_000_000, 10**300], ids=["45000km", "1e300"])
+    def test_a_middle_cylinder_is_refused_on_the_sphere(self, radius):
+        """Measured 9 939 253 m and 9 699 152 m before."""
+        unmeasurable = task(
+            turnpoint("A", 46.0, 8.0, radius=400),
+            turnpoint("B", 46.1, 8.0, radius=radius),
+            turnpoint("C", 46.2, 8.0, radius=400),
+        )
+        unmeasurable.earth_model = EarthModel.FAI_SPHERE
+
+        with pytest.raises(UnmeasurableRouteError, match="far side of the earth"):
+            MeasuredTask.from_task(unmeasurable)
+
+    @pytest.mark.parametrize(
+        ("model", "radius"),
+        [
+            (None, 10_000_000),
+            (EarthModel.FAI_SPHERE, 10_000_000),
+            (EarthModel.FAI_SPHERE, 20_000_000),
+        ],
+    )
+    def test_a_cylinder_short_of_the_far_side_still_measures(self, model, radius):
+        """From inside a goal cylinder the route runs straight out to its edge.
+
+        The takeoff lies on the goal's meridian, so the edge is the radius less
+        the distance between the centres — exactly, on either earth.
+        """
+        inside = task(
+            turnpoint("A", 46.0, 8.0, radius=400),
+            turnpoint("B", 46.1, 8.0, radius=radius),
+        )
+        inside.earth_model = model
+
+        measured = MeasuredTask.from_task(inside)
+
+        apart = geodesic_distance((46.0, 8.0), (46.1, 8.0), model)
+        assert measured.route.total_m == pytest.approx(radius - apart, abs=0.01)
+
+    def test_the_takeoff_radius_is_not_touched_so_it_is_not_refused(self):
+        """ADR 0002: the route starts at the takeoff's centre whatever its size."""
+        huge = task(
+            turnpoint("A", 46.0, 8.0, radius=10**300),
+            turnpoint("B", 46.1, 8.0, radius=400),
+        )
+        small = task(
+            turnpoint("A", 46.0, 8.0, radius=0),
+            turnpoint("B", 46.1, 8.0, radius=400),
+        )
+
+        assert (
+            MeasuredTask.from_task(huge).route.total_m
+            == MeasuredTask.from_task(small).route.total_m
+        )

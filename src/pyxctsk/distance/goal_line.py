@@ -43,7 +43,12 @@ from enum import Enum
 from typing import Sequence
 
 from ..model.task import GoalType, Task, Turnpoint
-from .earth import EarthModelLike, geod_for_earth_model, geodesic_arc
+from .earth import (
+    EarthModelLike,
+    geod_for_earth_model,
+    geodesic_arc,
+    geodesic_destination,
+)
 from .measured_task import MeasuredTask
 
 # Constants for goal line visualization
@@ -319,15 +324,21 @@ class GoalLine:
         which this method built by unpacking its own two (lat, lon) tuples —
         in a module that flips axis order between neighbouring lines, where
         swapping two of six floats costs a rotated goal line.
-        """
-        geod = geod_for_earth_model(self.earth_model)
-        azimuth = self.approach_azimuth()
-        lat, lon = self.center
-        half_length = self.control_zone_radius
 
-        lon1, lat1, _ = geod.fwd(lon, lat, (azimuth + 90) % 360, half_length)
-        lon2, lat2, _ = geod.fwd(lon, lat, (azimuth - 90) % 360, half_length)
-        return (lon1, lat1), (lon2, lat2), azimuth
+        Raises:
+            UnmeasurableRouteError: If half the line reaches past the far side
+                of the earth, where it has no end (see
+                :func:`~pyxctsk.distance.earth.geodesic_destination`).
+        """
+        azimuth = self.approach_azimuth()
+        half_length = self.control_zone_radius
+        end1 = geodesic_destination(
+            self.center, (azimuth + 90) % 360, half_length, self.earth_model
+        )
+        end2 = geodesic_destination(
+            self.center, (azimuth - 90) % 360, half_length, self.earth_model
+        )
+        return end1, end2, azimuth
 
     @property
     def control_zone_radius(self) -> float:

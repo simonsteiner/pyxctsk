@@ -25,6 +25,7 @@ from pyxctsk import (
     TaskType,
     Turnpoint,
     TurnpointType,
+    UnmeasurableRouteError,
     Waypoint,
 )
 from pyxctsk.distance import GoalLine, GoalLineOrientation
@@ -187,6 +188,27 @@ class TestTheCylinderOutline:
             assert geodesic_distance(centre, (lat, lon), model) == pytest.approx(
                 radius, abs=1e-6
             )
+
+    @pytest.mark.parametrize("model", [None, EarthModel.FAI_SPHERE])
+    def test_a_cylinder_past_the_far_side_has_no_outline(self, model):
+        """A takeoff the route never touches still has an outline to draw.
+
+        Its radius cannot change the distance (ADR 0002), so nothing refuses it
+        before the drawing — where 10^300 m used to come out as a KML ring of
+        points thousands of kilometres from the centre. GeoJSON draws no ring:
+        it carries the centre and the radius the task declares, which are true.
+        """
+        task = _task()
+        task.earth_model = model
+        task.turnpoints[0].radius = 10**300
+        drawing = TaskDrawing.from_task(task)
+
+        with pytest.raises(UnmeasurableRouteError, match="far side of the earth"):
+            drawing.outline_of(task.turnpoints[0])
+        with pytest.raises(UnmeasurableRouteError, match="far side of the earth"):
+            drawing_to_kml(drawing)
+        takeoff = drawing_to_geojson(drawing)["features"][0]
+        assert takeoff["properties"]["radius"] == 10**300
 
     def test_the_kml_polygon_is_the_outline(self):
         """The writer renders the drawing's answer rather than its own."""

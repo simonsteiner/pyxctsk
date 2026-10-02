@@ -14,6 +14,7 @@ from pyxctsk import (
     GoalType,
     InvalidFormatError,
     Task,
+    UnmeasurableRouteError,
     load_task,
     parse_task,
     render_task,
@@ -196,10 +197,24 @@ _QR_SCALAR_PATHS = [
 
 
 def _survives_every_output(task: Task) -> None:
-    """Render every text format and the distance report, as the CLI would."""
-    for fmt in ("json", "qrcode-json", "kml", "geojson"):
+    """Render every text format and the distance report, as the CLI would.
+
+    A scalar may be well-formed and still describe a task its earth cannot
+    hold: a 10^9 m takeoff radius reads, measures (the takeoff is not touched,
+    ADR 0002), and has no outline to draw in KML. Such an output is refused
+    with ``UnmeasurableRouteError``, which the CLI reports; it used to be a
+    ring of points nowhere near the cylinder. Nothing else may escape.
+    """
+    for fmt in ("json", "qrcode-json", "geojson"):
         render_task(task, fmt)
-    report = DistanceReport.from_task(task)
+    try:
+        render_task(task, "kml")
+    except UnmeasurableRouteError:
+        pass
+    try:
+        report = DistanceReport.from_task(task)
+    except UnmeasurableRouteError:
+        return
     report.as_text()
     json.dumps(report.as_dict(), allow_nan=False)
 
