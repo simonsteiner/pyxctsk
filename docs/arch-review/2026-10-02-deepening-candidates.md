@@ -33,7 +33,7 @@ The backlog, in rank order. After the scan only three parts of this file change:
 | [C2](#c2--the-distance-report-owns-the-two-turnpoint-minimum) | The distance report owns the two-turnpoint minimum | 🟢 Strong · 🔴 live defect | deepening | pr-open | `refactor/report-owns-minimum` | [#30](https://github.com/simonsteiner/pyxctsk/pull/30) | no | |
 | [C3](#c3--the-polyline-decoder-owns-its-own-validity) | The polyline decoder owns its own validity | 🟢 Strong · 🔴 live defect | deepening | pr-open | `refactor/polyline-decoder-validity` | [#31](https://github.com/simonsteiner/pyxctsk/pull/31) | no | |
 | [C4](#c4--the-solver-refuses-a-route-it-cannot-measure) | The solver refuses a route it cannot measure | 🟢 Strong · 🔴 live defect | deepening | pr-open | `refactor/unmeasurable-route` | [#32](https://github.com/simonsteiner/pyxctsk/pull/32) | no | builds on C1 |
-| [C5](#c5--one-json-writer) | One JSON writer | 🟡 Worth exploring | maintainability | todo | `refactor/one-json-writer` | | | |
+| [C5](#c5--one-json-writer) | One JSON writer | 🟡 Worth exploring | maintainability | pr-open | `refactor/one-json-writer` | PR_PLACEHOLDER | no | stacked on #33 |
 | [C6](#c6--one-release-sequence) | One release sequence | 🟡 Worth exploring | maintainability | todo | `refactor/one-release-sequence` | | | |
 | [S1](#s1--qr-tasktype-swallows-an-unknown-value) | QR `taskType` swallows an unknown value | — | maintainability | pr-open | rides with C1 (`refactor/wire-scalars`) | [#29](https://github.com/simonsteiner/pyxctsk/pull/29) | yes | |
 | [S2](#s2--the-qr-recognizer-decodes-twice-and-is-not-total) | The QR recognizer decodes twice and is not total | — | maintainability | pr-open | `refactor/smaller-findings-2026-10-02` | [#33](https://github.com/simonsteiner/pyxctsk/pull/33) | no | |
@@ -47,6 +47,8 @@ The backlog, in rank order. After the scan only three parts of this file change:
 | [S10](#s10--a-qr-turnpoint-type-refuses-a-numeric-string) | A QR turnpoint type refuses a numeric string | — | maintainability | pr-open | `refactor/smaller-findings-2026-10-02` | [#33](https://github.com/simonsteiner/pyxctsk/pull/33) | no | found in C1 |
 | [S11](#s11--centre-distance-restates-the-two-turnpoint-minimum) | Centre distance restates the two-turnpoint minimum | — | maintainability | pr-open | `refactor/smaller-findings-2026-10-02` | [#33](https://github.com/simonsteiner/pyxctsk/pull/33) | no | found in C2 |
 | [S12](#s12--the-solver-warns-before-the-plane-refuses) | The solver warns before the plane refuses | — | maintainability | dropped | `refactor/smaller-findings-2026-10-02` | | | found in C4; does not reproduce on the stack top: no OptimizeWarning from the CLI or the library under -W always (checked 2026-10-02) |
+| [S13](#s13--the-json-writer-writes-nan) | The JSON writer writes `NaN` | — | maintainability | todo | | | | found in C5 |
+| [S14](#s14--deeply-nested-json-escapes-as-recursionerror) | Deeply nested JSON escapes as `RecursionError` | — | maintainability | todo | | | | found in C5 review |
 
 Strength: 🟢 Strong · 🟡 Worth exploring · ⚪ Speculative · 🔴 live defect (a bug reproduced during the scan).
 Status: `todo` · `in-progress` · `pr-open` · `merged` · `blocked` · `dropped`. `blocked` and `dropped` always carry a reason in Notes.
@@ -348,6 +350,16 @@ Four `json.dumps` call sites choose their own options: a waypoint named `Châtea
 <details>
 <summary>Decisions</summary>
 
+- Q1 — Where does the writer live? → `dump_json` in `model/shape.py`, beside `load_json`, because its four callers are `model/task.py`, `qrcode/task.py`, `renderer.py` and `cli.py`, and `tests/test_layering.py` forbids `model` from importing any other package — `model` is the only home all four reach without a back edge, and the reader already lives there.
+- Q2 — What does the writer own, and what stays with the caller? → the encoding (`ensure_ascii=False`) is the writer's; the layout is the caller's, named as one of three `JsonLayout` values (`compact`, `line`, `indented`) and required, because the four sites use three layouts — compact for the task and QR wire formats (the QR string is pinned byte-for-byte to tools.xcontest.org by `tests/data/reference_tasks/qrcode_string/`), `json.dumps`'s defaults for GeoJSON, `indent=2` for the report — and unifying them would rewrite every GeoJSON output to fix no defect. Named rather than `compact=`/`indent=` keywords, because review found the two keywords accepted `compact=True, indent=2`, a layout no output uses; required, so no output's layout is a default it did not choose. Deletion test: removing `dump_json` puts the encoding choice back at four sites, which is how the 2026-09-27 fix reached only two.
+- Q3 — Is writing `â` and `§` raw instead of `\u` escapes a one-way door? → no, and not breaking, because RFC 8259 §7 makes the two spellings one string: all 26 `distances` JSON outputs change only by `\u00a7` → `§` in the `notes` block and are `json.loads`-equal to the base, no corpus waypoint name is outside ASCII (`grep -lP '[^\x00-\x7F]'` over the 26 `.xctsk` files matches none) so every GeoJSON output is byte-identical, the CLI writes UTF-8 on every locale since 2026-09-27, and `Task.to_json()` shipped the same change then as a non-breaking fix. A consumer byte-diffing the report against a stored file sees the change, so the changelog names it.
+- Q4 — Must the writer handle a lone surrogate? → no, because none can arrive from input: `TEXT` refuses one at read (an escaped `\udc80` name is `turnpoints[0].waypoint.name: not valid text: surrogates not allowed`), so no CLI path carries one. A task built in code with one already produced a string UTF-8 cannot encode from `json` and `qrcode-json` (`UnicodeEncodeError` on `.encode()`, checked on the base), and GeoJSON and the report now do the same; the model does not validate on construction (CLAUDE.md), and the writer does not either — its docstring says so.
+- Q5 — Fold in `parser.py`'s own `json.loads`? → yes: `Input.of` decodes through `load_json` and catches `MalformedPayloadError`, because it is the same concept (decode one document) and that error is the `ValueError` subclass load_json raises for exactly what the old `except ValueError` caught, so behaviour is unchanged (full suite, golden); `src/` now has one `json.loads` and one `json.dumps`, both in `model/shape.py`.
+- Q6 — Does `DistanceReport` get an `as_json()`? → no, `cli.py` writes `dump_json(report.as_dict(), indent=2)`, because the CLI is the report's only JSON caller (`git grep "as_dict()" src/ scripts/`: the report's in `cli.py`; `scripts/task_viewer` serializes `task_distances_from(...).as_dict()`, a different value, through Flask) and a method for one caller is a second rendering seam with one adapter.
+- Q7 — Should the writer refuse `NaN`/`Infinity` (`allow_nan=False`)? → not here, because no parsed task can carry one (C1's `NUMBER` refuses non-finite) and C4 refuses a non-finite distance; a task built in code with `lat=nan` writes `"lat":NaN`, which is not JSON — recorded as a proposed smaller finding rather than changing what the writer raises in this PR.
+- Q8 — `scripts/task_viewer`'s `jsonify`? → out of scope: it is Flask's HTTP serializer in a repository utility, not a library output, and it serializes dicts the library does not render as JSON.
+- Q9 — Dependency category and test surface? → `in-process`; pinned at the CLI, the interface every output shares: `tests/test_cli.py::TestWritingOutput::test_every_output_writes_a_non_ascii_name_as_itself`, a task with a waypoint named `Château` through `convert` (json, qrcode-json, kml, geojson) and `distances` — red for geojson and distances before the change. `tests/model/test_task.py::test_both_formats_write_non_ascii_names_as_they_are` stays: it pins the two model methods directly.
+
 </details>
 
 ---
@@ -465,6 +477,18 @@ After C1 every wire integer accepts a numeric string except the QR turnpoint's `
 
 With a `1e300` radius scipy emits `OptimizeWarning: NaN result encountered` from inside the solver before `UnmeasurableRouteError` is raised, so a refused task still prints a warning to stderr. Refuse before the solver runs, or suppress the warning where the refusal follows.
 
+### S13 · The JSON writer writes `NaN`
+
+`src/pyxctsk/model/shape.py` (`dump_json`) · *found while implementing C5*
+
+A task built in code with `lat=float("nan")` serializes as `"lat":NaN`, which is not JSON — `load_json` reads it only because Python's `json` does, and the field table then refuses it. `allow_nan=False` in the one writer would refuse it at write, but raises a bare `ValueError` outside `pyXCTSKError`; decide the error before changing it.
+
+### S14 · Deeply nested JSON escapes as `RecursionError`
+
+`src/pyxctsk/model/shape.py` (`load_json`), `src/pyxctsk/parser.py` (`Input.of`) · *found while reviewing C5*
+
+`printf '%s' "$(python3 -c 'print("["*100000)')" | pyxctsk convert` prints a `RecursionError` traceback from `json.loads`, outside `pyXCTSKError`: `load_json` and the parser catch `ValueError` only. Same on the base branch. `load_json` is now the one reader, so catching it there and raising `MalformedPayloadError` would cover every path.
+
 <details>
 <summary>Decisions</summary>
 
@@ -502,3 +526,5 @@ With a `1e300` radius scipy emits `OptimizeWarning: NaN result encountered` from
 - **C3 · `z` is read through `TEXT` before it is decoded.** The card names the alphabet and the termination; a JSON array of one-character strings passed both, because iterating it yields characters, and decoded to a turnpoint at 0°N 0°E. Whether `z` is a string is the wire-type rule C1's `TEXT` codec already owns, so `_PolylineCoordinates.read` applies it rather than `decode_nums` growing a second one.
 - **C4 · the refusal is the plane's alone, and it covers a third case.** The card's after-diagram puts "plane + solver" behind the seam; the solver raises nothing — it loses its assertion and stays total (Q5), because it has no earth to name a cause from, and `LocalPlane` refuses the overflowed points on the way back. And the scan's huge-radius `CRSError` turned out to have a quieter sibling the card did not list: a radius past half the earth on a three-turnpoint task reported `NaN` metres with exit 0 (Q3). Both are the same failure, so both are refused here.
 - **C4 · the plane is not the only owner after all.** The departure above says the refusal is the plane's alone. A cylinder past the far side of the earth is not a plane question — along the central meridian the plane represents its route point by wrapping — so it is refused by `earth.geodesic_destination` where a point is placed on its boundary (Q11–Q13). That touches `earth.py`, `goal_line.py` and the drawings (KML, and GeoJSON for a LINE goal), none named on the card.
+- **C5 · the writer takes the layout as arguments.** The card's Wins say "output options in one place"; only the encoding moved there. The layout is a property of each format — a compact wire payload, an indented report — and each call site names it as one of three `JsonLayout` values (Q2), because folding GeoJSON's into a shared default would change every GeoJSON output byte for no defect.
+- **C5 · `parser.py` reads through `load_json` too.** Not on the card's file list; its `Input.of` was the one other JSON decode in `src/` (Q5), so the reader side has one owner as well.
