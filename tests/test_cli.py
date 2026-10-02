@@ -122,6 +122,14 @@ class TestCLIConvert:
         assert result.exit_code != 0
         assert "error" in result.output.lower()
 
+    def test_a_qr_scheme_that_is_not_utf8_is_an_error(self):
+        r"""S2: ``printf 'XCTSK:\xff' | pyxctsk convert`` printed a traceback."""
+        result = CliRunner().invoke(convert, [], input=b"XCTSK:\xff")
+
+        assert result.exit_code == 1
+        assert not isinstance(result.exception, UnicodeDecodeError)
+        assert "Error:" in result.output
+
     def test_cli_main_command(self):
         """The main help preserves examples as separate readable lines."""
         runner = CliRunner()
@@ -337,6 +345,39 @@ class TestCLIDistances:
         assert result.exit_code == 1
         assert "Error:" in result.output
         assert "far side of the earth" in result.output
+
+    @pytest.mark.parametrize(
+        ("command", "options"),
+        [
+            (distances, []),
+            (distances, ["--format", "text"]),
+            (convert, ["--format", "kml"]),
+            (convert, ["--format", "geojson"]),
+        ],
+    )
+    def test_a_negative_radius_is_named_not_blamed_on_the_route(self, command, options):
+        """S9: it said "route point 0 is 11.0 m outside turnpoint 0's cylinder"."""
+        payload = task(
+            turnpoint("A", 46.0, 8.0, radius=-11, type=TurnpointType.TAKEOFF),
+            turnpoint("B", 46.1, 8.0, radius=400),
+        ).to_json()
+
+        result = CliRunner().invoke(command, options, input=payload.encode())
+
+        assert result.exit_code == 1
+        assert "Error: turnpoint 0 has a negative radius (-11)" in result.output
+
+    def test_a_negative_radius_still_converts_to_the_formats_that_carry_it(self):
+        """Reading stays lenient: only measuring the cylinder refuses it."""
+        payload = task(
+            turnpoint("A", 46.0, 8.0, radius=-11, type=TurnpointType.TAKEOFF),
+            turnpoint("B", 46.1, 8.0, radius=400),
+        ).to_json()
+
+        result = CliRunner().invoke(convert, [], input=payload.encode())
+
+        assert result.exit_code == 0, result.output
+        assert parse_task(result.output).turnpoints[0].radius == -11
 
     def test_input_that_cannot_be_parsed_is_an_error(self):
         """Not a traceback."""

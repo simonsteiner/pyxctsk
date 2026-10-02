@@ -69,6 +69,8 @@ from .qrcode.task import (
 # Both QR schemes the spec defines. XCTSKZ: is checked first because XCTSK: is
 # not a prefix of it, but keeping them ordered makes the intent obvious.
 _QR_SCHEMES = (QR_CODE_SCHEME_COMPRESSED, QR_CODE_SCHEME)
+#: The same, as the bytes the URL adapter recognizes.
+_QR_SCHEME_PREFIXES = tuple(scheme.encode("ascii") for scheme in _QR_SCHEMES)
 
 # File extensions a task is commonly saved under. Used only to hint, when a
 # string handed to parse_task is not a payload, that it may have been meant as
@@ -194,33 +196,32 @@ class FormatAdapter:
     read: Callable[["Input"], Arrived]
 
 
-def _qr_url_text(inp: Input) -> str | None:
-    """Return the input as text if it carries either QR scheme, else None."""
-    if inp.text is not None and inp.text.startswith(_QR_SCHEMES):
-        return inp.text
-    for scheme in _QR_SCHEMES:
-        if inp.raw.startswith(scheme.encode("utf-8")):
-            return inp.raw.decode("utf-8", errors="strict")
-    return None
-
-
 def _is_xctsk_url(inp: Input) -> bool:
-    """Whether the input carries the ``XCTSK:`` or ``XCTSKZ:`` scheme."""
-    return _qr_url_text(inp) is not None
+    r"""Whether the input carries the ``XCTSK:`` or ``XCTSKZ:`` scheme.
+
+    Asked of the bytes, so it is total: a scheme followed by bytes that are not
+    UTF-8 is still this format's, and :func:`_read_xctsk_url` says why it
+    cannot be read. It used to re-decode them strictly here, and
+    ``XCTSK:\xff`` escaped the CLI as a ``UnicodeDecodeError`` traceback.
+    """
+    return inp.raw.startswith(_QR_SCHEME_PREFIXES)
 
 
 def _read_xctsk_url(inp: Input) -> Arrived:
     """Read the compact ``XCTSK:`` and ``XCTSKZ:`` URL formats.
 
     Raises:
-        InvalidFormatError: If the scheme is right but the payload is not.
+        InvalidFormatError: If the scheme is right but the payload is not —
+            including a payload that is not UTF-8 text.
     """
-    url = _qr_url_text(inp)
-    assert url is not None  # recognizes() said so
+    scheme = inp.raw.split(b":", 1)[0].decode("ascii")
+    if inp.text is None:
+        raise InvalidFormatError(
+            f"recognized {scheme}: URL but its payload is not UTF-8 text"
+        )
     try:
-        return QRCodeTask.from_string(url)
+        return QRCodeTask.from_string(inp.text)
     except MalformedPayloadError as exc:
-        scheme = url.split(":", 1)[0]
         raise InvalidFormatError(
             f"recognized {scheme}: URL but its payload could not be parsed: {exc}"
         ) from exc

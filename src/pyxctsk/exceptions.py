@@ -167,10 +167,23 @@ class UnmeasurableRouteError(pyXCTSKError):
     """
 
 
-class InvalidTimeOfDayError(pyXCTSKError):
-    """Raised when time of day format is invalid."""
+class InvalidTimeOfDayError(pyXCTSKError, ValueError):
+    """Raised when a time of day is not one.
 
-    def __init__(self, time_str: str):
-        """Initialize InvalidTimeOfDayError with the invalid time string."""
+    Both of ``TimeOfDay``'s refusals raise it — a spelling that is not
+    ``HH:MM:SSZ``, and a field out of range — in one wording. The second used
+    to be a bare ``ValueError``, so ``ValueError`` is kept for the reason
+    :class:`TooFewTurnpointsError` states.
+
+    Attributes:
+        time_str: The value that is not a time, as it arrived — usually a
+            string, but whatever the wire carried for one that is not.
+        reason: Why it is not one. Defaults to the spelling, the one reason
+            the parser has.
+    """
+
+    def __init__(self, time_str: object, reason: str = "expected HH:MM:SSZ"):
+        """Initialize with the value that is not a time, and why."""
         self.time_str = time_str
-        super().__init__(f"invalid time: {time_str!r}")
+        self.reason = reason
+        super().__init__(f"invalid time {time_str!r}: {reason}")

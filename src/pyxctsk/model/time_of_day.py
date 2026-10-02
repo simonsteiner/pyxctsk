@@ -4,6 +4,12 @@ Its own module because both the domain model and the QR models need it and
 neither should import the other. It is the one value type that validates on
 construction — an out-of-range hour is rejected in ``__post_init__``, unlike
 the task dataclasses, which are checked by ``validation.py`` instead.
+
+Both of its refusals are one :class:`~pyxctsk.exceptions.InvalidTimeOfDayError`
+in one wording, ``invalid time '25:00:00Z': hour must be between 0 and 23``.
+The constructor used to raise a bare ``ValueError`` in a style of its own, and
+the parser's message came out wrapped twice — ``invalid time: 'Invalid time
+string: 12:00Z'``.
 """
 
 import re
@@ -27,13 +33,20 @@ class TimeOfDay:
     second: int
 
     def __post_init__(self) -> None:
-        """Validate the time of day values."""
-        if not (0 <= self.hour <= 23):
-            raise ValueError("Hour must be between 0 and 23")
-        if not (0 <= self.minute <= 59):
-            raise ValueError("Minute must be between 0 and 59")
-        if not (0 <= self.second <= 59):
-            raise ValueError("Second must be between 0 and 59")
+        """Validate the time of day values.
+
+        Raises:
+            InvalidTimeOfDayError: If a field is out of range.
+        """
+        for name, value, limit in (
+            ("hour", self.hour, 23),
+            ("minute", self.minute, 59),
+            ("second", self.second, 59),
+        ):
+            if not 0 <= value <= limit:
+                raise InvalidTimeOfDayError(
+                    str(self), f"{name} must be between 0 and {limit}"
+                )
 
     def to_json_string(self) -> str:
         r"""Convert to the ``HH:MM:SSZ`` string used as a JSON value.
@@ -49,18 +62,22 @@ class TimeOfDay:
         return f"{self.hour:02d}:{self.minute:02d}:{self.second:02d}Z"
 
     @classmethod
-    def from_json_string(cls, time_str: str) -> "TimeOfDay":
+    def from_json_string(cls, time_str: object) -> "TimeOfDay":
         """Parse from JSON string format.
 
         Args:
-            time_str (str): JSON string to parse.
+            time_str: The JSON value to parse — a string, if it is a time.
 
         Returns:
             TimeOfDay: Parsed TimeOfDay object.
 
         Raises:
-            InvalidTimeOfDayError: If the string is not a valid time.
+            InvalidTimeOfDayError: If the value is not a valid time, a value
+                that is not a string included.
         """
+        if not isinstance(time_str, str):
+            raise InvalidTimeOfDayError(time_str)
+
         # Handle both quoted and unquoted formats
         if time_str.startswith('"') and time_str.endswith('"'):
             time_str = time_str[1:-1]  # Remove quotes
@@ -68,7 +85,7 @@ class TimeOfDay:
         pattern = r"^(\d{2}):(\d{2}):(\d{2})Z$"
         match = re.match(pattern, time_str)
         if not match:
-            raise InvalidTimeOfDayError(f"Invalid time string: {time_str}")
+            raise InvalidTimeOfDayError(time_str)
 
         hour = int(match.group(1))
         minute = int(match.group(2))

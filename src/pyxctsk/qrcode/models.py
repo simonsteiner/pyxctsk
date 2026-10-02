@@ -16,6 +16,7 @@ same class and each reads exactly what it writes.
 from dataclasses import dataclass, field
 from typing import Any, ClassVar, Mapping, MutableMapping
 
+from ..exceptions import MalformedPayloadError
 from ..model.enums import (
     OBSOLETE_DIRECTION_DEFAULT,
     Direction,
@@ -26,6 +27,7 @@ from ..model.enums import (
 from ..model.passthrough import QR_EXTENSIONS_KEY
 from ..model.shape import (
     DEFAULTED,
+    INTEGER,
     LATITUDE,
     LONGITUDE,
     NUMBER,
@@ -346,11 +348,27 @@ class _PolylineCoordinates(Field):
             result["z"] = encode_waypoint_turnpoint(obj.lon, obj.lat, obj.alt_smoothed)
 
 
+def _no_turnpoint_type(raw: Any) -> bool:
+    """Whether a QR ``t`` says "no type": absent, null, or the integer 0.
+
+    The integer is read by :data:`INTEGER`, the rule every other wire integer
+    follows, so ``"0"`` is no type exactly as ``0`` is; it used to be refused
+    as ``'0' is not one of [1, 2, 3]``. What ``INTEGER`` refuses — ``false``,
+    say — is not absent either, and the codec then says why.
+    """
+    if raw is None:
+        return True
+    try:
+        return bool(INTEGER.from_wire(raw) == 0)
+    except MalformedPayloadError:
+        return False
+
+
 #: TAKEOFF is a type this format knows but does not spell: only SSS and ESS
 #: carry a ``t``, and a turnpoint without one is an ordinary turnpoint. So is
 #: one whose ``t`` is 0, the value the format uses for "no type".
 _SPEED_SECTION_ONLY = Optionality(
-    absent=lambda raw: raw is None or (raw == 0 and not isinstance(raw, bool)),
+    absent=_no_turnpoint_type,
     omit=lambda value: value not in (TurnpointType.SSS, TurnpointType.ESS),
 )
 

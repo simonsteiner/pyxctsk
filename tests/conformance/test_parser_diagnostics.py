@@ -395,3 +395,77 @@ class TestAPolylineIsReadOnlyIfItIsOne:
 
         with pytest.raises(InvalidFormatError, match=r"t\[0\]\.z: expected a string"):
             parse_task("XCTSK:" + json.dumps(payload))
+
+
+class TestTheSmallerFindingsOfTheReview:
+    """The 2026-10-02 review's smaller findings that a payload reproduces."""
+
+    def test_a_qr_scheme_that_is_not_utf8_is_a_format_error(self):
+        r"""S2: ``XCTSK:\xff`` escaped the recognizer as ``UnicodeDecodeError``.
+
+        The recognizer re-decoded the bytes strictly after ``Input.of`` had
+        already found they were not UTF-8, so it was not total.
+        """
+        with pytest.raises(InvalidFormatError, match="XCTSK: .*not UTF-8"):
+            parse_task(b"XCTSK:\xff")
+
+    @pytest.mark.parametrize(
+        ("path", "raw", "message"),
+        [
+            (
+                ("sss", "timeGates"),
+                ["12:00Z"],
+                r"sss\.timeGates\[0\]: invalid time '12:00Z': expected HH:MM:SSZ$",
+            ),
+            (
+                ("goal", "deadline"),
+                "25:00:00Z",
+                r"goal\.deadline: invalid time '25:00:00Z': "
+                r"hour must be between 0 and 23$",
+            ),
+            (
+                ("goal", "deadline"),
+                5,
+                r"goal\.deadline: invalid time 5: expected HH:MM:SSZ$",
+            ),
+        ],
+    )
+    def test_a_bad_time_says_so_once(self, path, raw, message):
+        """S4: one message style, where it read ``invalid time: 'Invalid…'``.
+
+        An hour out of range came from a bare ``ValueError`` in a different
+        style, and a number leaked ``'int' object has no attribute``.
+        """
+        with pytest.raises(InvalidFormatError, match=message):
+            parse_task(_mutated(BASE_TASK, path, raw))
+
+    @pytest.mark.parametrize("raw", [0, "0", None])
+    def test_a_qr_turnpoint_type_of_zero_is_no_type_however_spelled(self, raw):
+        """S10: ``"t": "0"`` was refused while ``"t": 0`` read as no type.
+
+        Every other wire integer reads a numeric string since C1.
+        """
+        payload = _qr_payload()
+        payload["t"][1]["t"] = raw
+
+        task = parse_task("XCTSK:" + json.dumps(payload))
+
+        assert task.turnpoints[1].type is None
+
+    def test_a_qr_turnpoint_type_spelled_as_a_string_is_the_type(self):
+        """S10: ``"2"`` is the SSS, as ``"2"`` is the SSS type in ``s.t``."""
+        payload = _qr_payload()
+        payload["t"][1]["t"] = "2"
+
+        task = parse_task("XCTSK:" + json.dumps(payload))
+
+        assert task.turnpoints[1].type == "SSS"
+
+    @pytest.mark.parametrize("raw", [True, "x", 9])
+    def test_a_qr_turnpoint_type_that_is_not_one_is_still_refused(self, raw):
+        """S10: reading ``"0"`` as no type does not make junk no type."""
+        payload = _qr_payload()
+        payload["t"][1]["t"] = raw
+
+        with pytest.raises(InvalidFormatError, match=r"t\[1\]\.t"):
+            parse_task("XCTSK:" + json.dumps(payload))
