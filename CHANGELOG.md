@@ -30,6 +30,8 @@ All notable changes to this project will be documented in this file.
 
 - **A QR turnpoint type of `"0"` reads as no type, as `0` does.** Since every wire integer accepts a numeric string, `"t": "2"` read as SSS while `"t": "0"` was refused as `'0' is not one of [1, 2, 3]`; "no type" now goes through the same integer rule, so `0`, `"0"` and `0.0` all read as no type.
 
+- **Release notes keep a `## ` subsection.** `scripts/changelog_extract.py` ended a version's section at any `## ` heading, so a `## Migration` heading inside it cut the rest from the GitHub Release notes, and `roll` refused an `[Unreleased]` section whose only entries sat under one. A section now ends at the next `## [` heading, as its docstring said.
+
 - **Also:** the README, CLAUDE.md and the `convert` docstrings list `geojson` among the output formats — `renderer.OUTPUT_FORMATS` is the one table, and a test holds the README's list to it. `scripts/task_viewer` imports pyxctsk unconditionally, dropping its `XCTRACK_AVAILABLE` flag and the `# type: ignore` comments it cost.
 
 ## [v0.6.1] - 2026-09-27

@@ -26,6 +26,9 @@ import sys
 
 PATH = pathlib.Path("CHANGELOG.md")
 UNRELEASED = "## [Unreleased]"
+# A section runs to the next version heading; any other ``## `` heading, such
+# as ``## Migration``, belongs to the section it sits in.
+VERSION_HEADING = "## ["
 USAGE = "usage: changelog_extract.py [--title | roll] <version>"
 
 
@@ -40,7 +43,7 @@ def extract(text: str, version: str) -> str:
     out: list[str] = []
     capturing = False
     for line in text.splitlines():
-        if line.startswith("## "):
+        if line.startswith(VERSION_HEADING):
             if capturing:
                 break
             match = heading.match(line)
@@ -84,7 +87,11 @@ def roll(text: str, version: str, date: datetime.date) -> str:
     if any(_heading(version).match(line) for line in lines):
         sys.exit(f"{PATH} already has a section for v{version}.")
     end = next(
-        (i for i in range(start + 1, len(lines)) if lines[i].startswith("## ")),
+        (
+            i
+            for i in range(start + 1, len(lines))
+            if lines[i].startswith(VERSION_HEADING)
+        ),
         len(lines),
     )
     if not "\n".join(lines[start + 1 : end]).strip():
