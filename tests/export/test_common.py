@@ -210,6 +210,24 @@ class TestTheCylinderOutline:
         takeoff = drawing_to_geojson(drawing)["features"][0]
         assert takeoff["properties"]["radius"] == 10**300
 
+    @pytest.mark.parametrize("model", [None, EarthModel.FAI_SPHERE])
+    def test_a_line_goal_past_the_far_side_is_drawn_in_neither_format(self, model):
+        """Both formats draw a LINE goal's ends and control zone, so both refuse.
+
+        The distance still stands — a LINE goal is a point to the optimizer —
+        but GeoJSON, unlike for a cylinder, carries the line's geometry, and
+        10^300 m of it used to come out as two ends nowhere near the goal.
+        """
+        task = _task(GoalType.LINE)
+        task.earth_model = model
+        task.turnpoints[-1].radius = 10**300
+        drawing = TaskDrawing.from_task(task)
+
+        with pytest.raises(UnmeasurableRouteError, match="far side of the earth"):
+            drawing_to_geojson(drawing)
+        with pytest.raises(UnmeasurableRouteError, match="far side of the earth"):
+            drawing_to_kml(drawing)
+
     def test_the_kml_polygon_is_the_outline(self):
         """The writer renders the drawing's answer rather than its own."""
         drawing = TaskDrawing.from_task(_task(GoalType.CYLINDER))

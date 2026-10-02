@@ -201,20 +201,18 @@ def _survives_every_output(task: Task) -> None:
 
     A scalar may be well-formed and still describe a task its earth cannot
     hold: a 10^9 m takeoff radius reads, measures (the takeoff is not touched,
-    ADR 0002), and has no outline to draw in KML. Such an output is refused
-    with ``UnmeasurableRouteError``, which the CLI reports; it used to be a
-    ring of points nowhere near the cylinder. Nothing else may escape.
+    ADR 0002), and has no outline to draw. Only a drawing may refuse it, with
+    ``UnmeasurableRouteError``, which the CLI reports; it used to be a ring of
+    points nowhere near the cylinder. Nothing else may escape.
     """
-    for fmt in ("json", "qrcode-json", "geojson"):
+    for fmt in ("json", "qrcode-json"):
         render_task(task, fmt)
-    try:
-        render_task(task, "kml")
-    except UnmeasurableRouteError:
-        pass
-    try:
-        report = DistanceReport.from_task(task)
-    except UnmeasurableRouteError:
-        return
+    for drawing in ("kml", "geojson"):
+        try:
+            render_task(task, drawing)
+        except UnmeasurableRouteError:
+            pass
+    report = DistanceReport.from_task(task)
     report.as_text()
     json.dumps(report.as_dict(), allow_nan=False)
 
