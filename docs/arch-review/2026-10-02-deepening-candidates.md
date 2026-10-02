@@ -30,7 +30,7 @@ The backlog, in rank order. After the scan only three parts of this file change:
 | ID | Deepening | Strength | Lens | Status | Branch | PR | Breaking | Notes |
 |---|---|---|---|---|---|---|---|---|
 | [C1](#c1--one-owner-for-a-wire-scalar) | One owner for a wire scalar | 🟢 Strong · 🔴 live defect | deepening | pr-open | `refactor/wire-scalars` | [#29](https://github.com/simonsteiner/pyxctsk/pull/29) | yes | batch 2026-10-02: C1 → C2 → C3 → C4 |
-| [C2](#c2--the-distance-report-owns-the-two-turnpoint-minimum) | The distance report owns the two-turnpoint minimum | 🟢 Strong · 🔴 live defect | deepening | todo | `refactor/report-owns-minimum` | | | |
+| [C2](#c2--the-distance-report-owns-the-two-turnpoint-minimum) | The distance report owns the two-turnpoint minimum | 🟢 Strong · 🔴 live defect | deepening | pr-open | `refactor/report-owns-minimum` | | no | |
 | [C3](#c3--the-polyline-decoder-owns-its-own-validity) | The polyline decoder owns its own validity | 🟢 Strong · 🔴 live defect | deepening | todo | `refactor/polyline-decoder-validity` | | | |
 | [C4](#c4--the-solver-refuses-a-route-it-cannot-measure) | The solver refuses a route it cannot measure | 🟢 Strong · 🔴 live defect | deepening | todo | `refactor/unmeasurable-route` | | | builds on C1 |
 | [C5](#c5--one-json-writer) | One JSON writer | 🟡 Worth exploring | maintainability | todo | `refactor/one-json-writer` | | | |
@@ -183,6 +183,15 @@ flowchart LR
 
 <details>
 <summary>Decisions</summary>
+
+- Q1 — Does the minimum belong on `DistanceReport` or on `MeasuredTask`? → on `DistanceReport`, because `MeasuredTask` is what `TaskDrawing` measures for `convert --format kml`/`geojson`, and a one-turnpoint task converts to both with exit 0 (`tests/export/test_kml.py::test_task_to_kml_single_turnpoint`, `tests/test_cli.py`'s one-turnpoint format tests, and a manual `convert` of a one-turnpoint file on both branches, byte-identical); `test_a_task_with_no_turnpoints_measures_to_nothing` already pins `MeasuredTask` as total — the pair, not the verdict.
+- Q2 — In each constructor classmethod, or in `__post_init__`? → `__post_init__`, because a report has three ways in — `from_task`, `from_measured_task` and the dataclass constructor — and the red test refused in only two of six cases: `from_measured_task` and `DistanceReport(measured=...)`, on zero and one turnpoints, all returned a report with `task_distance_m == 0.0`. Only the constructor is common to all three.
+- Q3 — Does `from_task` still check before it measures? → no, it measures and constructs, because `MeasuredTask.from_task` is total on zero and one turnpoints (Q1), so the early check was a second copy of the rule; `pyxctsk distances` on a one-turnpoint file prints the same message with exit 1 on both branches.
+- Q4 — `task_distances_from`'s copy of the guard? → deleted, with its imports of `MIN_TURNPOINTS_FOR_DISTANCE`, `TOO_FEW_TURNPOINTS_MESSAGE` and `TooFewTurnpointsError`, because its only path to a table is `DistanceReport.from_measured_task`, which now raises; the comparisons against `MIN_TURNPOINTS_FOR_DISTANCE` in `src/` fall from two (`report.py:156`, `task_distances.py:180`) to one, in `DistanceReport.__post_init__`.
+- Q5 — `from_measured_task` is now the constructor spelled differently: delete it? → keep it, because `GoalLine.from_measured_task` and `SpeedSection.from_measured_task` name the same construction in the two sibling modules, it is reachable as `pyxctsk.DistanceReport.from_measured_task`, and deleting it would break the API while removing no concept; it gains the `Raises:` it lacked.
+- Q6 — Which tests survive? → `tests/distance/test_report.py::TestTooFewTurnpoints` becomes one test over the three ways in × zero and one turnpoints, plus the two-turnpoint boundary, replacing three `from_task`-only tests; `test_task_distances.py`'s refusal test keeps the two table entry points and drops its `DistanceReport.from_task` case, now pinned in `test_report.py`; `test_measured_task.py` is unchanged, because it pins Q1.
+- Q7 — Dependency category? → `in-process`: pure computation over a value, tested at the `DistanceReport` interface.
+- Q8 — One-way door, breaking? → neither: `pyxctsk distances` (json, text) and `convert` (json, kml, geojson) over all 26 `.xctsk` files under `tests/data/reference_tasks` — 130 outputs — are byte-identical to `refactor/wire-scalars`; the only behaviour that changes is two entry points refusing what `TooFewTurnpointsError` is documented to refuse, instead of reporting 0.0 m.
 
 </details>
 

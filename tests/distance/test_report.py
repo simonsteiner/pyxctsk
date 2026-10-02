@@ -10,7 +10,7 @@ wiring: that the command renders this report and writes it out.
 import pytest
 
 from pyxctsk import DistanceReport, Task, TaskType
-from pyxctsk.distance import NOTES, TooFewTurnpointsError
+from pyxctsk.distance import NOTES, MeasuredTask, TooFewTurnpointsError
 from tests.builders import task, turnpoint
 from tests.corpus import reference_task
 
@@ -150,28 +150,40 @@ class TestTheTwoRenderings:
 
 
 class TestTooFewTurnpoints:
-    """One turnpoint has no leg, so it has no distance — and no report."""
+    """One turnpoint has no leg, so it has no distance — and no report.
 
-    def test_a_task_with_one_turnpoint_is_refused(self):
-        """It used to be the CLI alone that knew this; the library answered 0.0."""
-        built = task(turnpoint("A", 46.0, 8.0, radius=400))
+    The report refuses at construction, so no way of building one can skip the
+    check. It used to sit in ``from_task`` alone, with a copy in
+    ``task_distances_from``, and ``from_measured_task`` — the third public way
+    in — answered a one-turnpoint task with a distance of 0.0.
+    """
 
-        with pytest.raises(TooFewTurnpointsError):
-            DistanceReport.from_task(built)
-
-    def test_an_empty_task_is_refused(self):
-        """Same rule, at the other degenerate end."""
-        with pytest.raises(TooFewTurnpointsError):
-            DistanceReport.from_task(
-                Task(task_type=TaskType.CLASSIC, version=1, turnpoints=[])
-            )
-
-    def test_the_message_says_what_is_wrong(self):
-        """The CLI prints this verbatim, so it is written for a user."""
-        built = task(turnpoint("A", 46.0, 8.0, radius=400))
+    @pytest.mark.parametrize(
+        "build",
+        [
+            DistanceReport.from_task,
+            lambda t: DistanceReport.from_measured_task(MeasuredTask.from_task(t)),
+            lambda t: DistanceReport(measured=MeasuredTask.from_task(t)),
+        ],
+        ids=["from_task", "from_measured_task", "constructor"],
+    )
+    @pytest.mark.parametrize("count", [0, 1], ids=["no turnpoints", "one turnpoint"])
+    def test_every_way_to_build_a_report_refuses_it(self, build, count):
+        """The CLI prints the message verbatim, so it is written for a user."""
+        built = Task(
+            task_type=TaskType.CLASSIC,
+            version=1,
+            turnpoints=[turnpoint("A", 46.0, 8.0, radius=400)][:count],
+        )
 
         with pytest.raises(TooFewTurnpointsError, match="at least two turnpoints"):
-            DistanceReport.from_task(built)
+            build(built)
+
+    def test_two_turnpoints_are_enough(self):
+        """The minimum is two, not more."""
+        built = task(turnpoint("A", 46.0, 8.0), turnpoint("B", 46.1, 8.0))
+
+        assert DistanceReport.from_task(built).task_distance_m > 0
 
 
 class TestTheEarthModelIsReadOffTheRoute:

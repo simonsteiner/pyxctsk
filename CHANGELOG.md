@@ -10,6 +10,10 @@ All notable changes to this project will be documented in this file.
 
 - **Releases publish to PyPI with trusted publishing, from one workflow.** `publish.yml` is the only workflow that uploads: it runs at a `vX.Y.Z` tag — pushed by `scripts/release.sh`, or dispatched at the tag by `release.yml` — checks that the tag matches the package version and has a dated changelog section, runs the CI gate, builds once, attests build provenance, and uploads through PyPI's OIDC trusted publishing instead of a stored API token. Run from a branch, it is a dry run that builds and publishes nothing. `release.yml` and `publish.yml` call `ci.yml` rather than copying its matrix, `main` and the tag are pushed atomically, and `scripts/changelog_extract.py roll <version>` is the one place the changelog is rolled — it refuses an empty `[Unreleased]` section or a version that already has one. See `RELEASING.md`.
 
+### Fixed
+
+- **Every way of building a `DistanceReport` refuses a task too short to have a distance.** The two-turnpoint rule was a copy in `DistanceReport.from_task` and another in `task_distances_from`, and the third public entry point had neither: `DistanceReport.from_measured_task(MeasuredTask.from_task(task))` — or `DistanceReport(measured=...)` — on a one-turnpoint task reported a task distance of `0.0` m, the answer the rule exists to prevent. The report's constructor now checks it, and the copies are gone; `calculate_task_distances` and `task_distances_from` refuse because the report they render does. `MeasuredTask` is unchanged and still measures a one-turnpoint task, so `convert --format kml`/`geojson` of one keeps working. The CLI's message and exit code, and every corpus conversion and distance report, are byte-identical.
+
 ## [v0.6.1] - 2026-09-27
 
 ### Fixed

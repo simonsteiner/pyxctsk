@@ -22,14 +22,9 @@ The cylinder conversion this module used to own lives in
 from dataclasses import dataclass
 from typing import Any
 
-from ..exceptions import TooFewTurnpointsError
 from ..model.task import Task
 from .measured_task import MeasuredTask
-from .report import (
-    MIN_TURNPOINTS_FOR_DISTANCE,
-    TOO_FEW_TURNPOINTS_MESSAGE,
-    DistanceReport,
-)
+from .report import DistanceReport
 
 #: What a board rounds to, and what every published reference value is quoted
 #: to. The report itself carries unrounded metres.
@@ -176,9 +171,12 @@ def task_distances_from(measured: MeasuredTask) -> TaskDistanceTable:
     Returns:
         TaskDistanceTable: The table. Call ``as_dict()`` for the dictionary
         this used to return.
+
+    Raises:
+        TooFewTurnpointsError: If the task has fewer than
+            :data:`~pyxctsk.distance.report.MIN_TURNPOINTS_FOR_DISTANCE`
+            turnpoints; the report it renders refuses one.
     """
-    if len(measured.turnpoints) < MIN_TURNPOINTS_FOR_DISTANCE:
-        raise TooFewTurnpointsError(TOO_FEW_TURNPOINTS_MESSAGE)
     return TaskDistanceTable.from_report(DistanceReport.from_measured_task(measured))
 
 
@@ -195,5 +193,10 @@ def calculate_task_distances(task: Task) -> TaskDistanceTable:
     Returns:
         TaskDistanceTable: The table. Call ``as_dict()`` for the dictionary
         this used to return.
+
+    Raises:
+        TooFewTurnpointsError: If the task has fewer than
+            :data:`~pyxctsk.distance.report.MIN_TURNPOINTS_FOR_DISTANCE`
+            turnpoints.
     """
     return task_distances_from(MeasuredTask.from_task(task))
