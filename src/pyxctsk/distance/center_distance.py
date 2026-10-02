@@ -148,6 +148,9 @@ def center_distance(
 
     Raises:
         ValueError: If ``reading`` is not a :class:`CenterDistanceReading`.
+        TaskValidationError: Under
+            :attr:`~CenterDistanceReading.LAUNCH_TO_GOAL_BOUNDARY`, which reads
+            the goal's radius, if any turnpoint's radius is negative.
     """
     # Two centres make the first leg. Not ``report.MIN_TURNPOINTS_FOR_DISTANCE``
     # read across, though the number is the same: that is the report's
@@ -222,6 +225,10 @@ def center_distance_readings(task: Task) -> dict[str, float | None]:
     Returns:
         One entry per :class:`CenterDistanceReading`, in metres, with None for
         any that does not apply to this task.
+
+    Raises:
+        TaskValidationError: If any turnpoint's radius is negative, as
+            :func:`center_distance` raises for the goal-boundary reading.
     """
     return {
         reading.value: center_distance(task, reading)

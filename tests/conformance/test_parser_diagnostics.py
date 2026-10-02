@@ -384,7 +384,7 @@ class TestAMalformedScalarIsRefusedWhereItIsRead:
         with pytest.raises(InvalidFormatError, match=message):
             parse_task(_mutated(BASE_TASK, path, raw))
 
-    @pytest.mark.parametrize("raw", [0, "0", None])
+    @pytest.mark.parametrize("raw", [0, "0", 0.0, None])
     def test_a_qr_turnpoint_type_of_zero_is_no_type_however_spelled(self, raw):
         """S10: ``"t": "0"`` was refused while ``"t": 0`` read as no type.
 

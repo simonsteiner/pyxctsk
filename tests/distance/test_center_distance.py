@@ -6,7 +6,7 @@ diagnosis really are different answers. See `docs/s7f-distance-reference.md`.
 
 import pytest
 
-from pyxctsk import EarthModel, GoalType, Task, TurnpointType
+from pyxctsk import EarthModel, GoalType, Task, TaskValidationError, TurnpointType
 from pyxctsk.distance import (
     PROPOSED_READING,
     CenterDistanceReading,
@@ -149,6 +149,22 @@ class TestDegenerateTasks:
 
         assert center_distance(odd, CenterDistanceReading.START_TO_GOAL) is None
         assert center_distance(odd) is not None
+
+    def test_a_negative_radius_is_refused_where_a_radius_is_read(self):
+        """S9's refusal reaches the one reading that uses the goal's radius.
+
+        The proposed reading reads only centres, so it still answers.
+        """
+        negative = task(
+            turnpoint("A", 46.0, 8.0, radius=-5, type=TurnpointType.TAKEOFF),
+            turnpoint("B", 46.1, 8.0, radius=400),
+        )
+
+        assert center_distance(negative) is not None
+        with pytest.raises(TaskValidationError, match="negative radius"):
+            center_distance(negative, CenterDistanceReading.LAUNCH_TO_GOAL_BOUNDARY)
+        with pytest.raises(TaskValidationError, match="negative radius"):
+            center_distance_readings(negative)
 
 
 class TestAgainstThePublishedValues:
