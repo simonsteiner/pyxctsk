@@ -146,6 +146,11 @@ class MeasuredTask:
 
         Returns:
             The measured task.
+
+        Raises:
+            UnmeasurableRouteError: If the task's local plane cannot represent
+                its route — turnpoints a quarter of the globe from the task
+                area's centre, or a cylinder larger than the earth.
         """
         return cls(
             task=task,

@@ -306,18 +306,19 @@ def optimize_plane_route(
         centers = _place_at_centers(unique_circles)
         return [centers[index] for index in index_of]
 
-    best: list[tuple[float, float]] | None = None
-    best_length = math.inf
-    for place in _INITIAL_PLACEMENTS:
-        points = _sweep_to_convergence(
-            unique_circles,
-            place(unique_circles),
-            max_sweeps,
-            epsilon,
-        )
-        length = _polyline_length(points)
-        if length < best_length:
-            best, best_length = points, length
-
-    assert best is not None  # _INITIAL_PLACEMENTS is never empty
+    # Every placement is settled and the shortest kept. ``min`` rather than a
+    # running "strictly shorter than infinity" comparison: that one needed
+    # ``assert best is not None`` to say a winner existed, and the assertion
+    # fired whenever every length overflowed — a radius near 1e308 — or was
+    # NaN. Whether such a route means anything on the earth is not a planar
+    # question; ``LocalPlane.lon_lat`` refuses it on the way back.
+    best = min(
+        (
+            _sweep_to_convergence(
+                unique_circles, place(unique_circles), max_sweeps, epsilon
+            )
+            for place in _INITIAL_PLACEMENTS
+        ),
+        key=_polyline_length,
+    )
     return [best[index] for index in index_of]

@@ -174,6 +174,8 @@ class DistanceReport:
             TooFewTurnpointsError: If the task has fewer than
                 :data:`MIN_TURNPOINTS_FOR_DISTANCE` turnpoints, which leaves no
                 leg to measure.
+            UnmeasurableRouteError: If the task's route cannot be solved in
+                its local plane (see :meth:`MeasuredTask.from_task`).
         """
         # Counted before measuring, so a task too short to have a distance is
         # told so rather than whatever measuring it would have failed on.

@@ -146,6 +146,23 @@ class MismatchedRouteError(pyXCTSKError, ValueError):
     """
 
 
+class UnmeasurableRouteError(pyXCTSKError):
+    """Raised when a task's route cannot be solved in its local plane.
+
+    S7F §7.1.2 solves a route in one Transverse Mercator plane centred on the
+    task area, and :class:`~pyxctsk.distance.plane.LocalPlane` is the only way
+    into or out of it. A point a quarter of the globe from the plane's central
+    meridian has no finite planar image, and a planar point thousands of
+    kilometres out — where a cylinder radius larger than the earth puts the
+    route — has no finite way back. Both used to surface from the solver as an
+    ``AssertionError`` about its own placements, as pyproj's ``CRSError``, or
+    as a distance of ``NaN`` metres with exit 0.
+
+    It is not a ``ValueError``: unlike :class:`TooFewTurnpointsError` it has
+    no earlier type to stay compatible with.
+    """
+
+
 class InvalidTimeOfDayError(pyXCTSKError):
     """Raised when time of day format is invalid."""
 

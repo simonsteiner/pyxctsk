@@ -129,6 +129,21 @@ class TestOptimizePlaneRoute:
         assert len(points) == len(circles)
         assert points[2] == points[3]
 
+    def test_a_route_too_long_to_measure_is_still_a_route(self):
+        """Every placement overflowing is an answer, not an assertion.
+
+        The winner used to be the placement strictly shorter than infinity,
+        guarded by ``assert best is not None  # _INITIAL_PLACEMENTS is never
+        empty`` — which fired whenever all three lengths overflowed. Whether
+        such a route can be put back on the earth is the plane's question.
+        """
+        circles = [(0.0, 0.0, 0.0), (1_000.0, 0.0, 1e308), (2_000.0, 0.0, 0.0)]
+
+        points = optimize_plane_route(circles, max_sweeps=10)
+
+        assert len(points) == len(circles)
+        assert math.isinf(_route_length(points))
+
     def test_multi_start_route_regression(self):
         """The deep solver preserves the shipped route-level result."""
         circles = [

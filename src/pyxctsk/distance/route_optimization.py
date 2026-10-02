@@ -265,6 +265,11 @@ def calculate_iteratively_refined_route(
     Returns:
         OptimizedRoute: The route points, its per-leg distances, and the earth
         model they were measured on.
+
+    Raises:
+        UnmeasurableRouteError: If the local plane the route is solved in
+            cannot represent a turnpoint or a route point (see
+            :class:`~pyxctsk.distance.plane.LocalPlane`).
     """
     max_sweeps = (
         num_iterations if num_iterations is not None else DEFAULT_NUM_ITERATIONS
@@ -317,6 +322,10 @@ def optimized_distance(
 
     Returns:
         Optimized distance in meters.
+
+    Raises:
+        UnmeasurableRouteError: As
+            :func:`calculate_iteratively_refined_route` raises it.
     """
     return calculate_iteratively_refined_route(
         turnpoints,

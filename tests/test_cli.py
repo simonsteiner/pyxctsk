@@ -293,6 +293,29 @@ class TestCLIDistances:
         assert result.exit_code == 1
         assert "at least two turnpoints" in result.output
 
+    @pytest.mark.parametrize(
+        ("command", "options"),
+        [
+            (distances, []),
+            (distances, ["--format", "text"]),
+            (convert, ["--format", "kml"]),
+            (convert, ["--format", "geojson"]),
+        ],
+    )
+    def test_a_task_the_plane_cannot_hold_is_an_error(self, command, options):
+        """Two points half the globe apart: reported, not an AssertionError."""
+        payload = task(
+            turnpoint("A", 0.0, 0.0, radius=0, type=TurnpointType.SSS),
+            turnpoint("B", 0.0, 180.0, radius=0, type=TurnpointType.ESS),
+        ).to_json()
+
+        result = CliRunner().invoke(command, options, input=payload.encode())
+
+        assert result.exit_code == 1
+        assert not isinstance(result.exception, AssertionError)
+        assert "Error:" in result.output
+        assert "Transverse Mercator" in result.output
+
     def test_input_that_cannot_be_parsed_is_an_error(self):
         """Not a traceback."""
         result = CliRunner().invoke(distances, input=b"not a task")

@@ -4,12 +4,14 @@ These tests exercise the planar solver through its two entry points and the
 TurnpointGeometry seam that lets route orchestration use lightweight fakes.
 """
 
+import math
 from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
 from pyproj import CRS, Transformer
 
+from pyxctsk import UnmeasurableRouteError
 from pyxctsk.distance import OptimizedRoute
 from pyxctsk.distance.earth import (
     FAI_SPHERE_RADIUS_M,
@@ -194,6 +196,36 @@ class TestLtmScaleFactor:
 
         assert x == pytest.approx(x_unscaled * ltm_scale_factor(46.0), rel=1e-12)
         assert x != pytest.approx(x_unscaled, rel=1e-9)
+
+
+class TestThePlaneRefusesWhatItCannotRepresent:
+    """``LocalPlane`` is the only way into and out of the plane, so it refuses.
+
+    A Transverse Mercator projection has no finite image for a point 90° of
+    longitude from its central meridian on the equator, and no finite inverse
+    for a planar point far beyond the earth.
+    """
+
+    def test_a_point_off_the_plane_is_refused_going_in(self):
+        """A point on the equator 90° from the central meridian has no image."""
+        plane = LocalPlane.around([(0.0, 0.0)])
+
+        with pytest.raises(UnmeasurableRouteError, match="cannot be projected"):
+            plane.xy((0.0, 90.0))
+
+    def test_a_point_off_the_earth_is_refused_coming_back(self):
+        """A planar point 10^300 m out has no geographic inverse."""
+        plane = LocalPlane.around([(46.0, 8.0)])
+
+        with pytest.raises(UnmeasurableRouteError, match="cannot be mapped back"):
+            plane.lon_lat((1e300, 0.0))
+
+    def test_a_non_finite_planar_point_is_refused_coming_back(self):
+        """What the solver returns when its lengths overflowed."""
+        plane = LocalPlane.around([(46.0, 8.0)])
+
+        with pytest.raises(UnmeasurableRouteError, match="cannot be mapped back"):
+            plane.lon_lat((math.inf, math.nan))
 
 
 class TestTaskAreaCenter:

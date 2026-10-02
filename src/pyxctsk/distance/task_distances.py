@@ -198,5 +198,7 @@ def calculate_task_distances(task: Task) -> TaskDistanceTable:
         TooFewTurnpointsError: If the task has fewer than
             :data:`~pyxctsk.distance.report.MIN_TURNPOINTS_FOR_DISTANCE`
             turnpoints.
+        UnmeasurableRouteError: If the task's route cannot be solved in its
+            local plane (see :meth:`MeasuredTask.from_task`).
     """
     return task_distances_from(MeasuredTask.from_task(task))

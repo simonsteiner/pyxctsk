@@ -17,6 +17,7 @@ from pyxctsk import (
     Task,
     TaskType,
     TurnpointType,
+    UnmeasurableRouteError,
 )
 from pyxctsk.distance import (
     MeasuredTask,
@@ -256,3 +257,74 @@ class TestTheConstructorChecksThePair:
     def test_the_cylinders_are_not_an_argument(self):
         """Derived from the task, so they cannot come from somewhere else."""
         assert "turnpoints" not in inspect.signature(MeasuredTask).parameters
+
+
+class TestARouteThePlaneCannotHoldIsRefused:
+    """A task the local Transverse Mercator plane cannot represent is an error.
+
+    Every case here is a task ``Task.validate()`` accepts. The route is solved
+    in one plane centred on the task area (S7F §7.1.2, §7.1.6), and a
+    Transverse Mercator plane cannot hold a point a quarter of the globe from
+    its central meridian, nor map a planar point thousands of kilometres out
+    back onto the earth. These used to leave as a bare ``AssertionError`` from
+    the solver ("_INITIAL_PLACEMENTS is never empty"), as pyproj's
+    ``CRSError`` for a projection centred on ``lon_0=nan``, or — worst — as a
+    report of ``NaN`` metres with exit 0.
+    """
+
+    @pytest.mark.parametrize(
+        ("course", "cause"),
+        [
+            pytest.param(
+                [(0.0, 0.0, 0), (0.0, 180.0, 0)],
+                "projected",
+                id="half-the-globe-apart",
+            ),
+            pytest.param(
+                [(0.0, 0.0, 0), (0.0, 179.9, 400)],
+                "projected",
+                id="nearly-half-the-globe-apart",
+            ),
+            pytest.param(
+                [(46.0, 8.0, 0), (46.1, 8.1, 10**300)],
+                "mapped back",
+                id="huge-radius-was-a-crs-error",
+            ),
+            pytest.param(
+                [(46.0, 8.0, 0), (46.1, 8.1, 20_000_000), (46.2, 8.0, 0)],
+                "mapped back",
+                id="radius-past-half-the-earth-was-nan-metres",
+            ),
+            pytest.param(
+                [(46.0, 8.0, 0), (46.1, 8.1, 10**308), (46.2, 8.0, 0)],
+                "mapped back",
+                id="radius-overflowing-the-planar-length",
+            ),
+        ],
+    )
+    def test_it_is_refused_naming_the_plane(self, course, cause):
+        """One library error, saying which way the projection failed."""
+        unmeasurable = task(
+            *(
+                turnpoint(
+                    f"P{i}",
+                    lat,
+                    lon,
+                    radius=radius,
+                    type=(
+                        TurnpointType.SSS
+                        if i == 0
+                        else TurnpointType.ESS
+                        if i == len(course) - 1
+                        else None
+                    ),
+                )
+                for i, (lat, lon, radius) in enumerate(course)
+            )
+        )
+        assert unmeasurable.validate() == []
+
+        with pytest.raises(UnmeasurableRouteError, match=cause) as raised:
+            MeasuredTask.from_task(unmeasurable)
+
+        assert "Transverse Mercator" in str(raised.value)
