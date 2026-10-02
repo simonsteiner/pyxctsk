@@ -179,6 +179,21 @@ class TestTooFewTurnpoints:
         with pytest.raises(TooFewTurnpointsError, match="at least two turnpoints"):
             build(built)
 
+    def test_a_task_too_short_is_refused_before_it_is_measured(self):
+        """Measuring a one-turnpoint task first blamed a route it did not have.
+
+        A negative radius made ``from_task`` report a point outside the
+        cylinder instead of the two-turnpoint minimum the CLI promised.
+        """
+        built = Task(
+            task_type=TaskType.CLASSIC,
+            version=1,
+            turnpoints=[turnpoint("A", 46.0, 8.0, radius=-5)],
+        )
+
+        with pytest.raises(TooFewTurnpointsError, match="at least two turnpoints"):
+            DistanceReport.from_task(built)
+
     def test_two_turnpoints_are_enough(self):
         """The minimum is two, not more."""
         built = task(turnpoint("A", 46.0, 8.0), turnpoint("B", 46.1, 8.0))

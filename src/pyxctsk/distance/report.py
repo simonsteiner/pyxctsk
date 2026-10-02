@@ -56,6 +56,13 @@ MIN_TURNPOINTS_FOR_DISTANCE = 2
 #: What refusing says; the CLI prints it verbatim.
 TOO_FEW_TURNPOINTS_MESSAGE = "a task needs at least two turnpoints to have a distance."
 
+
+def _require_distance(turnpoint_count: int) -> None:
+    """Refuse a task of ``turnpoint_count`` turnpoints if it has no leg."""
+    if turnpoint_count < MIN_TURNPOINTS_FOR_DISTANCE:
+        raise TooFewTurnpointsError(TOO_FEW_TURNPOINTS_MESSAGE)
+
+
 #: What each published number is, and which section defines it. Carried with
 #: the report because "not defined by S7F" is the single most important thing
 #: it says, and a number travelling without it invites a false comparison.
@@ -139,8 +146,7 @@ class DistanceReport:
 
     def __post_init__(self) -> None:
         """Refuse a task too short to have a distance."""
-        if len(self.measured.turnpoints) < MIN_TURNPOINTS_FOR_DISTANCE:
-            raise TooFewTurnpointsError(TOO_FEW_TURNPOINTS_MESSAGE)
+        _require_distance(len(self.measured.turnpoints))
 
     @cached_property
     def speed_section(self) -> SpeedSection | None:
@@ -169,6 +175,9 @@ class DistanceReport:
                 :data:`MIN_TURNPOINTS_FOR_DISTANCE` turnpoints, which leaves no
                 leg to measure.
         """
+        # Counted before measuring, so a task too short to have a distance is
+        # told so rather than whatever measuring it would have failed on.
+        _require_distance(len(task.turnpoints))
         return cls(measured=MeasuredTask.from_task(task))
 
     @classmethod
