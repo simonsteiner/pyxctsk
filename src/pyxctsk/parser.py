@@ -44,7 +44,6 @@ Functions:
     load_task(path: str | os.PathLike) -> Task: Read a file, then parse it.
 """
 
-import json
 import os
 from dataclasses import dataclass
 from typing import Any, Callable
@@ -57,6 +56,7 @@ from .exceptions import (
     MissingQRCodeSupportError,
     TaskValidationError,
 )
+from .model.shape import load_json
 from .model.task import TASK_SHAPE, Task
 from .qrcode.image import read_qrcode_image
 from .qrcode.task import (
@@ -66,9 +66,13 @@ from .qrcode.task import (
     QRCodeTask,
 )
 
-# Both QR schemes the spec defines. XCTSKZ: is checked first because XCTSK: is
-# not a prefix of it, but keeping them ordered makes the intent obvious.
-_QR_SCHEMES = (QR_CODE_SCHEME_COMPRESSED, QR_CODE_SCHEME)
+# Both QR schemes the spec defines, as the bytes the URL adapter recognizes —
+# bytes, so recognizing one never needs the payload to be text. XCTSKZ: is
+# checked first because XCTSK: is not a prefix of it, but keeping them ordered
+# makes the intent obvious.
+_QR_SCHEMES = tuple(
+    scheme.encode("ascii") for scheme in (QR_CODE_SCHEME_COMPRESSED, QR_CODE_SCHEME)
+)
 
 # File extensions a task is commonly saved under. Used only to hint, when a
 # string handed to parse_task is not a payload, that it may have been meant as
@@ -146,8 +150,8 @@ class Input:
         document: Any = _NOT_JSON
         if text is not None:
             try:
-                document = json.loads(text)
-            except ValueError:
+                document = load_json(text)
+            except MalformedPayloadError:
                 document = _NOT_JSON
 
         return cls(raw=raw, text=text, document=document)
@@ -194,33 +198,32 @@ class FormatAdapter:
     read: Callable[["Input"], Arrived]
 
 
-def _qr_url_text(inp: Input) -> str | None:
-    """Return the input as text if it carries either QR scheme, else None."""
-    if inp.text is not None and inp.text.startswith(_QR_SCHEMES):
-        return inp.text
-    for scheme in _QR_SCHEMES:
-        if inp.raw.startswith(scheme.encode("utf-8")):
-            return inp.raw.decode("utf-8", errors="strict")
-    return None
-
-
 def _is_xctsk_url(inp: Input) -> bool:
-    """Whether the input carries the ``XCTSK:`` or ``XCTSKZ:`` scheme."""
-    return _qr_url_text(inp) is not None
+    r"""Whether the input carries the ``XCTSK:`` or ``XCTSKZ:`` scheme.
+
+    Asked of the bytes, so it is total: a scheme followed by bytes that are not
+    UTF-8 is still this format's, and :func:`_read_xctsk_url` says why it
+    cannot be read. It used to re-decode them strictly here, and
+    ``XCTSK:\xff`` escaped the CLI as a ``UnicodeDecodeError`` traceback.
+    """
+    return inp.raw.startswith(_QR_SCHEMES)
 
 
 def _read_xctsk_url(inp: Input) -> Arrived:
     """Read the compact ``XCTSK:`` and ``XCTSKZ:`` URL formats.
 
     Raises:
-        InvalidFormatError: If the scheme is right but the payload is not.
+        InvalidFormatError: If the scheme is right but the payload is not —
+            including a payload that is not UTF-8 text.
     """
-    url = _qr_url_text(inp)
-    assert url is not None  # recognizes() said so
+    scheme = inp.raw.split(b":", 1)[0].decode("ascii")
+    if inp.text is None:
+        raise InvalidFormatError(
+            f"recognized {scheme}: URL but its payload is not UTF-8 text"
+        )
     try:
-        return QRCodeTask.from_string(url)
+        return QRCodeTask.from_string(inp.text)
     except MalformedPayloadError as exc:
-        scheme = url.split(":", 1)[0]
         raise InvalidFormatError(
             f"recognized {scheme}: URL but its payload could not be parsed: {exc}"
         ) from exc
@@ -305,7 +308,7 @@ def _read_qrcode_image(inp: Input) -> Arrived:
             f"looks like an image, but it could not be read: {exc}"
         ) from exc
 
-    payloads = [Input.of(text) for text in texts if text.startswith(_QR_SCHEMES)]
+    payloads = [p for p in map(Input.of, texts) if _is_xctsk_url(p)]
     if not payloads:
         raise InvalidFormatError(
             "looks like an image, but it carries no XCTSK: QR code"

@@ -8,14 +8,27 @@ built on (:class:`LocalPlane`).
 
 Split out of ``turnpoint.py``. Nothing here knows what a turnpoint is — a
 caller projects a point, solves, and projects back.
+
+**A plane has edges, and this module owns them.** :meth:`LocalPlane.xy` and
+:meth:`LocalPlane.lon_lat` are the only ways into and out of the plane, so they
+are where a point it cannot represent is refused, with
+:class:`~pyxctsk.exceptions.UnmeasurableRouteError`, rather than handed on as
+``inf`` for the solver to choke on. That is not the same as refusing a cylinder
+larger than the earth: along the central meridian the inverse projection wraps
+round the globe and stays finite, so such a cylinder can pass through the
+plane — it is refused where a point is placed on its boundary, by
+:func:`~pyxctsk.distance.earth.geodesic_destination`, which owns the earth's
+far side.
 """
 
+import math
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Sequence
 
 from pyproj import CRS, Transformer
 
+from ..exceptions import UnmeasurableRouteError
 from .earth import EarthModelLike, canonical, crs_for_earth_model, datum_proj4
 
 
@@ -205,8 +218,20 @@ class LocalPlane:
 
         Returns:
             (x, y) in meters.
+
+        Raises:
+            UnmeasurableRouteError: If the point has no finite image in this
+                plane — a Transverse Mercator projection has none a quarter
+                of the globe from its central meridian, which is where the
+                far end of a task spanning half of it lies.
         """
         x, y = self.to_plane.transform(point[1], point[0])
+        if not (math.isfinite(x) and math.isfinite(y)):
+            raise UnmeasurableRouteError(
+                f"lat {point[0]}, lon {point[1]} cannot be projected into the local "
+                "Transverse Mercator plane the route is solved in (S7F §7.1.2): "
+                "it is too far from the task area's centre"
+            )
         return (x, y)
 
     def lon_lat(self, xy: tuple[float, float]) -> tuple[float, float]:
@@ -222,6 +247,23 @@ class LocalPlane:
 
         Returns:
             (lon, lat) in degrees.
+
+        Raises:
+            UnmeasurableRouteError: If the planar point has no finite
+                geographic inverse — it lies thousands of kilometres out, where
+                a cylinder radius larger than the earth puts the route, or the
+                solver's lengths overflowed and it is not finite at all.
         """
         lon, lat = self.to_geo.transform(xy[0], xy[1])
+        if not (math.isfinite(lon) and math.isfinite(lat)):
+            # The plane's origin is the task area's centre (+x_0=0 +y_0=0).
+            # Past a million kilometres the figure is noise, not information.
+            out = math.hypot(*xy) / 1000
+            where = f"{out:.0f} km" if out < 1e6 else "over a million km"
+            raise UnmeasurableRouteError(
+                f"a route point {where} from the centre of the local Transverse "
+                "Mercator plane the route is solved in (S7F §7.1.2) cannot be "
+                "mapped back onto the earth: the task has a cylinder too large "
+                "to measure"
+            )
         return (lon, lat)

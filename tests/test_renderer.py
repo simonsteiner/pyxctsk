@@ -15,6 +15,7 @@ import pytest
 
 from pyxctsk import OUTPUT_FORMATS, parse_task, render_task
 from tests.corpus import reference_task, reference_tasks
+from tests.paths import TESTS_DIR
 
 
 class TestEveryRowRenders:
@@ -55,6 +56,17 @@ class TestTheTableIsTheOnlyStatementOfTheFormats:
         choices = getattr(option.type, "choices", None)
 
         assert list(choices or []) == list(OUTPUT_FORMATS)
+
+    def test_the_readmes_list_is_the_table(self):
+        """S6: the README, CLAUDE.md and `cli.py` each listed four, not five.
+
+        `geojson` was in the table and in `--help` and in none of the prose.
+        The README is the list a user reads, so it stays — held to the table.
+        """
+        readme = (TESTS_DIR.parent / "README.md").read_text(encoding="utf-8")
+        (listed,) = re.findall(r"`--format \[([^\]]*)\]`", readme)
+
+        assert listed.split("|") == list(OUTPUT_FORMATS)
 
     def test_the_task_files_extension_and_media_type_are_the_json_row_only(self):
         """No second name for them at the front door, which nothing read."""

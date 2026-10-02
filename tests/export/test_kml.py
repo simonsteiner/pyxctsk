@@ -9,6 +9,8 @@ This module verifies:
 
 import re
 
+import pytest
+
 from pyxctsk import (
     Goal,
     GoalType,
@@ -276,3 +278,48 @@ class TestDegenerateAndStyledOutput:
 
         # The goal's cylinder is red, so its centre point must be red too.
         assert kml_result.count("ff0000ff") >= 2
+
+
+class TestTextXmlCannotCarry:
+    r"""S3: a name JSON allows but XML 1.0 does not, in a KML document.
+
+    ``"a\u0001"`` is valid JSON and valid UTF-8, so the reader keeps it; KML is
+    XML 1.0, which has no way to spell most C0 controls — not even as a
+    character reference — and simplekml's pretty-printer raised
+    ``xml.parsers.expat.ExpatError``, outside the library's error hierarchy.
+    """
+
+    @staticmethod
+    def _named(name: str) -> Task:
+        task = Task(
+            task_type=TaskType.CLASSIC,
+            version=1,
+            turnpoints=[
+                Turnpoint(
+                    radius=400,
+                    waypoint=Waypoint(name=name, lat=46.5, lon=8.0, alt_smoothed=1000),
+                    type=TurnpointType.TAKEOFF,
+                ),
+                Turnpoint(
+                    radius=400,
+                    waypoint=Waypoint(name="B", lat=46.6, lon=8.1, alt_smoothed=1000),
+                ),
+            ],
+        )
+        return task
+
+    @pytest.mark.parametrize(
+        "control", ["\x00", "\x01", "\x1f", chr(0xFFFE), chr(0xFFFF)]
+    )
+    def test_each_is_replaced_not_raised(self, control):
+        """Replaced by U+FFFD, so the name still shows something was there."""
+        kml_result = task_to_kml(self._named(f"a{control}b"))
+
+        assert "<name>a\N{REPLACEMENT CHARACTER}b</name>" in kml_result
+        assert "<name>a\N{REPLACEMENT CHARACTER}b Center</name>" in kml_result
+
+    def test_what_xml_can_carry_is_left_alone(self):
+        """Tab, newline, DEL and C1 controls are XML 1.0 characters."""
+        kml_result = task_to_kml(self._named("a\tb\x7f\x85é"))
+
+        assert "<name>a\tb\x7f\x85é</name>" in kml_result

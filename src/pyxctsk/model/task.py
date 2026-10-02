@@ -17,7 +17,6 @@ Neighbouring modules hold what this one deliberately does not:
   - ``time_of_day`` — ``TimeOfDay``, shared with the QR models
 """
 
-import json
 from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Any, ClassVar
 
@@ -36,13 +35,19 @@ from .enums import (  # noqa: F401
 from .passthrough import EXTENSIONS_KEY
 from .shape import (
     DEFAULTED,
+    INTEGER,
+    LATITUDE,
+    LONGITUDE,
+    NUMBER,
     OPTIONAL_EMPTY,
     REQUIRED,
-    ROUNDED_INT,
+    TEXT,
     TIME_OF_DAY,
+    WHOLE_METRES,
     Optionality,
     Shape,
     Value,
+    dump_json,
     enum_codec,
     list_codec,
     load_json,
@@ -108,11 +113,11 @@ class Waypoint:
 WAYPOINT_SHAPE = Shape(
     Waypoint,
     (
-        Value("name", "name", optionality=REQUIRED),
-        Value("lat", "lat", optionality=REQUIRED),
-        Value("lon", "lon", optionality=REQUIRED),
-        Value("alt_smoothed", "altSmoothed", ROUNDED_INT, REQUIRED),
-        Value("description", "description", optionality=OPTIONAL_EMPTY),
+        Value("name", "name", TEXT, REQUIRED),
+        Value("lat", "lat", LATITUDE, REQUIRED),
+        Value("lon", "lon", LONGITUDE, REQUIRED),
+        Value("alt_smoothed", "altSmoothed", WHOLE_METRES, REQUIRED),
+        Value("description", "description", TEXT, OPTIONAL_EMPTY),
     ),
 )
 Waypoint.KNOWN_KEYS = WAYPOINT_SHAPE.keys
@@ -171,7 +176,7 @@ class Turnpoint:
 TURNPOINT_SHAPE = Shape(
     Turnpoint,
     (
-        Value("radius", "radius", ROUNDED_INT, REQUIRED),
+        Value("radius", "radius", WHOLE_METRES, REQUIRED),
         Value("waypoint", "waypoint", shape_codec(WAYPOINT_SHAPE), REQUIRED),
         # ``TurnpointType.NONE`` is the empty string, so "no type" and "the
         # type that means none" are the same absence to OPTIONAL_EMPTY.
@@ -381,7 +386,7 @@ GOAL_SHAPE = Shape(
     (
         Value("type", "type", enum_codec(GoalType)),
         Value("deadline", "deadline", TIME_OF_DAY),
-        Value("finish_altitude", "finishAltitude"),
+        Value("finish_altitude", "finishAltitude", NUMBER),
     ),
     ignored_keys=Goal.IGNORED_KEYS,
 )
@@ -447,10 +452,10 @@ class Task:
         passthrough design exists so that what arrives is what leaves. It went
         unnoticed because every reference task carries a goal.
 
-        Ask for this wherever the *flown* goal is meant — the cylinders, the
-        goal line, the drawing, the QR conversion. Read :attr:`goal` where what
-        the file said is meant, which is :mod:`~pyxctsk.model.validation`'s
-        whole job.
+        Ask for this wherever the *flown* goal is meant — the cylinders and the
+        goal line. Read :attr:`goal` where what the file said is meant, which
+        is :mod:`~pyxctsk.model.validation`'s whole job and the QR conversion's
+        too: it writes no ``g`` object for a task that never spelled one out.
 
         Returns:
             The goal with defaults applied, or None for a task with no
@@ -494,10 +499,7 @@ class Task:
         Returns:
             str: JSON string representation of the task.
         """
-        # Not ASCII-escaped, as the QR format's is not: a waypoint named
-        # "Zürich" is written as such rather than with a \u escape, and the
-        # CLI writes UTF-8 whatever the locale.
-        return json.dumps(self.to_dict(), separators=(",", ":"), ensure_ascii=False)
+        return dump_json(self.to_dict(), layout="compact")
 
     @classmethod
     def from_json(cls, json_str: str) -> "Task":
@@ -583,7 +585,7 @@ TASK_SHAPE = Shape(
     Task,
     (
         Value("task_type", "taskType", enum_codec(TaskType), REQUIRED),
-        Value("version", "version", optionality=REQUIRED),
+        Value("version", "version", INTEGER, REQUIRED),
         Value(
             "turnpoints",
             "turnpoints",

@@ -111,11 +111,12 @@ class TaskDrawing:
             turnpoint: One of the task's turnpoints.
 
         Returns:
-            True if this is the goal turnpoint and the task has a goal defined.
+            True if this is the task's last turnpoint, which is always its goal
+            — :attr:`Task.effective_goal` guarantees a task with turnpoints
+            has one.
         """
-        if self.task.effective_goal is None:
-            return False
-        return bool(self.task.turnpoints) and turnpoint is self.task.turnpoints[-1]
+        turnpoints = self.task.turnpoints
+        return bool(turnpoints) and turnpoint is turnpoints[-1]
 
     def outline_of(self, turnpoint: Turnpoint) -> list[tuple[float, float]]:
         """The boundary of this turnpoint's cylinder, as a closed ring.

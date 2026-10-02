@@ -1,5 +1,7 @@
 """Task to KML conversion."""
 
+import re
+
 import simplekml  # type: ignore
 
 from ..model.task import Task
@@ -23,6 +25,33 @@ ROUTE_ALPHA = 0xE6  # Course line, 90% opaque
 # `500` at the call site with a comment, beside a named constant for the first.
 TURNPOINT_ALTITUDE = 5000
 GOAL_LINE_ALTITUDE = 500
+
+#: Every character XML 1.0 has no way to spell, not even as a character
+#: reference: the C0 controls but tab, newline and carriage return, the
+#: surrogates, and U+FFFE/U+FFFF (XML 1.0 §2.2, ``Char``).
+_NOT_XML_CHAR = re.compile(
+    "[^\t\n\r\u0020-\ud7ff\ue000-\N{REPLACEMENT CHARACTER}\U00010000-\U0010ffff]"
+)
+
+
+def _xml_text(text: str) -> str:
+    r"""Return ``text`` with each character XML cannot carry replaced by U+FFFD.
+
+    A name may hold any character JSON and UTF-8 can — the reader keeps
+    ``"a\u0001"`` as text, because the full and QR formats both carry it — but
+    KML is XML 1.0, and simplekml raised ``xml.parsers.expat.ExpatError`` on
+    one, outside the library's error hierarchy. Replaced rather than refused, so
+    one stray control character costs a glyph rather than the whole map; and
+    replaced rather than dropped, so the name still shows that something was
+    there. Only KML needs this: GeoJSON is JSON.
+
+    Args:
+        text: User text bound for the document.
+
+    Returns:
+        The text, safe to hand to simplekml.
+    """
+    return _NOT_XML_CHAR.sub("\N{REPLACEMENT CHARACTER}", text)
 
 
 def _create_turnpoint_style(color: Color) -> simplekml.Style:
@@ -63,9 +92,11 @@ def _create_turnpoint_elements(
             (lon, lat, task_altitude) for lon, lat in drawing.outline_of(turnpoint)
         ]
 
+        label = _xml_text(drawing.label_of(turnpoint, i))
+
         # Create turnpoint circle as polygon
         circle_polygon = kml.newpolygon(
-            name=drawing.label_of(turnpoint, i),
+            name=label,
             description=drawing.description_of(turnpoint),
             outerboundaryis=circle_coords,
             extrude=1,
@@ -78,7 +109,7 @@ def _create_turnpoint_elements(
 
         # Add turnpoint center point, in the same colour as its cylinder.
         center_point = kml.newpoint(
-            name=f"{drawing.label_of(turnpoint, i)} Center",
+            name=f"{label} Center",
             coords=[coord],
         )
         center_point.style.iconstyle.scale = 0.5

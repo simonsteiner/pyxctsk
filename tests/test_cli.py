@@ -122,6 +122,14 @@ class TestCLIConvert:
         assert result.exit_code != 0
         assert "error" in result.output.lower()
 
+    def test_a_qr_scheme_that_is_not_utf8_is_an_error(self):
+        r"""S2: ``printf 'XCTSK:\xff' | pyxctsk convert`` printed a traceback."""
+        result = CliRunner().invoke(convert, [], input=b"XCTSK:\xff")
+
+        assert result.exit_code == 1
+        assert not isinstance(result.exception, UnicodeDecodeError)
+        assert "Error:" in result.output
+
     def test_cli_main_command(self):
         """The main help preserves examples as separate readable lines."""
         runner = CliRunner()
@@ -293,6 +301,84 @@ class TestCLIDistances:
         assert result.exit_code == 1
         assert "at least two turnpoints" in result.output
 
+    @pytest.mark.parametrize(
+        ("command", "options"),
+        [
+            (distances, []),
+            (distances, ["--format", "text"]),
+            (convert, ["--format", "kml"]),
+            (convert, ["--format", "geojson"]),
+        ],
+    )
+    def test_a_task_the_plane_cannot_hold_is_an_error(self, command, options):
+        """Two points half the globe apart: reported, not an AssertionError."""
+        payload = task(
+            turnpoint("A", 0.0, 0.0, radius=0, type=TurnpointType.SSS),
+            turnpoint("B", 0.0, 180.0, radius=0, type=TurnpointType.ESS),
+        ).to_json()
+
+        result = CliRunner().invoke(command, options, input=payload.encode())
+
+        assert result.exit_code == 1
+        assert not isinstance(result.exception, AssertionError)
+        assert "Error:" in result.output
+        assert "Transverse Mercator" in result.output
+
+    @pytest.mark.parametrize(
+        ("command", "options"),
+        [
+            (distances, []),
+            (distances, ["--format", "text"]),
+            (convert, ["--format", "kml"]),
+            (convert, ["--format", "geojson"]),
+        ],
+    )
+    def test_a_cylinder_past_the_far_side_is_an_error(self, command, options):
+        """A 10^300 m goal: reported, not measured as 2 941 637 m with exit 0."""
+        payload = task(
+            turnpoint("A", 46.0, 8.0, radius=400),
+            turnpoint("B", 46.1, 8.0, radius=10**300),
+        ).to_json()
+
+        result = CliRunner().invoke(command, options, input=payload.encode())
+
+        assert result.exit_code == 1
+        assert "Error:" in result.output
+        assert "far side of the earth" in result.output
+
+    @pytest.mark.parametrize(
+        ("command", "options"),
+        [
+            (distances, []),
+            (distances, ["--format", "text"]),
+            (convert, ["--format", "kml"]),
+            (convert, ["--format", "geojson"]),
+        ],
+    )
+    def test_a_negative_radius_is_named_not_blamed_on_the_route(self, command, options):
+        """S9: it said "route point 0 is 11.0 m outside turnpoint 0's cylinder"."""
+        payload = task(
+            turnpoint("A", 46.0, 8.0, radius=-11, type=TurnpointType.TAKEOFF),
+            turnpoint("B", 46.1, 8.0, radius=400),
+        ).to_json()
+
+        result = CliRunner().invoke(command, options, input=payload.encode())
+
+        assert result.exit_code == 1
+        assert "Error: turnpoint 0 has a negative radius (-11)" in result.output
+
+    def test_a_negative_radius_still_converts_to_the_formats_that_carry_it(self):
+        """Reading stays lenient: only measuring the cylinder refuses it."""
+        payload = task(
+            turnpoint("A", 46.0, 8.0, radius=-11, type=TurnpointType.TAKEOFF),
+            turnpoint("B", 46.1, 8.0, radius=400),
+        ).to_json()
+
+        result = CliRunner().invoke(convert, [], input=payload.encode())
+
+        assert result.exit_code == 0, result.output
+        assert parse_task(result.output).turnpoints[0].radius == -11
+
     def test_input_that_cannot_be_parsed_is_an_error(self):
         """Not a traceback."""
         result = CliRunner().invoke(distances, input=b"not a task")
@@ -341,6 +427,34 @@ class TestWritingOutput:
             assert parse_task(out.read_bytes()).turnpoints[0].waypoint.name == "Küçük"
         else:
             assert "Küçük" in out.read_text(encoding="utf-8")
+
+    @pytest.mark.parametrize(
+        "command, options",
+        [
+            (convert, ["--format", "json"]),
+            (convert, ["--format", "qrcode-json"]),
+            (convert, ["--format", "kml"]),
+            (convert, ["--format", "geojson"]),
+            (distances, ["--format", "json"]),
+        ],
+        ids=["json", "qrcode-json", "kml", "geojson", "distances"],
+    )
+    def test_every_output_writes_a_non_ascii_name_as_itself(self, command, options):
+        r"""Four JSON writers chose their own options, and two escaped ``â``.
+
+        ``json`` and ``qrcode-json`` wrote ``Château``; ``geojson`` and the
+        ``distances`` report wrote its ``â`` as ``\u00e2`` — the same JSON value,
+        two spellings, depending on which call site produced it. KML, which is not
+        JSON, is here because it is the other text output a name reaches.
+        """
+        built = parse_task(reference_task("task_bevo").xctsk_path.read_bytes())
+        built.turnpoints[0].waypoint.name = "Château"
+
+        result = CliRunner().invoke(command, options, input=built.to_json().encode())
+
+        assert result.exit_code == 0, result.output
+        assert "Château" in result.output
+        assert "\\u00e2" not in result.output
 
     def test_the_distance_report_is_writable_as_a_file(self, tmp_path):
         """Its text rendering contains §, so a non-UTF-8 locale used to refuse."""

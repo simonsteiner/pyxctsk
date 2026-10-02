@@ -19,7 +19,7 @@ import pytest
 from pyxctsk import Task, TaskType
 from pyxctsk.distance import (
     DistanceReport,
-    MeasuredTask,  # noqa: F401
+    MeasuredTask,
     TaskTurnpoint,
     TooFewTurnpointsError,
     calculate_task_distances,
@@ -277,9 +277,11 @@ class TestProjectionFromARoute:
     def test_a_task_too_short_to_have_a_distance_is_refused(self, count):
         """It used to answer 0.0 km and `turnpoints: []`.
 
-        Both are at the front door, and they gave one task two answers: the
-        table dropped the turnpoint the task did have and reported a distance
-        of zero, where the report raised. The message is the same one now.
+        The table and the report are both at the front door, and they gave one
+        task two answers: the table dropped the turnpoint the task did have and
+        reported a distance of zero, where the report raised. The table is a
+        rendering of the report now, so it refuses because the report does —
+        `tests/distance/test_report.py` pins the rule itself.
         """
         turnpoints = [turnpoint("A", 46.5, 8.0)][:count]
         task = Task(task_type=TaskType.CLASSIC, version=1, turnpoints=turnpoints)
@@ -287,7 +289,6 @@ class TestProjectionFromARoute:
         for call in (
             lambda: calculate_task_distances(task),
             lambda: task_distances_from(MeasuredTask.from_task(task)),
-            lambda: DistanceReport.from_task(task),
         ):
             with pytest.raises(TooFewTurnpointsError, match="at least two turnpoints"):
                 call()

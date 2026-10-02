@@ -146,10 +146,44 @@ class MismatchedRouteError(pyXCTSKError, ValueError):
     """
 
 
-class InvalidTimeOfDayError(pyXCTSKError):
-    """Raised when time of day format is invalid."""
+class UnmeasurableRouteError(pyXCTSKError):
+    """Raised when a task's geometry cannot be measured on its earth.
 
-    def __init__(self, time_str: str):
-        """Initialize InvalidTimeOfDayError with the invalid time string."""
+    Two owners raise it, each for the one thing it knows. S7F §7.1.2 solves a
+    route in one Transverse Mercator plane centred on the task area, and
+    :class:`~pyxctsk.distance.plane.LocalPlane` is the only way into or out of
+    it: a point a quarter of the globe from the plane's central meridian has
+    no finite planar image, and a planar point thousands of kilometres out has
+    no finite way back. Those used to surface from the solver as an
+    ``AssertionError`` about its own placements, as pyproj's ``CRSError``, or
+    as a distance of ``NaN`` metres with exit 0. And a cylinder reaching past
+    the far side of the earth has no boundary at all, which
+    :func:`~pyxctsk.distance.earth.geodesic_destination` refuses wherever a
+    point is placed on one — a route point snapped onto it, its outline, a
+    goal line's end; that used to be a finite, wrong distance with exit 0.
+
+    It is not a ``ValueError``: unlike :class:`TooFewTurnpointsError` it has
+    no earlier type to stay compatible with.
+    """
+
+
+class InvalidTimeOfDayError(pyXCTSKError, ValueError):
+    """Raised when a time of day is not one.
+
+    Both of ``TimeOfDay``'s refusals raise it — a spelling that is not
+    ``HH:MM:SSZ``, and a field out of range — in one wording. The second used
+    to be a bare ``ValueError``, so ``ValueError`` is kept for the reason
+    :class:`TooFewTurnpointsError` states.
+
+    Attributes:
+        time_str: The value that is not a time, as it arrived — usually a
+            string, but whatever the wire carried for one that is not.
+        reason: Why it is not one. Defaults to the spelling, the one reason
+            the parser has.
+    """
+
+    def __init__(self, time_str: object, reason: str = "expected HH:MM:SSZ"):
+        """Initialize with the value that is not a time, and why."""
         self.time_str = time_str
-        super().__init__(f"invalid time: {time_str!r}")
+        self.reason = reason
+        super().__init__(f"invalid time {time_str!r}: {reason}")

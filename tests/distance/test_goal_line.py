@@ -20,6 +20,7 @@ from pyxctsk import (
     TaskType,
     Turnpoint,
     TurnpointType,
+    UnmeasurableRouteError,
     Waypoint,
 )
 from pyxctsk.distance import geodesic_distance
@@ -305,6 +306,26 @@ class TestGoalLineEarthModel:
                 assert measured == pytest.approx(goal_line.length / 2, abs=0.01), (
                     f"{earth_model}: endpoint is not half the line from the goal"
                 )
+
+    @pytest.mark.parametrize("earth_model", [None, EarthModel.FAI_SPHERE])
+    def test_a_line_longer_than_the_earth_has_no_ends(self, earth_model):
+        """A LINE goal is a point to the optimizer, so only its drawing can fail.
+
+        Half of a 2 x 10^300 m line, walked from the goal, went round the earth
+        and stopped somewhere — two finite endpoints and a control zone that
+        were nowhere near the line the task declares.
+        """
+        task = _line_goal_task(goal_radius=10**300)
+        task.earth_model = earth_model
+        goal_line = GoalLine.from_task(task)
+        assert goal_line is not None
+
+        with pytest.raises(UnmeasurableRouteError, match="far side of the earth"):
+            goal_line.endpoints()
+        with pytest.raises(UnmeasurableRouteError, match="far side of the earth"):
+            _semicircle_arc(
+                goal_line.center, 0.0, goal_line.control_zone_radius, earth_model
+            )
 
     def test_the_two_models_disagree_enough_to_matter(self):
         """The models place the endpoints tens of metres apart on a long line."""

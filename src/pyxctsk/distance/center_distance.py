@@ -148,7 +148,18 @@ def center_distance(
 
     Raises:
         ValueError: If ``reading`` is not a :class:`CenterDistanceReading`.
+        TaskValidationError: Under
+            :attr:`~CenterDistanceReading.LAUNCH_TO_GOAL_BOUNDARY`, which reads
+            the goal's radius, if any turnpoint's radius is negative.
     """
+    # Two centres make the first leg. Not ``report.MIN_TURNPOINTS_FOR_DISTANCE``
+    # read across, though the number is the same: that is the report's
+    # *refusal*, checked before the report ever asks this, while this function
+    # is public and answers any task, so too short a task is a reading that
+    # does not apply — None, the "n/a" ``center_distance_readings()`` reports —
+    # not an error. The START_TO_GOAL slice below asks the same question of a
+    # shorter list. (``report`` imports this module, so reading its constant
+    # would also be a cycle.)
     turnpoints = task.turnpoints
     if len(turnpoints) < 2:
         return None
@@ -214,6 +225,10 @@ def center_distance_readings(task: Task) -> dict[str, float | None]:
     Returns:
         One entry per :class:`CenterDistanceReading`, in metres, with None for
         any that does not apply to this task.
+
+    Raises:
+        TaskValidationError: If any turnpoint's radius is negative, as
+            :func:`center_distance` raises for the goal-boundary reading.
     """
     return {
         reading.value: center_distance(task, reading)

@@ -4,25 +4,18 @@ Provides endpoints for task data retrieval, KML export, comparison, and task lis
 """
 
 from flask import Blueprint, Response, abort, jsonify, make_response
-
-try:
-    from pyxctsk import (
-        OUTPUT_FORMATS,
-        TaskDrawing,
-        drawing_to_geojson,
-        load_task,
-        task_distances_from,
-    )
-
-    XCTRACK_AVAILABLE = True
-except ImportError as e:
-    print(f"Warning: xctrack module not available: {e}")
-    XCTRACK_AVAILABLE = False
-
 from shared import (
     XCTSK_DIR,
     load_task_data,
     prepare_comparison_data,
+)
+
+from pyxctsk import (
+    OUTPUT_FORMATS,
+    TaskDrawing,
+    drawing_to_geojson,
+    load_task,
+    task_distances_from,
 )
 
 api_bp: Blueprint = Blueprint("api", __name__)
@@ -118,18 +111,15 @@ def kml_task_api(task_name: str) -> Response | tuple[Response, int]:
     Returns:
         Response: Flask response with KML data and appropriate headers, or error message and status code.
     """
-    if not XCTRACK_AVAILABLE:
-        return json_error("XCTrack module not available", 500)
-
     # Load and parse XCTSK file
     xctsk_path = XCTSK_DIR / f"{task_name}.xctsk"
     if not xctsk_path.exists():
         return json_error("XCTSK file not found", 404)
 
-    fmt = OUTPUT_FORMATS["kml"]  # type: ignore
+    fmt = OUTPUT_FORMATS["kml"]
     try:
-        task = load_task(xctsk_path)  # type: ignore
-        response = make_response(fmt.render(task, False))  # type: ignore
+        task = load_task(xctsk_path)
+        response = make_response(fmt.render(task, False))
         response.mimetype = fmt.media_type
         response.headers["Content-Disposition"] = (
             f"attachment; filename={task_name}{fmt.extension}"
@@ -152,9 +142,6 @@ def compare_task_api(task_name: str) -> Response | tuple[Response, int]:
     Returns:
         Response: Flask JSON response with comparison data, or error message and status code.
     """
-    if not XCTRACK_AVAILABLE:
-        return json_error("XCTrack module not available", 500)
-
     # Load original task data
     json_data, geojson_data = load_task_data(task_name)
     if not json_data:
@@ -166,15 +153,13 @@ def compare_task_api(task_name: str) -> Response | tuple[Response, int]:
         return json_error("XCTSK file not found", 404)
 
     try:
-        task = load_task(xctsk_path)  # type: ignore
+        task = load_task(xctsk_path)
         # One drawing: the table and the map share a single optimized route.
-        drawing = TaskDrawing.from_task(task)  # type: ignore
+        drawing = TaskDrawing.from_task(task)
         # `.as_dict()`: the table is a value now, and this consumer wants the
         # dictionary rendering it has always read.
-        distance_results = task_distances_from(  # type: ignore
-            drawing.measured
-        ).as_dict()
-        xctrack_geojson = drawing_to_geojson(drawing)  # type: ignore
+        distance_results = task_distances_from(drawing.measured).as_dict()
+        xctrack_geojson = drawing_to_geojson(drawing)
         comparison_data = prepare_comparison_data(json_data, distance_results, task)
 
         return jsonify(

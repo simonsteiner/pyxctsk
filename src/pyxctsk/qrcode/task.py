@@ -27,7 +27,6 @@ This module provides:
 
 import base64
 import binascii
-import json
 import zlib
 from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Any, Mapping, MutableMapping
@@ -37,12 +36,13 @@ from ..model.enums import EarthModel, TaskType
 from ..model.passthrough import QR_EXTENSIONS_KEY
 from ..model.shape import (
     DEFAULTED,
-    LENIENT_INT,
+    INTEGER,
     Discriminator,
     Field,
     Optionality,
     Shape,
     Value,
+    dump_json,
     list_codec,
     load_json,
     require_object,
@@ -214,7 +214,7 @@ class QRCodeTask:
         Returns:
             Compact JSON string suitable for QR code embedding
         """
-        return json.dumps(self.to_dict(), separators=(",", ":"), ensure_ascii=False)
+        return dump_json(self.to_dict(), layout="compact")
 
     def as_waypoints(self) -> "QRCodeTask":
         """Return this task as an XC/Waypoints one.
@@ -356,6 +356,10 @@ class _CompetitionTaskType(Field):
     task is the *other* shape, named by ``T``. So the key is read leniently,
     because older payloads did spell the waypoints type here (as ``WAYPOINTS``
     or ``W``), and written as the one constant this shape means.
+
+    Lenient about spellings, not about values: anything else is refused as the
+    full format refuses it. It used to read as absent, so ``"taskType": "FOO"``
+    was re-written as ``CLASSIC`` with the value lost.
     """
 
     @property
@@ -366,11 +370,13 @@ class _CompetitionTaskType(Field):
     def read(self, data: Mapping[str, Any]) -> dict[str, Any]:
         """Accept either spelling of either type, or neither."""
         raw = data.get("taskType")
+        if raw is None:
+            return {}
         if raw == "CLASSIC":
             return {"task_type": TaskType.CLASSIC}
         if raw in ("WAYPOINTS", "W"):
             return {"task_type": TaskType.WAYPOINTS}
-        return {}
+        raise MalformedPayloadError(f"{raw!r} is not a valid TaskType")
 
     def write(self, obj: Any, result: MutableMapping[str, Any]) -> None:
         """Write the only value this shape defines."""
@@ -442,7 +448,7 @@ _A_LIST_OR_NOTHING = Optionality(
 #: ``e``: WGS84 is 0 (the default, so never written) and the FAI sphere 1 — an
 #: integer a producer may have written as a string.
 EARTH_MODEL_WIRE = {EarthModel.WGS84: 0, EarthModel.FAI_SPHERE: 1}
-_EARTH_MODEL = wire_int_codec(EARTH_MODEL_WIRE, lenient=True)
+_EARTH_MODEL = wire_int_codec(EARTH_MODEL_WIRE)
 
 #: The competition shape, in the key order tools.xcontest.org emits.
 QR_TASK_SHAPE = Shape(
@@ -459,7 +465,7 @@ QR_TASK_SHAPE = Shape(
         _CompetitionTaskType(),
         _TakeoffTimes(),
         Value("earth_model", "e", _EARTH_MODEL, _NON_DEFAULT_EARTH_MODEL),
-        Value("version", "version", LENIENT_INT, DEFAULTED),
+        Value("version", "version", INTEGER, DEFAULTED),
     ),
     ext_key=QR_EXTENSIONS_KEY,
 )
@@ -469,7 +475,7 @@ QR_WAYPOINTS_TASK_SHAPE = Shape(
     QRCodeTask,
     (
         Discriminator("T", "W", "task_type", TaskType.WAYPOINTS),
-        Value("version", "V", LENIENT_INT, DEFAULTED),
+        Value("version", "V", INTEGER, DEFAULTED),
         Value(
             "turnpoints",
             "t",

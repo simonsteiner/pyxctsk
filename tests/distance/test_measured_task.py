@@ -16,7 +16,9 @@ from pyxctsk import (
     MismatchedRouteError,
     Task,
     TaskType,
+    TaskValidationError,
     TurnpointType,
+    UnmeasurableRouteError,
 )
 from pyxctsk.distance import (
     MeasuredTask,
@@ -25,8 +27,10 @@ from pyxctsk.distance import (
     task_distances_from,
     task_to_turnpoints,
 )
+from pyxctsk.distance.earth import geodesic_distance
 from pyxctsk.distance.goal_line import GoalLine
 from pyxctsk.distance.speed_section import SpeedSection
+from pyxctsk.model.validation import ValidationRule
 from tests.builders import task, turnpoint
 from tests.corpus import reference_task
 
@@ -256,3 +260,211 @@ class TestTheConstructorChecksThePair:
     def test_the_cylinders_are_not_an_argument(self):
         """Derived from the task, so they cannot come from somewhere else."""
         assert "turnpoints" not in inspect.signature(MeasuredTask).parameters
+
+
+class TestARouteThePlaneCannotHoldIsRefused:
+    """A task the local Transverse Mercator plane cannot represent is an error.
+
+    Every case here is a task ``Task.validate()`` accepts. The route is solved
+    in one plane centred on the task area (S7F §7.1.2, §7.1.6), and a
+    Transverse Mercator plane cannot hold a point a quarter of the globe from
+    its central meridian, nor map a planar point thousands of kilometres out
+    back onto the earth. These used to leave as a bare ``AssertionError`` from
+    the solver ("_INITIAL_PLACEMENTS is never empty"), as pyproj's
+    ``CRSError`` for a projection centred on ``lon_0=nan``, or — worst — as a
+    report of ``NaN`` metres with exit 0.
+    """
+
+    @pytest.mark.parametrize(
+        ("course", "cause"),
+        [
+            pytest.param(
+                [(0.0, 0.0, 0), (0.0, 180.0, 0)],
+                "projected",
+                id="half-the-globe-apart",
+            ),
+            pytest.param(
+                [(0.0, 0.0, 0), (0.0, 179.9, 400)],
+                "projected",
+                id="nearly-half-the-globe-apart",
+            ),
+            pytest.param(
+                [(46.0, 8.0, 0), (46.1, 8.1, 10**300)],
+                "mapped back",
+                id="huge-radius-was-a-crs-error",
+            ),
+            pytest.param(
+                [(46.0, 8.0, 0), (46.1, 8.1, 20_000_000), (46.2, 8.0, 0)],
+                "mapped back",
+                id="radius-past-half-the-earth-was-nan-metres",
+            ),
+            pytest.param(
+                [(46.0, 8.0, 0), (46.1, 8.1, 10**308), (46.2, 8.0, 0)],
+                "mapped back",
+                id="radius-overflowing-the-planar-length",
+            ),
+        ],
+    )
+    def test_it_is_refused_naming_the_plane(self, course, cause):
+        """One library error, saying which way the projection failed."""
+        unmeasurable = task(
+            *(
+                turnpoint(
+                    f"P{i}",
+                    lat,
+                    lon,
+                    radius=radius,
+                    type=(
+                        TurnpointType.SSS
+                        if i == 0
+                        else TurnpointType.ESS
+                        if i == len(course) - 1
+                        else None
+                    ),
+                )
+                for i, (lat, lon, radius) in enumerate(course)
+            )
+        )
+        assert unmeasurable.validate() == []
+
+        with pytest.raises(UnmeasurableRouteError, match=cause) as raised:
+            MeasuredTask.from_task(unmeasurable)
+
+        assert "Transverse Mercator" in str(raised.value)
+
+
+class TestACylinderPastTheFarSideOfTheEarthIsRefused:
+    """A cylinder reaching past the far side of the earth has no boundary.
+
+    The plane refuses what it cannot represent, but a route point placed far
+    out *along its central meridian* is representable: a meridian is a closed
+    curve, so the inverse projection wraps round it and returns a finite point.
+    The snap onto the boundary (§7.1.7) then walked the radius round the earth
+    too. Every shape here used to report a finite distance with exit 0.
+    """
+
+    @pytest.mark.parametrize("model", [None, EarthModel.FAI_SPHERE])
+    @pytest.mark.parametrize(
+        "course",
+        [
+            pytest.param([(46.0, 8.0, 400), (46.1, 8.0, 10**300)], id="goal-1e300"),
+            pytest.param(
+                [(46.0, 8.0, 400), (46.1, 8.0, 25_000_000)], id="goal-25000km"
+            ),
+            pytest.param(
+                [(46.0, 8.0, 400), (46.1, 8.0, 400), (46.2, 8.0, 30_000_000)],
+                id="third-of-three-30000km",
+            ),
+        ],
+    )
+    def test_it_is_refused(self, course, model):
+        """Not 2 941 637 m, nor any other number."""
+        unmeasurable = task(
+            *(
+                turnpoint(
+                    f"P{i}",
+                    lat,
+                    lon,
+                    radius=radius,
+                    type=(
+                        TurnpointType.SSS
+                        if i == 0
+                        else TurnpointType.ESS
+                        if i == len(course) - 1
+                        else None
+                    ),
+                )
+                for i, (lat, lon, radius) in enumerate(course)
+            )
+        )
+        unmeasurable.earth_model = model
+        assert unmeasurable.validate() == []
+
+        with pytest.raises(UnmeasurableRouteError, match="far side of the earth"):
+            MeasuredTask.from_task(unmeasurable)
+
+    @pytest.mark.parametrize("radius", [45_000_000, 10**300], ids=["45000km", "1e300"])
+    def test_a_middle_cylinder_is_refused_on_the_sphere(self, radius):
+        """Measured 9 939 253 m and 9 699 152 m before."""
+        unmeasurable = task(
+            turnpoint("A", 46.0, 8.0, radius=400),
+            turnpoint("B", 46.1, 8.0, radius=radius),
+            turnpoint("C", 46.2, 8.0, radius=400),
+        )
+        unmeasurable.earth_model = EarthModel.FAI_SPHERE
+
+        with pytest.raises(UnmeasurableRouteError, match="far side of the earth"):
+            MeasuredTask.from_task(unmeasurable)
+
+    @pytest.mark.parametrize(
+        ("model", "radius"),
+        [
+            (None, 10_000_000),
+            (EarthModel.FAI_SPHERE, 10_000_000),
+            (EarthModel.FAI_SPHERE, 20_000_000),
+        ],
+    )
+    def test_a_cylinder_short_of_the_far_side_still_measures(self, model, radius):
+        """From inside a goal cylinder the route runs straight out to its edge.
+
+        The takeoff lies on the goal's meridian, so the edge is the radius less
+        the distance between the centres — exactly, on either earth.
+        """
+        inside = task(
+            turnpoint("A", 46.0, 8.0, radius=400),
+            turnpoint("B", 46.1, 8.0, radius=radius),
+        )
+        inside.earth_model = model
+
+        measured = MeasuredTask.from_task(inside)
+
+        apart = geodesic_distance((46.0, 8.0), (46.1, 8.0), model)
+        assert measured.route.total_m == pytest.approx(radius - apart, abs=0.01)
+
+    def test_the_takeoff_radius_is_not_touched_so_it_is_not_refused(self):
+        """ADR 0002: the route starts at the takeoff's centre whatever its size."""
+        huge = task(
+            turnpoint("A", 46.0, 8.0, radius=10**300),
+            turnpoint("B", 46.1, 8.0, radius=400),
+        )
+        small = task(
+            turnpoint("A", 46.0, 8.0, radius=0),
+            turnpoint("B", 46.1, 8.0, radius=400),
+        )
+
+        assert (
+            MeasuredTask.from_task(huge).route.total_m
+            == MeasuredTask.from_task(small).route.total_m
+        )
+
+
+class TestANegativeRadiusIsNamed:
+    """S9: ``"radius": -11`` was reported as a route that does not fit.
+
+    ``MismatchedRouteError`` said route point 0 was 11.0 m outside turnpoint
+    0's cylinder — blaming the optimizer for the task. A cylinder cannot have a
+    negative radius, which is the rule ``Task.validate()`` already states, so
+    measuring refuses with that rule's issue rather than a second wording.
+    """
+
+    @pytest.mark.parametrize("index", [0, 1, 3])
+    def test_every_role_is_refused_with_the_validation_rule(self, index):
+        """The takeoff and the goal too: no role makes a negative size mean one."""
+        measured = _race_task()
+        measured.turnpoints[index].radius = -11
+
+        with pytest.raises(TaskValidationError) as caught:
+            MeasuredTask.from_task(measured)
+
+        (issue,) = caught.value.issues
+        assert issue.rule is ValidationRule.NEGATIVE_RADIUS
+        assert str(issue) == f"turnpoint {index} has a negative radius (-11)"
+
+    def test_a_negative_line_goal_is_refused_too(self):
+        """Its cylinder is a point, but the radius it declares is still a size."""
+        line = _race_task()
+        line.goal = Goal(type=GoalType.LINE)
+        line.turnpoints[-1].radius = -400
+
+        with pytest.raises(TaskValidationError, match="negative radius"):
+            task_to_turnpoints(line)

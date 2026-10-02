@@ -5,6 +5,15 @@ implements the [XCTrack Competition Interfaces](https://xctrack.org/Competition_
 specification and FAI Sporting Code S7F. Each file is dated and kept as written —
 superseded reviews stay for history rather than being edited. Newest first.
 
+- [2026-10-02 — The field table checks containers, and nothing owns a scalar](2026-10-02-deepening-candidates.md)
+  — **6 candidates, 8 smaller findings, all open;** the status table in the file is the
+  backlog. Every finding on the four Strong candidates is a reproduced live defect. The
+  headline: the 2026-09-27 review made the field table refuse a wrong *container*, but a
+  scalar is still read four different ways or not checked at all. `"radius":"inf"` crashes
+  every command, `"lat":true` reports 4 996 km, and junk in a QR `z` reads as coordinates
+  in the Gulf of Guinea. Also: `DistanceReport.from_measured_task` answers 0.0 for the
+  one-turnpoint task its sibling refuses, and an antipodal task trips a bare
+  `AssertionError` in the solver.
 - [2026-09-27 — Deepening candidates after the solver deepening](2026-09-27-deepening-candidates.md)
   — **all eight candidates and all eight smaller findings applied;** a Progress table in
   the file records each commit and which of them break the API. Scoped by churn since the

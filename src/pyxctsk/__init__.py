@@ -62,6 +62,7 @@ from .exceptions import (
     MismatchedRouteError,
     MissingQRCodeSupportError,
     TaskValidationError,
+    UnmeasurableRouteError,
     pyXCTSKError,
 )
 from .export.common import TaskDrawing
@@ -152,6 +153,7 @@ __all__ = [
     "TooFewTurnpointsError",
     "Turnpoint",
     "TurnpointType",
+    "UnmeasurableRouteError",
     "ValidationIssue",
     "ValidationRule",
     "Waypoint",

@@ -130,6 +130,9 @@ class SpeedSection:
             one whose ESS precedes its SSS. The last is a task
             :meth:`~pyxctsk.Task.validate` already reports as invalid
             (``SSS_AFTER_ESS``); there is no honest number to return for it.
+
+        Raises:
+            TaskValidationError: If a turnpoint's radius is negative.
         """
         # The *task type* decides whether there is a speed section at all, not
         # the turnpoint roles. An XC/Waypoints task is "a simple route from

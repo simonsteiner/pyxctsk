@@ -22,29 +22,13 @@ from shared import (
     prepare_comparison_data,
 )
 
-# Add the xctrack module to the path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
-
-# Initialize function variables with proper typing
-load_task: Optional[Callable[[Any], Any]] = None
-task_distances_from: Optional[Callable[..., Dict[str, Any]]] = None
-generate_task_geojson: Optional[Callable[[Any], Dict[Any, Any]]] = None
-drawing_to_geojson: Optional[Callable[[Any], Dict[Any, Any]]] = None
-TaskDrawing: Optional[Any] = None
-
-try:
-    from pyxctsk import (
-        TaskDrawing,
-        drawing_to_geojson,
-        generate_task_geojson,
-        load_task,
-        task_distances_from,
-    )
-
-    XCTRACK_AVAILABLE = True
-except ImportError as e:
-    print(f"Warning: xctrack module not available: {e}")
-    XCTRACK_AVAILABLE = False
+from pyxctsk import (
+    TaskDrawing,
+    drawing_to_geojson,
+    generate_task_geojson,
+    load_task,
+    task_distances_from,
+)
 
 # Add task_viewer and its subdirectories to path to import AirScore utilities
 task_viewer_path = Path(__file__).parent
@@ -96,7 +80,6 @@ def index():
     return render_template(
         "index.html",
         tasks=tasks,
-        xctrack_available=XCTRACK_AVAILABLE,
         airscore_available=AIRSCORE_AVAILABLE,
         url_prefix="task_viewer.",
     )
@@ -145,33 +128,27 @@ def compare_task(task_name: str):
 
     Raises:
         werkzeug.exceptions.NotFound: If the task or XCTSK file is missing.
-        werkzeug.exceptions.InternalServerError: If the XCTrack module is not available.
     """
-    if not XCTRACK_AVAILABLE:
-        abort(500, "XCTrack module not available for calculations")
-
     # Load original task data
     json_data, geojson_data = load_task_data(task_name)
     if not json_data:
         abort(404, "Task data not found")
 
-    # Load and parse XCTSK file using xctrack module
+    # Load and parse the XCTSK file
     xctsk_path = XCTSK_DIR / f"{task_name}.xctsk"
     if not xctsk_path.exists():
         abort(404, "XCTSK file not found")
 
     try:
-        # Parse task using xctrack
-        task = load_task(xctsk_path)  # type: ignore
+        # Parse the task with pyxctsk
+        task = load_task(xctsk_path)
 
         # One drawing: the table and the map share a single optimized route.
-        drawing = TaskDrawing.from_task(task)  # type: ignore
+        drawing = TaskDrawing.from_task(task)
         # `.as_dict()`: the table is a value now, and this consumer wants the
         # dictionary rendering it has always read.
-        distance_results = task_distances_from(  # type: ignore
-            drawing.measured
-        ).as_dict()
-        xctrack_geojson = drawing_to_geojson(drawing)  # type: ignore
+        distance_results = task_distances_from(drawing.measured).as_dict()
+        xctrack_geojson = drawing_to_geojson(drawing)
 
         # Prepare comparison data
         comparison_data = prepare_comparison_data(json_data, distance_results, task)
@@ -212,27 +189,23 @@ def geojson_debug_task(task_name: str):
 
     Raises:
         werkzeug.exceptions.NotFound: If the task or XCTSK file is missing.
-        werkzeug.exceptions.InternalServerError: If the XCTrack module is not available.
     """
-    if not XCTRACK_AVAILABLE:
-        abort(500, "XCTrack module not available for calculations")
-
     # Load original task data
     json_data, geojson_data = load_task_data(task_name)
     if not json_data:
         abort(404, "Task data not found")
 
-    # Load and parse XCTSK file using xctrack module
+    # Load and parse the XCTSK file
     xctsk_path = XCTSK_DIR / f"{task_name}.xctsk"
     if not xctsk_path.exists():
         abort(404, "XCTSK file not found")
 
     try:
-        # Parse task using xctrack
-        task = load_task(xctsk_path)  # type: ignore
+        # Parse the task with pyxctsk
+        task = load_task(xctsk_path)
 
         # Generate XCTrack GeoJSON data with debug information
-        xctrack_geojson = generate_task_geojson(task)  # type: ignore
+        xctrack_geojson = generate_task_geojson(task)
 
         return render_template(
             "geojson_debug_view.html",
@@ -274,14 +247,14 @@ def airscore_task(task_name: str):
             url_prefix="task_viewer.",
         )
 
-    # Load and parse XCTSK file using xctrack module
+    # Load and parse the XCTSK file
     xctsk_path = XCTSK_DIR / f"{task_name}.xctsk"
     if not xctsk_path.exists():
         abort(404, "XCTSK file not found")
 
     try:
-        # Parse task using xctrack
-        task = load_task(xctsk_path)  # type: ignore
+        # Parse the task with pyxctsk
+        task = load_task(xctsk_path)
 
         # Calculate distances using AirScore clone
         airscore_results = calculate_airscore_distances(task)  # type: ignore

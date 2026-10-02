@@ -20,12 +20,6 @@
 
 {% block content %}
 <div class="container py-5">
-    {% if not xctrack_available %}
-    <div class="alert alert-danger" role="alert">
-        <strong>Error:</strong> XCTrack module is not available. Please ensure the xctrack module is properly installed.
-    </div>
-    {% endif %}
-
     <div class="row mb-4">
         <div class="col">
             <h1>Available Tasks</h1>
@@ -60,11 +54,7 @@
                     <div class="row">
                         {% for task in tasks %}
                         <div class="col-md-3 col-sm-4 col-6 mb-3">
-                            {% if xctrack_available %}
                             <a href="/task/{{ task }}" class="btn btn-outline-primary w-100">{{ task }}</a>
-                            {% else %}
-                            <button class="btn btn-outline-secondary w-100" disabled>{{ task }}</button>
-                            {% endif %}
                         </div>
                         {% endfor %}
                     </div>

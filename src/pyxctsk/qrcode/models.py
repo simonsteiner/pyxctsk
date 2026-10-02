@@ -16,6 +16,7 @@ same class and each reads exactly what it writes.
 from dataclasses import dataclass, field
 from typing import Any, ClassVar, Mapping, MutableMapping
 
+from ..exceptions import MalformedPayloadError
 from ..model.enums import (
     OBSOLETE_DIRECTION_DEFAULT,
     Direction,
@@ -26,9 +27,15 @@ from ..model.enums import (
 from ..model.passthrough import QR_EXTENSIONS_KEY
 from ..model.shape import (
     DEFAULTED,
+    INTEGER,
+    LATITUDE,
+    LONGITUDE,
+    NUMBER,
     OPTIONAL_EMPTY,
     REQUIRED,
+    TEXT,
     TIME_OF_DAY,
+    WHOLE_METRES,
     Field,
     Optionality,
     Shape,
@@ -104,7 +111,7 @@ QR_GOAL_SHAPE = Shape(
     QRCodeGoal,
     (
         Value("deadline", "d", TIME_OF_DAY),
-        Value("finish_altitude", "fa"),
+        Value("finish_altitude", "fa", NUMBER),
         Value("type", "t", wire_int_codec(GOAL_TYPE_WIRE)),
     ),
 )
@@ -271,8 +278,9 @@ class QRCodeTurnpoint:
             QRCodeTurnpoint instance
 
         Raises:
-            MalformedPayloadError: If ``z`` or ``n`` is missing, or ``z`` does
-                not decode to three or four numbers.
+            MalformedPayloadError: If ``z`` or ``n`` is missing, ``z`` is
+                not a polyline string, or it does not decode to three or four
+                numbers.
         """
         return QR_TURNPOINT_SHAPE.read(data)
 
@@ -288,7 +296,10 @@ class _PolylineCoordinates(Field):
 
     Reading does not depend on which shape asked: the number count says which
     encoding it is, so a three-number ``z`` in a competition payload is a
-    waypoint turnpoint with radius 0 rather than an error.
+    waypoint turnpoint with radius 0 rather than an error. The count is the
+    only check made here — whether ``z`` is a polyline at all is the
+    decoder's, so a truncated competition turnpoint is refused there rather
+    than counted as a waypoint.
 
     Attributes:
         with_radius: Whether this shape's ``z`` carries the fourth number.
@@ -303,7 +314,7 @@ class _PolylineCoordinates(Field):
 
     def read(self, data: Mapping[str, Any]) -> dict[str, Any]:
         """Decode ``z`` into the four coordinate attributes."""
-        nums = decode_nums(data["z"])
+        nums = decode_nums(TEXT.from_wire(data["z"]))
         if len(nums) == 4:
             lon, lat, alt_smoothed, radius = (
                 nums[0] / 1e5,
@@ -318,11 +329,13 @@ class _PolylineCoordinates(Field):
             raise ValueError(
                 f'turnpoint "z" must hold 3 or 4 numbers, got {len(nums)}: {data["z"]!r}'
             )
+        # The full format's rules for the same four values: a polyline can
+        # decode to a point off the earth, or to an integer no float can hold.
         return {
-            "lon": lon,
-            "lat": lat,
-            "alt_smoothed": alt_smoothed,
-            "radius": radius,
+            "lon": LONGITUDE.from_wire(lon),
+            "lat": LATITUDE.from_wire(lat),
+            "alt_smoothed": WHOLE_METRES.from_wire(alt_smoothed),
+            "radius": WHOLE_METRES.from_wire(radius),
         }
 
     def write(self, obj: Any, result: MutableMapping[str, Any]) -> None:
@@ -335,19 +348,35 @@ class _PolylineCoordinates(Field):
             result["z"] = encode_waypoint_turnpoint(obj.lon, obj.lat, obj.alt_smoothed)
 
 
+def _no_turnpoint_type(raw: Any) -> bool:
+    """Whether a QR ``t`` says "no type": absent, null, or the integer 0.
+
+    The integer is read by :data:`INTEGER`, the rule every other wire integer
+    follows, so ``"0"`` is no type exactly as ``0`` is; it used to be refused
+    as ``'0' is not one of [1, 2, 3]``. What ``INTEGER`` refuses — ``false``,
+    say — is not absent either, and the codec then says why.
+    """
+    if raw is None:
+        return True
+    try:
+        return bool(INTEGER.from_wire(raw) == 0)
+    except MalformedPayloadError:
+        return False
+
+
 #: TAKEOFF is a type this format knows but does not spell: only SSS and ESS
 #: carry a ``t``, and a turnpoint without one is an ordinary turnpoint. So is
 #: one whose ``t`` is 0, the value the format uses for "no type".
 _SPEED_SECTION_ONLY = Optionality(
-    absent=lambda raw: raw is None or (raw == 0 and not isinstance(raw, bool)),
+    absent=_no_turnpoint_type,
     omit=lambda value: value not in (TurnpointType.SSS, TurnpointType.ESS),
 )
 
 QR_TURNPOINT_SHAPE = Shape(
     QRCodeTurnpoint,
     (
-        Value("description", "d", optionality=OPTIONAL_EMPTY),
-        Value("name", "n", optionality=REQUIRED),
+        Value("description", "d", TEXT, OPTIONAL_EMPTY),
+        Value("name", "n", TEXT, REQUIRED),
         Value("type", "t", wire_int_codec(TURNPOINT_TYPE_WIRE), _SPEED_SECTION_ONLY),
         _PolylineCoordinates(with_radius=True),
     ),
@@ -359,7 +388,7 @@ QRCodeTurnpoint.KNOWN_KEYS = QR_TURNPOINT_SHAPE.keys
 QR_WAYPOINT_TURNPOINT_SHAPE = Shape(
     QRCodeTurnpoint,
     (
-        Value("name", "n", optionality=REQUIRED),
+        Value("name", "n", TEXT, REQUIRED),
         _PolylineCoordinates(with_radius=False),
     ),
     ext_key=QR_EXTENSIONS_KEY,

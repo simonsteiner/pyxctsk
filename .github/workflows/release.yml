@@ -1,8 +1,9 @@
 name: Release 🚀
 
 # Manually triggered from the GitHub UI (Actions → Release → Run workflow) on
-# main. Runs the CI gate, bumps the version, rolls the CHANGELOG, commits, tags
-# and pushes, then dispatches publish.yml at the tag. Publishing lives only in
+# main. Runs the CI gate, makes the release commit and tag with
+# scripts/prepare_release.sh (the sequence scripts/release.sh runs too), pushes
+# both, then dispatches publish.yml at the tag. Publishing lives only in
 # publish.yml: a tag pushed with GITHUB_TOKEN does not start workflows, but a
 # workflow_dispatch does, so the PyPI trusted publisher covers publish.yml alone.
 
@@ -52,43 +53,32 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Bump version
-        id: bump
+      # The release sequence scripts/release.sh runs too: it refuses a tag that
+      # exists on origin, rolls the CHANGELOG (stopping on an empty
+      # [Unreleased] section), sets the version, checks the notes and title
+      # publish.yml will read, then commits and tags. It pushes nothing, and
+      # on failure leaves the checkout as it found it.
+      - name: Commit and tag the release
+        id: release
         env:
           BUMP: ${{ inputs.bump }}
         run: |
-          uv version --bump "$BUMP" --no-sync
-          version="$(uv version --short)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          version="$(scripts/prepare_release.sh "$BUMP")"
           echo "version=$version" >> "$GITHUB_OUTPUT"
-
-      # Before anything is pushed: an empty [Unreleased] section, or a version
-      # that already has one, stops the release here, and the notes and title
-      # publish.yml will need must be readable.
-      - name: Roll CHANGELOG [Unreleased] into a dated release
-        env:
-          VERSION: ${{ steps.bump.outputs.version }}
-        run: |
-          python3 scripts/changelog_extract.py roll "$VERSION"
-          python3 scripts/changelog_extract.py "$VERSION" > /dev/null
-          python3 scripts/changelog_extract.py --title "$VERSION"
 
       # --atomic: main and the tag land together or not at all. The push is
       # rejected if main moved since this run started.
-      - name: Commit, tag, and push
+      - name: Push main and the tag
         env:
-          VERSION: ${{ steps.bump.outputs.version }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add pyproject.toml uv.lock CHANGELOG.md
-          git commit -m "release v$VERSION"
-          git tag -a "v$VERSION" -m "Version $VERSION"
-          git push --atomic origin HEAD:main "v$VERSION"
+          VERSION: ${{ steps.release.outputs.version }}
+        run: git push --atomic origin HEAD:main "v$VERSION"
 
       - name: Dispatch publish
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.bump.outputs.version }}
+          VERSION: ${{ steps.release.outputs.version }}
         run: |
           gh workflow run publish.yml --ref "v$VERSION"
           echo "Released v$VERSION; publishing in [publish.yml]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/workflows/publish.yml)." >> "$GITHUB_STEP_SUMMARY"

@@ -4,16 +4,20 @@ These tests exercise the planar solver through its two entry points and the
 TurnpointGeometry seam that lets route orchestration use lightweight fakes.
 """
 
+import math
 from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
 from pyproj import CRS, Transformer
 
+from pyxctsk import EarthModel, UnmeasurableRouteError
 from pyxctsk.distance import OptimizedRoute
 from pyxctsk.distance.earth import (
     FAI_SPHERE_RADIUS_M,
+    geodesic_destination,
     geodesic_distance,
+    snap_to_boundary,
 )
 from pyxctsk.distance.plane import LocalPlane, ltm_scale_factor, task_area_center
 from pyxctsk.distance.route_optimization import (
@@ -194,6 +198,81 @@ class TestLtmScaleFactor:
 
         assert x == pytest.approx(x_unscaled * ltm_scale_factor(46.0), rel=1e-12)
         assert x != pytest.approx(x_unscaled, rel=1e-9)
+
+
+class TestThePlaneRefusesWhatItCannotRepresent:
+    """``LocalPlane`` is the only way into and out of the plane, so it refuses.
+
+    A Transverse Mercator projection has no finite image for a point 90° of
+    longitude from its central meridian on the equator, and no finite inverse
+    for a planar point far beyond the earth.
+    """
+
+    def test_a_point_off_the_plane_is_refused_going_in(self):
+        """A point on the equator 90° from the central meridian has no image."""
+        plane = LocalPlane.around([(0.0, 0.0)])
+
+        with pytest.raises(UnmeasurableRouteError, match="cannot be projected"):
+            plane.xy((0.0, 90.0))
+
+    def test_a_point_off_the_earth_is_refused_coming_back(self):
+        """A planar point 10^300 m out has no geographic inverse."""
+        plane = LocalPlane.around([(46.0, 8.0)])
+
+        with pytest.raises(UnmeasurableRouteError, match="cannot be mapped back"):
+            plane.lon_lat((1e300, 0.0))
+
+    def test_a_non_finite_planar_point_is_refused_coming_back(self):
+        """What the solver returns when its lengths overflowed."""
+        plane = LocalPlane.around([(46.0, 8.0)])
+
+        with pytest.raises(UnmeasurableRouteError, match="cannot be mapped back"):
+            plane.lon_lat((math.inf, math.nan))
+
+
+class TestNoPointLiesPastTheFarSideOfTheEarth:
+    """``geodesic_destination`` refuses a distance the earth does not have.
+
+    pyproj walks a geodesic for as long as it is asked to, past the antipode
+    and round again, and returns wherever it stopped. A cylinder that reaches
+    past the far side of the earth has no boundary there, so every point
+    placed on one — a route point snapped onto it (§7.1.7), an outline, a goal
+    line's end — was somewhere else, finite and wrong: a 10^300 m goal
+    cylinder measured 2 941 637 m with exit 0.
+    """
+
+    @pytest.mark.parametrize("model", [None, EarthModel.FAI_SPHERE])
+    @pytest.mark.parametrize("distance", [2.5e7, 4.5e7, 1e300])
+    def test_a_distance_past_the_far_side_is_refused(self, model, distance):
+        """Past half the meridian (WGS84) or half the great circle (sphere)."""
+        with pytest.raises(UnmeasurableRouteError, match="far side of the earth"):
+            geodesic_destination((46.1, 8.0), 180.0, distance, model)
+
+    @pytest.mark.parametrize("model", [None, EarthModel.FAI_SPHERE])
+    def test_a_distance_short_of_the_far_side_is_reached(self, model):
+        """20 000 km due south of 46.1°N lands on the other side, that far away."""
+        lon, lat = geodesic_destination((46.1, 8.0), 180.0, 2e7, model)
+
+        assert geodesic_distance((46.1, 8.0), (lat, lon), model) == pytest.approx(
+            2e7, abs=1e-3
+        )
+
+    def test_a_negative_distance_walks_the_other_way(self):
+        """Not "past the far side": a negative goal-line radius drew before.
+
+        What a negative radius means is S9's question; this one only refuses
+        a distance no point on the earth lies at.
+        """
+        backward = geodesic_destination((46.1, 8.0), 90.0, -400.0)
+
+        assert backward == pytest.approx(
+            geodesic_destination((46.1, 8.0), 270.0, 400.0)
+        )
+
+    def test_the_snap_onto_a_boundary_refuses_it_too(self):
+        """§7.1.7 places a point at exactly the radius, so it cannot here."""
+        with pytest.raises(UnmeasurableRouteError, match="far side of the earth"):
+            snap_to_boundary((8.0, 46.0), (46.1, 8.0), 1e300)
 
 
 class TestTaskAreaCenter:

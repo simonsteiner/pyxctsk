@@ -25,7 +25,7 @@ from dataclasses import asdict, dataclass
 from functools import cached_property
 from typing import Any
 
-from ..exceptions import TooFewTurnpointsError  # noqa: F401  (re-exported)
+from ..exceptions import TooFewTurnpointsError
 from ..metadata import pyxctsk_version
 from ..model.task import Task
 from .center_distance import (
@@ -45,14 +45,23 @@ S7F_EDITION = "2026 V1.0"
 #: One turnpoint has no leg, so there is no route and no distance — the library
 #: used to answer 0.0 and only the CLI knew to refuse.
 #:
-#: The rule has one owner because the library used to give one task two
-#: answers: ``DistanceReport.from_task`` raised while
-#: ``calculate_task_distances`` — also at the front door — returned 0.0 km and
-#: ``turnpoints: []``, dropping the one turnpoint the task did have.
+#: :class:`DistanceReport` checks it at construction, so every way of building
+#: a report — and the distance table rendered from one — refuses alike. It was
+#: once a copy in each of two entry points, and ``from_measured_task``, the
+#: third, had none: it reported a one-turnpoint task as 0.0 m.
+#: :class:`~pyxctsk.distance.MeasuredTask` deliberately does not check it — a
+#: drawing of a one-turnpoint task is still a drawing.
 MIN_TURNPOINTS_FOR_DISTANCE = 2
 
-#: What refusing says. One message, since two shapes now refuse.
+#: What refusing says; the CLI prints it verbatim.
 TOO_FEW_TURNPOINTS_MESSAGE = "a task needs at least two turnpoints to have a distance."
+
+
+def _require_distance(turnpoint_count: int) -> None:
+    """Refuse a task of ``turnpoint_count`` turnpoints if it has no leg."""
+    if turnpoint_count < MIN_TURNPOINTS_FOR_DISTANCE:
+        raise TooFewTurnpointsError(TOO_FEW_TURNPOINTS_MESSAGE)
+
 
 #: What each published number is, and which section defines it. Carried with
 #: the report because "not defined by S7F" is the single most important thing
@@ -120,11 +129,24 @@ class DistanceReport:
     :meth:`as_text`. The numbers are all projections of :attr:`measured` and
     :attr:`speed_section`, so the two renderings read one set of values.
 
+    A task with fewer than :data:`MIN_TURNPOINTS_FOR_DISTANCE` turnpoints has
+    no report: the constructor refuses it, so no way of building one skips the
+    check.
+
     Attributes:
         measured: The task and the route measured for it.
+
+    Raises:
+        TooFewTurnpointsError: If the task has fewer than
+            :data:`MIN_TURNPOINTS_FOR_DISTANCE` turnpoints, which leaves no leg
+            to measure.
     """
 
     measured: MeasuredTask
+
+    def __post_init__(self) -> None:
+        """Refuse a task too short to have a distance."""
+        _require_distance(len(self.measured.turnpoints))
 
     @cached_property
     def speed_section(self) -> SpeedSection | None:
@@ -152,10 +174,13 @@ class DistanceReport:
             TooFewTurnpointsError: If the task has fewer than
                 :data:`MIN_TURNPOINTS_FOR_DISTANCE` turnpoints, which leaves no
                 leg to measure.
+            UnmeasurableRouteError: If the task's route cannot be solved in
+                its local plane (see :meth:`MeasuredTask.from_task`).
         """
-        if len(task.turnpoints) < MIN_TURNPOINTS_FOR_DISTANCE:
-            raise TooFewTurnpointsError(TOO_FEW_TURNPOINTS_MESSAGE)
-        return cls.from_measured_task(MeasuredTask.from_task(task))
+        # Counted before measuring, so a task too short to have a distance is
+        # told so rather than whatever measuring it would have failed on.
+        _require_distance(len(task.turnpoints))
+        return cls(measured=MeasuredTask.from_task(task))
 
     @classmethod
     def from_measured_task(cls, measured: MeasuredTask) -> "DistanceReport":
@@ -166,6 +191,11 @@ class DistanceReport:
 
         Returns:
             The report.
+
+        Raises:
+            TooFewTurnpointsError: If the task has fewer than
+                :data:`MIN_TURNPOINTS_FOR_DISTANCE` turnpoints, which leaves no
+                leg to measure.
         """
         return cls(measured=measured)
 
