@@ -19,7 +19,7 @@ import pytest
 from pyxctsk import Task, TaskType
 from pyxctsk.distance import (
     DistanceReport,
-    MeasuredTask,  # noqa: F401
+    MeasuredTask,
     TaskTurnpoint,
     TooFewTurnpointsError,
     calculate_task_distances,
