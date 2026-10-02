@@ -49,6 +49,7 @@ The backlog, in rank order. After the scan only three parts of this file change:
 | [S12](#s12--the-solver-warns-before-the-plane-refuses) | The solver warns before the plane refuses | — | maintainability | dropped | `refactor/smaller-findings-2026-10-02` | | | found in C4; does not reproduce on the stack top: no OptimizeWarning from the CLI or the library under -W always (checked 2026-10-02) |
 | [S13](#s13--the-json-writer-writes-nan) | The JSON writer writes `NaN` | — | maintainability | todo | | | | found in C5 |
 | [S14](#s14--deeply-nested-json-escapes-as-recursionerror) | Deeply nested JSON escapes as `RecursionError` | — | maintainability | todo | | | | found in C5 review |
+| [S15](#s15--passthrough-text-is-not-held-to-text) | Passthrough text is not held to `TEXT` | — | maintainability | todo | | | | found in C1 review |
 
 Strength: 🟢 Strong · 🟡 Worth exploring · ⚪ Speculative · 🔴 live defect (a bug reproduced during the scan).
 Status: `todo` · `in-progress` · `pr-open` · `merged` · `blocked` · `dropped`. `blocked` and `dropped` always carry a reason in Notes.
@@ -499,6 +500,12 @@ A task built in code with `lat=float("nan")` serializes as `"lat":NaN`, which is
 `src/pyxctsk/model/shape.py` (`load_json`), `src/pyxctsk/parser.py` (`Input.of`) · *found while reviewing C5*
 
 `printf '%s' "$(python3 -c 'print("["*100000)')" | pyxctsk convert` prints a `RecursionError` traceback from `json.loads`, outside `pyXCTSKError`: `load_json` and the parser catch `ValueError` only. Same on the base branch. `load_json` is now the one reader, so catching it there and raising `MalformedPayloadError` would cover every path.
+
+### S15 · Passthrough text is not held to `TEXT`
+
+`src/pyxctsk/model/passthrough.py` (`read_passthrough`) · *found while reviewing C1*
+
+C1's `TEXT` refuses a lone surrogate in every spec field, but an unknown key's value — and an extension's — is read unchecked and written back verbatim, so a root `"x": "\ud800"` still makes `pyxctsk convert --format json` die with an uncaught `UnicodeEncodeError`, outside `pyXCTSKError`. `kml`, `geojson` and `qrcode-json` don't write the key, so they succeed. Same on `main`. Holding passthrough keys and string values (nested too) to the same UTF-8 rule in `read_passthrough`, refused with a path, would close it.
 
 <details>
 <summary>Decisions</summary>
