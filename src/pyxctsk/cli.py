@@ -16,7 +16,6 @@ Features:
 See project README for usage examples and supported formats.
 """
 
-import json
 import sys
 from typing import BinaryIO
 
@@ -25,6 +24,7 @@ import click
 from .distance.report import DistanceReport
 from .exceptions import pyXCTSKError
 from .metadata import pyxctsk_version
+from .model.shape import dump_json
 from .parser import parse_task
 from .renderer import OUTPUT_FORMATS, render_task
 
@@ -267,7 +267,7 @@ def distances(
         report = DistanceReport.from_task(parse_task(input_data, strict=strict))
         _write_output(
             output_file,
-            json.dumps(report.as_dict(), indent=2)
+            dump_json(report.as_dict(), layout="indented")
             if output_format == "json"
             else report.as_text(),
         )

@@ -428,6 +428,34 @@ class TestWritingOutput:
         else:
             assert "Küçük" in out.read_text(encoding="utf-8")
 
+    @pytest.mark.parametrize(
+        "command, options",
+        [
+            (convert, ["--format", "json"]),
+            (convert, ["--format", "qrcode-json"]),
+            (convert, ["--format", "kml"]),
+            (convert, ["--format", "geojson"]),
+            (distances, ["--format", "json"]),
+        ],
+        ids=["json", "qrcode-json", "kml", "geojson", "distances"],
+    )
+    def test_every_output_writes_a_non_ascii_name_as_itself(self, command, options):
+        r"""Four JSON writers chose their own options, and two escaped ``â``.
+
+        ``json`` and ``qrcode-json`` wrote ``Château``; ``geojson`` and the
+        ``distances`` report wrote its ``â`` as ``\u00e2`` — the same JSON value,
+        two spellings, depending on which call site produced it. KML, which is not
+        JSON, is here because it is the other text output a name reaches.
+        """
+        built = parse_task(reference_task("task_bevo").xctsk_path.read_bytes())
+        built.turnpoints[0].waypoint.name = "Château"
+
+        result = CliRunner().invoke(command, options, input=built.to_json().encode())
+
+        assert result.exit_code == 0, result.output
+        assert "Château" in result.output
+        assert "\\u00e2" not in result.output
+
     def test_the_distance_report_is_writable_as_a_file(self, tmp_path):
         """Its text rendering contains §, so a non-UTF-8 locale used to refuse."""
         out = tmp_path / "report.txt"

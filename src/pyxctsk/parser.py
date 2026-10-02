@@ -44,7 +44,6 @@ Functions:
     load_task(path: str | os.PathLike) -> Task: Read a file, then parse it.
 """
 
-import json
 import os
 from dataclasses import dataclass
 from typing import Any, Callable
@@ -57,6 +56,7 @@ from .exceptions import (
     MissingQRCodeSupportError,
     TaskValidationError,
 )
+from .model.shape import load_json
 from .model.task import TASK_SHAPE, Task
 from .qrcode.image import read_qrcode_image
 from .qrcode.task import (
@@ -150,8 +150,8 @@ class Input:
         document: Any = _NOT_JSON
         if text is not None:
             try:
-                document = json.loads(text)
-            except ValueError:
+                document = load_json(text)
+            except MalformedPayloadError:
                 document = _NOT_JSON
 
         return cls(raw=raw, text=text, document=document)

@@ -38,6 +38,7 @@ from typing import Callable
 
 from .export.geojson import generate_task_geojson
 from .export.kml import task_to_kml
+from .model.shape import dump_json
 from .model.task import Task
 from .qrcode.image import generate_qrcode_image
 
@@ -58,9 +59,7 @@ def _render_kml(task: Task, compressed: bool) -> str:
 
 def _render_geojson(task: Task, compressed: bool) -> str:
     """The same map as a GeoJSON FeatureCollection."""
-    import json
-
-    return json.dumps(generate_task_geojson(task))
+    return dump_json(generate_task_geojson(task), layout="line")
 
 
 def _qr_string(task: Task, compressed: bool) -> str:

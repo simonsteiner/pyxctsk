@@ -27,7 +27,6 @@ This module provides:
 
 import base64
 import binascii
-import json
 import zlib
 from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Any, Mapping, MutableMapping
@@ -43,6 +42,7 @@ from ..model.shape import (
     Optionality,
     Shape,
     Value,
+    dump_json,
     list_codec,
     load_json,
     require_object,
@@ -214,7 +214,7 @@ class QRCodeTask:
         Returns:
             Compact JSON string suitable for QR code embedding
         """
-        return json.dumps(self.to_dict(), separators=(",", ":"), ensure_ascii=False)
+        return dump_json(self.to_dict(), layout="compact")
 
     def as_waypoints(self) -> "QRCodeTask":
         """Return this task as an XC/Waypoints one.

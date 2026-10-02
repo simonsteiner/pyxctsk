@@ -17,7 +17,6 @@ Neighbouring modules hold what this one deliberately does not:
   - ``time_of_day`` — ``TimeOfDay``, shared with the QR models
 """
 
-import json
 from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Any, ClassVar
 
@@ -48,6 +47,7 @@ from .shape import (
     Optionality,
     Shape,
     Value,
+    dump_json,
     enum_codec,
     list_codec,
     load_json,
@@ -499,10 +499,7 @@ class Task:
         Returns:
             str: JSON string representation of the task.
         """
-        # Not ASCII-escaped, as the QR format's is not: a waypoint named
-        # "Zürich" is written as such rather than with a \u escape, and the
-        # CLI writes UTF-8 whatever the locale.
-        return json.dumps(self.to_dict(), separators=(",", ":"), ensure_ascii=False)
+        return dump_json(self.to_dict(), layout="compact")
 
     @classmethod
     def from_json(cls, json_str: str) -> "Task":
