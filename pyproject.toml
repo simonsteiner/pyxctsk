@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "pyxctsk"
 version = "0.7.0"
-description = "Python implementation of XCTrack's task format"
+description = "Python library & CLI for XCTrack .xctsk competition tasks: read/write, XCTSK/XCTSKZ QR codes, and reference FAI S7F distance calculations"
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
