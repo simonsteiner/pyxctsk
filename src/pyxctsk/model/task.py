@@ -36,10 +36,15 @@ from .enums import (  # noqa: F401
 from .passthrough import EXTENSIONS_KEY
 from .shape import (
     DEFAULTED,
+    INTEGER,
+    LATITUDE,
+    LONGITUDE,
+    NUMBER,
     OPTIONAL_EMPTY,
     REQUIRED,
-    ROUNDED_INT,
+    TEXT,
     TIME_OF_DAY,
+    WHOLE_METRES,
     Optionality,
     Shape,
     Value,
@@ -108,11 +113,11 @@ class Waypoint:
 WAYPOINT_SHAPE = Shape(
     Waypoint,
     (
-        Value("name", "name", optionality=REQUIRED),
-        Value("lat", "lat", optionality=REQUIRED),
-        Value("lon", "lon", optionality=REQUIRED),
-        Value("alt_smoothed", "altSmoothed", ROUNDED_INT, REQUIRED),
-        Value("description", "description", optionality=OPTIONAL_EMPTY),
+        Value("name", "name", TEXT, REQUIRED),
+        Value("lat", "lat", LATITUDE, REQUIRED),
+        Value("lon", "lon", LONGITUDE, REQUIRED),
+        Value("alt_smoothed", "altSmoothed", WHOLE_METRES, REQUIRED),
+        Value("description", "description", TEXT, OPTIONAL_EMPTY),
     ),
 )
 Waypoint.KNOWN_KEYS = WAYPOINT_SHAPE.keys
@@ -171,7 +176,7 @@ class Turnpoint:
 TURNPOINT_SHAPE = Shape(
     Turnpoint,
     (
-        Value("radius", "radius", ROUNDED_INT, REQUIRED),
+        Value("radius", "radius", WHOLE_METRES, REQUIRED),
         Value("waypoint", "waypoint", shape_codec(WAYPOINT_SHAPE), REQUIRED),
         # ``TurnpointType.NONE`` is the empty string, so "no type" and "the
         # type that means none" are the same absence to OPTIONAL_EMPTY.
@@ -381,7 +386,7 @@ GOAL_SHAPE = Shape(
     (
         Value("type", "type", enum_codec(GoalType)),
         Value("deadline", "deadline", TIME_OF_DAY),
-        Value("finish_altitude", "finishAltitude"),
+        Value("finish_altitude", "finishAltitude", NUMBER),
     ),
     ignored_keys=Goal.IGNORED_KEYS,
 )
@@ -583,7 +588,7 @@ TASK_SHAPE = Shape(
     Task,
     (
         Value("task_type", "taskType", enum_codec(TaskType), REQUIRED),
-        Value("version", "version", optionality=REQUIRED),
+        Value("version", "version", INTEGER, REQUIRED),
         Value(
             "turnpoints",
             "turnpoints",

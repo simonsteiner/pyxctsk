@@ -145,6 +145,15 @@ window is one value across two.
 The name a field goes by in a format. The same concept has two: a turnpoint's
 type is `type` in the full format and `t` in the QR one.
 
+**Wire scalar**:
+A single value under a wire key — not an object, not a list. Each has a kind,
+and each kind one rule for what it accepts: a number (finite, never a boolean,
+possibly spelled as a string), whole metres (a number rounded to the metre), an
+integer, a latitude or longitude (a number on the earth), and text (a string
+every output can carry). A value outside its kind's rule is a malformed payload,
+not a value to be found wrong later.
+_Avoid_: primitive, raw value
+
 **Unknown key**:
 A key a shape does not define. Carried back out verbatim and never interpreted,
 because real producers put data outside the format and dropping it loses a

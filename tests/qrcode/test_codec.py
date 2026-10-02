@@ -797,6 +797,6 @@ class TestAnUnreadableSectionIsCarriedNotEaten:
 
     def test_a_row_that_reads_what_it_declares_carries_nothing(self):
         """The default, and why every other row is unaffected."""
-        from pyxctsk.model.shape import OPTIONAL, Value
+        from pyxctsk.model.shape import NUMBER, OPTIONAL, Value
 
-        assert Value("goal", "g", optionality=OPTIONAL).unread({"g": 7}) == ()
+        assert Value("goal", "g", NUMBER, OPTIONAL).unread({"g": 7}) == ()

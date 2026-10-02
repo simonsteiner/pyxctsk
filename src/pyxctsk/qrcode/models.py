@@ -26,9 +26,14 @@ from ..model.enums import (
 from ..model.passthrough import QR_EXTENSIONS_KEY
 from ..model.shape import (
     DEFAULTED,
+    LATITUDE,
+    LONGITUDE,
+    NUMBER,
     OPTIONAL_EMPTY,
     REQUIRED,
+    TEXT,
     TIME_OF_DAY,
+    WHOLE_METRES,
     Field,
     Optionality,
     Shape,
@@ -104,7 +109,7 @@ QR_GOAL_SHAPE = Shape(
     QRCodeGoal,
     (
         Value("deadline", "d", TIME_OF_DAY),
-        Value("finish_altitude", "fa"),
+        Value("finish_altitude", "fa", NUMBER),
         Value("type", "t", wire_int_codec(GOAL_TYPE_WIRE)),
     ),
 )
@@ -318,11 +323,13 @@ class _PolylineCoordinates(Field):
             raise ValueError(
                 f'turnpoint "z" must hold 3 or 4 numbers, got {len(nums)}: {data["z"]!r}'
             )
+        # The full format's rules for the same four values: a polyline can
+        # decode to a point off the earth, or to an integer no float can hold.
         return {
-            "lon": lon,
-            "lat": lat,
-            "alt_smoothed": alt_smoothed,
-            "radius": radius,
+            "lon": LONGITUDE.from_wire(lon),
+            "lat": LATITUDE.from_wire(lat),
+            "alt_smoothed": WHOLE_METRES.from_wire(alt_smoothed),
+            "radius": WHOLE_METRES.from_wire(radius),
         }
 
     def write(self, obj: Any, result: MutableMapping[str, Any]) -> None:
@@ -346,8 +353,8 @@ _SPEED_SECTION_ONLY = Optionality(
 QR_TURNPOINT_SHAPE = Shape(
     QRCodeTurnpoint,
     (
-        Value("description", "d", optionality=OPTIONAL_EMPTY),
-        Value("name", "n", optionality=REQUIRED),
+        Value("description", "d", TEXT, OPTIONAL_EMPTY),
+        Value("name", "n", TEXT, REQUIRED),
         Value("type", "t", wire_int_codec(TURNPOINT_TYPE_WIRE), _SPEED_SECTION_ONLY),
         _PolylineCoordinates(with_radius=True),
     ),
@@ -359,7 +366,7 @@ QRCodeTurnpoint.KNOWN_KEYS = QR_TURNPOINT_SHAPE.keys
 QR_WAYPOINT_TURNPOINT_SHAPE = Shape(
     QRCodeTurnpoint,
     (
-        Value("name", "n", optionality=REQUIRED),
+        Value("name", "n", TEXT, REQUIRED),
         _PolylineCoordinates(with_radius=False),
     ),
     ext_key=QR_EXTENSIONS_KEY,

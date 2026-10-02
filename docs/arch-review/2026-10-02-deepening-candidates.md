@@ -29,13 +29,13 @@ The backlog, in rank order. After the scan only three parts of this file change:
 
 | ID | Deepening | Strength | Lens | Status | Branch | PR | Breaking | Notes |
 |---|---|---|---|---|---|---|---|---|
-| [C1](#c1--one-owner-for-a-wire-scalar) | One owner for a wire scalar | 🟢 Strong · 🔴 live defect | deepening | in-progress | `refactor/wire-scalars` | | | batch 2026-10-02: C1 → C2 → C3 → C4 |
+| [C1](#c1--one-owner-for-a-wire-scalar) | One owner for a wire scalar | 🟢 Strong · 🔴 live defect | deepening | pr-open | `refactor/wire-scalars` | | yes | batch 2026-10-02: C1 → C2 → C3 → C4 |
 | [C2](#c2--the-distance-report-owns-the-two-turnpoint-minimum) | The distance report owns the two-turnpoint minimum | 🟢 Strong · 🔴 live defect | deepening | todo | `refactor/report-owns-minimum` | | | |
 | [C3](#c3--the-polyline-decoder-owns-its-own-validity) | The polyline decoder owns its own validity | 🟢 Strong · 🔴 live defect | deepening | todo | `refactor/polyline-decoder-validity` | | | |
 | [C4](#c4--the-solver-refuses-a-route-it-cannot-measure) | The solver refuses a route it cannot measure | 🟢 Strong · 🔴 live defect | deepening | todo | `refactor/unmeasurable-route` | | | builds on C1 |
 | [C5](#c5--one-json-writer) | One JSON writer | 🟡 Worth exploring | maintainability | todo | `refactor/one-json-writer` | | | |
 | [C6](#c6--one-release-sequence) | One release sequence | 🟡 Worth exploring | maintainability | todo | `refactor/one-release-sequence` | | | |
-| [S1](#s1--qr-tasktype-swallows-an-unknown-value) | QR `taskType` swallows an unknown value | — | maintainability | todo | rides with C1 | | | |
+| [S1](#s1--qr-tasktype-swallows-an-unknown-value) | QR `taskType` swallows an unknown value | — | maintainability | pr-open | rides with C1 (`refactor/wire-scalars`) | | yes | |
 | [S2](#s2--the-qr-recognizer-decodes-twice-and-is-not-total) | The QR recognizer decodes twice and is not total | — | maintainability | todo | `refactor/smaller-findings-2026-10-02` | | | |
 | [S3](#s3--kml-leaks-an-expaterror) | KML leaks an `ExpatError` | — | maintainability | todo | `refactor/smaller-findings-2026-10-02` | | | |
 | [S4](#s4--timeofday-raises-two-types-and-wraps-its-message-twice) | `TimeOfDay` raises two types and wraps its message twice | — | maintainability | todo | `refactor/smaller-findings-2026-10-02` | | | |
@@ -121,6 +121,22 @@ flowchart LR
 
 <details>
 <summary>Decisions</summary>
+
+- Q1 — Where does a scalar's rule live, and behind what seam? → as module-level `Codec` values in `model/shape.py` beside `list_codec` and `enum_codec`, raising `MalformedPayloadError`; no new seam, because `Value.read` already sends every value through `codec.from_wire` inside `_read_at`, which attaches the path — `turnpoints[1].radius: expected a finite number, got 'inf'` came out with no change to the traversal.
+- Q2 — Which kinds? → `NUMBER`, `WHOLE_METRES`, `INTEGER`, `LATITUDE`, `LONGITUDE`, `TEXT`, because those six cover every scalar `Value` row in both formats (`grep 'Value("'` over `src/`: names and descriptions are text, `lat`/`lon` coordinates, `radius`/`altSmoothed` whole metres, `version`/`V` and the five wire-integer tables integers, `finishAltitude`/`fa` a number); time-of-day and enums already had a single owner each.
+- Q3 — Does `Value` keep a pass-through default codec? → no: `codec` is required and `IDENTITY` is deleted, because the ten rows that relied on the default (full: `name`, `lat`, `lon`, `description`, `version`, `finishAltitude`; QR: `fa`, `d`, two `n`) are exactly the ten unchecked scalars behind the card's reproductions.
+- Q4 — Is a number spelled as a string accepted, and for which kinds? → for every number kind, written back as a number, and `wire_int_codec`'s `lenient=` flag is deleted, because Burnair's `"radius": "700"` (`tests/model/test_task.py`) and the QR `version`/`e` strings (read by `int(str(...))` before `447e294`) are the real-world precedents, and a per-row flag is the drift being removed. `"lat": "46"` used to parse and raise `TypeError` in `plane.py`; it now reads as 46. "Spelled as a string" means JSON's own number grammar, not Python's `int()`/`float()`, which also read `" 700 "`, `"1_000"` and `"٣"` (Arabic-Indic three) — found in review.
+- Q5 — Does `NUMBER` normalize `int` to `float`? → no, JSON's int/float is kept, because the corpus is written back byte-for-byte: `pyxctsk convert` (json, qrcode-json, `-z`) and `distances` (json, text) over all 26 `.xctsk` files under `tests/data/reference_tasks` and the 24 expected QR strings — 178 outputs — are identical to the base branch.
+- Q6 — Is a JSON boolean a number? → never, for any kind, because `"lat": true` was read as 1°N and reported a 4 996 226 m task with exit 0, and `ROUNDED_INT` accepted `true` as 1.
+- Q7 — What counts as finite? → whatever a float can hold: `NaN`, `Infinity` (which Python's `json` reads) and an integer beyond float range are refused, because `"inf"` and `1e400` escaped as `OverflowError` from every command and `math.isfinite(10**400)` itself raises `OverflowError`.
+- Q8 — Are coordinates range-checked at read? → yes, closed `[-90, 90]` and `[-180, 180]`, and the QR `z` row applies the same two codecs to what it decodes, because `"lat": 95` reaches the solver's `assert` (C4's reproduction, whose card says C1 refuses it) and every corpus coordinate is in range (golden outputs identical).
+- Q9 — Is `2.0` an integer? → no, as `LENIENT_INT` already refused it, because no fixture or producer writes a version as a float and accepting it would widen what the table writes back (`2.0`).
+- Q10 — Is a non-string name coerced to text? → refused, not coerced, because `str(123)` would quietly change the value round-tripped; a lone surrogate is refused because `convert` raised `UnicodeEncodeError` writing it. Control characters stay text here: they are valid JSON and UTF-8, and only KML refuses them (S3).
+- Q11 — The full-format `version`? → `INTEGER`, because `"version": "1"` under `--strict` reported `this format defines version 1, the task declares 1`; it now reads as 1 and `version: true` is refused rather than written back as `true`.
+- Q12 — S1: what does an unknown QR `taskType` do? → raise `'FOO' is not a valid TaskType`, the full format's wording; `null` stays absent, because all 60 `taskType` values in `tests/data` are `CLASSIC` (`grep -oE '"taskType": ?"[^"]*"'`), so no real input changes, and the value was being lost on re-write.
+- Q13 — Does `_READ_ERRORS` change? → no: `OverflowError` is not added, because the scalar codecs raise `MalformedPayloadError` themselves; a sweep of 24 scalar paths × 14 bad values (336 parses, both formats, QR `z` included) shows every input is either refused at read or survives json, qrcode-json, kml, geojson and the distance report.
+- Q14 — Dependency category and test surface? → `in-process`; tests at the parser interface (`tests/conformance/test_parser_diagnostics.py`: the card's six reproductions, S1, and the sweep) plus the six rules at the codec interface (`tests/model/test_shape.py`); the `IDENTITY`/`ROUNDED_INT`/`LENIENT_INT` tests are replaced, because those codecs are gone.
+- Q15 — One-way door? → no: no key, spelling or default the library writes changes (golden outputs identical); what changes is reading — values that crashed or were silently wrong are refused, and numeric strings in more places are read as numbers. Breaking for the `model.shape` API (three codecs and `lenient=` removed, `Value` needs a codec) and for inputs such as `"name": 123` that `convert` used to pass through.
 
 </details>
 
@@ -394,3 +410,6 @@ The docstring says a section runs to the next `## [` heading; the code stops at 
 ## Departures
 
 <!-- filled during implementation: where a PR deliberately differs from this report, and why -->
+
+- **C1 · the QR `z` row reads through the scalar codecs too.** The card names the `Value` rows; the polyline row decodes the same four values the full format reads as `lat`, `lon`, `altSmoothed` and `radius`, so it reads them through `LATITUDE`, `LONGITUDE` and `WHOLE_METRES` rather than keeping a second, absent rule — review found a `z` radius of 10**400 parsed and raised `OverflowError` from `distances`. That touches `qrcode/models.py`'s `_PolylineCoordinates`, which C3 also changes — but only its decoder call, not these checks.
+- **C1 · numeric strings are read, not refused.** The CAUTION lists `"lat":"46"` and `"version":"1"` among the failures, which reads as if they should be refused; they are now read as the numbers they spell (Q4, Q11), because the radius already was (Burnair, v0.6.1) and one rule per kind cannot accept the spelling for a radius and refuse it for a latitude. The spelling must be JSON's number grammar.
