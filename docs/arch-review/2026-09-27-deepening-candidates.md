@@ -7,7 +7,7 @@ visual report: [`2026-09-27-deepening-candidates.html`](2026-09-27-deepening-can
 
 Written in the deep-module vocabulary — **module, interface, implementation, depth, seam,
 adapter, leverage, locality** — and the domain vocabulary of
-[`../../CONTEXT.md`](../../CONTEXT.md). Nothing recorded as applied by an earlier review is
+[`../../GLOSSARY.md`](../../GLOSSARY.md). Nothing recorded as applied by an earlier review is
 re-reported. Every claim about behaviour was reproduced by running the library.
 
 **All eight candidates and all eight smaller findings are applied** — see
