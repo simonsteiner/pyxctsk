@@ -222,7 +222,7 @@ class TaskDrawing:
         The two writers disagreed: KML wrote "Course Line" and GeoJSON wrote
         "Optimized Route" for the same line, each pinned as expected by a test
         in its own file, so the suite enforced the divergence. This is the
-        glossary's term (``CONTEXT.md``: *optimized route*), which is what
+        glossary's term (``GLOSSARY.md``: *optimized route*), which is what
         makes it the one to keep.
 
         Returns:

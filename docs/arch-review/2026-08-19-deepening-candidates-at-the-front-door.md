@@ -7,7 +7,7 @@ green. Companion visual report:
 
 Written in the deep-module vocabulary — **module, interface, implementation, depth, seam,
 adapter, leverage, locality** — and in the domain vocabulary of
-[`../../CONTEXT.md`](../../CONTEXT.md). Nothing recorded as applied by the
+[`../../GLOSSARY.md`](../../GLOSSARY.md). Nothing recorded as applied by the
 [2026-08-17](2026-08-17-deepening-candidates.md),
 [2026-08-18](2026-08-18-deepening-candidates-after-s7f.md) or
 [2026-08-19](2026-08-19-pre-release-code-quality-review.md) reviews is re-reported; every
