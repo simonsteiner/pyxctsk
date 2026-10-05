@@ -3,9 +3,7 @@
 
 [global]
 # MD013: the docs keep a paragraph, table row or link on one line.
-# MD038: `## ` with its space is the heading prefix the release tooling
-# matches; trimming it inside the code span changes what the text says.
-disable = ["MD013", "MD038"]
+disable = ["MD013"]
 # Changelog versions each repeat Added / Changed / Fixed; only siblings must differ.
 [MD024]
 siblings_only = true
@@ -18,3 +16,8 @@ allowed_elements = ["details", "summary", "br"]
 [per-file-ignores]
 # Its italic provenance lines under the title are a byline, not headings.
 "docs/arch-review/2025-06-07-competition-interfaces-analysis.md" = ["MD036"]
+# MD038: it quotes `## `, the heading prefix the release tooling matches, in a
+# table row and a heading, where an inline disable would break the row or the
+# anchor; trimming the space changes what the text says. CHANGELOG.md's one
+# such span carries an inline disable instead.
+"docs/arch-review/2026-10-02-deepening-candidates.md" = ["MD038"]
