@@ -49,7 +49,7 @@ duplicate-collapse fix from over-reaching.
 Every `task1`–`task8` carries an `"o"` object at two levels, byte-identical
 across the set:
 
-```
+```text
 root          "o": {"v": 2, "fa": 1220}      in all 8
 per-turnpoint "o": {"a1": 180}               on all 61 turnpoints
 ```
@@ -110,7 +110,7 @@ tasks — the only fixtures here with independent distance figures.
 Through-centers matches exactly (146.1 km and 58.3 km). The optimized route
 matches on **every leg but the first**:
 
-```
+```text
 seeyou-finish-1220   ours 0.23 23.34 10.59 13.64 12.20 16.60 5.30   = 81.89 km
                    SeeYou 0.0  23.3  10.6  13.6  12.2  16.6  5.3    = 81.6 km
 seeyou-finish-auto   ours 3.33 61.20                                = 64.53 km

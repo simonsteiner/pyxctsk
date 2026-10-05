@@ -36,7 +36,7 @@ Two consequences.
 **It costs n×.** Measured per reference task (optimizer alone vs
 `calculate_task_distances`):
 
-```
+```text
 task_gimi   n= 6   0.019s → 0.078s    4.1x
 task_bevo   n=10   0.025s → 0.166s    6.7x
 task_duna   n=11   0.023s → 0.202s    8.8x
@@ -54,7 +54,7 @@ rather than `plane_optimal_point`), so "optimized distance to turnpoint i" is th
 of a *truncated task*. Comparing the dict's `cumulative_optimized_km` against the actual
 route prefix, both derived from the same `Task`:
 
-```
+```text
 task_bevo    i=1  route 12.683  dict 11.300   +1.383 km
              i=3  route 38.113  dict 36.500   +1.613 km
              i=7  route 83.092  dict 78.000   +5.092 km
@@ -106,7 +106,7 @@ task.goal and task.goal.type == GoalType.LINE and task.turnpoints and len(task.t
 returns `None` on the second. When the previous turnpoint coincides with the goal, both
 fire and the goal disappears from the output entirely:
 
-```
+```text
 turnpoints: A(47.0, 8.0) TAKEOFF, Goal(47.0, 8.0)   goal=LINE
 geojson: [('A','cylinder'), ('Optimized Route','optimized_route')]
 kml "Goal Line" present: False
@@ -119,7 +119,7 @@ Second consequence of the same split: **`is_goal_turnpoint` can never fire for a
 goal**, because it compares against `all_turnpoints[-1]` — the turnpoint the renderer just
 removed. The red goal colour is unreachable:
 
-```
+```text
 LINE     [('A','#204d74'), ('B','#269abc')]                     red: False
 CYLINDER [('A','#204d74'), ('B','#269abc'), ('Goal','#ff0000')] red: True
 ```
@@ -168,7 +168,7 @@ live:
 (`qrcode/task.py:128`) is the *union* of both formats' key sets, but each branch handles
 only its half, so the passthrough sees nothing unknown:
 
-```
+```text
 in : {'T':'W','V':2,'t':[…],'e':1,'to':'09:00:00Z','g':{'t':2}}
 unknown captured: {}
 out: {'T':'W','V':2,'t':[…]}          LOST: {'e','to','g'}
@@ -178,7 +178,7 @@ out: {'T':'W','V':2,'t':[…]}          LOST: {'e','to','g'}
 and their QR counterparts have no `KNOWN_KEYS` and no `unknown` field, so nested unknown
 keys are dropped — the loss `passthrough.py:8-12` exists to prevent:
 
-```
+```text
 waypoint.zzz kept: False   sss extra: False   goal extra: False   takeoff extra: False
 ```
 
@@ -186,7 +186,7 @@ waypoint.zzz kept: False   sss extra: False   goal extra: False   takeoff extra:
 copies it across verbatim, so a full-format key can land in a slot the QR format defines,
 producing a payload this library cannot re-read:
 
-```
+```text
 model: turnpoints[0].unknown == {'t': 99}
 QR   : {"t":[{"n":"A","z":"…","t":99}], …}
 re-read: ValueError: 99 is not a valid QRCodeTurnpointType

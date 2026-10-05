@@ -36,6 +36,7 @@ route's points on refinement passes. Delete `_create_refined_turnpoints` and the
 unreachable code.
 
 **Wins.**
+
 - locality: one DP, one place to test
 - leverage: refinement becomes one argument
 - delete ~120 lines of duplication
@@ -60,6 +61,7 @@ What callers actually reach: `optimal_point` (the route optimizer, through the
 **Solution.** Delete the three dead functions.
 
 **Wins.**
+
 - deletion test: complexity vanishes, nothing reappears
 - interface shrinks to the one surviving dispatch
 - removes a second copy of goal-line math (see C)
@@ -87,6 +89,7 @@ turnpoint, so the deepening must let the approach direction vary (e.g. an
 `approach_from` parameter on the crossing method).
 
 **Wins.**
+
 - locality: goal-line rules in one module
 - the "single source" docstring becomes true
 - one endpoint primitive, one test surface
@@ -108,6 +111,7 @@ a shallow interface spread thin.
 moves. Scope stays tight.
 
 **Wins.**
+
 - locality: each pair defined once
 - add an enum value in one row
 - round-trip becomes table-symmetric

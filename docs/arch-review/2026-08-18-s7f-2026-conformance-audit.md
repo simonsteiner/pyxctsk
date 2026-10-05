@@ -241,7 +241,7 @@ implements, the way the optimizer's docstrings name §7.
 
 **§7.2** defines two numbers. pyxctsk produces one.
 
-```
+```text
 distanceSpeedSection = pathToESSdistance − preStartSectionDistance
 ```
 
@@ -292,7 +292,7 @@ Measured effects, over the 24-task corpus:
 - **Antimeridian**: a task straddling ±180° gets a projection centre roughly 120° of
   longitude away. Constructed cases:
 
-  ```
+  ```text
   Fiji, 3 turnpoints:  mean-of-longitudes centre = -59.67°  (task is at ~180°)
   ```
 
@@ -341,7 +341,7 @@ re-measured against this grid rather than against a single task.
 
 **§7.1.2** fixes the scale factor of the localized Transverse Mercator projection:
 
-```
+```text
 scaling = { centre.lat ≤ 55°:  0.99994
             centre.lat > 55°:  0.99994 + (centre.lat − 55)/60 × 1.3e-4 }
 ```

@@ -79,7 +79,7 @@ lists all three under **Optional**. The packaging says the opposite.
 **The one user-facing consequence is wrong advice.** `parser.py:114` tells a user whose
 PNG failed to parse:
 
-```
+```text
 looks like an image, but QR code support is not installed
 (pip install 'pyxctsk[web]' for Pillow and zxing-cpp)
 ```
@@ -92,9 +92,9 @@ move to an extra, it is still wrong.
 **Two dependencies are documented that are not used.** `geopy>=2.5.0` is a required
 runtime dependency, and `src/` never imports it:
 
-```console
-$ grep -rn "^\s*\(import\|from\) geopy" src/     # no output
-$ grep -rln "geopy" scripts/ tests/ | wc -l      # 6 — all outside the wheel
+```bash
+grep -rn "^\s*\(import\|from\) geopy" src/     # no output
+grep -rln "geopy" scripts/ tests/ | wc -l      # 6 — all outside the wheel
 ```
 
 Every user of the wheel installs geopy and its transitive tree for the benefit of
@@ -201,7 +201,7 @@ declare it at all.
 **Files:** `src/pyxctsk/__init__.py:79`, `src/pyxctsk/model/validation.py:41`,
 `src/pyxctsk/qrcode/conversion.py:58`
 
-```
+```text
 src/pyxctsk/__init__.py:79:            VERSION = 1
 src/pyxctsk/model/validation.py:41:    FULL_FORMAT_VERSION = 1
 src/pyxctsk/qrcode/conversion.py:58:    TASK_VERSION = 1
@@ -257,7 +257,7 @@ return [
 corpus plus the `ess-goal/` and `elevated-goal/` sets), comparing
 `(center, radius, goal_type, earth_model)` per turnpoint:
 
-```
+```text
 task_to_turnpoints collapse: identical on 50 tasks
 ```
 
@@ -302,7 +302,7 @@ turns `Nested("sss", "s", QR_SSS_SHAPE, _A_DICT_OR_NOTHING)` into
 **Verified.** A `TASK_SHAPE` rebuilt with `Value` + `shape_codec` in place of both
 classes, read and written over the reference corpus:
 
-```
+```text
 derived keys equal: True
 Value+shape_codec reproduces Nested/NestedList byte-for-byte on 24 tasks (2 skipped)
 ```
@@ -350,7 +350,7 @@ def _semicircle_arc(center_lon, center_lat, forward_azimuth, radius, earth_model
 **Verified.** Old against new over 300 random (lat, lon, azimuth, radius) combinations,
 comparing all 21 points:
 
-```
+```text
 semicircle arc worst coord delta (deg): 2.842170943040401e-14
 ```
 
@@ -416,7 +416,7 @@ if not (prev_inside and next_inside):
 **Verified** over 4000 random (p1, p2, centre, radius) configurations spanning all four
 inside/outside combinations:
 
-```
+```text
 plane_optimal_point mismatches: 0 /4000
 ```
 
@@ -472,9 +472,9 @@ line's length comes from `goal_line_length_from_turnpoints()`, not a field."*
 
 `__post_init__` stores a derived goal:
 
-```console
-$ in : {"taskType":"CLASSIC","version":1,"turnpoints":[{...}]}
-$ out: {"taskType":"CLASSIC","version":1,"turnpoints":[{...}],"goal":{"type":"CYLINDER"}}
+```text
+in : {"taskType":"CLASSIC","version":1,"turnpoints":[{...}]}
+out: {"taskType":"CLASSIC","version":1,"turnpoints":[{...}],"goal":{"type":"CYLINDER"}}
 ```
 
 A task file with no `goal` key round-trips into one that has a `goal` object. This is the
@@ -638,7 +638,6 @@ Deliberately after the release:
    split. Each is a decision about a published contract or a large mechanical move, and
    neither is what a release week is for.
 
-
 ---
 
 ## Progress
@@ -648,7 +647,7 @@ commit. Every commit ran the full suite, `ruff check`, `ruff format` and
 `mypy src/ tests/` green, and each behaviour-preserving claim was checked against the
 reference corpus rather than asserted.
 
-```
+```text
 77dae95 build: make QR image support the extra the code already assumes
 4b5ea96 fix: one constant for "the full format is version 1"
 2fb41d1 fix: five small corrections across the front door and the writers

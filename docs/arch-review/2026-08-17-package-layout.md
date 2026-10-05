@@ -13,7 +13,7 @@ why, not a proposal.
 thing any reader — human or agent — sees, and it said nothing about which modules
 belonged together. The prefixes were doing a directory's job:
 
-```
+```text
 qrcode_task.py  qrcode_models.py  qrcode_encoding.py  qrcode_enums.py
 qrcode_image.py qrcode_conversion.py
 task.py  task_enums.py  task_distances.py
@@ -37,7 +37,7 @@ Three specific costs:
 
 ## What changed
 
-```
+```text
 src/pyxctsk/
   __init__.py  __main__.py  cli.py  parser.py  exceptions.py
   model/     task  enums  time_of_day  passthrough  validation  rounding
@@ -48,7 +48,7 @@ src/pyxctsk/
 
 Dependencies run one way:
 
-```
+```text
 model ──> qrcode
   └────> distance ──> export
 ```
@@ -72,7 +72,7 @@ turnpoint's radius, because that is what sizes a LINE goal's cylinder. With
 real cycle the moment each package got an `__init__` that re-exports its own
 submodules — and it failed loudly, on `import pyxctsk`:
 
-```
+```text
 ImportError: cannot import name 'task_to_turnpoints' from partially
 initialized module 'pyxctsk.distance.task_distances'
 ```

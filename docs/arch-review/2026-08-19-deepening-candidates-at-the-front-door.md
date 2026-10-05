@@ -265,7 +265,7 @@ none. The only checks pairing the two families are per-field and remembered one 
 
 Today three of the four class pairs are exactly parallel; nothing keeps them that way:
 
-```
+```text
 Goal      only: []              QRCodeGoal      only: []
 SSS       only: ['time_close']  QRCodeSSS       only: []
 Takeoff   only: ['unknown']     QRCodeTakeoff   only: []
@@ -309,7 +309,7 @@ is geometry, already owned by `GoalLine.control_zone` (`goal_line.py:331-336`, w
 
 **And the two formats already disagree about a user-visible name for the same thing:**
 
-```
+```text
 kml.py:114      name="Course Line"
 geojson.py:91   "name": "Optimized Route"
 ```
@@ -783,7 +783,7 @@ Every commit ran the full suite, `ruff check`, `ruff format` and `mypy src/ test
 and each behaviour-preserving claim was checked against the reference corpus rather than
 asserted. The suite went from **995 to 1133 passing** at the same 98 % line coverage.
 
-```
+```text
 b7312b4 fix(parser)!: give the adapters the recognition question their docstring promised
 2965787 fix(qrcode): decide the QR shape once, and carry a section it cannot read
 ca1e754 fix(export)!: let the drawing answer for the goal line and the route too
