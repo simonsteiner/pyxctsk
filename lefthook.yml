@@ -23,6 +23,14 @@ pre-commit:
         - "scripts/**"
       run: uv run mypy --explicit-package-bases {staged_files}
 
+    # The only fixer of *.md, so it can run beside cspell. Config and excludes
+    # in .rumdl.toml; an excluded staged file is skipped, not an error.
+    rumdl:
+      priority: 3
+      glob: "*.md"
+      run: uv run rumdl check --fix {staged_files}
+      stage_fixed: true
+
     cspell:
       priority: 4
       glob: "*.{py,md,txt,toml,yml,yaml,json,cfg,ini}"

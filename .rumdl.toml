@@ -1,0 +1,20 @@
+# Ref: https://rumdl.dev/ — the Markdown linter lefthook, CI and the VS Code
+# extension (rvben.rumdl) all read this file.
+
+[global]
+# MD013: the docs keep a paragraph, table row or link on one line.
+# MD038: `## ` with its space is the heading prefix the release tooling
+# matches; trimming it inside the code span changes what the text says.
+disable = ["MD013", "MD038"]
+# Changelog versions each repeat Added / Changed / Fixed; only siblings must differ.
+[MD024]
+siblings_only = true
+
+# Review docs fold each candidate's detail into <details>, and table cells need
+# <br> to break a line.
+[MD033]
+allowed_elements = ["details", "summary", "br"]
+
+[per-file-ignores]
+# Its italic provenance lines under the title are a byline, not headings.
+"docs/arch-review/2025-06-07-competition-interfaces-analysis.md" = ["MD036"]

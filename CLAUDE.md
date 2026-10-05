@@ -28,6 +28,7 @@ uv run pytest -m "not slow"                   # skip slow-marked tests (none at 
 uv run ruff check --fix src/ tests/ scripts/   # lint (E/W/F/I/D) + autofix
 uv run ruff format src/ tests/ scripts/        # format (black-compatible)
 uv run mypy src/ tests/                               # type check (strict; config in pyproject.toml)
+uv run rumdl check --fix .                     # Markdown lint + fix (config in .rumdl.toml)
 
 # Git hooks are managed by lefthook (config in lefthook.yml)
 uv run lefthook install                        # enable hooks on commit
@@ -50,7 +51,7 @@ The CLI entry point is `pyxctsk` (`pyxctsk.cli:main`), with two commands. It par
 
 **Four packages, one direction.** `src/pyxctsk/` keeps only the front door at its top level — `__init__.py` (the public API), `__main__.py`, `cli.py`, `parser.py`, `renderer.py`, `exceptions.py`, `metadata.py` — and everything else lives in one of four packages:
 
-```
+```text
 model/     task, enums, shape, time_of_day, passthrough, validation, rounding
 qrcode/    task, models, encoding, image, conversion
 distance/  earth, plane, solver, turnpoint, route_optimization, measured_task,

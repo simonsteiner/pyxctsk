@@ -16,6 +16,7 @@ uv sync --frozen --all-extras
 uv run ruff check src/ tests/ scripts/
 uv run ruff format --check src/ tests/ scripts/
 uv run mypy src/ tests/
+uv run rumdl check .
 
 git ls-files -z '*.py' '*.md' '*.txt' '*.toml' '*.yml' '*.yaml' '*.json' '*.cfg' '*.ini' \
   | xargs -0 npx --yes cspell --no-progress --no-must-find-files --config cspell.json
