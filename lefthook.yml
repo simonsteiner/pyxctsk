@@ -4,16 +4,12 @@
 pre-commit:
   parallel: true
   commands:
-    ruff-check:
+    # One job, not two: under `parallel: true` lefthook ignores `priority`, and
+    # two fixers rewriting the same files at once undo each other's fixes.
+    ruff:
       priority: 1
       glob: "*.py"
-      run: uv run ruff check --fix {staged_files}
-      stage_fixed: true
-
-    ruff-format:
-      priority: 2
-      glob: "*.py"
-      run: uv run ruff format {staged_files}
+      run: uv run ruff check --fix {staged_files} && uv run ruff format {staged_files}
       stage_fixed: true
 
     mypy:

@@ -92,6 +92,9 @@ target-version = "py311"
 src = ["src"]
 # Vendored third-party code: never format or lint it.
 extend-exclude = ["scripts/task_viewer/airscore_clone"]
+# The hook passes staged files by name, and ruff lints a named file even when
+# it is excluded unless this is set.
+force-exclude = true
 
 [tool.ruff.lint]
 # E/W pycodestyle, F pyflakes, I import sorting, D docstrings.
