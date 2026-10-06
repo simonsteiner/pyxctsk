@@ -68,7 +68,7 @@ which spells it across two lines.
 
 **A mismatched pair is silent, in both directions.**
 
-```
+```text
 task_distances_from_route(task_bevo, route_of_task_duna)      # no error
   optimized_distance_km = 81.2     # task_bevo's true value: 94.0
   savings_km            = 47.5     # savings_percent: 36.9
@@ -167,7 +167,7 @@ on the converted `Task`. That is precisely the failure `validation.py:18-22` say
 version, a task type and a goal it never carried… validating inventions reports on the
 converter"*.
 
-```
+```text
 qr.version = 99
 QRCodeTask.validate()            → ['this format defines version 2, the task declares 99']
 parse_task(payload).version      → 1          # the converter invented it
@@ -212,7 +212,7 @@ docstrings repeat the same sentence — "an `EarthModel` member, its string valu
 
 **Three ways to be silently wrong, all reproduced.**
 
-```
+```text
 geodesic_distance(a, b, "FAI_SPHERE") → 134989.615 m
 geodesic_distance(a, b, "FAI-SPHERE") → 135087.210 m   ← typo, 97.6 m out, no error
 geodesic_distance(a, b, 42)           → 135087.210 m   ← passes mypy
@@ -271,7 +271,7 @@ places, and a fix applied to one reader has already failed to reach the other.
 and must not be read. `center_distance`'s `START_TO_GOAL` reading scans for the same
 annotation with no such guard, so one CLI JSON document now says both things at once:
 
-```
+```text
 taskType = W (XC/Waypoints), turnpoints annotated TAKEOFF / SSS / ESS
 
 speed_section_distance_m                    : None       ← roles ignored
@@ -328,7 +328,7 @@ two are already made inconsistently.
 **None of the four writes passes `encoding=`,** while the data is UTF-8 and the KML declares
 `<?xml version="1.0" encoding="UTF-8"?>`:
 
-```
+```text
 $ LC_ALL=C PYTHONCOERCECLOCALE=0 PYTHONUTF8=0 \
     pyxctsk distances task_bevo.xctsk --format text -o out.txt
 Error: 'ascii' codec can't encode character '\xa7' in position 77
@@ -366,7 +366,7 @@ question both writers must answer identically is a method on the drawing, not so
 of them assembles". Label and description were left behind, and the two writers now disagree
 — with the KML one visibly wrong. On `task_bevo`:
 
-```
+```text
 KML     <description>Type: TurnpointType.TAKEOFF, Radius: 400m</description>
 KML     <description>Type: None, Radius: 4500m</description>
 GeoJSON description "Radius: 400m"   tp_type <TurnpointType.TAKEOFF: 'TAKEOFF'>
@@ -507,6 +507,7 @@ Departures from the card worth recording:
 - **The `route()` rows stayed `dict[str, Any]`.** Making them a value type was tempting and
   is not done: they are the published JSON shape, and a dataclass between the fields and
   `json.dumps` would be a layer with one caller.
+
 ### Outcome of the smaller findings
 
 All eight applied, in four commits.

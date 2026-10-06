@@ -326,4 +326,3 @@ Immediately after, or before if the release is not time-sensitive:
 maintainability bar, but a release includes its automation, installed CLI and
 package metadata. Findings 1–3 are high-conviction, directly reproduced, and
 have simpler fixes than explanations for shipping them.
-

@@ -311,7 +311,7 @@ Found after the audit, while checking a set of QR codes now kept in
 Navigator** (Naviter), confirmed — the tasks were created in the app. Every one
 carries:
 
-```
+```text
 root          "o": {"v": 2, "fa": 1220}
 per-turnpoint "o": {"a1": 180}
 ```

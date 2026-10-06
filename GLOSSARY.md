@@ -179,5 +179,4 @@ _Avoid_: parser, handler
 One way a task is written out — the full JSON, a map, a QR payload, a QR image
 — together with what a caller needs to deliver it: its media type, its file
 extension, and whether the payload is bytes or text.
-_Avoid_: exporter, writer (a *writer* is the code, a format is the choice)
-
+_Avoid_: exporter, writer (a _writer_ is the code, a format is the choice)

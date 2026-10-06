@@ -133,7 +133,8 @@ uv run python scripts/check_qr_deps.py
 ### Code Quality & Formatting
 
 The project uses [lefthook](https://github.com/evilmartians/lefthook) to run
-[ruff](https://docs.astral.sh/ruff/) (lint + format), mypy, and cspell on commit:
+[ruff](https://docs.astral.sh/ruff/) (lint + format), mypy,
+[rumdl](https://rumdl.dev/) (Markdown lint + fix) and cspell on commit:
 
 ```bash
 # Install the git hooks (one-time)
@@ -146,6 +147,7 @@ uv run lefthook run pre-commit
 uv run ruff check --fix src/ tests/ scripts/
 uv run ruff format src/ tests/ scripts/
 uv run mypy src/ tests/
+uv run rumdl check .
 ```
 
 ## Usage Examples

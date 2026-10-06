@@ -4,16 +4,12 @@
 pre-commit:
   parallel: true
   commands:
-    ruff-check:
+    # One job, not two: under `parallel: true` lefthook ignores `priority`, and
+    # two fixers rewriting the same files at once undo each other's fixes.
+    ruff:
       priority: 1
       glob: "*.py"
-      run: uv run ruff check --fix {staged_files}
-      stage_fixed: true
-
-    ruff-format:
-      priority: 2
-      glob: "*.py"
-      run: uv run ruff format {staged_files}
+      run: uv run ruff check --fix {staged_files} && uv run ruff format {staged_files}
       stage_fixed: true
 
     mypy:
@@ -22,6 +18,14 @@ pre-commit:
       exclude:
         - "scripts/**"
       run: uv run mypy --explicit-package-bases {staged_files}
+
+    # The only fixer of *.md, so it can run beside cspell. Config and excludes
+    # in .rumdl.toml; an excluded staged file is skipped, not an error.
+    rumdl:
+      priority: 3
+      glob: "*.md"
+      run: uv run rumdl check --fix {staged_files}
+      stage_fixed: true
 
     cspell:
       priority: 4

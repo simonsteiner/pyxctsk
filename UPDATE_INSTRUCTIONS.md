@@ -39,7 +39,6 @@ uv sync --all-extras
    update, not a separate decision.
 
    After editing `pyproject.toml`, run `uv lock` to refresh `uv.lock`.
-
 5. **Test**: `uv sync --all-extras && uv run pytest`
 6. **Re-run the checkers whenever `ruff` or `mypy` moved** — a tool bump changes
    what they report, and neither shows up in the test suite:
