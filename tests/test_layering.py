@@ -1,6 +1,6 @@
 """The package layering, asserted rather than described.
 
-`CLAUDE.md` states two rules about how `src/pyxctsk/` is allowed to import
+`AGENTS.md` states two rules about how `src/pyxctsk/` is allowed to import
 itself. Both were prose until this file, and both have already been broken once
 each — the second one broke `import pyxctsk` outright:
 

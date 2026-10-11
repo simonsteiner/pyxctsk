@@ -1,7 +1,6 @@
 {
     "version": "0.2",
     "ignorePaths": [
-        "scripts/commands.txt",
         "scripts/downloaded_tasks/*",
         "scripts/task_viewer/airscore_clone/*",
         "scripts/xctsk_files/*",
