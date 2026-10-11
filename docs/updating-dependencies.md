@@ -1,95 +1,48 @@
-# Update Instructions
+# Updating dependencies
 
-Quick guide for updating dependencies and maintaining the pyxctsk project.
+How to bump pyxctsk's dependencies. Setting up the environment is in
+[setup.md](setup.md).
 
-## Prerequisites
+## Update process
 
-Sync the environment (creates `.venv` and installs everything):
+1. **Sync first**: `uv sync --all-extras --group tools`
+2. **Check outdated packages**: `uv pip list --outdated`, or
+   `uv tree --outdated` to see which declared dependency pulls each one in
+3. **Bump everything within the declared ranges**: `uv lock --upgrade`
+4. **Bump a single package**: `uv lock --upgrade-package scipy`
+5. **Raise the floors in `pyproject.toml`** to the versions you just locked. The
+   convention here is that a floor names the version the suite is actually run
+   against, so raising floors is a step in the update, not a separate decision.
+   That covers every list:
 
-```bash
-cd /home/simon/DEV/git/pyxctsk
-uv sync --all-extras
-```
-
-## Updating Dependencies
-
-### Update Process
-
-1. **Check outdated packages**: `uv pip list --outdated`
-2. **Bump everything within the declared ranges**: `uv lock --upgrade`
-3. **Bump a single package**: `uv lock --upgrade-package scipy`
-4. **Update pyproject.toml** if you want to raise the minimum versions, e.g.:
-
-    ```toml
-    dependencies = [
-        "click>=8.4.2",
-        "geopy>=2.5.0",
-        "Pillow>=12.3.0",
-        "pyproj>=3.7.2",
-        "qrcode[pil]>=8.2",
-        "scipy>=1.17.1",
-        "simplekml>=1.3.6",
-        "zxing-cpp>=3.1.1",
-    ]
-    ```
-
-   The same applies to `[project.optional-dependencies]` (`web`, `analysis`) and
-   the `dev` `[dependency-groups]`. The convention here is that a floor names the
-   version the suite is actually run against, so raising floors is a step in the
-   update, not a separate decision.
+    - runtime `dependencies` under `[project]`
+    - the `qr` extra under `[project.optional-dependencies]`
+    - the `dev` and `tools` groups under `[dependency-groups]`
 
    After editing `pyproject.toml`, run `uv lock` to refresh `uv.lock`.
-5. **Test**: `uv sync --all-extras && uv run pytest`
-6. **Re-run the checkers whenever `ruff` or `mypy` moved** — a tool bump changes
-   what they report, and neither shows up in the test suite:
+6. **Test**: `uv sync --all-extras && uv run pytest`
+7. **Re-run the checkers whenever `ruff`, `mypy` or `rumdl` moved** — a tool bump
+   changes what they report, and none of them shows up in the test suite:
 
     ```bash
     uv run ruff check --fix src/ tests/ scripts/
     uv run ruff format src/ tests/ scripts/
     uv run mypy src/ tests/
+    uv run rumdl check .
     ```
 
    Note that `ruff format` reaches beyond `*.py`: since 0.16 it also formats
    Python code blocks inside Markdown, so a docs file can turn up in the diff.
-   The lefthook hooks are globbed to `*.py` and won't catch that.
+   The ruff hook is globbed to `*.py` and won't catch that.
+8. **Run the full gate**: `scripts/verify.sh`
 
-### Check Latest Versions
-
-```bash
-uv pip index versions [package_name]
-```
-
-## Development Dependencies
-
-```bash
-# Install the dev group plus the web and analysis extras
-uv sync --all-extras
-```
-
-## Troubleshooting
-
-**Common Issues:**
-
-- **Import errors / stale environment**: Re-sync with `uv sync --all-extras`
-- **Rebuild from scratch**: `rm -rf .venv && uv sync --all-extras`
-- **Missing dependencies**: Ensure scipy is installed
-
-**Quick verification test:**
-
-```bash
-uv run python -c "
-from scipy.optimize import fminbound; print('✓ scipy.optimize')
-from PIL import Image; import zxingcpp; print('✓ QR code reading')
-"
-```
-
-## Maintenance Schedule
+## Maintenance schedule
 
 - **Monthly**: Check security updates, update dev dependencies
 - **Quarterly**: Update main dependencies, check deprecated features
 - **Before releases**: Update all dependencies, run full test suite
 
-## Version History
+## Version history
 
 | Date | Updated Packages | Notes |
 |------|------------------|-------|

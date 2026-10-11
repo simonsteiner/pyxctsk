@@ -54,101 +54,14 @@ back out of an image, needs these:
 Without them, `parse_task` on an image and `pyxctsk convert --format png` fail
 with a message naming the extra; everything else works.
 
-### Development
-
-- **pytest**: Testing framework
-- **ruff**: Linting and formatting
-- **mypy**: Static type checking
-- **lefthook**: Git hook manager
-
-## Project Structure
-
-```text
-.
-├── src/
-│   └── pyxctsk/           # Core package implementation
-│       ├── __init__.py    # Public API — everything most callers need
-│       ├── parser.py      # Single entry point for every input format
-│       ├── cli.py         # `pyxctsk convert`
-│       ├── exceptions.py
-│       ├── model/         # The task itself: dataclasses, enums, validation
-│       ├── qrcode/        # The compact QR format, and conversion to the model
-│       ├── distance/      # Route optimization, task distances, goal-line geometry
-│       └── export/        # KML and GeoJSON writers
-├── tests/                 # Test suite, mirroring the package layout
-│   ├── conftest.py        # Shared fixtures
-│   ├── paths.py           # Where the reference data lives
-│   ├── model/  qrcode/  distance/  export/
-│   ├── conformance/       # Spec-audit regressions, cutting across packages
-│   └── data/              # Reference tasks and generated output
-├── scripts/               # Utility scripts
-├── pyproject.toml         # Project configuration
-└── README.md
-```
-
-Dependencies between the packages run one way — `model → qrcode` and
-`model → distance → export` — so a change to an export format cannot reach the
-domain model, and the model does not know how distances are computed. Each
-package's `__init__.py` is its interface and describes what it holds.
-
-- `src/pyxctsk/`: Core library implementation with immutable data models and parsing logic
-- `tests/`: Test suite; each subpackage covers the source package of the same name
-- `scripts/`: Utility scripts for automation and testing
-
 ## Installation
 
-### Core Library Only
-
 ```bash
-pip install pyxctsk
+pip install pyxctsk         # core library and CLI
+pip install "pyxctsk[qr]"   # plus QR code images (PNG output and QR image input)
 ```
 
-### Development Installation
-
-This project uses [uv](https://docs.astral.sh/uv/) for dependency management.
-
-```bash
-git clone https://github.com/simonsteiner/pyxctsk.git
-cd pyxctsk
-
-# Create the virtual environment and install the project (editable), the dev
-# dependency group, and the optional QR image support.
-uv sync --all-extras
-
-# Also install dependencies for the repository-only utilities under scripts/.
-uv sync --all-extras --group tools
-
-# Run tests
-uv run pytest
-
-# Run single test with parameter
-# -s: disables output capturing, allowing print statements and other outputs to be shown in the terminal.
-# -vv: increases verbosity, providing more detailed test results.
-uv run pytest -s tests/qrcode/test_codec.py -vv
-
-# (Optional) To check QR code dependencies, run:
-uv run python scripts/check_qr_deps.py
-```
-
-### Code Quality & Formatting
-
-The project uses [lefthook](https://github.com/evilmartians/lefthook) to run
-[ruff](https://docs.astral.sh/ruff/) (lint + format), mypy,
-[rumdl](https://rumdl.dev/) (Markdown lint + fix) and cspell on commit:
-
-```bash
-# Install the git hooks (one-time)
-uv run lefthook install
-
-# Run the pre-commit hooks against staged files
-uv run lefthook run pre-commit
-
-# Or run the tools directly
-uv run ruff check --fix src/ tests/ scripts/
-uv run ruff format src/ tests/ scripts/
-uv run mypy src/ tests/
-uv run rumdl check .
-```
+To work on pyxctsk itself, see [docs/setup.md](./docs/setup.md).
 
 ## Usage Examples
 
@@ -211,7 +124,7 @@ The `pyxctsk` CLI enables conversion and inspection of XCTrack task files in mul
 - `--strict`  
   Reject a task that breaks the spec's structural rules instead of converting it. A malformed value is refused with or without it.
 - `<input_file>`  
-  Input file (optional). If omitted, reads from stdin. Accepts `.xctsk` files or QR code images.
+  Input file (optional). If omitted, reads from stdin. Accepts `.xctsk` files, files holding an `XCTSK:`/`XCTSKZ:` string, or QR code images.
 
 **Examples:**
 
@@ -230,8 +143,8 @@ cat task.xctsk | pyxctsk convert --format kml             # From stdin
 
 **Supported formats:**
 
-- Input: `.xctsk` (XCTrack task files), QR code image (PNG)
-- Output: JSON, KML, GeoJSON, QR code (PNG or XCTSK: URL string)
+- Input: `.xctsk` (XCTrack task files), `XCTSK:`/`XCTSKZ:` strings (in a file or on stdin), QR code image (PNG)
+- Output: JSON, KML, GeoJSON, QR code (PNG or `XCTSK:`/`XCTSKZ:` string)
 
 See the CLI startup message (`pyxctsk --help` or running the CLI with no arguments) for a quick summary of options and supported formats.
 
@@ -239,10 +152,17 @@ See the CLI startup message (`pyxctsk --help` or running the CLI with no argumen
 
 - Python 3.11+ (CI verifies 3.11 through 3.14 on every pull request and push to `main`, and again before each release)
 - Install `pyxctsk[qr]` for QR code images (PNG output and QR image input).
-- Development tooling lives in the `dev` dependency group and is installed by
-  `uv sync`; `uv sync --all-extras` also installs QR image support.
-- Utilities under `scripts/` are source-checkout tools, not part of the
-  published package. Install their dependencies with `uv sync --group tools`.
+
+## Documentation
+
+- [docs/setup.md](./docs/setup.md) — development setup, tests, code-quality tools
+- [docs/s7f-distance-reference.md](./docs/s7f-distance-reference.md) — what FAI S7F defines about task distances, and what it leaves open
+- [docs/adr/](./docs/adr/) — design decisions behind the route optimizer
+- [docs/arch-review/](./docs/arch-review/) — architecture and spec-conformance reviews
+- [docs/releasing.md](./docs/releasing.md) — how releases are cut and published
+- [docs/updating-dependencies.md](./docs/updating-dependencies.md) — bumping dependencies
+- [GLOSSARY.md](./GLOSSARY.md) — the domain vocabulary
+- [CHANGELOG.md](./CHANGELOG.md) — what changed in each release
 
 ## License
 
