@@ -53,7 +53,7 @@ uv run pyxctsk distances task.xctsk --format text  # try the CLI
 
 ### Model and validation
 
-- **Model classes are plain dataclasses that don't validate on construction.** `Task.validate()` is the structural check, and nothing derived (such as a goal line's length) is stored on the model.
+- **The task dataclasses in `model/task.py` don't validate on construction (`TimeOfDay` is the one exception, rejecting an out-of-range field in `__post_init__`).** `Task.validate()` is the structural check, and nothing derived (such as a goal line's length) is stored on the model.
 - **Spec rules live in `model/validation.py`, not on `Task`.** They read a `TaskStructure`, which `Task.validate()` and `QRCodeTask.validate()` each present; validate what arrived, not its conversion.
 - **Parsing is lenient about structure and strict about scalars.** A negative radius or an unknown version still parses (`--strict` rejects it); a value of the wrong kind never does.
 - **Every library error descends from `exceptions.pyXCTSKError`.** The CLI catches one tuple of them; add new errors to the hierarchy.
