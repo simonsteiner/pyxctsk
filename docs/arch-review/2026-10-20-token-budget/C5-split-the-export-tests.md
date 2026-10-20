@@ -31,7 +31,7 @@ flowchart LR
   style after fill:#fafaf9,stroke:#e2e8f0
 ```
 
-`TestOnePalette` (`test_common.py:329-709`, ~4.1k tokens) is over the budget by itself. About half of it compares the KML and GeoJSON writers, which neither writer's test file shows.
+`TestOnePalette` (`test_common.py:329-709`, ~4.2k tokens) is most of the file's 2,458-token overage. About half of it compares the KML and GeoJSON writers, which neither writer's test file shows.
 
 | Problem | Solution | Wins |
 |---|---|---|

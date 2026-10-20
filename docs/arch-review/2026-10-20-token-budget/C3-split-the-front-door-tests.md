@@ -31,7 +31,7 @@ flowchart LR
   style after fill:#fafaf9,stroke:#e2e8f0
 ```
 
-`test_cli.py` (16 commits in 3 months) has six test classes:
+`test_cli.py` (16 commits in 3 months) has seven test classes:
 
 | Lines | Class | Tokens |
 |---|---|---|
@@ -46,6 +46,7 @@ flowchart LR
 | Lines | Class | Tokens |
 |---|---|---|
 | 1–274 | rules | ~2.7k |
+| 275 | `TestImportsAreCollectedByWhetherTheyRun` | ~1.0k |
 | 376 | `TestTheFrontDoorNamesTheAnswers` | ~0.9k |
 | 467 | `TestTheOptimizerDependencyIsNotPaidUpFront` | ~0.5k |
 

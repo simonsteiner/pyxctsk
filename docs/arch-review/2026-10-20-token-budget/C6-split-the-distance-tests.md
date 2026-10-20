@@ -46,7 +46,6 @@ The file is 71 tokens over the budget and was touched in 14 commits in 3 months.
 | The reference-accuracy tests also carry geometry edge cases and the earth-model selector, which change for different reasons. | Split by what each class pins: the reference corpus, geometry cases, and earth model. Move the module constants to where every file can reach them. | locality: earth-model tests together<br>S1: one race task builder |
 
 - **Constants:** `WITH_REFERENCE`, `CONVERGENCE_SAMPLE` and `REF_QUANTIZATION_M` must be reachable from every file that uses them.
-- **S1:** moving the shared race task to `tests/builders.py` also takes `test_measured_task.py` (4.5k) off the watch list.
 
 <details>
 <summary>Decisions</summary>

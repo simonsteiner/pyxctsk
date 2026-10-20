@@ -26,8 +26,8 @@ flowchart LR
     T2["task.py · Task + TASK_SHAPE"]:::deep
     subgraph tk[" "]
       direction TB
-      PT2["turnpoints and takeoff"]:::faded
-      SG2["SSS and goal"]:::faded
+      PT2["turnpoints, takeoff and SSS"]:::faded
+      SG2["goal"]:::faded
     end
     T2 -.- tk
     TS2["test_shape.py · the Toy machinery"]:::module
@@ -45,13 +45,13 @@ flowchart LR
   style after fill:#fafaf9,stroke:#e2e8f0
 ```
 
-Both files are deep modules that grew past the budget. 13 files import from `model.shape`.
+Both files are deep modules that grew past the budget. 9 files import from `model.shape`.
 
 `shape.py` has three seams:
 
 | Lines | Seam | Tokens |
 |---|---|---|
-| 1–213 | JSON I/O and `Codec` | ~1.8k |
+| 1–213 | JSON I/O and `Codec` | ~2.0k |
 | 214–428 | wire-scalar codecs | ~2.1k |
 | 429–729 | `Field`/`Shape` | ~2.9k |
 
@@ -59,13 +59,13 @@ Both files are deep modules that grew past the budget. 13 files import from `mod
 
 | Lines | Seam | Tokens |
 |---|---|---|
-| 64–310 | points and takeoff | ~2.0k |
+| 64–310 | points, takeoff and SSS | ~2.0k |
 | 311–396 | goal | ~0.8k |
 | 397–602 | `Task` | ~2.2k |
 
 | Problem | Solution | Wins |
 |---|---|---|
-| The model's two most-read modules can't be committed to without first being split. | Move each internal seam into a sibling submodule of `model/`. `Shape` and `Task` keep their interface, and the model still imports nothing outside `model/`. | locality: codecs apart from traversal<br>interface unchanged for 13 importers |
+| The model's two most-read modules can't be committed to without first being split. | Move each internal seam into a sibling submodule of `model/`. `Shape` and `Task` keep their interface, and the model still imports nothing outside `model/`. | locality: codecs apart from traversal<br>interface unchanged for 9 importers |
 
 - **`EXPECTED_DEFERRED_IMPORTS`:** its entry is keyed `("model/task.py", "qrcode.conversion")`, so `Task.to_qr_code_task` stays in `task.py`.
 - **AGENTS.md:** it names `model/shape.py` as the home of the codecs and of `load_json`/`dump_json`. Decide between re-exporting the names and updating AGENTS.md, and record the choice.

@@ -4,7 +4,7 @@
 
 🟢 **Strong** · `in-process` · builds on: —
 
-`CHANGELOG.md:1-344` · `scripts/changelog_extract.py:27-97` · `scripts/prepare_release.sh:86-93` · `.github/workflows/publish.yml:46-49,133-134` · `docs/releasing.md`
+`CHANGELOG.md:1-344` · `scripts/changelog_extract.py:27-105` · `scripts/prepare_release.sh:86-93` · `.github/workflows/publish.yml:46-49,133-134` · `docs/releasing.md`
 
 ```mermaid
 flowchart LR
@@ -35,7 +35,7 @@ flowchart LR
 |---|---|---|
 | Every user-visible PR edits a 24k-token file that the budget check will refuse. | Keep `[Unreleased]` and the newest release in `CHANGELOG.md`, and move released sections out under `docs/changelog/`. The release tooling still rolls and extracts the release being cut. | locality: the open release, alone<br>unblocks every PR's changelog entry |
 
-- **Release tooling:** `roll` only touches `[Unreleased]` and the section above it. `extract` and `title` run on the version being released, which is always the newest. Check that this holds before changing the tooling.
+- **Release tooling:** `roll` rewrites only `[Unreleased]`, but it also refuses a version whose heading is already anywhere in the file (`changelog_extract.py:87`). Once released sections move out, that guard has to see them too, or an archived version could be released again. `extract` and `title` run on the version being released, which is always the newest. Check that this holds before changing the tooling.
 - **v0.6.0 is a published dated record:** decide whether it is split or marked `linguist-generated` like the old arch-review reports.
 - **Unaffected:** `MANIFEST.in` and `pyproject.toml` don't ship the file, no test reads it, and `README.md:165` links it.
 

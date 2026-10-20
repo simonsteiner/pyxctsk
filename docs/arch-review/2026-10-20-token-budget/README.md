@@ -88,7 +88,7 @@ After `.gitattributes` marks what nobody edits by hand (downloaded XContest page
 
 `tests/distance/test_center_distance.py:23` · `tests/distance/test_measured_task.py:38` · rides with C6
 
-Both files build the same four-turnpoint task (`A`/`S`/`C`/`G`, ESS at goal, cylinder goal). `test_speed_section.py:21` has a different one with a separate ESS. Move the shared one to `tests/builders.py` under a name that says what it is; this also takes `test_measured_task.py` (4.5k) off the watch list.
+Both files build the same four-turnpoint task (`A`/`S`/`C`/`G`, ESS at goal, cylinder goal). `test_speed_section.py:21` has a different one with a separate ESS. Move the shared one to `tests/builders.py` under a name that says what it is.
 
 ### S2 · A `process` branch that never runs
 
@@ -104,7 +104,7 @@ Both files build the same four-turnpoint task (`A`/`S`/`C`/`G`, ESS at goal, cyl
 
 ### S4 · The existing hook jobs break three setup rules
 
-`lefthook.yml:9-34` · follow-up, not in this rollout
+`lefthook.yml:9-33` · follow-up, not in this rollout
 
 Every job sets `priority:` under `parallel: true`, which lefthook ignores (the file's own comment says so). `mypy` runs on `{staged_files}`, though a strict type check gives a different answer on a subset, and `cspell` runs `npx --yes cspell` with no pinned version. Each fix touches the existing jobs, which the rollout leaves alone.
 

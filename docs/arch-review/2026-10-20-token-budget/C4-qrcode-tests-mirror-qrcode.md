@@ -10,7 +10,7 @@
 flowchart LR
   subgraph before["Before"]
     direction TB
-    Q1["test_codec.py · 8.0k<br>tests five qrcode modules"]:::leak
+    Q1["test_codec.py · 8.0k<br>tests four qrcode modules"]:::leak
     Q1 --> I1["image.py"]:::module
     Q1 --> M1["models.py"]:::module
     Q1 --> T1["task.py"]:::module
@@ -34,7 +34,7 @@ flowchart LR
   style after fill:#fafaf9,stroke:#e2e8f0
 ```
 
-`src/pyxctsk/qrcode/` has no `codec.py`. `test_codec.py` (8,003 tokens, 15 commits in 3 months) tests five modules:
+`src/pyxctsk/qrcode/` has no `codec.py`. `test_codec.py` (8,003 tokens, 15 commits in 3 months) tests four modules:
 
 | Lines | Tests | Module |
 |---|---|---|
@@ -46,7 +46,7 @@ flowchart LR
 
 | Problem | Solution | Wins |
 |---|---|---|
-| One test file, named after no module, tests five `qrcode/` modules and is the largest file in `tests/`. | Give each `qrcode/` module its own test file, as AGENTS.md's "`tests/` mirrors `src/pyxctsk/`" says. Keep the corpus round-trips as one file. | locality: a module's tests beside it<br>restores the mirror convention |
+| One test file, named after no module, tests four `qrcode/` modules and is the largest file in `tests/`. | Give each `qrcode/` module its own test file, as AGENTS.md's "`tests/` mirrors `src/pyxctsk/`" says. Keep the corpus round-trips as one file. | locality: a module's tests beside it<br>restores the mirror convention |
 
 - **Helpers:** `REFERENCE_TASKS` (line 44) and `_normalized` (line 92) move with the tests that use them. `tests/qr_test_utils.py` already holds the image helpers.
 - **AGENTS.md:** its Commands example runs `tests/qrcode/test_codec.py`. Keep that path valid or update the example.
