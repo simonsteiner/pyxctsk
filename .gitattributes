@@ -1,9 +1,11 @@
 # Files no one edits by hand. scripts/hooks/check-file-tokens.py skips
 # anything marked linguist-generated or linguist-vendored here.
 
-# XContest task pages saved by scripts/xcontest_xctsk_tool.py (html/), and
+# XContest tasks saved by scripts/xcontest_xctsk_tool.py (html/, xctsk/),
 # what scripts/extract_task_data.py writes from them (html_cleaned/, json/,
-# geojson/).
+# geojson/), the QR codes scripts/extract_qr_from_html.py reads out of them
+# (qrcode/), and scripts/test_qrcode_generation.py's output
+# (qrcode_test_output/).
 scripts/downloaded_tasks/** linguist-generated
 
 # A copy of AirScore's task, route and IGC modules; never edited (AGENTS.md).
