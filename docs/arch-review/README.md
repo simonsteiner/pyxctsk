@@ -5,6 +5,13 @@ implements the [XCTrack Competition Interfaces](https://xctrack.org/Competition_
 specification and FAI Sporting Code S7F. Each file is dated and kept as written —
 superseded reviews stay for history rather than being edited. Newest first.
 
+- [2026-10-20 — Thirteen hand-written files block their next commit once the token budget is enforced](2026-10-20-token-budget/README.md)
+  — **7 candidates, 4 smaller findings, all open;** the status table in the report's
+  `README.md` is the backlog. The first review written as a folder, so that no file
+  in it outgrows the 5,000-token budget that `scripts/hooks/check-file-tokens.py`
+  enforces. After `.gitattributes` marks the downloaded, vendored and dated files,
+  `CHANGELOG.md` (23.9k tokens, 94 commits in 3 months) is the file that would block
+  nearly every PR. The others are the model's field tables and five test files.
 - [2026-10-02 — The field table checks containers, and nothing owns a scalar](2026-10-02-deepening-candidates.md)
   — **6 candidates, 8 smaller findings, all open;** the status table in the file is the
   backlog. Every finding on the four Strong candidates is a reproduced live defect. The
