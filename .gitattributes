@@ -1,0 +1,24 @@
+# Files no one edits by hand. scripts/hooks/check-file-tokens.py skips
+# anything marked linguist-generated or linguist-vendored here.
+
+# XContest task pages saved by scripts/xcontest_xctsk_tool.py (html/), and
+# what scripts/extract_task_data.py writes from them (html_cleaned/, json/,
+# geojson/).
+scripts/downloaded_tasks/** linguist-generated
+
+# A copy of AirScore's task, route and IGC modules; never edited (AGENTS.md).
+scripts/task_viewer/airscore_clone/** linguist-vendored
+
+# Dated single-file arch-review reports, kept as written. Reports written as
+# folders keep every file under the budget, so they stay checked.
+docs/arch-review/2026-07-07-route-optimization-audit.md linguist-generated
+docs/arch-review/2026-08-16-code-quality-refactor-plan.md linguist-generated
+docs/arch-review/2026-08-17-deepening-candidates.md linguist-generated
+docs/arch-review/2026-08-18-deepening-candidates-after-s7f.html linguist-generated
+docs/arch-review/2026-08-18-deepening-candidates-after-s7f.md linguist-generated
+docs/arch-review/2026-08-18-s7f-2026-conformance-audit.md linguist-generated
+docs/arch-review/2026-08-19-deepening-candidates-at-the-front-door.html linguist-generated
+docs/arch-review/2026-08-19-deepening-candidates-at-the-front-door.md linguist-generated
+docs/arch-review/2026-08-19-pre-release-code-quality-review.md linguist-generated
+docs/arch-review/2026-09-27-deepening-candidates.html linguist-generated
+docs/arch-review/2026-10-02-deepening-candidates.md linguist-generated
