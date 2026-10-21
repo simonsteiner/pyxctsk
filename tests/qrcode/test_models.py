@@ -1,9 +1,6 @@
 """Tests for the models nested inside a QR task."""
 
 
-# Use shared QR code test utilities
-
-
 class TestTheNestedModelsAreReachableOnTheirOwn:
     """``to_dict`` / ``from_dict`` on the objects nested inside a QR task.
 

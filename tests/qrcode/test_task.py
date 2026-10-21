@@ -12,8 +12,6 @@ from pyxctsk.qrcode.models import QRCodeTurnpoint
 from pyxctsk.qrcode.task import QRCodeTask
 from tests.corpus import reference_tasks
 
-# Use shared QR code test utilities
-
 
 def test_qr_turnpoint_field_order():
     """Test that the turnpoint fields are in the correct order."""

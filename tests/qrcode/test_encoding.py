@@ -9,8 +9,6 @@ from pyxctsk import (
 )
 from pyxctsk.qrcode.encoding import decode_nums, encode_num
 
-# Use shared QR code test utilities
-
 
 class TestThePolylineDecoderOwnsItsValidity:
     """``decode_nums`` reads only what ``encode_num`` can write.
