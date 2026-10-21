@@ -30,7 +30,7 @@ The backlog, in rank order. After the scan only three parts of the report change
 | ID | Deepening | Strength | Lens | Status | Branch | PR | Breaking | Notes |
 |---|---|---|---|---|---|---|---|---|
 | [C1](C1-changelog-keeps-the-open-release.md) | `CHANGELOG.md` keeps the open release; released ones move out | 🟢 Strong | maintainability | dropped | `refactor/changelog-archive` | | | the `file-tokens` job excludes `CHANGELOG.md` instead; see Departures |
-| [C2](C2-split-the-model-tables.md) | Split `model/shape.py` and `model/task.py` along their seams | 🟢 Strong | maintainability | todo | `refactor/split-model` | | | |
+| [C2](C2-split-the-model-tables.md) | Split `model/shape.py` and `model/task.py` along their seams | 🟢 Strong | maintainability | in-progress | `refactor/split-model` | | | |
 | [C3](C3-split-the-front-door-tests.md) | Split the CLI and layering tests | 🟢 Strong | maintainability | todo | `refactor/split-front-door-tests` | | | |
 | [C4](C4-qrcode-tests-mirror-qrcode.md) | `tests/qrcode/` mirrors `qrcode/` | 🟢 Strong | maintainability | todo | `refactor/split-qrcode-tests` | | | |
 | [C5](C5-split-the-export-tests.md) | Split the export tests; the writers' agreement gets its own file | 🟢 Strong | maintainability | todo | `refactor/split-export-tests` | | | |
