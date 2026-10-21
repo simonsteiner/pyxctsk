@@ -6,32 +6,26 @@ These tests encode the acceptance criteria from the route-optimization audit
 - optimized distances match XCTrack's displayed optimized distance on real
   tasks (within 0.1% and 50 m on 5+ tasks; reference values are rounded to
   0.1 km, so a 50 m quantization allowance applies),
-- nested/overlapping cylinders take the crossing case (no spurious detours),
-- a previous point inside a cylinder yields the segment-circle intersection,
-- goal-line tasks finish on the goal line, perpendicular to the incoming leg,
-- iteration beyond the ε = 0.1 m convergence point changes nothing,
 - optimized distance never exceeds the distance through centers (except for
   concentric turnpoints, where touching semantics *require* flying back out —
   behaviour XCTrack shares, see task_nohe).
 
-Everything here goes straight at the optimizer. The pipeline that calls it —
+Everything here goes straight at the optimizer. The crossing, goal-line and
+convergence cases are `test_route_optimization_cases.py` and the earth model is
+`test_earth.py`. The pipeline that calls the optimizer —
 `calculate_task_distances`, cumulative distances, degenerate inputs — is
 `test_task_distances.py`; the optimizer's internals are
 `test_route_optimization.py`.
 """
 
-import math
-
 import pytest
 from pyproj import Geod
 
-from pyxctsk import EarthModel, GoalType, TurnpointType
+from pyxctsk import GoalType, TurnpointType
 from pyxctsk.distance import (
-    MeasuredTask,
     TaskTurnpoint,
     calculate_iteratively_refined_route,
     distance_through_centers,
-    geodesic_distance,
     optimized_distance,
 )
 from pyxctsk.distance.measured_task import task_to_turnpoints
@@ -48,11 +42,6 @@ REF_QUANTIZATION_M = 50.0
 
 #: Every task the reference producer recorded an optimized distance for.
 WITH_REFERENCE = tasks_with_reference_distance()
-
-#: Convergence is a property of the algorithm, not of any one task, so it is
-#: checked on a sample rather than all 22 — each case runs the optimizer twice,
-#: the second time to 500 sweeps. The sample is named in the test ids.
-CONVERGENCE_SAMPLE = WITH_REFERENCE[:5]
 
 
 def _has_concentric_pair(turnpoints: list[TaskTurnpoint]) -> bool:
@@ -155,7 +144,8 @@ class TestOneSolverOneProjection:
     ``TaskTurnpoint.optimal_point`` used to project onto a plane centred on
     *that turnpoint*, while the route optimizer projected onto the plane of
     the whole task area. Same paragraph of the spec (S7F §7.1.2), two
-    different answers — and every crossing-case test below aimed at the one
+    different answers — and every crossing-case test in
+    ``test_route_optimization_cases.py`` aimed at the one
     the product does not use, so a fix made there could go green and ship
     nothing. The plane is a required argument of ``boundary_point`` now, so a
     test cannot reach the per-turnpoint projection without saying it means to;
@@ -246,212 +236,3 @@ class TestOneSolverOneProjection:
         )[-1]
 
         assert goal.radius == 400
-
-
-class TestCrossingCase:
-    """GetOptPi crossing situations (Ding et al. Theorem 1)."""
-
-    def test_prev_inside_yields_segment_circle_intersection(self):
-        """A previous point inside the cylinder gives the boundary crossing.
-
-        Hand-computed: cylinder center (47, 8), r = 5000 m; previous point
-        2000 m due east of the center (inside), next point 20000 m due east.
-        The prev→next segment runs due east, so the optimal point is exactly
-        5000 m due east of the center.
-        """
-        center = (47.0, 8.0)
-        lon_p, lat_p, _ = WGS84.fwd(center[1], center[0], 90.0, 2_000.0)
-        lon_n, lat_n, _ = WGS84.fwd(center[1], center[0], 90.0, 20_000.0)
-        lon_e, lat_e, _ = WGS84.fwd(center[1], center[0], 90.0, 5_000.0)
-
-        tp = TaskTurnpoint(center[0], center[1], 5_000.0)
-        # The task's own plane, which is the projection the optimizer builds —
-        # these used to take a default plane centred on this turnpoint alone,
-        # a projection no shipped code path ever constructs.
-        plane = LocalPlane.around([tp.center, (lat_p, lon_p), (lat_n, lon_n)])
-        point = boundary_point(tp, (lat_p, lon_p), (lat_n, lon_n), plane)
-
-        _, _, err = WGS84.inv(point[1], point[0], lon_e, lat_e)
-        assert err < 1.0, f"crossing point off by {err:.2f} m"
-        # And it must sit exactly on the boundary.
-        _, _, dist_to_center = WGS84.inv(point[1], point[0], center[1], center[0])
-        assert dist_to_center == pytest.approx(5_000.0, abs=0.01)
-
-    def test_crossing_point_adds_no_distance(self):
-        """When the leg already crosses the cylinder, the detour is zero."""
-        prev_point = (46.8, 8.0)
-        next_point = (47.2, 8.0)
-        tp = TaskTurnpoint(47.0, 8.0, 3_000.0)
-        plane = LocalPlane.around([tp.center, prev_point, next_point])
-        point = boundary_point(tp, prev_point, next_point, plane)
-
-        _, _, direct = WGS84.inv(
-            prev_point[1], prev_point[0], next_point[1], next_point[0]
-        )
-        _, _, leg1 = WGS84.inv(prev_point[1], prev_point[0], point[1], point[0])
-        _, _, leg2 = WGS84.inv(point[1], point[0], next_point[1], next_point[0])
-        assert leg1 + leg2 - direct < 1.0
-
-    def test_nested_cylinder_no_spurious_detour(self):
-        """A small turnpoint inside a large start cylinder routes straight through.
-
-        Task: takeoff → large SSS cylinder (r=20 km) → small turnpoint (r=1 km,
-        its center inside the SSS circle) → goal. Both circles are crossed by
-        the direct path, so the optimized distance must not exceed the straight
-        takeoff→goal-boundary geodesic, and must be well below the center path.
-        """
-        takeoff = TaskTurnpoint(47.0, 8.0)
-        sss = TaskTurnpoint(47.30, 8.0, 20_000.0)  # takeoff→center ≈ 33 km
-        small = TaskTurnpoint(47.35, 8.0, 1_000.0)  # inside the SSS circle
-        goal = TaskTurnpoint(47.6, 8.0, 400.0)
-        turnpoints = [takeoff, sss, small, goal]
-
-        opt = optimized_distance(turnpoints)
-        centers = distance_through_centers(turnpoints)
-
-        # Straight geodesic from takeoff to the goal boundary is the lower
-        # bound; every cylinder lies on it, so the optimum must reach it.
-        _, _, direct = WGS84.inv(8.0, 47.0, 8.0, 47.6)
-        assert opt == pytest.approx(direct - 400.0, abs=1.0)
-        assert opt <= centers
-
-        # The route point on each intermediate circle lies on the straight
-        # line (crossing case): no out-and-back deviation in longitude.
-        route = calculate_iteratively_refined_route(turnpoints).points
-        for lat, lon in route:
-            assert abs(lon - 8.0) < 1e-4
-
-
-class TestGoalLine:
-    """Goal-line finish per S7F §6.2.3.1."""
-
-    def test_goal_line_task_matches_reference(self):
-        """task_piga_line: finish sits on the goal line and distance matches."""
-        task = reference_task("task_piga_line").task
-        turnpoints = task_to_turnpoints(task)
-
-        optimized = calculate_iteratively_refined_route(turnpoints)
-        route = optimized.points
-        assert optimized.total_m / 1000.0 == pytest.approx(35.4, abs=0.1)
-
-        # The goal line is centred on the goal and perpendicular to the
-        # incoming optimized leg, so its center is the optimal crossing: the
-        # finish point must be the goal center — which lies on the line for
-        # any orientation, and trivially satisfies perpendicularity.
-        goal_center = turnpoints[-1].center
-        assert route[-1][0] == pytest.approx(goal_center[0], abs=1e-9)
-        assert route[-1][1] == pytest.approx(goal_center[1], abs=1e-9)
-
-    def test_finish_point_perpendicular_foot_is_center(self):
-        """The optimal crossing of a goal line is the goal center.
-
-        The line is oriented perpendicular to the incoming leg (§6.2.3.1), so
-        the perpendicular foot from the incoming point is the center itself.
-        """
-        goal = TaskTurnpoint(47.0, 8.0, 0)
-        prev_point = (46.9, 7.95)
-        plane = LocalPlane.around([goal.center, prev_point])
-        finish = boundary_point(goal, prev_point, prev_point, plane)
-        assert finish == goal.center
-
-
-class TestConvergence:
-    """ε = 0.1 m convergence (S7F §7.1.3)."""
-
-    @pytest.mark.parametrize("reference", CONVERGENCE_SAMPLE, ids=str)
-    def test_more_iterations_change_nothing(self, reference):
-        """Beyond convergence, more sweeps change the result by < 0.1 m."""
-        turnpoints = task_to_turnpoints(reference.task)
-        base = optimized_distance(turnpoints)
-        more = optimized_distance(turnpoints, num_iterations=500)
-
-        assert abs(base - more) <= 0.1, (
-            f"{reference.stem}: {abs(base - more):.3f} m change after convergence"
-        )
-
-
-class TestEarthModel:
-    """earthModel field: WGS84 (default) vs FAI sphere (R = 6371 km)."""
-
-    def test_fai_sphere_great_circle_distance(self):
-        """Zero-radius points 1° apart along a meridian: exactly R·π/180."""
-        turnpoints = [TaskTurnpoint(0.0, 8.0, 0), TaskTurnpoint(1.0, 8.0, 0)]
-        sphere = EarthModel.FAI_SPHERE
-        sphere_deg = 6_371_000.0 * math.pi / 180.0  # 111194.93 m
-        assert optimized_distance(turnpoints, earth_model=sphere) == pytest.approx(
-            sphere_deg, abs=1.0
-        )
-        assert distance_through_centers(turnpoints, sphere) == pytest.approx(
-            sphere_deg, abs=1.0
-        )
-
-    def test_wgs84_differs_from_sphere(self):
-        """The same task measures differently on the two earth models."""
-        turnpoints = [TaskTurnpoint(0.0, 8.0, 0), TaskTurnpoint(1.0, 8.0, 0)]
-        wgs = optimized_distance(turnpoints)
-        sph = optimized_distance(turnpoints, earth_model="FAI_SPHERE")
-        # A meridian degree at the equator is ~110.57 km on WGS84.
-        assert wgs == pytest.approx(110_574.4, abs=10.0)
-        assert abs(wgs - sph) > 500.0
-
-    def test_task_earth_model_propagates(self):
-        """The measured task hands the task's earthModel to the optimizer."""
-        task = reference_task("task_bevo").task
-        task.earth_model = EarthModel.FAI_SPHERE
-        sphere = MeasuredTask.from_task(task)
-        task.earth_model = None
-        wgs = MeasuredTask.from_task(task)
-
-        assert sphere.route.earth_model is EarthModel.FAI_SPHERE
-        assert abs(sphere.total_m - wgs.total_m) > 50.0
-
-
-class TestTheEarthModelSelector:
-    """The three values ADR 0003 admits, and the ones it does not.
-
-    The selector was typed `object` in 16 signatures, so anything unrecognised
-    fell through to WGS84 and neither mypy nor the runtime said a word: a
-    misspelled "FAI-SPHERE" cost 97.6 m on a 135 km leg, silently.
-    """
-
-    A = (46.0, 8.0)
-    B = (47.0, 9.0)
-
-    @pytest.mark.parametrize("selector", [None, "WGS84", EarthModel.WGS84, "wgs84"])
-    def test_the_ellipsoid_is_named_three_ways_and_defaulted(self, selector):
-        """None means WGS84, and the enum and its string value agree."""
-        assert geodesic_distance(self.A, self.B, selector) == pytest.approx(
-            geodesic_distance(self.A, self.B)
-        )
-
-    @pytest.mark.parametrize("selector", ["FAI_SPHERE", EarthModel.FAI_SPHERE])
-    def test_the_sphere_is_named_two_ways(self, selector):
-        """And it really is a different answer, not a synonym."""
-        sphere = geodesic_distance(self.A, self.B, selector)
-
-        assert sphere == pytest.approx(134989.615, abs=0.01)
-        assert sphere != pytest.approx(geodesic_distance(self.A, self.B), abs=1.0)
-
-    @pytest.mark.parametrize(
-        "selector", ["WSG84", "FAI-SPHERE", "SPHERE", "", 42, object()]
-    )
-    def test_anything_else_is_refused_rather_than_treated_as_wgs84(self, selector):
-        """The failure mode this replaces: a typo that measured 97.6 m short."""
-        with pytest.raises(ValueError, match="not an earth model"):
-            geodesic_distance(self.A, self.B, selector)
-
-    def test_the_message_names_what_is_allowed(self):
-        """So a caller can fix it without reading the source."""
-        with pytest.raises(ValueError, match="WGS84.*FAI_SPHERE"):
-            geodesic_distance(self.A, self.B, "WSG84")
-
-    def test_a_task_declaring_a_bad_model_fails_when_measured(self):
-        """The model is a format field, so this is reachable from a real file."""
-        built = task(
-            turnpoint("A", 46.0, 8.0, radius=400),
-            turnpoint("B", 46.5, 8.5, radius=400),
-        )
-        built.earth_model = "NOT_AN_EARTH"  # type: ignore[assignment]
-
-        with pytest.raises(ValueError, match="not an earth model"):
-            MeasuredTask.from_task(built)
