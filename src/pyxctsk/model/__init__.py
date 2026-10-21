@@ -4,7 +4,8 @@ This package holds the task itself and the rules that belong to it: the
 dataclasses of the spec's object graph (:mod:`~pyxctsk.model.task` and
 :mod:`~pyxctsk.model.task_parts`), the field tables and codecs that map them to
 the wire (:mod:`~pyxctsk.model.shape`, :mod:`~pyxctsk.model.codec` and
-:mod:`~pyxctsk.model.json_io`), the enumerations that constrain their fields (:mod:`~pyxctsk.model.enums`), the
+:mod:`~pyxctsk.model.json_io`), the enumerations that constrain their fields
+(:mod:`~pyxctsk.model.enums`), the
 ``HH:MM:SSZ`` value type (:mod:`~pyxctsk.model.time_of_day`), the
 unknown-field passthrough rules (:mod:`~pyxctsk.model.passthrough`), the
 spec's structural checks (:mod:`~pyxctsk.model.validation`) and the Java
