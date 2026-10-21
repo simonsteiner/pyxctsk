@@ -30,12 +30,12 @@ The backlog, in rank order. After the scan only three parts of the report change
 | ID | Deepening | Strength | Lens | Status | Branch | PR | Breaking | Notes |
 |---|---|---|---|---|---|---|---|---|
 | [C1](C1-changelog-keeps-the-open-release.md) | `CHANGELOG.md` keeps the open release; released ones move out | 🟢 Strong | maintainability | dropped | `refactor/changelog-archive` | | | the `file-tokens` job excludes `CHANGELOG.md` instead; see Departures |
-| [C2](C2-split-the-model-tables.md) | Split `model/shape.py` and `model/task.py` along their seams | 🟢 Strong | maintainability | in-progress | `refactor/split-model` | | | committed locally; PR not opened yet |
-| [C3](C3-split-the-front-door-tests.md) | Split the CLI and layering tests | 🟢 Strong | maintainability | in-progress | `refactor/split-front-door-tests` | | | committed locally; PR not opened yet |
-| [C4](C4-qrcode-tests-mirror-qrcode.md) | `tests/qrcode/` mirrors `qrcode/` | 🟢 Strong | maintainability | in-progress | `refactor/split-qrcode-tests` | | | committed locally; PR not opened yet |
-| [C5](C5-split-the-export-tests.md) | Split the export tests; the writers' agreement gets its own file | 🟢 Strong | maintainability | in-progress | `refactor/split-export-tests` | | | committed locally; PR not opened yet |
-| [C6](C6-split-the-distance-tests.md) | Split the XCTrack accuracy tests | 🟢 Strong | maintainability | todo | `refactor/split-distance-tests` | | | |
-| [S1](#s1--two-identical-_race_task-builders) | Two identical `_race_task` builders | — | maintainability | todo | rides with C6 | | | |
+| [C2](C2-split-the-model-tables.md) | Split `model/shape.py` and `model/task.py` along their seams | 🟢 Strong | maintainability | pr-open | `refactor/split-model` | [#45](https://github.com/simonsteiner/pyxctsk/pull/45) | | |
+| [C3](C3-split-the-front-door-tests.md) | Split the CLI and layering tests | 🟢 Strong | maintainability | pr-open | `refactor/split-front-door-tests` | [#46](https://github.com/simonsteiner/pyxctsk/pull/46) | | |
+| [C4](C4-qrcode-tests-mirror-qrcode.md) | `tests/qrcode/` mirrors `qrcode/` | 🟢 Strong | maintainability | pr-open | `refactor/split-qrcode-tests` | [#47](https://github.com/simonsteiner/pyxctsk/pull/47) | | |
+| [C5](C5-split-the-export-tests.md) | Split the export tests; the writers' agreement gets its own file | 🟢 Strong | maintainability | pr-open | `refactor/split-export-tests` | [#48](https://github.com/simonsteiner/pyxctsk/pull/48) | | |
+| [C6](C6-split-the-distance-tests.md) | Split the XCTrack accuracy tests | 🟢 Strong | maintainability | pr-open | `refactor/split-distance-tests` | [#49](https://github.com/simonsteiner/pyxctsk/pull/49) | | |
+| [S1](#s1--two-identical-_race_task-builders) | Two identical `_race_task` builders | — | maintainability | pr-open | rides with C6 | [#49](https://github.com/simonsteiner/pyxctsk/pull/49) | | in C6's PR |
 | [S3](#s3--nothing-enforces-the-budget) | Nothing enforces the budget | — | maintainability | merged | `chore/shared-file-tokens` | [#43](https://github.com/simonsteiner/pyxctsk/pull/43) | | landed first; see Departures |
 | [C7](C7-split-the-scripts.md) | Split the three oversized `scripts/` utilities | 🟡 Worth exploring | maintainability | todo | `refactor/split-scripts` | | | no commit in 3 months |
 | [S2](#s2--a-process-branch-that-never-runs) | A `process` branch that never runs | — | maintainability | todo | rides with C7 | | | |
@@ -129,3 +129,5 @@ Every job sets `priority:` under `parallel: true`, which lefthook ignores (the f
 - **C4 follows the After diagram, not the table, for lines 1-316.** The card's table lists them under `task.py`, but its After diagram keeps them in `test_codec.py` as the corpus round-trips, and the Decisions followed the diagram.
 - **C5: `_drawing_of` stays in `test_geojson.py`.** The card said both GeoJSON halves use it, but the goal-line half uses none of the module helpers (Q9), so only `_task` went to `tests/builders.py`.
 - **C5: the agreement file holds two tests that render no writer.** Q4 moved `test_the_control_zone_radius_is_half_the_line` and `test_an_ordinary_turnpoint_is_described_without_a_role` with the twelve that do, because they pin the drawing answers both writers share.
+- **C6/S1: the shared builder is typed `-> Task`, so two tests gained `assert ... is not None`.** The untyped `_race_task` let mypy see `radius` and `center_distance` as unchecked; `test_the_goal_boundary_reading_is_shorter_by_the_goal_radius` now binds `goal_radius` and `whole` and asserts both are set before subtracting.
+- **C6/S1: the two `_race_task` bodies matched but their docstrings did not, so `race_to_goal_cylinder_task` merges them.** One docstring names the pre-start leg, the speed section and the cylinder goal, covering both callers.
