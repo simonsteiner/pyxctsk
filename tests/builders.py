@@ -107,6 +107,26 @@ def task(
     )
 
 
+def three_turnpoint_task(
+    goal: GoalType | None = None, middle_lat: float = 46.0
+) -> Task:
+    """A three-turnpoint task, optionally with a goal of the given type.
+
+    Args:
+        goal: The goal's type, or None for a task with no goal.
+        middle_lat: Latitude of the second turnpoint, to move the course.
+
+    Returns:
+        Task: A takeoff, a middle turnpoint and a goal cylinder on one meridian.
+    """
+    return task(
+        turnpoint("A", 45.5, 8.0, alt=0, type=TurnpointType.TAKEOFF),
+        turnpoint("B", middle_lat, 8.0, alt=0, type=TurnpointType.NONE),
+        turnpoint("Goal", 47.0, 8.0, alt=0, radius=400, type=TurnpointType.NONE),
+        goal=goal,
+    )
+
+
 #: One turnpoint at a known position, so every format test converts the same
 #: task and differs only in what it asks the CLI to write.
 TAKEOFF_ONLY_TASK = task(
