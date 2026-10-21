@@ -243,8 +243,8 @@ class TestEveryFieldCrossesTheSeam:
 
     `model/shape.py` exists to abolish "a hand-written to_dict sitting beside a
     hand-written from_dict, with nothing making the two agree", and it did — at
-    the model↔wire seam, where `test_shape.py` pairs each table against its
-    dataclass. The model↔*model* seam is still exactly that situation:
+    the model↔wire seam, where `conformance/test_field_tables.py` pairs each
+    table against its dataclass. The model↔*model* seam is still exactly that situation:
     `task_to_qr_code_task` and `qr_code_task_to_task` are two hand-written
     field-by-field constructors of ~65 lines each.
 

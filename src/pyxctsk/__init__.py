@@ -79,11 +79,11 @@ from .model.task import (
     Takeoff,
     Task,
     TaskType,
-    TimeOfDay,
     Turnpoint,
     TurnpointType,
     Waypoint,
 )
+from .model.time_of_day import TimeOfDay
 from .model.validation import FULL_FORMAT_VERSION, ValidationIssue, ValidationRule
 from .parser import load_task, parse_task
 from .qrcode.image import generate_qrcode_image
