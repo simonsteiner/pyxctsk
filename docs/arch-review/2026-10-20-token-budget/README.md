@@ -1,6 +1,6 @@
 # pyxctsk: thirteen hand-written files block their next commit once the token budget is enforced
 
-`2026-10-20` · at `6f728ab` (`docs/arch-review-token-budget`) · scope: every tracked file over the 5,000-token budget of `scripts/hooks/check-file-tokens.py`, then the `lefthook.yml` job that enforces it · glossary: `GLOSSARY.md` · ADRs read: 0001–0004 (none bears on a split)
+`2026-10-20` · at `6f728ab` (`docs/arch-review-token-budget`) · scope: every tracked file over the 5,000-token budget of the shared [`check-file-tokens.py`](https://github.com/simonsteiner/skills/blob/filetokens.v1.0.0/.lefthook/pre-commit/check-file-tokens.py), then the `lefthook.yml` job that enforces it · glossary: `GLOSSARY.md` · ADRs read: 0001–0004 (none bears on a split)
 
 **Jump to:** [Status](#status) · [Where it hurts](#where-it-hurts) · [Since the last review](#since-the-last-review) · [Smaller findings](#smaller-findings) · [Recommendation](#recommendation) · cards: [C1](C1-changelog-keeps-the-open-release.md) · [C2](C2-split-the-model-tables.md) · [C3](C3-split-the-front-door-tests.md) · [C4](C4-qrcode-tests-mirror-qrcode.md) · [C5](C5-split-the-export-tests.md) · [C6](C6-split-the-distance-tests.md) · [C7](C7-split-the-scripts.md)
 
@@ -36,7 +36,7 @@ The backlog, in rank order. After the scan only three parts of the report change
 | [C5](C5-split-the-export-tests.md) | Split the export tests; the writers' agreement gets its own file | 🟢 Strong | maintainability | todo | `refactor/split-export-tests` | | | |
 | [C6](C6-split-the-distance-tests.md) | Split the XCTrack accuracy tests | 🟢 Strong | maintainability | todo | `refactor/split-distance-tests` | | | |
 | [S1](#s1--two-identical-_race_task-builders) | Two identical `_race_task` builders | — | maintainability | todo | rides with C6 | | | |
-| [S3](#s3--nothing-enforces-the-budget) | Nothing enforces the budget | — | maintainability | todo | `chore/file-tokens-hook` | | | last PR of the stack |
+| [S3](#s3--nothing-enforces-the-budget) | Nothing enforces the budget | — | maintainability | pr-open | `chore/shared-file-tokens` | | | landed first; see Departures |
 | [C7](C7-split-the-scripts.md) | Split the three oversized `scripts/` utilities | 🟡 Worth exploring | maintainability | todo | `refactor/split-scripts` | | | no commit in 3 months |
 | [S2](#s2--a-process-branch-that-never-runs) | A `process` branch that never runs | — | maintainability | todo | rides with C7 | | | |
 | [S4](#s4--the-existing-hook-jobs-break-three-setup-rules) | The existing hook jobs break three setup rules | — | maintainability | todo | | | | follow-up, not in this rollout |
@@ -118,3 +118,5 @@ Every job sets `priority:` under `parallel: true`, which lefthook ignores (the f
 ## Departures
 
 <!-- filled during implementation: where a PR deliberately differs from this report, and why -->
+
+- **The `file-tokens` job (S3) landed before the splits, from a shared script.** `chore/shared-file-tokens` added it to `lefthook.yml` running the shared [`check-file-tokens.py`](https://github.com/simonsteiner/skills/blob/filetokens.v1.0.0/.lefthook/pre-commit/check-file-tokens.py), which lefthook fetches from [simonsteiner/skills](https://github.com/simonsteiner/skills) pinned to the tag `filetokens.v1.0.0`, and deleted the copy in `scripts/hooks/`. Until its split lands, a commit that touches a file this report lists is blocked, so each split commit leaves every file it touches under the budget.

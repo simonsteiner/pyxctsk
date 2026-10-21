@@ -1,8 +1,29 @@
 # Ref: https://github.com/evilmartians/lefthook
 # Install the git hooks with: uv run lefthook install
 
+min_version: 2.0.5 # `args:` on script jobs
+
+remotes:
+  # The shared token-budget script. A tag, never a commit SHA. Bump `ref` to
+  # update; the next commit fetches it.
+  - git_url: https://github.com/simonsteiner/skills
+    ref: filetokens.v1.0.0
+    configs:
+      - lefthook/file-tokens.yml
+
 pre-commit:
   parallel: true
+  jobs:
+    # Every staged file an agent writes stays under 5,000 tokens (bytes / 4), so
+    # an agent can read it whole. Lockfiles, build output, binaries and generated
+    # files are skipped; mark more with linguist-generated in .gitattributes.
+    # On failure it prints how to split the file. The script comes from the
+    # remote above; the budget is set here.
+    # Through uv, like ruff and mypy: the project's Python, not python3 on PATH.
+    - name: file-tokens
+      script: check-file-tokens.py
+      runner: uv run python
+      args: --max-tokens 5000 {staged_files}
   commands:
     # One job, not two: under `parallel: true` lefthook ignores `priority`, and
     # two fixers rewriting the same files at once undo each other's fixes.

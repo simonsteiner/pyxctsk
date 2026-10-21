@@ -4,6 +4,9 @@
 [global]
 # MD013: the docs keep a paragraph, table row or link on one line.
 disable = ["MD013"]
+# lefthook clones its remotes into .git/info/lefthook-remotes/, and rumdl
+# doesn't skip .git on its own.
+exclude = [".git/**"]
 # Changelog versions each repeat Added / Changed / Fixed; only siblings must differ.
 [MD024]
 siblings_only = true

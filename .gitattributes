@@ -1,5 +1,5 @@
-# Files no one edits by hand. scripts/hooks/check-file-tokens.py skips
-# anything marked linguist-generated or linguist-vendored here.
+# Files no one edits by hand. The token budget (the file-tokens job in
+# lefthook.yml) skips anything marked linguist-generated or linguist-vendored here.
 
 # XContest tasks saved by scripts/xcontest_xctsk_tool.py (html/, xctsk/),
 # what scripts/extract_task_data.py writes from them (html_cleaned/, json/,
