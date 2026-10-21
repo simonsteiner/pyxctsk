@@ -32,7 +32,7 @@ The backlog, in rank order. After the scan only three parts of the report change
 | [C1](C1-changelog-keeps-the-open-release.md) | `CHANGELOG.md` keeps the open release; released ones move out | 🟢 Strong | maintainability | dropped | `refactor/changelog-archive` | | | the `file-tokens` job excludes `CHANGELOG.md` instead; see Departures |
 | [C2](C2-split-the-model-tables.md) | Split `model/shape.py` and `model/task.py` along their seams | 🟢 Strong | maintainability | in-progress | `refactor/split-model` | | | committed locally; PR not opened yet |
 | [C3](C3-split-the-front-door-tests.md) | Split the CLI and layering tests | 🟢 Strong | maintainability | in-progress | `refactor/split-front-door-tests` | | | committed locally; PR not opened yet |
-| [C4](C4-qrcode-tests-mirror-qrcode.md) | `tests/qrcode/` mirrors `qrcode/` | 🟢 Strong | maintainability | todo | `refactor/split-qrcode-tests` | | | |
+| [C4](C4-qrcode-tests-mirror-qrcode.md) | `tests/qrcode/` mirrors `qrcode/` | 🟢 Strong | maintainability | in-progress | `refactor/split-qrcode-tests` | | | committed locally; PR not opened yet |
 | [C5](C5-split-the-export-tests.md) | Split the export tests; the writers' agreement gets its own file | 🟢 Strong | maintainability | todo | `refactor/split-export-tests` | | | |
 | [C6](C6-split-the-distance-tests.md) | Split the XCTrack accuracy tests | 🟢 Strong | maintainability | todo | `refactor/split-distance-tests` | | | |
 | [S1](#s1--two-identical-_race_task-builders) | Two identical `_race_task` builders | — | maintainability | todo | rides with C6 | | | |
@@ -126,3 +126,4 @@ Every job sets `priority:` under `parallel: true`, which lefthook ignores (the f
 - **C2: `pyxctsk/__init__.py` imports `TimeOfDay` from `model.time_of_day`.** `task.py` no longer re-exports it, and nothing else imported it from there.
 - **C2: `ruff` merged the `# noqa: F401` re-export blocks.** The `*_SHAPE` tables now share `task.py`'s re-export import with the classes, which Q6 did not plan.
 - **C3: the `_rel` helper became `rel_path`, not `rel`.** Q10 said the moved helpers drop their underscores, but a test assigns a local `rel = rel(path)`, which ruff flags as F823.
+- **C4 follows the After diagram, not the table, for lines 1-316.** The card's table lists them under `task.py`, but its After diagram keeps them in `test_codec.py` as the corpus round-trips, and the Decisions followed the diagram.
