@@ -17,7 +17,7 @@ uv run ruff check --fix src/ tests/ scripts/  # lint and autofix
 uv run ruff format src/ tests/ scripts/  # format
 uv run mypy src/ tests/  # type-check (strict)
 uv run rumdl check .  # lint Markdown
-uv run lefthook install  # enable the pre-commit hooks (ruff, mypy, rumdl, cspell)
+uv run lefthook install  # enable the pre-commit hooks (ruff, mypy, rumdl, cspell, token budget)
 uv run lefthook run pre-commit  # run the hooks on staged files
 uv run python scripts/check_qr_deps.py  # check the qr extra imports and decodes
 scripts/verify.sh  # the full CI and release gate, including tests from the built sdist

@@ -44,4 +44,6 @@ flowchart LR
 
 <!-- filled during implementation, one line each -->
 
+- Dropped: the `file-tokens` job excludes `CHANGELOG.md` instead (see the report's Departures).
+
 </details>
