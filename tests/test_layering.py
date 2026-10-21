@@ -31,7 +31,16 @@ from textwrap import dedent
 
 import pytest
 
-SRC = Path(__file__).resolve().parents[1] / "src" / "pyxctsk"
+from tests.import_scan import (
+    SRC,
+    classify_imports,
+    deferred_imports,
+    import_time_imports,
+    modules,
+    rel_path,
+    target_module,
+    target_package,
+)
 
 #: What each package is allowed to import from the rest of pyxctsk.
 ALLOWED: dict[str, set[str]] = {
@@ -60,127 +69,22 @@ EXPECTED_DEFERRED_IMPORTS = {
 }
 
 
-def _modules() -> list[Path]:
-    """Every source file in the package, __init__ files included."""
-    return sorted(p for p in SRC.rglob("*.py") if "__pycache__" not in p.parts)
-
-
-def _rel(path: Path) -> str:
-    """Package-relative path, e.g. 'model/task.py'."""
-    return path.relative_to(SRC).as_posix()
-
-
-def _target_module(node: ast.ImportFrom, module_path: Path) -> str | None:
-    """Resolve a relative `from ... import` to the pyxctsk module it names.
-
-    Returns the dotted path within pyxctsk (``"qrcode.conversion"``,
-    ``"exceptions"``, …), or None for third-party and standard-library imports.
-    """
-    if node.level == 0:  # absolute import: third-party or stdlib
-        return None
-
-    # Directory the import is resolved against: level 1 is the module's own
-    # package, level 2 its parent, and so on.
-    base = module_path.parent
-    for _ in range(node.level - 1):
-        base = base.parent
-
-    parts = (node.module or "").split(".") if node.module else []
-    resolved = base.relative_to(SRC).as_posix()
-    full = [p for p in (resolved.split("/") if resolved != "." else []) + parts if p]
-    return ".".join(full) if full else None
-
-
-def _target_package(node: ast.ImportFrom, module_path: Path) -> str | None:
-    """The top-level pyxctsk package a relative import reaches into.
-
-    ``"qrcode"`` for ``from ..qrcode.conversion import x``. None for
-    third-party and standard-library imports.
-    """
-    target = _target_module(node, module_path)
-    return target.split(".")[0] if target else None
-
-
-def _is_type_checking_guard(node: ast.AST) -> bool:
-    """Whether this is an `if TYPE_CHECKING:` / `if typing.TYPE_CHECKING:`.
-
-    Only the guarded body is type-only; an `else:` branch on the same `if` runs
-    normally, so the caller skips the body and keeps walking `orelse`.
-    """
-    if not isinstance(node, ast.If):
-        return False
-    if isinstance(node.test, ast.Name):
-        return node.test.id == "TYPE_CHECKING"
-    if isinstance(node.test, ast.Attribute):
-        return node.test.attr == "TYPE_CHECKING"
-    return False
-
-
-def _classify_imports(
-    tree: ast.Module,
-) -> tuple[list[ast.ImportFrom], list[ast.ImportFrom]]:
-    """Split a module's `from ... import`s by whether they run on import.
-
-    The question both layer rules ask is "does this execute when the module is
-    imported", which is not the same as "is this a direct child of the module".
-    A `try:/except ImportError:` at module level, a module-level `if`, and a
-    class body all run on import; only a function body defers, and only
-    `if TYPE_CHECKING:` never runs at all.
-
-    Args:
-        tree: The parsed module.
-
-    Returns:
-        `(at_import_time, deferred)`, each in statement order. Bodies guarded by
-        `if TYPE_CHECKING:` appear in neither.
-    """
-    at_import_time: list[ast.ImportFrom] = []
-    deferred: list[ast.ImportFrom] = []
-
-    def visit(node: ast.AST, in_function: bool) -> None:
-        if isinstance(node, ast.ImportFrom):
-            (deferred if in_function else at_import_time).append(node)
-            return
-        if _is_type_checking_guard(node):
-            assert isinstance(node, ast.If)  # narrowed by the guard predicate
-            for statement in node.orelse:
-                visit(statement, in_function)
-            return
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            in_function = True
-        for child in ast.iter_child_nodes(node):
-            visit(child, in_function)
-
-    visit(tree, False)
-    return at_import_time, deferred
-
-
-def _import_time_imports(tree: ast.Module) -> list[ast.ImportFrom]:
-    """Relative imports that run when the module is imported."""
-    return _classify_imports(tree)[0]
-
-
-def _deferred_imports(tree: ast.Module) -> list[ast.ImportFrom]:
-    """Relative imports inside function bodies, which run only when called."""
-    return _classify_imports(tree)[1]
-
-
 @pytest.fixture(scope="module")
 def parsed() -> list[tuple[Path, ast.Module]]:
     """Every module in the package, parsed once."""
-    return [(path, ast.parse(path.read_text())) for path in _modules()]
+    return [(path, ast.parse(path.read_text())) for path in modules()]
 
 
 def test_dependencies_run_one_way(parsed):
     """No package imports another it is not allowed to depend on."""
     violations = []
     for path, tree in parsed:
-        rel = _rel(path)
+        rel = rel_path(path)
         package = path.relative_to(SRC).parts[0]
         if package not in ALLOWED:  # top-level module: may import anything
             continue
-        for node in _import_time_imports(tree):
-            target = _target_package(node, path)
+        for node in import_time_imports(tree):
+            target = target_package(node, path)
             if target in (None, package) or target in LEAVES:
                 continue
             if target not in ALLOWED[package]:
@@ -202,7 +106,7 @@ def test_no_module_imports_its_own_package_init(parsed):
         package = path.relative_to(SRC).parts[0]
         if package not in ALLOWED:
             continue
-        for node in _import_time_imports(tree):
+        for node in import_time_imports(tree):
             # `from . import x` — the package's own __init__ by definition.
             bare_own_package = node.level == 1 and node.module is None
             # `from ..export import x` / `from ..export.common import x` from
@@ -213,7 +117,7 @@ def test_no_module_imports_its_own_package_init(parsed):
                 and node.module.split(".")[0] == package
             )
             if bare_own_package or via_own_package:
-                violations.append(f"{_rel(path)}:{node.lineno}")
+                violations.append(f"{rel_path(path)}:{node.lineno}")
 
     assert not violations, (
         "these import their own package's __init__ instead of a sibling "
@@ -226,10 +130,10 @@ def test_leaf_modules_are_leaves(parsed):
     for path, tree in parsed:
         if path.parent != SRC or path.stem not in LEAVES:
             continue
-        for node in _import_time_imports(tree):
-            target = _target_package(node, path)
+        for node in import_time_imports(tree):
+            target = target_package(node, path)
             assert target is None, (
-                f"{_rel(path)}:{node.lineno} is treated as a leaf by every "
+                f"{rel_path(path)}:{node.lineno} is treated as a leaf by every "
                 f"package but imports {target}"
             )
 
@@ -241,11 +145,11 @@ def test_deferred_imports_are_the_known_cycle_breakers(parsed):
         package = path.relative_to(SRC).parts[0]
         if package not in ALLOWED:
             continue
-        for node in _deferred_imports(tree):
-            target = _target_module(node, path)
+        for node in deferred_imports(tree):
+            target = target_module(node, path)
             if target is None or target.split(".")[0] in LEAVES:
                 continue
-            found.add((_rel(path), target))
+            found.add((rel_path(path), target))
 
     assert found == EXPECTED_DEFERRED_IMPORTS, (
         "function-local imports inside the packages changed.\n"
@@ -265,7 +169,7 @@ def _classified(source: str) -> tuple[list[str], list[str]]:
     Returns:
         `(at_import_time, deferred)` as the dotted module each import names.
     """
-    at_import_time, deferred = _classify_imports(ast.parse(dedent(source)))
+    at_import_time, deferred = classify_imports(ast.parse(dedent(source)))
     return (
         [node.module or "" for node in at_import_time],
         [node.module or "" for node in deferred],
@@ -373,97 +277,6 @@ class TestImportsAreCollectedByWhetherTheyRun:
         assert at_import_time == ["model.task", "qrcode.image", "export.common"]
 
 
-class TestTheFrontDoorNamesTheAnswers:
-    """`pyxctsk.__all__` is the whole library's interface, not a sample of it.
-
-    Its export set had no rule: it carried 7 of `pyxctsk.distance`'s 22 names,
-    including `distance_through_centers` — documented as "the primitive, not
-    the published number" — while `center_distance`, the call that docstring
-    tells you to make instead, was absent. It also exported `OptimizedRoute`
-    and `task_distances_from` without exporting anything that could build the
-    argument, which is why `docs/s7f-distance-reference.md` reached past it.
-    """
-
-    #: What a doc, a docstring or a test tells a caller to import from the top
-    #: level. Adding a name here without exporting it fails.
-    DOCUMENTED = (
-        "DistanceReport",
-        "MeasuredTask",
-        "TaskDrawing",
-        "Task",
-        "parse_task",
-        "render_task",
-        "OUTPUT_FORMATS",
-        "center_distance",
-        "center_distance_readings",
-        "CenterDistanceReading",
-        "PROPOSED_READING",
-        "GoalLine",
-        "TooFewTurnpointsError",
-        "TaskValidationError",
-        "pyXCTSKError",
-        "ValidationRule",
-        "calculate_iteratively_refined_route",
-        "task_to_turnpoints",
-    )
-
-    def test_every_documented_name_is_reachable_from_the_front_door(self):
-        """Reaching into a subpackage should be a choice, not a workaround."""
-        import pyxctsk
-
-        missing = [n for n in self.DOCUMENTED if not hasattr(pyxctsk, n)]
-
-        assert missing == []
-        assert [n for n in self.DOCUMENTED if n not in pyxctsk.__all__] == []
-
-    def test_the_published_reading_travels_with_the_primitive(self):
-        """Exporting `distance_through_centers` alone is what misled a caller.
-
-        The primitive stays — it is a real function over `TaskTurnpoint`s — but
-        the number a task board publishes has to be reachable beside it.
-        """
-        import pyxctsk
-
-        if "distance_through_centers" in pyxctsk.__all__:
-            assert "center_distance" in pyxctsk.__all__
-            assert "CenterDistanceReading" in pyxctsk.__all__
-
-    def test_every_exported_name_resolves(self):
-        """`__all__` and the module cannot disagree about what exists."""
-        import pyxctsk
-
-        assert [n for n in pyxctsk.__all__ if not hasattr(pyxctsk, n)] == []
-
-    def test_a_route_can_be_built_by_a_caller_who_only_uses_the_front_door(self):
-        """`OptimizedRoute` was exported with no exported way to make one."""
-        import pyxctsk
-
-        assert hasattr(pyxctsk, "OptimizedRoute")
-        assert hasattr(pyxctsk, "MeasuredTask")
-        route = pyxctsk.MeasuredTask.from_task(
-            pyxctsk.Task(
-                task_type=pyxctsk.TaskType.CLASSIC,
-                version=1,
-                turnpoints=[
-                    pyxctsk.Turnpoint(
-                        radius=400,
-                        waypoint=pyxctsk.Waypoint(
-                            name="A", lat=46.0, lon=8.0, alt_smoothed=0
-                        ),
-                    ),
-                    pyxctsk.Turnpoint(
-                        radius=400,
-                        waypoint=pyxctsk.Waypoint(
-                            name="B", lat=46.5, lon=8.5, alt_smoothed=0
-                        ),
-                    ),
-                ],
-            )
-        ).route
-
-        assert isinstance(route, pyxctsk.OptimizedRoute)
-
-
 class TestTheOptimizerDependencyIsNotPaidUpFront:
     """`import pyxctsk` cost 400 ms, 297 of them scipy.optimize.
 
@@ -484,7 +297,7 @@ class TestTheOptimizerDependencyIsNotPaidUpFront:
         deferred: list[str] = []
         for path in sorted(SRC.rglob("*.py")):
             tree = ast.parse(path.read_text())
-            deferred_nodes = set(map(id, _deferred_imports(tree)))
+            deferred_nodes = set(map(id, deferred_imports(tree)))
             for node in ast.walk(tree):
                 if not isinstance(node, ast.ImportFrom) or not node.module:
                     continue

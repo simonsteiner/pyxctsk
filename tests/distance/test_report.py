@@ -3,8 +3,9 @@
 These used to live in `tests/test_cli.py`, where asserting *what the report
 says* meant building a runner, invoking a click command, checking an exit code
 and parsing stdout — because the report was two private functions inside
-`cli.py`. They assert on the value now. What is left in `test_cli.py` is the
-wiring: that the command renders this report and writes it out.
+`cli.py`. They assert on the value now. What is left in
+`test_cli_distances.py` is the wiring: that the command renders this report and
+writes it out.
 """
 
 import pytest
