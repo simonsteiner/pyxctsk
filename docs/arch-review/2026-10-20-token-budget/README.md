@@ -33,7 +33,7 @@ The backlog, in rank order. After the scan only three parts of the report change
 | [C2](C2-split-the-model-tables.md) | Split `model/shape.py` and `model/task.py` along their seams | 🟢 Strong | maintainability | in-progress | `refactor/split-model` | | | committed locally; PR not opened yet |
 | [C3](C3-split-the-front-door-tests.md) | Split the CLI and layering tests | 🟢 Strong | maintainability | in-progress | `refactor/split-front-door-tests` | | | committed locally; PR not opened yet |
 | [C4](C4-qrcode-tests-mirror-qrcode.md) | `tests/qrcode/` mirrors `qrcode/` | 🟢 Strong | maintainability | in-progress | `refactor/split-qrcode-tests` | | | committed locally; PR not opened yet |
-| [C5](C5-split-the-export-tests.md) | Split the export tests; the writers' agreement gets its own file | 🟢 Strong | maintainability | in-progress | `refactor/split-export-tests` | | | |
+| [C5](C5-split-the-export-tests.md) | Split the export tests; the writers' agreement gets its own file | 🟢 Strong | maintainability | in-progress | `refactor/split-export-tests` | | | committed locally; PR not opened yet |
 | [C6](C6-split-the-distance-tests.md) | Split the XCTrack accuracy tests | 🟢 Strong | maintainability | todo | `refactor/split-distance-tests` | | | |
 | [S1](#s1--two-identical-_race_task-builders) | Two identical `_race_task` builders | — | maintainability | todo | rides with C6 | | | |
 | [S3](#s3--nothing-enforces-the-budget) | Nothing enforces the budget | — | maintainability | merged | `chore/shared-file-tokens` | [#43](https://github.com/simonsteiner/pyxctsk/pull/43) | | landed first; see Departures |
@@ -127,3 +127,5 @@ Every job sets `priority:` under `parallel: true`, which lefthook ignores (the f
 - **C2: `ruff` merged the `# noqa: F401` re-export blocks.** The `*_SHAPE` tables now share `task.py`'s re-export import with the classes, which Q6 did not plan.
 - **C3: the `_rel` helper became `rel_path`, not `rel`.** Q10 said the moved helpers drop their underscores, but a test assigns a local `rel = rel(path)`, which ruff flags as F823.
 - **C4 follows the After diagram, not the table, for lines 1-316.** The card's table lists them under `task.py`, but its After diagram keeps them in `test_codec.py` as the corpus round-trips, and the Decisions followed the diagram.
+- **C5: `_drawing_of` stays in `test_geojson.py`.** The card said both GeoJSON halves use it, but the goal-line half uses none of the module helpers (Q9), so only `_task` went to `tests/builders.py`.
+- **C5: the agreement file holds two tests that render no writer.** Q4 moved `test_the_control_zone_radius_is_half_the_line` and one other with the twelve that do, because they pin the drawing answers both writers share.

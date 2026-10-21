@@ -38,14 +38,14 @@ class TestColorValue:
 
 
 class TestOnePalette:
-    """One palette, rendered twice — not two palettes that have to agree.
+    """One palette: every turnpoint role has a colour, and no two share one.
 
     The KML writer used to map the shared ``#rrggbb`` string back through a
     hand-written dict of ``simplekml.Color`` constants, which re-declared the
     palette and lost four of its five turnpoint values: a TAKEOFF turnpoint was
-    ``#204d74`` in GeoJSON and ``#00008b`` in KML. Only the goal's red survived
-    the round trip. These tests read the colour out of both outputs and compare
-    them, so a drift cannot pass again.
+    ``#204d74`` in GeoJSON and ``#00008b`` in KML. These tests cover the palette
+    itself; ``test_writers_agree.py`` reads the colour out of both outputs and
+    compares them.
     """
 
     #: Every role a turnpoint can be drawn in, as (turnpoint type, is_goal).
