@@ -44,7 +44,7 @@ uv run pyxctsk distances task.xctsk --format text  # try the CLI
 ### Wire formats
 
 - **Every wire shape is one ordered field table in `src/pyxctsk/model/shape.py`.** `to_dict` and `from_dict` traverse it, row order is output order, and adding a spec field is one row; a class with two shapes gets two tables, never a union key set.
-- **Every scalar row names a wire-scalar codec** (`TEXT`, `NUMBER`, `WHOLE_METRES`, `INTEGER`, `LATITUDE`, `LONGITUDE`) from `model/shape.py`. A bad value raises `MalformedPayloadError` from the table, with a path like `turnpoints[0].waypoint`.
+- **Every scalar row names a wire-scalar codec** (`TEXT`, `NUMBER`, `WHOLE_METRES`, `INTEGER`, `LATITUDE`, `LONGITUDE`) from `model/shape.py`, which re-exports them from `model/codec.py` where they are defined. A bad value raises `MalformedPayloadError` from the table, with a path like `turnpoints[0].waypoint`.
 - **JSON goes through `load_json` and `dump_json` in `model/shape.py`.** Name a `JsonLayout` (`compact`, `line` or `indented`); never call `json.dumps` with options of your own.
 - **Unknown keys are preserved, never interpreted.** Use `model/passthrough.py` through `Shape`; never map a non-spec key onto a spec field because the names match.
 - **`Task` ↔ `QRCodeTask` conversion lives only in `qrcode/conversion.py`.** Never import one format's task module from the other at module level; `Task.to_qr_code_task()` and `QRCodeTask.to_task()` reach conversion through function-local imports.
@@ -53,7 +53,7 @@ uv run pyxctsk distances task.xctsk --format text  # try the CLI
 
 ### Model and validation
 
-- **The task dataclasses in `model/task.py` don't validate on construction (`TimeOfDay` is the one exception, rejecting an out-of-range field in `__post_init__`).** `Task.validate()` is the structural check, and nothing derived (such as a goal line's length) is stored on the model.
+- **The task dataclasses in `model/task.py` and `model/task_parts.py` don't validate on construction (`TimeOfDay` is the one exception, rejecting an out-of-range field in `__post_init__`).** `Task.validate()` is the structural check, and nothing derived (such as a goal line's length) is stored on the model.
 - **Spec rules live in `model/validation.py`, not on `Task`.** They read a `TaskStructure`, which `Task.validate()` and `QRCodeTask.validate()` each present; validate what arrived, not its conversion.
 - **Parsing is lenient about structure and strict about scalars.** A negative radius or an unknown version still parses (`--strict` rejects it); a value of the wrong kind never does.
 - **Every library error descends from `exceptions.pyXCTSKError`.** The CLI catches one tuple of them; add new errors to the hierarchy.

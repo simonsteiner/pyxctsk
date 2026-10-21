@@ -43,386 +43,38 @@ those two answers are the ones that used to be written in different places and
 quietly stop matching.
 """
 
-import json
-import math
-import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import (
-    Any,
-    Callable,
-    Generic,
-    Literal,
-    Mapping,
-    MutableMapping,
-    TypeVar,
-)
+from typing import Any, Callable, Generic, Mapping, MutableMapping, TypeVar
 
-from ..exceptions import MalformedPayloadError, pyXCTSKError
+from ..exceptions import MalformedPayloadError
+
+# The names that moved to ``json_io`` and ``codec`` stay importable from here, so
+# the importers outside ``model/`` keep one address for them. Inside ``model/``,
+# a module imports each name from the module that defines it.
+from .codec import (  # noqa: F401
+    INTEGER,
+    LATITUDE,
+    LONGITUDE,
+    NUMBER,
+    TEXT,
+    TIME_OF_DAY,
+    WHOLE_METRES,
+    Codec,
+    enum_codec,
+    list_codec,
+    read_at,
+    wire_int_codec,
+)
+from .json_io import (  # noqa: F401
+    JsonLayout,
+    dump_json,
+    load_json,
+    require_object,
+)
 from .passthrough import read_passthrough, write_passthrough
-from .rounding import round_half_up
-from .time_of_day import TimeOfDay
 
 T = TypeVar("T")
-
-#: What a codec may raise when handed a wire value of the wrong type or
-#: spelling. Codecs are applied to untrusted input, so this is the one place
-#: these are expected rather than bugs: each is converted into a
-#: :class:`~pyxctsk.exceptions.MalformedPayloadError` naming where it happened.
-_READ_ERRORS = (KeyError, ValueError, TypeError, AttributeError, pyXCTSKError)
-
-
-def _json_type(value: Any) -> str:
-    """Name a decoded JSON value's type the way the format would."""
-    if value is None:
-        return "null"
-    if isinstance(value, bool):
-        return "a boolean"
-    if isinstance(value, (int, float)):
-        return "a number"
-    if isinstance(value, str):
-        return "a string"
-    if isinstance(value, list):
-        return "an array"
-    if isinstance(value, Mapping):
-        return "an object"
-    return type(value).__name__
-
-
-def require_object(data: Any) -> Mapping[str, Any]:
-    """Return a wire value that must be a JSON object, or refuse it.
-
-    Args:
-        data: The decoded value.
-
-    Returns:
-        The same value, now known to be a mapping.
-
-    Raises:
-        MalformedPayloadError: If it is anything else.
-    """
-    if not isinstance(data, Mapping):
-        raise MalformedPayloadError(f"expected an object, got {_json_type(data)}")
-    return data
-
-
-def load_json(text: str | bytes) -> Any:
-    """Decode a JSON document, refusing one that is not JSON at all.
-
-    Args:
-        text: The document.
-
-    Returns:
-        The decoded value, of whatever JSON type it is.
-
-    Raises:
-        MalformedPayloadError: If it does not decode.
-    """
-    try:
-        return json.loads(text)
-    except ValueError as exc:
-        raise MalformedPayloadError(f"not JSON: {exc}") from exc
-
-
-#: The layouts a JSON output is written in, one per kind of output: ``compact``
-#: for a wire payload (the task file, the QR string — no space after ``,`` or
-#: ``:``), ``line`` for one line as :func:`json.dumps` spaces it by default
-#: (GeoJSON), ``indented`` for a document a person reads (the distance report).
-#: Named rather than spelled as ``separators=``/``indent=`` at each call site,
-#: so a combination no output uses cannot be asked for.
-JsonLayout = Literal["compact", "line", "indented"]
-
-_LAYOUT_OPTIONS: dict[str, dict[str, Any]] = {
-    "compact": {"separators": (",", ":")},
-    "line": {},
-    "indented": {"indent": 2},
-}
-
-
-def dump_json(value: Any, *, layout: JsonLayout) -> str:
-    r"""Encode a value as a JSON document, the one way every output writes JSON.
-
-    :func:`load_json`'s counterpart. What every output shares is decided here:
-    a character outside ASCII is written as itself, never as a ``\u`` escape.
-    The two spellings are one JSON value, but four call sites chose between
-    them independently, so a waypoint named ``Château`` came out one way in the
-    task and QR formats and the other in GeoJSON and the distance report — and
-    the fix that reached two of them could not reach the other two. Only the
-    layout is each output's own, and it is one of :data:`JsonLayout`'s.
-
-    A lone surrogate cannot arrive from a parsed task — the ``TEXT`` codec
-    refuses one at read. A model built in code can still hold one, and then the
-    document cannot be encoded as UTF-8; the model does not validate on
-    construction, and this writer does not either.
-
-    Args:
-        value: What to encode.
-        layout: How the document is laid out.
-
-    Returns:
-        The document.
-    """
-    return json.dumps(value, ensure_ascii=False, **_LAYOUT_OPTIONS[layout])
-
-
-def _read_at(segment: str, read: Callable[[Any], T], raw: Any) -> T:
-    """Run one step of a read, attributing any failure to ``segment``.
-
-    Args:
-        segment: The key, or ``[i]`` index, being read.
-        read: The step.
-        raw: What the step reads.
-
-    Returns:
-        What the step returned.
-
-    Raises:
-        MalformedPayloadError: Whatever the step raised, located.
-    """
-    try:
-        return read(raw)
-    except MalformedPayloadError as exc:
-        raise exc.inside(segment) from exc.__cause__
-    except KeyError as exc:
-        # A required key that is not there. The key itself is the location,
-        # which is one level deeper than ``segment`` only when a row reads a
-        # key it does not own — so name the key that was missing.
-        raise MalformedPayloadError(
-            "required key is missing", str(exc.args[0]) if exc.args else segment
-        ) from exc
-    except _READ_ERRORS as exc:
-        raise MalformedPayloadError(str(exc), segment) from exc
-
-
-@dataclass(frozen=True)
-class Codec:
-    """How one value is spelled on the wire.
-
-    Attributes:
-        to_wire: Model value to JSON value.
-        from_wire: JSON value to model value.
-    """
-
-    to_wire: Callable[[Any], Any]
-    from_wire: Callable[[Any], Any]
-
-
-def _identity(value: Any) -> Any:
-    return value
-
-
-# -- Wire scalars ------------------------------------------------------------
-#
-# Every scalar a table reads goes through one of the codecs below, and each
-# kind of scalar has exactly one rule. The table used to check containers and
-# trust scalars: ``name``, ``lat``, ``lon``, ``version`` and ``fa`` were read
-# as whatever JSON held, and "a number on the wire" was answered three
-# different ways by three codecs. So a bad scalar parsed and failed where it
-# was first *used* — an ``OverflowError`` for an infinite radius, a
-# ``TypeError`` from the planar projection for a latitude spelled ``"46"``,
-# and for a JSON ``true`` latitude no error at all: it was 1°N.
-#
-# The rules, once each:
-#
-# - **A number is finite and not a boolean.** ``True == 1`` in Python; on the
-#   wire it is not a number. Python's ``json`` reads ``NaN`` and ``Infinity``,
-#   and an integer too large for a float, so finiteness is checked here.
-# - **A number may be spelled as a string** — in JSON's own number grammar,
-#   nothing looser. Burnair writes ``"radius": "700"``, and producers have
-#   written the QR version and earth model as strings; it is one rule for every
-#   number rather than a flag on some of them. It is written back as a number.
-# - **Text is a string UTF-8 can carry.** A lone surrogate is valid JSON and
-#   cannot be written back out.
-#
-# Each raises :class:`~pyxctsk.exceptions.MalformedPayloadError`, which the
-# table locates — ``turnpoints[0].radius: expected a finite number, got 'inf'``.
-
-
-#: JSON's own number grammar — what "a number spelled as a string" means.
-#: Python's ``int`` and ``float`` read far more: padding, ``1_000``, ``inf``,
-#: and digits from every script, so ``"٣"`` would be a radius of 3 metres.
-_JSON_NUMBER = re.compile(r"-?(?:0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?")
-
-#: Longest refused value echoed into a message; a 5 000-digit altitude is not
-#: worth repeating back in full.
-_ECHO_LIMIT = 40
-
-
-def _describe(raw: Any) -> str:
-    """Name a refused wire value: strings and numbers by value, else by type."""
-    if isinstance(raw, str) or (
-        isinstance(raw, (int, float)) and not isinstance(raw, bool)
-    ):
-        text = repr(raw)
-        return text if len(text) <= _ECHO_LIMIT else text[: _ECHO_LIMIT - 3] + "..."
-    return _json_type(raw)
-
-
-def _wire_number(raw: Any) -> int | float | None:
-    """The number a wire value is or spells, keeping JSON's int/float; else None.
-
-    None for a boolean, a container, and a string outside JSON's grammar — and
-    for an integer string too long for Python to convert, which no float could
-    hold either.
-    """
-    if isinstance(raw, bool):
-        return None
-    if isinstance(raw, (int, float)):
-        return raw
-    if not isinstance(raw, str):
-        return None
-    match = _JSON_NUMBER.fullmatch(raw)
-    if match is None:
-        return None
-    try:
-        return float(raw) if match.group(1) or match.group(2) else int(raw)
-    except ValueError:  # more digits than int() will convert
-        return None
-
-
-def _read_number(raw: Any) -> int | float:
-    """A finite number, or a string spelling one; JSON's int/float kept."""
-    value = _wire_number(raw)
-    if value is None:
-        raise MalformedPayloadError(f"expected a number, got {_describe(raw)}")
-    try:
-        finite = math.isfinite(value)
-    except OverflowError:  # an integer no float can hold
-        finite = False
-    if not finite:
-        raise MalformedPayloadError(f"expected a finite number, got {_describe(raw)}")
-    return value
-
-
-def _read_integer(raw: Any) -> int:
-    """An integer, or a string spelling one; ``2.0`` reads as 2, ``true`` never.
-
-    A producer holding a double writes ``1.0``; it is read as the integer it
-    is, and so written back as ``1``.
-    """
-    value = _wire_number(raw)
-    if isinstance(value, float) and value.is_integer():
-        return int(value)
-    if not isinstance(value, int):
-        raise MalformedPayloadError(f"expected an integer, got {_describe(raw)}")
-    return value
-
-
-def _coordinate(name: str, limit: int) -> Callable[[Any], int | float]:
-    """Return the reader for a coordinate within ``[-limit, limit]`` degrees."""
-
-    def read(raw: Any) -> int | float:
-        value = _read_number(raw)
-        if not -limit <= value <= limit:
-            raise MalformedPayloadError(
-                f"{name} {value!r} is outside [-{limit}, {limit}]"
-            )
-        return value
-
-    return read
-
-
-def _read_text(raw: Any) -> str:
-    """A string that UTF-8, and so every output format, can carry."""
-    if not isinstance(raw, str):
-        raise MalformedPayloadError(f"expected a string, got {_describe(raw)}")
-    try:
-        raw.encode("utf-8")
-    except UnicodeEncodeError as exc:
-        raise MalformedPayloadError(
-            f"not valid text: {exc.reason} at index {exc.start}"
-        ) from None
-    return raw
-
-
-#: Any finite number — the elevated goal's height above the last turnpoint.
-#: An integer stays an integer, so what was read is what is written.
-NUMBER = Codec(_identity, _read_number)
-
-#: A number this library holds as whole metres — a radius or an altitude. The
-#: QR encoding can only carry whole metres, so a fractional value is rounded on
-#: the way in; see :mod:`pyxctsk.model.rounding` for which way.
-WHOLE_METRES = Codec(_identity, lambda raw: round_half_up(_read_number(raw)))
-
-#: A whole number: a format version, or one of the QR format's wire integers.
-INTEGER = Codec(_identity, _read_integer)
-
-#: Degrees north, in ``[-90, 90]``.
-LATITUDE = Codec(_identity, _coordinate("latitude", 90))
-
-#: Degrees east, in ``[-180, 180]``.
-LONGITUDE = Codec(_identity, _coordinate("longitude", 180))
-
-#: A name or a description.
-TEXT = Codec(_identity, _read_text)
-
-#: ``HH:MM:SSZ``, the only time spelling either format uses.
-TIME_OF_DAY = Codec(lambda value: value.to_json_string(), TimeOfDay.from_json_string)
-
-
-def enum_codec(enum_cls: Callable[[Any], Any]) -> Codec:
-    """Return a codec for a constrained value.
-
-    Args:
-        enum_cls: The enum. Called on the wire value, so an unrecognized one
-            raises rather than moving through the library as a bare string.
-
-    Returns:
-        Codec: Spelling the enum as its ``value``.
-    """
-    return Codec(lambda member: member.value, enum_cls)
-
-
-def wire_int_codec(table: Mapping[Any, int]) -> Codec:
-    """Return a codec spelling constrained values as the integers a format uses.
-
-    The QR format writes a goal type as ``1`` or ``2`` where the full format
-    writes ``"LINE"`` or ``"CYLINDER"``. That is a spelling, not a second kind
-    of value, so the QR models hold the same enums as the full ones and this
-    codec is where the integers live. They used to be six ``IntEnum`` classes
-    and twelve translation tables between them and the model's enums, with a
-    default at every call site for whatever a table left out.
-
-    Args:
-        table: Each value's wire integer. Must be one-to-one. The integer is
-            read by :data:`INTEGER`, so a string spelling one is accepted and a
-            JSON ``true`` — which Python calls ``1`` — is not.
-
-    Returns:
-        Codec: Writing ``table[value]``, and reading its inverse.
-    """
-    inverse = {number: value for value, number in table.items()}
-    if len(inverse) != len(table):
-        raise ValueError(f"wire integers are not one-to-one: {dict(table)!r}")
-
-    def from_wire(raw: Any) -> Any:
-        number = INTEGER.from_wire(raw)
-        if number not in inverse:
-            raise MalformedPayloadError(f"{raw!r} is not one of {sorted(inverse)}")
-        return inverse[number]
-
-    return Codec(lambda value: table[value], from_wire)
-
-
-def list_codec(item: Codec) -> Codec:
-    """Return a codec for a JSON array of values.
-
-    Args:
-        item: The codec for one element.
-
-    Returns:
-        Codec: Applying ``item`` element-wise.
-    """
-
-    def from_wire(raw: Any) -> list[Any]:
-        # A list is required, not just an iterable: a string where an array
-        # belongs used to be read one character at a time, so a single time
-        # gate written as ``"12:00:00Z"`` reported "invalid time: '1'".
-        if not isinstance(raw, list):
-            raise MalformedPayloadError(f"expected an array, got {_json_type(raw)}")
-        return [_read_at(f"[{i}]", item.from_wire, r) for i, r in enumerate(raw)]
-
-    return Codec(lambda values: [item.to_wire(v) for v in values], from_wire)
 
 
 @dataclass(frozen=True)
@@ -667,7 +319,7 @@ class Shape(Generic[T]):
         kwargs: dict[str, Any] = {}
         unread: set[str] = set()
         for field in self.fields:
-            kwargs.update(_read_at(field.keys[0], field.read, data))
+            kwargs.update(read_at(field.keys[0], field.read, data))
             unread.update(field.unread(data))
         if self.carries_unknown:
             # The allow-list is what this shape read *from this payload*, not
