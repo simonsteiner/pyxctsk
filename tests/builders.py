@@ -105,3 +105,10 @@ def task(
         goal=goal,
         sss=sss,
     )
+
+
+#: One turnpoint at a known position, so every format test converts the same
+#: task and differs only in what it asks the CLI to write.
+TAKEOFF_ONLY_TASK = task(
+    turnpoint("Test", 46.5, 8.0, radius=1000, type=TurnpointType.TAKEOFF)
+)
