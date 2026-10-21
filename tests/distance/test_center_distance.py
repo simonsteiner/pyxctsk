@@ -16,19 +16,8 @@ from pyxctsk.distance import (
     distance_through_centers,
     task_to_turnpoints,
 )
-from tests.builders import task, turnpoint
+from tests.builders import race_to_goal_cylinder_task, task, turnpoint
 from tests.corpus import reference_task, reference_tasks, tasks_with_reference_distance
-
-
-def _race_task():
-    """A task with a pre-start leg and a goal cylinder, so all readings differ."""
-    return task(
-        turnpoint("A", 46.0, 8.0, radius=400, type=TurnpointType.TAKEOFF),
-        turnpoint("S", 46.3, 8.2, radius=5000, type=TurnpointType.SSS),
-        turnpoint("C", 46.6, 8.6, radius=8000),
-        turnpoint("G", 46.9, 8.3, radius=2000, type=TurnpointType.ESS),
-        goal=GoalType.CYLINDER,
-    )
 
 
 class TestTheProposedReading:
@@ -36,14 +25,14 @@ class TestTheProposedReading:
 
     def test_the_default_is_the_proposed_reading(self):
         """Callers who do not choose get the one we are proposing."""
-        built = _race_task()
+        built = race_to_goal_cylinder_task()
 
         assert center_distance(built) == center_distance(built, PROPOSED_READING)
         assert PROPOSED_READING is CenterDistanceReading.LAUNCH_TO_GOAL
 
     def test_it_is_the_polyline_through_every_centre(self):
         """No turnpoint is skipped and nothing is subtracted."""
-        built = _race_task()
+        built = race_to_goal_cylinder_task()
 
         assert center_distance(built) == pytest.approx(
             distance_through_centers(task_to_turnpoints(built))
@@ -51,7 +40,7 @@ class TestTheProposedReading:
 
     def test_it_honours_the_declared_earth_model(self):
         """ADR 0003 — and on the FAI sphere this is not an S7F number at all."""
-        built = _race_task()
+        built = race_to_goal_cylinder_task()
         wgs84 = center_distance(built)
         built.earth_model = EarthModel.FAI_SPHERE
 
@@ -81,15 +70,19 @@ class TestTheAlternativeReadings:
 
     def test_the_goal_boundary_reading_is_shorter_by_the_goal_radius(self):
         """It ends where the *optimized* distance ends."""
-        built = _race_task()
+        built = race_to_goal_cylinder_task()
+        goal_radius = built.turnpoints[-1].radius
+        whole = center_distance(built)
+        assert goal_radius is not None
+        assert whole is not None
 
         assert center_distance(
             built, CenterDistanceReading.LAUNCH_TO_GOAL_BOUNDARY
-        ) == pytest.approx(center_distance(built) - built.turnpoints[-1].radius)
+        ) == pytest.approx(whole - goal_radius)
 
     def test_the_start_reading_drops_the_pre_start_leg(self):
         """From the SSS, the way §7.2's speed section excludes it."""
-        built = _race_task()
+        built = race_to_goal_cylinder_task()
 
         from_start = center_distance(built, CenterDistanceReading.START_TO_GOAL)
 
@@ -109,7 +102,7 @@ class TestTheAlternativeReadings:
 
     def test_every_reading_is_reported_together(self):
         """The diagnostic: one call, every answer, keyed by name."""
-        readings = center_distance_readings(_race_task())
+        readings = center_distance_readings(race_to_goal_cylinder_task())
 
         assert set(readings) == {r.value for r in CenterDistanceReading}
         assert all(v is not None for v in readings.values())
@@ -125,7 +118,7 @@ class TestTheAlternativeReadings:
     def test_an_unknown_reading_is_an_error(self):
         """Not silently the default."""
         with pytest.raises(ValueError, match="not a center-distance reading"):
-            center_distance(_race_task(), "LAUNCH_TO_SOMEWHERE")  # type: ignore[arg-type]
+            center_distance(race_to_goal_cylinder_task(), "LAUNCH_TO_SOMEWHERE")  # type: ignore[arg-type]
 
 
 class TestDegenerateTasks:
@@ -195,7 +188,7 @@ class TestTheBoundaryReadingEndsWhereTheRouteEnds:
 
     def test_a_cylinder_goal_subtracts_its_radius(self):
         """The ordinary case, and the one the reading was written for."""
-        built = _race_task()
+        built = race_to_goal_cylinder_task()
 
         boundary = center_distance(built, CenterDistanceReading.LAUNCH_TO_GOAL_BOUNDARY)
 

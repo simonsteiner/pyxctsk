@@ -132,3 +132,21 @@ def three_turnpoint_task(
 TAKEOFF_ONLY_TASK = task(
     turnpoint("Test", 46.5, 8.0, radius=1000, type=TurnpointType.TAKEOFF)
 )
+
+
+def race_to_goal_cylinder_task() -> Task:
+    """A takeoff, the SSS, one turnpoint and the ESS, ending on a cylinder goal.
+
+    The ESS sits at the goal and the start has a pre-start leg, so a speed
+    section and the readings of the distance through centres all differ.
+
+    Returns:
+        Task: Turnpoints A (takeoff), S (SSS), C and G (ESS), goal cylinder.
+    """
+    return task(
+        turnpoint("A", 46.0, 8.0, radius=400, type=TurnpointType.TAKEOFF),
+        turnpoint("S", 46.3, 8.2, radius=5000, type=TurnpointType.SSS),
+        turnpoint("C", 46.6, 8.6, radius=8000),
+        turnpoint("G", 46.9, 8.3, radius=2000, type=TurnpointType.ESS),
+        goal=GoalType.CYLINDER,
+    )
