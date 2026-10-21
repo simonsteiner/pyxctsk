@@ -135,10 +135,10 @@ TAKEOFF_ONLY_TASK = task(
 
 
 def race_to_goal_cylinder_task() -> Task:
-    """A takeoff, the SSS, one turnpoint and the ESS, ending on a cylinder goal.
+    """A task with a pre-start leg, a speed section and a cylinder goal.
 
-    The ESS sits at the goal and the start has a pre-start leg, so a speed
-    section and the readings of the distance through centres all differ.
+    The ESS sits at the goal, so every reading of the distance through centres
+    differs.
 
     Returns:
         Task: Turnpoints A (takeoff), S (SSS), C and G (ESS), goal cylinder.

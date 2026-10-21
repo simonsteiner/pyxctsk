@@ -145,12 +145,11 @@ class TestOneSolverOneProjection:
     *that turnpoint*, while the route optimizer projected onto the plane of
     the whole task area. Same paragraph of the spec (S7F §7.1.2), two
     different answers — and every crossing-case test in
-    ``test_route_optimization_cases.py`` aimed at the one
-    the product does not use, so a fix made there could go green and ship
-    nothing. The plane is a required argument of ``boundary_point`` now, so a
-    test cannot reach the per-turnpoint projection without saying it means to;
-    these check that handing over the task's own plane reproduces what the
-    optimizer chose.
+    ``test_route_optimization_cases.py`` aimed at the one the product does not
+    use, so a fix made there could go green and ship nothing. The plane is a
+    required argument of ``boundary_point`` now, so a test cannot reach the
+    per-turnpoint projection without saying it means to; these check that
+    handing over the task's own plane reproduces what the optimizer chose.
     """
 
     def test_the_single_circle_answer_reproduces_the_optimizers_choice(self):
