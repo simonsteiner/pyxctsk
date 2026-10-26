@@ -31,19 +31,8 @@ from pyxctsk.distance.earth import geodesic_distance
 from pyxctsk.distance.goal_line import GoalLine
 from pyxctsk.distance.speed_section import SpeedSection
 from pyxctsk.model.validation import ValidationRule
-from tests.builders import task, turnpoint
+from tests.builders import race_to_goal_cylinder_task, task, turnpoint
 from tests.corpus import reference_task
-
-
-def _race_task():
-    """A task with a speed section and a cylinder goal."""
-    return task(
-        turnpoint("A", 46.0, 8.0, radius=400, type=TurnpointType.TAKEOFF),
-        turnpoint("S", 46.3, 8.2, radius=5000, type=TurnpointType.SSS),
-        turnpoint("C", 46.6, 8.6, radius=8000),
-        turnpoint("G", 46.9, 8.3, radius=2000, type=TurnpointType.ESS),
-        goal=GoalType.CYLINDER,
-    )
 
 
 class TestWhatItHolds:
@@ -51,13 +40,13 @@ class TestWhatItHolds:
 
     def test_it_holds_the_task_it_was_built_from(self):
         """The task is carried by identity, not copied."""
-        built = _race_task()
+        built = race_to_goal_cylinder_task()
 
         assert MeasuredTask.from_task(built).task is built
 
     def test_it_derives_one_cylinder_per_turnpoint(self):
         """The cylinders are the task's turnpoints, in order."""
-        built = _race_task()
+        built = race_to_goal_cylinder_task()
 
         measured = MeasuredTask.from_task(built)
 
@@ -66,7 +55,7 @@ class TestWhatItHolds:
 
     def test_the_cylinders_are_task_to_turnpoints(self):
         """The LINE-goal rule is applied in exactly one place."""
-        built = _race_task()
+        built = race_to_goal_cylinder_task()
 
         assert [tp.center for tp in MeasuredTask.from_task(built).turnpoints] == [
             tp.center for tp in task_to_turnpoints(built)
@@ -84,7 +73,7 @@ class TestWhatItHolds:
 
     def test_the_route_has_a_point_per_turnpoint(self):
         """One route point per cylinder, so the two zip without a length guard."""
-        measured = MeasuredTask.from_task(_race_task())
+        measured = MeasuredTask.from_task(race_to_goal_cylinder_task())
 
         assert len(measured.route.points) == len(measured.turnpoints)
 
@@ -94,7 +83,7 @@ class TestTheNumbersItProjects:
 
     def test_total_is_the_routes_total(self):
         """The task distance is read off the route, not measured again."""
-        measured = MeasuredTask.from_task(_race_task())
+        measured = MeasuredTask.from_task(race_to_goal_cylinder_task())
 
         assert measured.total_m == measured.route.total_m
 
@@ -215,7 +204,7 @@ class TestTheConstructorChecksThePair:
 
     def test_a_route_of_the_wrong_length_is_refused(self):
         """One route point per turnpoint, or it is not this task's route."""
-        measured = MeasuredTask.from_task(_race_task())
+        measured = MeasuredTask.from_task(race_to_goal_cylinder_task())
         short = OptimizedRoute(
             points=measured.route.points[:-1],
             legs=measured.route.legs[:-1],
@@ -227,7 +216,7 @@ class TestTheConstructorChecksThePair:
 
     def test_a_route_on_another_earth_is_refused(self):
         """The points may fit, but the legs were measured somewhere else."""
-        measured = MeasuredTask.from_task(_race_task())
+        measured = MeasuredTask.from_task(race_to_goal_cylinder_task())
         sphere = OptimizedRoute(
             points=measured.route.points,
             legs=measured.route.legs,
@@ -239,7 +228,7 @@ class TestTheConstructorChecksThePair:
 
     def test_a_point_outside_its_cylinder_is_refused(self):
         """Every point touches its own cylinder; a moved one does not."""
-        measured = MeasuredTask.from_task(_race_task())
+        measured = MeasuredTask.from_task(race_to_goal_cylinder_task())
         points = list(measured.route.points)
         points[2] = (points[2][0] + 0.5, points[2][1])
         moved = OptimizedRoute(
@@ -253,7 +242,7 @@ class TestTheConstructorChecksThePair:
 
     def test_its_own_route_is_accepted(self):
         """Rebuilding from the parts ``from_task`` produced is the same value."""
-        measured = MeasuredTask.from_task(_race_task())
+        measured = MeasuredTask.from_task(race_to_goal_cylinder_task())
 
         assert MeasuredTask(task=measured.task, route=measured.route) == measured
 
@@ -450,7 +439,7 @@ class TestANegativeRadiusIsNamed:
     @pytest.mark.parametrize("index", [0, 1, 3])
     def test_every_role_is_refused_with_the_validation_rule(self, index):
         """The takeoff and the goal too: no role makes a negative size mean one."""
-        measured = _race_task()
+        measured = race_to_goal_cylinder_task()
         measured.turnpoints[index].radius = -11
 
         with pytest.raises(TaskValidationError) as caught:
@@ -462,7 +451,7 @@ class TestANegativeRadiusIsNamed:
 
     def test_a_negative_line_goal_is_refused_too(self):
         """Its cylinder is a point, but the radius it declares is still a size."""
-        line = _race_task()
+        line = race_to_goal_cylinder_task()
         line.goal = Goal(type=GoalType.LINE)
         line.turnpoints[-1].radius = -400
 

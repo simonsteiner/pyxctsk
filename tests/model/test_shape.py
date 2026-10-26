@@ -1,58 +1,45 @@
-"""Tests for the field tables every serializable shape is declared as.
+"""Tests for the machinery the field tables are written in.
+
+That is ``Shape``, ``Value``, ``Discriminator`` and ``Optionality``.
 
 The tables themselves are exercised end-to-end by the reference round-trips —
-25 byte-exact QR strings and the corpus's JSON — so what is pinned here is the
-machinery those tables are written in, plus the one structural invariant the
-whole design rests on: that a shape's declared keys are the keys it actually
-uses, because every key belongs to a row.
+25 byte-exact QR strings and the corpus's JSON. The wire-scalar codecs are
+pinned in ``test_codec.py``, and the invariants over every real table in
+``tests/conformance/test_field_tables.py``.
 """
 
-import json
 from dataclasses import dataclass, field
 from types import SimpleNamespace
 from typing import Any
 
 import pytest
 
-from pyxctsk import MalformedPayloadError, Task, TaskType
+from pyxctsk import MalformedPayloadError, TaskType
 from pyxctsk.exceptions import pyXCTSKError
+from pyxctsk.model.codec import (
+    INTEGER,
+    TEXT,
+    WHOLE_METRES,
+    enum_codec,
+    list_codec,
+)
 from pyxctsk.model.shape import (
     DEFAULTED,
-    INTEGER,
-    LATITUDE,
-    LONGITUDE,
-    NUMBER,
     OPTIONAL_EMPTY,
     REQUIRED,
-    TEXT,
-    TIME_OF_DAY,
-    WHOLE_METRES,
     Discriminator,
     Shape,
     Value,
-    enum_codec,
-    list_codec,
     shape_codec,
 )
-from pyxctsk.model.task import (
+from pyxctsk.model.task_parts import (
     GOAL_SHAPE,
-    SSS_SHAPE,
-    TAKEOFF_SHAPE,
-    TASK_SHAPE,
     TURNPOINT_SHAPE,
-    WAYPOINT_SHAPE,
-    TurnpointType,
 )
-from pyxctsk.model.time_of_day import TimeOfDay
 from pyxctsk.qrcode.models import (
-    QR_GOAL_SHAPE,
-    QR_SSS_SHAPE,
-    QR_TAKEOFF_SHAPE,
     QR_TURNPOINT_SHAPE,
-    QR_WAYPOINT_TURNPOINT_SHAPE,
 )
 from pyxctsk.qrcode.task import QR_TASK_SHAPE, QR_WAYPOINTS_TASK_SHAPE
-from tests.corpus import reference_tasks
 
 
 @dataclass
@@ -178,136 +165,6 @@ class TestOptionality:
         assert Value("count", "c", INTEGER, REQUIRED).read({"c": 0}) == {"count": 0}
 
 
-class TestWireScalars:
-    """One rule per kind of scalar, and every scalar row reads through one.
-
-    The table used to check containers and trust scalars, so a bad scalar
-    parsed and failed where it was first used. The end-to-end reproductions
-    are in ``tests/conformance/test_parser_diagnostics.py``; these pin the
-    rules themselves.
-    """
-
-    @pytest.mark.parametrize("raw", ["2", 2])
-    def test_an_integer_may_be_spelled_as_a_string(self, raw):
-        """Producers have written the QR version and earth model as strings."""
-        assert INTEGER.from_wire(raw) == 2
-
-    @pytest.mark.parametrize("raw", [2.0, "2.0", "2e0"])
-    def test_an_integral_float_is_the_integer_it_spells(self, raw):
-        """A producer holding a double writes ``2.0``; it is read back as 2."""
-        value = INTEGER.from_wire(raw)
-        assert value == 2
-        assert type(value) is int
-
-    @pytest.mark.parametrize("raw", [True, 2.5, "2.5", None, [2]])
-    def test_an_integer_is_nothing_else(self, raw):
-        """``True == 1`` in Python, and ``2.5`` is not a whole number."""
-        with pytest.raises(MalformedPayloadError, match="expected an integer"):
-            INTEGER.from_wire(raw)
-
-    @pytest.mark.parametrize("raw", ["700", "699.5", 700, 699.5])
-    def test_whole_metres_accept_either_spelling(self, raw):
-        """Burnair writes a turnpoint radius as a string."""
-        assert WHOLE_METRES.from_wire(raw) == 700
-
-    @pytest.mark.parametrize(
-        "raw", [True, "inf", "nan", float("inf"), float("nan"), 10**400, "wide", []]
-    )
-    def test_a_number_is_finite_and_not_a_boolean(self, raw):
-        """Each of these used to reach the model, or ``OverflowError`` out."""
-        with pytest.raises(MalformedPayloadError, match="expected a"):
-            NUMBER.from_wire(raw)
-        with pytest.raises(MalformedPayloadError, match="expected a"):
-            WHOLE_METRES.from_wire(raw)
-
-    @pytest.mark.parametrize("raw", [1220, 1220.5])
-    def test_a_number_keeps_its_json_type(self, raw):
-        """What was read is what is written, so outputs stay byte-identical."""
-        assert type(NUMBER.from_wire(raw)) is type(raw)
-
-    @pytest.mark.parametrize("raw", [" 700 ", "1_000", "\u0663", "0x10", "+5", "07"])
-    def test_a_numeric_string_is_in_json_number_grammar(self, raw):
-        """Python's ``int`` reads all of these; JSON spells none of them."""
-        with pytest.raises(MalformedPayloadError, match="expected a number"):
-            NUMBER.from_wire(raw)
-
-    def test_a_refused_value_is_not_echoed_in_full(self):
-        """A 5 000-digit altitude made a 5 000-character message."""
-        with pytest.raises(MalformedPayloadError) as caught:
-            NUMBER.from_wire("9" * 5000)
-
-        assert len(str(caught.value)) < 100
-
-    def test_a_number_spelled_as_a_string_reads_as_the_number(self):
-        """An integer string is an integer, anything else a float."""
-        assert type(NUMBER.from_wire("46")) is int
-        assert NUMBER.from_wire("46.5") == 46.5
-
-    @pytest.mark.parametrize(
-        ("codec", "raw"),
-        [(LATITUDE, 90.0001), (LATITUDE, -95), (LONGITUDE, 180.5), (LONGITUDE, -181)],
-    )
-    def test_a_coordinate_is_on_the_earth(self, codec, raw):
-        """Off the earth reached the solver's assert instead."""
-        with pytest.raises(MalformedPayloadError, match="is outside"):
-            codec.from_wire(raw)
-
-    @pytest.mark.parametrize(("codec", "raw"), [(LATITUDE, -90), (LONGITUDE, 180)])
-    def test_the_poles_and_the_antimeridian_are_on_the_earth(self, codec, raw):
-        """The range is closed."""
-        assert codec.from_wire(raw) == raw
-
-    @pytest.mark.parametrize("raw", [123, True, None, ["A"]])
-    def test_text_is_a_string(self, raw):
-        """A numeric name broke the text report's format string."""
-        with pytest.raises(MalformedPayloadError, match="expected a string"):
-            TEXT.from_wire(raw)
-
-    def test_text_is_what_utf8_can_carry(self):
-        """A lone surrogate is valid JSON and cannot be written back out."""
-        with pytest.raises(MalformedPayloadError, match="not valid text"):
-            TEXT.from_wire("A\ud800")
-
-    def test_text_is_kept_as_is(self):
-        """Non-ASCII is text, not a problem."""
-        assert TEXT.from_wire("Château") == "Château"
-
-    def test_a_row_names_its_codec(self):
-        """There is no pass-through default for a value to slip through.
-
-        ``Value`` used to default to an identity codec, which is how ``name``,
-        ``lat``, ``lon``, ``version`` and ``fa`` reached the model unchecked.
-        """
-        with pytest.raises(TypeError):
-            Value("label", "l")  # type: ignore[call-arg]
-
-
-class TestCodecs:
-    """The value spellings both formats share."""
-
-    def test_time_of_day_round_trips(self):
-        """``HH:MM:SSZ``, the one time spelling both formats use."""
-        assert TIME_OF_DAY.to_wire(TIME_OF_DAY.from_wire("12:30:00Z")) == "12:30:00Z"
-
-    def test_an_enum_is_spelled_as_its_value(self):
-        """A constrained value travels as the string the spec names."""
-        codec = enum_codec(TurnpointType)
-
-        assert codec.to_wire(TurnpointType.SSS) == "SSS"
-        assert codec.from_wire("SSS") is TurnpointType.SSS
-
-    def test_an_unknown_enum_value_raises(self):
-        """A constrained value fails at parse time, as it did before."""
-        with pytest.raises(ValueError):
-            enum_codec(TurnpointType).from_wire("NONSENSE")
-
-    def test_a_list_codec_applies_element_wise(self):
-        """Time gates are the only array of values either format has."""
-        codec = list_codec(TIME_OF_DAY)
-
-        assert codec.to_wire(codec.from_wire(["09:00:00Z"])) == ["09:00:00Z"]
-
-
 class TestNestedRows:
     """Nesting is a codec, not a kind of row.
 
@@ -363,21 +220,6 @@ class TestNestedRows:
 
 
 #: Every shape in the package, with the attribute holding its carried keys.
-ALL_SHAPES = [
-    ("Task", TASK_SHAPE),
-    ("Turnpoint", TURNPOINT_SHAPE),
-    ("Waypoint", WAYPOINT_SHAPE),
-    ("Takeoff", TAKEOFF_SHAPE),
-    ("SSS", SSS_SHAPE),
-    ("Goal", GOAL_SHAPE),
-    ("QRCodeTask", QR_TASK_SHAPE),
-    ("QRCodeTask/waypoints", QR_WAYPOINTS_TASK_SHAPE),
-    ("QRCodeTurnpoint", QR_TURNPOINT_SHAPE),
-    ("QRCodeTurnpoint/waypoints", QR_WAYPOINT_TURNPOINT_SHAPE),
-    ("QRCodeTakeoff", QR_TAKEOFF_SHAPE),
-    ("QRCodeSSS", QR_SSS_SHAPE),
-    ("QRCodeGoal", QR_GOAL_SHAPE),
-]
 
 
 class TestTheTableChecksWireTypes:
@@ -434,135 +276,3 @@ class TestTheTableChecksWireTypes:
         """One ``except`` for a caller; old ``except ValueError`` still works."""
         assert issubclass(MalformedPayloadError, pyXCTSKError)
         assert issubclass(MalformedPayloadError, ValueError)
-
-
-class TestEveryKeyBelongsToARow:
-    """The invariant the whole design rests on.
-
-    If a shape can write a key its table does not declare, the derived
-    allow-list is wrong again and the passthrough will treat that key as
-    unknown on the way back in — reading it into ``unknown`` *and* writing it
-    from its own row, or worse, letting a carried key shadow it. Rendering the
-    whole corpus and checking every emitted key against the shape that emitted
-    it is what makes a bespoke row's undeclared key fail here rather than in a
-    round-trip nobody runs.
-    """
-
-    def _emitted_keys(self, obj: Any, shape: Shape) -> set[str]:
-        written = shape.write(obj)
-        carried = set(getattr(obj, "unknown", {}))
-        return set(written) - carried
-
-    @pytest.mark.parametrize("name, shape", ALL_SHAPES, ids=[n for n, _ in ALL_SHAPES])
-    def test_no_shape_declares_a_key_it_cannot_reach(self, name, shape):
-        """Every declared key is one some row owns, by construction."""
-        owned = {key for f in shape.fields for key in f.keys}
-        extra = shape.keys - owned - shape.ignored_keys
-
-        assert extra <= {shape.ext_key} - {None}, f"{name} declares stray {extra}"
-
-    @pytest.mark.parametrize("reference", reference_tasks(), ids=str)
-    def test_nothing_a_reference_task_emits_falls_outside_its_shape(self, reference):
-        """Rendered both ways, every key at every level is a declared one."""
-        task = reference.task
-
-        assert self._emitted_keys(task, TASK_SHAPE) <= TASK_SHAPE.keys
-        for turnpoint in task.turnpoints:
-            assert (
-                self._emitted_keys(turnpoint, TURNPOINT_SHAPE) <= TURNPOINT_SHAPE.keys
-            )
-            assert (
-                self._emitted_keys(turnpoint.waypoint, WAYPOINT_SHAPE)
-                <= WAYPOINT_SHAPE.keys
-            )
-
-        qr = task.to_qr_code_task()
-        assert self._emitted_keys(qr, QR_TASK_SHAPE) <= QR_TASK_SHAPE.keys
-        assert (
-            self._emitted_keys(qr.as_waypoints(), QR_WAYPOINTS_TASK_SHAPE)
-            <= QR_WAYPOINTS_TASK_SHAPE.keys
-        )
-        for qr_turnpoint in qr.turnpoints:
-            assert (
-                self._emitted_keys(qr_turnpoint, QR_TURNPOINT_SHAPE)
-                <= QR_TURNPOINT_SHAPE.keys
-            )
-            assert (
-                self._emitted_keys(qr_turnpoint, QR_WAYPOINT_TURNPOINT_SHAPE)
-                <= QR_WAYPOINT_TURNPOINT_SHAPE.keys
-            )
-
-    def test_the_takeoff_row_declares_both_of_its_keys(self):
-        """The regression this class is shaped to catch, stated directly."""
-        from pyxctsk.qrcode.models import QRCodeTakeoff
-        from pyxctsk.qrcode.task import QRCodeTask
-
-        task = QRCodeTask(takeoff=QRCodeTakeoff(time_open=TimeOfDay(9, 0, 0)))
-
-        assert set(QR_TASK_SHAPE.write(task)) <= QR_TASK_SHAPE.keys
-
-
-class TestTablesAndModelsAgree:
-    """A row names an attribute the class actually has.
-
-    ``Shape.read`` ends in ``cls(**kwargs)``, so a misspelled ``attr`` is a
-    ``TypeError`` at the moment something parses — which for a row the corpus
-    does not exercise could be a long way from here.
-    """
-
-    @pytest.mark.parametrize("name, shape", ALL_SHAPES, ids=[n for n, _ in ALL_SHAPES])
-    def test_every_row_names_a_field_of_its_class(self, name, shape):
-        """Checked for the rows that declare one attribute.
-
-        The handful spanning several write their own names, and the corpus
-        covers those.
-        """
-        fields = set(shape.cls.__dataclass_fields__)
-
-        for row in shape.fields:
-            attr = getattr(row, "attr", None)
-            if attr is not None:
-                assert attr in fields, f"{name}: no attribute {attr!r}"
-
-    @pytest.mark.parametrize("name, shape", ALL_SHAPES, ids=[n for n, _ in ALL_SHAPES])
-    def test_a_shape_carries_unknown_only_if_its_class_can(self, name, shape):
-        """The one shape that is not an object on the wire has no ``unknown``."""
-        has_field = "unknown" in shape.cls.__dataclass_fields__
-
-        assert shape.carries_unknown == has_field, name
-
-
-def test_the_derived_key_sets_match_the_spec_fields():
-    """A last check that deriving them changed none of them.
-
-    The allow-lists were hand-written before the tables existed; these are the
-    same sets, which is the evidence that the tables describe the format rather
-    than a new reading of it.
-    """
-    assert Task.KNOWN_KEYS == frozenset(
-        {
-            "taskType",
-            "version",
-            "earthModel",
-            "turnpoints",
-            "takeoff",
-            "sss",
-            "goal",
-            "extensions",
-        }
-    )
-    assert json.loads(Task.from_json(_MINIMAL).to_json())["taskType"] == "CLASSIC"
-
-
-_MINIMAL = json.dumps(
-    {
-        "taskType": "CLASSIC",
-        "version": 1,
-        "turnpoints": [
-            {
-                "radius": 400,
-                "waypoint": {"name": "A", "lat": 46.5, "lon": 8.1, "altSmoothed": 100},
-            }
-        ],
-    }
-)

@@ -29,7 +29,7 @@ See http://xctrack.org/ and http://xctrack.org/Competition_Interfaces.html
 # instead — was not, and ``OptimizedRoute`` was exported alongside a function
 # taking one but nothing that could construct one, which is why
 # ``docs/s7f-distance-reference.md`` had to reach past this module for four
-# names. ``tests/test_layering.py`` now asserts every documented name is
+# names. ``tests/test_front_door.py`` now asserts every documented name is
 # reachable from here.
 
 from .distance import (
@@ -79,11 +79,11 @@ from .model.task import (
     Takeoff,
     Task,
     TaskType,
-    TimeOfDay,
     Turnpoint,
     TurnpointType,
     Waypoint,
 )
+from .model.time_of_day import TimeOfDay
 from .model.validation import FULL_FORMAT_VERSION, ValidationIssue, ValidationRule
 from .parser import load_task, parse_task
 from .qrcode.image import generate_qrcode_image
@@ -97,7 +97,7 @@ from .renderer import OUTPUT_FORMATS, OutputFormat, render_task
 # where the other spelling returned "unknown".
 __version__ = pyxctsk_version()
 # Sorted, case-insensitively. It was in no discernible order, which is what
-# makes an accidental omission invisible; tests/test_layering.py checks the
+# makes an accidental omission invisible; tests/test_front_door.py checks the
 # contents, this checks that a reader can find a name in them.
 __all__ = [
     "calculate_iteratively_refined_route",
