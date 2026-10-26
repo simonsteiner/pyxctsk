@@ -89,7 +89,7 @@ class XCTSKClient:
         try:
             with open(safe_path(xctsk_file), "r", encoding="utf-8") as f:
                 task_data = json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError, ValueError) as e:
+        except (FileNotFoundError, ValueError) as e:  # JSONDecodeError is a ValueError
             return None, f"Error reading file {xctsk_file}: {e}"
 
         headers = {"Content-Type": "application/json"}
@@ -221,7 +221,7 @@ class XCTSKClient:
         try:
             with open(safe_path(xctsk_file), "r", encoding="utf-8") as f:
                 task_data = json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError, ValueError) as e:
+        except (FileNotFoundError, ValueError) as e:  # JSONDecodeError is a ValueError
             return False, f"Error reading file {xctsk_file}: {e}"
 
         try:
