@@ -27,7 +27,7 @@ Run commands through `uv run`, for example
 
 ### `xcontest_xctsk_tool.py`
 
-CLI tool for batch uploading XCTSK files, downloading tasks and HTML pages, and downloading QR codes via the XContest REST API from <https://tools.xcontest.org/xctsk/>. Implements retry logic, rate limiting, and metadata preservation with support for both v1 and v2 API endpoints.
+CLI tool for batch uploading XCTSK files, downloading tasks and HTML pages, and downloading QR codes via the XContest REST API from <https://tools.xcontest.org/xctsk/>. Implements retry logic, rate limiting, and metadata preservation with support for both v1 and v2 API endpoints. The command line is `xcontest_xctsk_tool.py`; the API client and the batch loops are in `xcontest_client.py`.
 
 #### REST API Endpoints
 
@@ -93,7 +93,7 @@ python xcontest_xctsk_tool.py process --author "Your Name"
 
 ### `extract_task_data.py`
 
-Parses XCTrack HTML exports in `downloaded_tasks/html_cleaned`, removes embedded images, and extracts task metadata, turnpoints, and embedded GeoJSON. Outputs cleaned HTML, structured JSON, and GeoJSON for downstream analysis or visualization using BeautifulSoup for robust HTML parsing with validation for distance and coordinate fields.
+Parses XCTrack HTML exports in `downloaded_tasks/html_cleaned`, removes embedded images, and extracts task metadata, turnpoints, and embedded GeoJSON. Outputs cleaned HTML, structured JSON, and GeoJSON for downstream analysis or visualization using BeautifulSoup for robust HTML parsing with validation for distance and coordinate fields. The parsing is in `task_html_parser.py`; `extract_task_data.py` reads the pages and writes the files.
 
 #### Usage
 
@@ -146,8 +146,10 @@ Dependency checker for QR code functionality. Verifies that Pillow and zxing-cpp
 
 ```text
 scripts/
-├── xcontest_xctsk_tool.py      # XContest API integration
+├── xcontest_xctsk_tool.py      # XContest API integration (command line)
+├── xcontest_client.py          # XContest API client and batch loops
 ├── extract_task_data.py        # HTML to JSON/GeoJSON conversion
+├── task_html_parser.py         # Task page HTML to task data and GeoJSON
 ├── extract_qr_from_html.py     # QR code extraction from HTML
 ├── test_distance_calculations.py  # Distance calculation validation
 ├── test_qrcode_generation.py   # QR code generation testing
