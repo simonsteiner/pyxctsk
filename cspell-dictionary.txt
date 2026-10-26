@@ -135,6 +135,7 @@ subparser
 svgs
 taskline
 testpaths
+tojson
 topojson
 tracklog
 tracklogs

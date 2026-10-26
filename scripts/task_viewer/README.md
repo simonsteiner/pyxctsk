@@ -29,6 +29,7 @@ Task Viewer is a standalone Flask application for displaying and comparing XCTra
     ├── airscore_view.html   # AirScore results view
     ├── base.html            # Base template
     ├── compare_view.html    # Task comparison view
+    ├── compare_view/        # Its styles and map script, included
     ├── geojson_debug_view.html      # GeoJson Debugging view
     ├── index.html           # Task list template
     └── task_view.html       # Task visualization template
