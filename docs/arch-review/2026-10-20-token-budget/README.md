@@ -37,8 +37,8 @@ The backlog, in rank order. After the scan only three parts of the report change
 | [C6](C6-split-the-distance-tests.md) | Split the XCTrack accuracy tests | 🟢 Strong | maintainability | pr-open | `refactor/split-distance-tests` | [#49](https://github.com/simonsteiner/pyxctsk/pull/49) | | |
 | [S1](#s1--two-identical-_race_task-builders) | Two identical `_race_task` builders | — | maintainability | pr-open | rides with C6 | [#49](https://github.com/simonsteiner/pyxctsk/pull/49) | | in C6's PR |
 | [S3](#s3--nothing-enforces-the-budget) | Nothing enforces the budget | — | maintainability | merged | `chore/shared-file-tokens` | [#43](https://github.com/simonsteiner/pyxctsk/pull/43) | | landed first; see Departures |
-| [C7](C7-split-the-scripts.md) | Split the three oversized `scripts/` utilities | 🟡 Worth exploring | maintainability | todo | `refactor/split-scripts` | | | no commit in 3 months |
-| [S2](#s2--a-process-branch-that-never-runs) | A `process` branch that never runs | — | maintainability | todo | rides with C7 | | | |
+| [C7](C7-split-the-scripts.md) | Split the three oversized `scripts/` utilities | 🟡 Worth exploring | maintainability | in-progress | `refactor/split-scripts` | | | no commit in 3 months |
+| [S2](#s2--a-process-branch-that-never-runs) | A `process` branch that never runs | — | maintainability | in-progress | rides with C7 | | | |
 | [S4](#s4--the-existing-hook-jobs-break-three-setup-rules) | The existing hook jobs break three setup rules | — | maintainability | todo | | | | follow-up, not in this rollout |
 
 Strength: 🟢 Strong · 🟡 Worth exploring · ⚪ Speculative · 🔴 live defect (a bug reproduced during the scan).
