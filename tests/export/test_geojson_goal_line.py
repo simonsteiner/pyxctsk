@@ -6,10 +6,7 @@ line, which still has to be drawn.
 
 from pyxctsk import Goal, GoalType, Task, TaskType, Turnpoint, TurnpointType, Waypoint
 from pyxctsk.export.common import TaskDrawing
-from pyxctsk.export.geojson import (
-    _create_goal_line_features,
-    generate_task_geojson,
-)
+from pyxctsk.export.geojson import _create_goal_line_features, generate_task_geojson
 
 
 class TestLineGoalWithoutAnApproach:

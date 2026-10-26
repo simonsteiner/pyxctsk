@@ -11,17 +11,11 @@ render it alike is in `test_writers_agree.py`.
 
 import pytest
 
-from pyxctsk import (
-    EarthModel,
-    GoalType,
-    UnmeasurableRouteError,
-)
+from pyxctsk import EarthModel, GoalType, UnmeasurableRouteError
 from pyxctsk.distance import GoalLine, GoalLineOrientation
 from pyxctsk.distance.earth import geodesic_distance
 from pyxctsk.export import common
-from pyxctsk.export.common import (
-    TaskDrawing,
-)
+from pyxctsk.export.common import TaskDrawing
 from pyxctsk.export.geojson import drawing_to_geojson, generate_task_geojson
 from pyxctsk.export.kml import drawing_to_kml
 from tests.builders import three_turnpoint_task
