@@ -202,8 +202,10 @@ def _process_turnpoint_row(
     # Collect all cells from the row (th for the first column, td for the rest)
     cells = []
     th = row.find("th")
-    if th and th.get_text(strip=True):
-        cells.append(th)
+    if th is not None:
+        th_text = th.get_text(strip=True)
+        if th_text:
+            cells.append(th)
 
     tds = row.find_all("td")
     cells.extend(tds)
@@ -293,8 +295,6 @@ def _set_turnpoint_type(entry: Dict[str, Any], row: BeautifulSoup) -> None:
             entry["Type"] = "Goal"
         else:
             entry["Type"] = "Turnpoint"
-    elif "Type" in entry.keys() and "Type" not in entry:
-        entry["Type"] = "Turnpoint"
 
 
 def extract_geojson(html: str) -> Optional[Dict[str, Any]]:
@@ -336,13 +336,13 @@ def extract_geojson(html: str) -> Optional[Dict[str, Any]]:
 
         return None
     except json.JSONDecodeError as e:
-        logger.error(f"Error parsing GeoJSON data: {e}")
+        logger.exception(f"Error parsing GeoJSON data: {e}")
         # Debug information to help diagnose JSON parsing errors
         logger.debug(f"JSON extract starts with: {geojson_str[:100]}...")
         logger.debug(f"JSON extract ends with: ...{geojson_str[-100:]}")
         return None
     except Exception as e:
-        logger.error(f"Unexpected error processing GeoJSON: {e}")
+        logger.exception(f"Unexpected error processing GeoJSON: {e}")
         return None
 
 
