@@ -27,7 +27,7 @@ Run commands through `uv run`, for example
 
 ### `xcontest_xctsk_tool.py`
 
-CLI tool for batch uploading XCTSK files, downloading tasks and HTML pages, and downloading QR codes via the XContest REST API from <https://tools.xcontest.org/xctsk/>. Implements retry logic, rate limiting, and metadata preservation with support for both v1 and v2 API endpoints. The command line is `xcontest_xctsk_tool.py`; the API client and the batch loops are in `xcontest_client.py`.
+CLI tool for batch uploading XCTSK files, downloading tasks and HTML pages, and downloading QR codes via the XContest REST API from <https://tools.xcontest.org/xctsk/>. Implements retry logic, rate limiting, and metadata preservation with support for both v1 and v2 API endpoints. The command line is `xcontest_xctsk_tool.py`; the API client and the batch loops are in `xcontest_client.py`. It reads and writes only paths inside the directory it runs from, so run it from the repository root or `scripts/`.
 
 #### REST API Endpoints
 

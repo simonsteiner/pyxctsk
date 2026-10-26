@@ -7,6 +7,7 @@ requests. The command line is `xcontest_xctsk_tool.py`.
 """
 
 import json
+import os
 import time
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -14,6 +15,25 @@ from typing import Dict, List, Optional, Tuple
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+
+
+def safe_path(path: Path) -> Path:
+    """Resolve a path the tool was given, refusing one outside the working directory.
+
+    Args:
+        path (Path): A file path from the command line, or built from one.
+
+    Returns:
+        Path: The canonical path.
+
+    Raises:
+        ValueError: If the path resolves outside the directory the tool runs in.
+    """
+    resolved = os.path.realpath(path)
+    base_dir = os.path.realpath(os.getcwd())
+    if resolved != base_dir and not resolved.startswith(base_dir + os.sep):
+        raise ValueError(f"path {str(path)!r} is outside the allowed directory")
+    return Path(resolved)
 
 
 class XCTSKClient:
@@ -48,7 +68,6 @@ class XCTSKClient:
             backoff_factor=1,
         )
         adapter = HTTPAdapter(max_retries=retry_strategy)
-        self.session.mount("http://", adapter)
         self.session.mount("https://", adapter)
 
     def upload_task(
@@ -68,9 +87,9 @@ class XCTSKClient:
             None. All exceptions are caught and returned as part of the message.
         """
         try:
-            with open(xctsk_file, "r", encoding="utf-8") as f:
+            with open(safe_path(xctsk_file), "r", encoding="utf-8") as f:
                 task_data = json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError) as e:
+        except (FileNotFoundError, json.JSONDecodeError, ValueError) as e:
             return None, f"Error reading file {xctsk_file}: {e}"
 
         headers = {"Content-Type": "application/json"}
@@ -155,9 +174,10 @@ class XCTSKClient:
 
             if response.status_code == 200:
                 # Ensure output directory exists
-                output_file.parent.mkdir(parents=True, exist_ok=True)
+                output_path = safe_path(output_file)
+                output_path.parent.mkdir(parents=True, exist_ok=True)
 
-                with open(output_file, "w", encoding="utf-8") as f:
+                with open(output_path, "w", encoding="utf-8") as f:
                     f.write(response.text)
 
                 # Extract metadata from headers
@@ -199,9 +219,9 @@ class XCTSKClient:
             None. All exceptions are caught and returned as part of the message.
         """
         try:
-            with open(xctsk_file, "r", encoding="utf-8") as f:
+            with open(safe_path(xctsk_file), "r", encoding="utf-8") as f:
                 task_data = json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError) as e:
+        except (FileNotFoundError, json.JSONDecodeError, ValueError) as e:
             return False, f"Error reading file {xctsk_file}: {e}"
 
         try:
@@ -214,9 +234,10 @@ class XCTSKClient:
 
             if response.status_code == 200:
                 # Ensure output directory exists
-                output_file.parent.mkdir(parents=True, exist_ok=True)
+                output_path = safe_path(output_file)
+                output_path.parent.mkdir(parents=True, exist_ok=True)
 
-                with open(output_file, "w", encoding="utf-8") as f:
+                with open(output_path, "w", encoding="utf-8") as f:
                     f.write(response.text)
 
                 return True, f"Generated QR code for {xctsk_file.name} -> {output_file}"
@@ -256,9 +277,10 @@ class XCTSKClient:
 
                 if output_file:
                     # Ensure output directory exists
-                    output_file.parent.mkdir(parents=True, exist_ok=True)
+                    output_path = safe_path(output_file)
+                    output_path.parent.mkdir(parents=True, exist_ok=True)
 
-                    with open(output_file, "w", encoding="utf-8") as f:
+                    with open(output_path, "w", encoding="utf-8") as f:
                         f.write(html_content)
 
                     return (
@@ -426,8 +448,9 @@ def process_all_tasks(
 
     # Save upload results if requested
     if results_file:
-        results_file.parent.mkdir(parents=True, exist_ok=True)
-        with open(results_file, "w") as f:
+        results_path = safe_path(results_file)
+        results_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(results_path, "w") as f:
             json.dump(upload_results, f, indent=2)
         print(f"Upload results saved to {results_file}")
 

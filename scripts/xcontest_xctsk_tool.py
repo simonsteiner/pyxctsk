@@ -26,6 +26,7 @@ from xcontest_client import (
     download_html_tasks,
     download_tasks,
     process_all_tasks,
+    safe_path,
     upload_directory,
 )
 
@@ -193,8 +194,9 @@ Examples:
 
             # Save results to file if requested
             if args.results_file:
-                args.results_file.parent.mkdir(parents=True, exist_ok=True)
-                with open(args.results_file, "w") as f:
+                results_path = safe_path(args.results_file)
+                results_path.parent.mkdir(parents=True, exist_ok=True)
+                with open(results_path, "w") as f:
                     json.dump(results, f, indent=2)
                 print(f"\nResults saved to {args.results_file}")
 
