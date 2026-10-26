@@ -40,6 +40,7 @@ The backlog, in rank order. After the scan only three parts of the report change
 | [C7](C7-split-the-scripts.md) | Split the three oversized `scripts/` utilities | 🟡 Worth exploring | maintainability | in-progress | `refactor/split-scripts` | | | no commit in 3 months |
 | [S2](#s2--a-process-branch-that-never-runs) | A `process` branch that never runs | — | maintainability | in-progress | rides with C7 | | | |
 | [S4](#s4--the-existing-hook-jobs-break-three-setup-rules) | The existing hook jobs break three setup rules | — | maintainability | todo | | | | follow-up, not in this rollout |
+| S5 | The compare view's error page raises instead of rendering | — | maintainability | todo | | | | found during C7; see Departures |
 
 Strength: 🟢 Strong · 🟡 Worth exploring · ⚪ Speculative · 🔴 live defect (a bug reproduced during the scan).
 Status: `todo` · `in-progress` · `pr-open` · `merged` · `blocked` · `dropped`. `blocked` and `dropped` always carry a reason in Notes.
@@ -131,3 +132,5 @@ Every job sets `priority:` under `parallel: true`, which lefthook ignores (the f
 - **C5: the agreement file holds two tests that render no writer.** Q4 moved `test_the_control_zone_radius_is_half_the_line` and `test_an_ordinary_turnpoint_is_described_without_a_role` with the twelve that do, because they pin the drawing answers both writers share.
 - **C6/S1: the shared builder is typed `-> Task`, so one test gained two `assert ... is not None` lines.** The untyped `_race_task` let mypy see `radius` and `center_distance` as unchecked; `test_the_goal_boundary_reading_is_shorter_by_the_goal_radius` now binds `goal_radius` and `whole` and asserts both are set before subtracting.
 - **C6/S1: the two `_race_task` bodies matched but their docstrings did not, so `race_to_goal_cylinder_task` merges them.** One docstring names the pre-start leg, the speed section and the cylinder goal, covering both callers.
+- **C7: the compare view's styles and map script are Jinja includes in `templates/compare_view/`, not files in `static/`.** Q6 chose includes because the map script holds two Jinja expressions and an include renders the page byte for byte; a static `.js` would have needed the GeoJSON moved into a JSON block, which changes the page.
+- **Found during C7, not fixed: the compare view's error page raises (S5).** `compare_task` renders `compare_view.html` with `error` but no `original_geojson` (`scripts/task_viewer/app.py:171`), and the map script's `{{ original_geojson | tojson | safe }}` raises `TypeError: Object of type Undefined is not JSON serializable`, so a task whose distances fail gives a 500, not the error page. It reproduces at `d20f10d`; the split keeps it, as a split preserves behaviour.
