@@ -248,18 +248,6 @@ Examples:
                 print("No files were processed successfully")
                 return 1
 
-        elif args.command == "process":
-            if not args.directory.exists():
-                print(f"Error: Directory {args.directory} does not exist")
-                return 1
-            if not args.html_output.exists():
-                print(f"Error: HTML output directory {args.html_output} does not exist")
-                return 1
-
-            process_all_tasks(
-                client, args.directory, args.html_output, args.author, args.results_file
-            )
-
     except KeyboardInterrupt:
         print("\nOperation cancelled by user")
         return 1
