@@ -9,11 +9,11 @@ from task_html_parser import extract_task_data, validate_geojson
 """
 Extract and convert XCTrack task data from HTML files to structured JSON and GeoJSON formats.
 
-This script provides the TaskDataExtractor class for parsing, cleaning, and extracting
-paragliding/hang gliding competition task data from XCTrack HTML exports. It supports:
-- Metadata and turnpoint extraction
-- GeoJSON extraction from embedded JavaScript
-- Output to clean HTML, JSON, and GeoJSON files in a structured directory
+This script provides the TaskDataExtractor class, which cleans
+paragliding/hang gliding competition task pages from XCTrack HTML exports and saves
+what `task_html_parser` extracts from them (metadata, turnpoints and the GeoJSON
+embedded in their JavaScript) to clean HTML, JSON, and GeoJSON files in a
+structured directory.
 
 Usage:
     Run as a script to process all HTML files in the input directory (downloaded_tasks/html_cleaned):
@@ -27,8 +27,8 @@ logger = logging.getLogger(__name__)
 class TaskDataExtractor:
     """Extracts XCTrack task data from HTML files into structured formats.
 
-    Handles parsing, cleaning, and extraction of paragliding/hang gliding competition task data
-    from XCTrack HTML exports, including metadata, turnpoints, and GeoJSON.
+    Handles the file I/O, the logging of what was found and the directory loops; the
+    parsing of metadata, turnpoints and GeoJSON is `task_html_parser`'s.
     """
 
     def __init__(self, output_base_dir: str = "downloaded_tasks"):
