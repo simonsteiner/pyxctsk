@@ -45,6 +45,7 @@ class CylinderFeature:
         color: The cylinder's colour, the goal's red included.
         centre: The centre as (lon, lat).
         radius: The radius in metres, as the task declares it.
+        earth_model: The task's earth, which :meth:`outline` measures on.
     """
 
     index: int
@@ -100,6 +101,7 @@ class GoalLineFeature:
         description: The line's length, rounded to the metre.
         color: The line's colour.
         length: The line's length in metres.
+        goal_line: The line itself, which :meth:`ends` asks on call.
     """
 
     name: str
@@ -125,6 +127,8 @@ class ControlZoneFeature:
         fill_color: The fill's colour.
         radius: The zone's radius in metres, which S7F 6.2.3.1 makes half the
             goal line.
+        goal_line: The line the zone surrounds, which :meth:`outline` asks on
+            call.
     """
 
     name: str
