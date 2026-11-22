@@ -30,12 +30,12 @@ The backlog, in rank order. After the scan only three parts of the report change
 | ID | Candidate | Strength | Door | Lens | Status | Branch | PR | Breaking | Notes |
 |---|---|---|---|---|---|---|---|---|---|
 | [C1](C1-json-round-trip.md) | `load_json` reads only what `dump_json` can write | 🟢 Strong · 🔴 live defect | ↔ two-way | maintainability | pr-open | `refactor/json-round-trip` | [#53](https://github.com/simonsteiner/pyxctsk/pull/53) | no | absorbs 2026-10-02 S13, S14, S15; batch 2026-11-23: C1 → C2 → C3 → S1-S3, S5 |
-| [C2](C2-drawing-features.md) | The drawing hands each writer features, not thirteen questions | 🟢 Strong | ↔ two-way | deepening | in-progress | `refactor/drawing-features` | | | outputs stay byte-identical |
+| [C2](C2-drawing-features.md) | The drawing hands each writer features, not thirteen questions | 🟢 Strong | ↔ two-way | deepening | pr-open | `refactor/drawing-features` | [#54](https://github.com/simonsteiner/pyxctsk/pull/54) | yes | outputs stay byte-identical |
 | [C3](C3-distance-table.md) | One way to the distance table, owned by its one consumer | 🟡 Worth exploring | ↔ two-way | deepening | in-progress | `refactor/distance-table` | | | breaks the public `TaskDistanceTable` names |
 | [S1](#s1--two-predicates-for-a-line-goal) | Two predicates for a line goal | - | ↔ two-way | coupling | in-progress | `refactor/smaller-findings-2026-11-23` | | | |
 | [S2](#s2--three-hand-written-leg-loops) | Three hand-written leg loops | - | ↔ two-way | deepening | in-progress | `refactor/smaller-findings-2026-11-23` | | | |
 | [S3](#s3--eleven-type-ignores-around-the-optional-qr-imports) | Eleven `type: ignore`s around the optional QR imports | - | ↔ two-way | maintainability | in-progress | `refactor/smaller-findings-2026-11-23` | | | |
-| [S4](#s4--a-test-pins-a-geojson-writer-internal) | A test pins a GeoJSON writer internal | - | ↔ two-way | coupling | in-progress | rides with C2 | | | |
+| [S4](#s4--a-test-pins-a-geojson-writer-internal) | A test pins a GeoJSON writer internal | - | ↔ two-way | coupling | pr-open | rides with C2 | [#54](https://github.com/simonsteiner/pyxctsk/pull/54) | | |
 | [S5](#s5--docstrings-narrate-the-codes-history) | Docstrings narrate the code's history | - | ↔ two-way | maintainability | in-progress | `refactor/smaller-findings-2026-11-23` | | | 73 lines in 26 files |
 | [S6](#s6--the-hook-jobs-break-three-setup-rules) | The hook jobs break three setup rules | - | ↔ two-way | maintainability | todo | `chore/lefthook-jobs` | | | carried from 2026-10-20 S4 |
 | [S7](#s7--the-compare-views-error-page-raises) | The compare view's error page raises | - | ↔ two-way | maintainability | todo | `fix/compare-view-error` | | | carried from 2026-10-20 S5 |
