@@ -135,6 +135,17 @@ class Task:
             return replace(self.goal, type=GoalType.CYLINDER)
         return self.goal
 
+    @property
+    def has_line_goal(self) -> bool:
+        """Whether the goal this task is flown to is a ``LINE``.
+
+        Asked of :attr:`effective_goal`, so a task with no turnpoints has none.
+        Whether there are enough turnpoints to orient a line is a separate
+        question, and ``GoalLine`` asks it.
+        """
+        goal = self.effective_goal
+        return goal is not None and goal.type is GoalType.LINE
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
 

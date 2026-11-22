@@ -30,7 +30,7 @@ depends on neither.
 from dataclasses import dataclass, field
 
 from ..exceptions import MismatchedRouteError, TaskValidationError
-from ..model.task import GoalType, Task
+from ..model.task import Task
 from ..model.validation import ValidationRule
 from .earth import EarthModelLike, canonical, geodesic_distance, name_of
 from .route_optimization import OptimizedRoute, calculate_iteratively_refined_route
@@ -84,12 +84,9 @@ def task_to_turnpoints(task: Task) -> list[TaskTurnpoint]:
     if negative:
         raise TaskValidationError(negative)
 
-    # ``effective_goal``, not ``goal``: the cylinders are the task as *flown*,
-    # so the format's CYLINDER default applies here — and it guarantees a type
-    # whenever there is a turnpoint to be the goal. ``goal`` is what the file
-    # said, which is validation's question rather than geometry's.
-    goal = task.effective_goal
-    line_goal = goal is not None and goal.type is GoalType.LINE
+    # ``has_line_goal`` reads the goal as *flown* (the format's CYLINDER default
+    # applied), which is geometry's question; validation reads what the file said.
+    line_goal = task.has_line_goal
 
     last = len(task.turnpoints) - 1
     return [

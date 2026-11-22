@@ -42,7 +42,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Sequence
 
-from ..model.task import GoalType, Task, Turnpoint
+from ..model.task import Task, Turnpoint
 from .earth import (
     EarthModelLike,
     geod_for_earth_model,
@@ -252,8 +252,7 @@ class GoalLine:
     @staticmethod
     def _has_line_goal(task: Task) -> bool:
         """Whether this task has a LINE goal with enough turnpoints to orient one."""
-        goal = task.effective_goal
-        return bool(goal and goal.type == GoalType.LINE and len(task.turnpoints) >= 2)
+        return task.has_line_goal and len(task.turnpoints) >= 2
 
     @classmethod
     def _build(
