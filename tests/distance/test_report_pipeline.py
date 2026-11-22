@@ -1,45 +1,34 @@
-"""The task-distance pipeline: `calculate_task_distances` and its parts.
+"""The task-distance pipeline: `DistanceReport` and its parts.
 
 This file covers the layer *above* the optimizer — that a task is turned into
-turnpoints correctly, that cumulative distances accumulate, that the result
-dict has the shape callers read, and that degenerate inputs (no turnpoints,
+turnpoints correctly, that cumulative distances accumulate, that the report
+reads the one route, and that degenerate inputs (no turnpoints,
 one turnpoint, zero radii, concentric circles) do something defined.
 
 How close the optimizer gets to XCTrack's published numbers is not asserted
 here; `test_xctrack_accuracy.py` owns that, and does it on every reference task
-at a tighter tolerance. The one reference check kept below runs through
-`calculate_task_distances`, so it is testing the wiring, not the algorithm.
+at a tighter tolerance. The one reference check kept below (the centre distance) runs through
+`DistanceReport.from_task`, so it is testing the wiring, not the algorithm.
 """
 
-import statistics
 from unittest.mock import patch
 
 import pytest
 
-from pyxctsk import Task, TaskType
 from pyxctsk.distance import (
     DistanceReport,
     MeasuredTask,
     TaskTurnpoint,
-    TooFewTurnpointsError,
-    calculate_task_distances,
     distance_through_centers,
     optimized_distance,
-    task_distances_from,
 )
 from pyxctsk.export import common
 from pyxctsk.export.common import TaskDrawing
 from pyxctsk.export.geojson import drawing_to_geojson
-from tests.builders import turnpoint
 from tests.corpus import reference_task, tasks_with_reference_distance
 
 #: The reference tasks the producer recorded distances for, discovered once.
 WITH_REFERENCE = tasks_with_reference_distance()
-
-#: How far the pipeline's optimized distance may sit from the producer's.
-#: Deliberately looser than ``test_xctrack_accuracy`` allows the optimizer
-#: itself: what is under test here is the wiring above it.
-TOLERANCE = 0.02
 
 #: Synthetic route with enough cylinder radius for optimization to matter.
 TEST_TURNPOINTS = [
@@ -65,47 +54,15 @@ class TestDistanceComprehensive:
         if not ref_km:
             pytest.skip("the producer recorded no center distance")
 
-        calc_km = calculate_task_distances(reference.task).center_distance_km
+        center_m = DistanceReport.from_task(reference.task).center_distance_m
+        assert center_m is not None
+        calc_km = center_m / 1000
         difference = abs(calc_km - ref_km) / ref_km
 
         assert difference < 0.005, (
             f"{reference.stem}: center distance differs by {difference:.1%} "
             f"(calc: {calc_km:.1f}km, ref: {ref_km:.1f}km)"
         )
-
-    @pytest.mark.parametrize("reference", WITH_REFERENCE, ids=str)
-    def test_optimized_distance_matches_reference(self, reference):
-        """The pipeline reproduces the producer's optimized distance.
-
-        A looser bound than ``test_xctrack_accuracy`` uses on the optimizer
-        itself: what is under test here is the wiring above it.
-        """
-        ref_km = reference.reference_optimized_km
-        calc_km = calculate_task_distances(reference.task).optimized_distance_km
-        difference = abs(calc_km - ref_km) / ref_km
-
-        assert difference < TOLERANCE, (
-            f"{reference.stem}: optimized distance differs by {difference:.1%} "
-            f"(calc: {calc_km:.1f}km, ref: {ref_km:.1f}km)"
-        )
-
-    def test_the_average_difference_is_well_inside_the_tolerance(self):
-        """Every task passing individually still allows a systematic bias.
-
-        A claim about the corpus rather than any one task, so this one stays a
-        loop.
-        """
-        differences = []
-        for r in WITH_REFERENCE:
-            # `tasks_with_reference_distance` is the subset that carries one;
-            # the accessor is still Optional because not every task does. The
-            # check used to be invisible because the table's values were `Any`.
-            reference_km = r.reference_optimized_km
-            assert reference_km is not None
-            calc_km = calculate_task_distances(r.task).optimized_distance_km
-            differences.append(abs(calc_km - reference_km) / reference_km)
-
-        assert statistics.mean(differences) < TOLERANCE / 2
 
     def test_algorithm_core_functionality(self):
         """Test core algorithm functionality with synthetic data.
@@ -142,19 +99,21 @@ class TestDistanceComprehensive:
         """
         task = reference_task(stem).task
 
-        results = calculate_task_distances(task)
+        report = DistanceReport.from_task(task)
         route = MeasuredTask.from_task(task).route
 
-        expected = [round(m / 1000.0, 1) for m in route.cumulative_m()]
-        actual = [tp.cumulative_optimized_km for tp in results.turnpoints]
-        assert actual == expected, f"{stem}: cumulative column left the route"
+        rows = report.route()
+        actual = [row.cumulative_m for row in rows]
+        assert actual == route.cumulative_m(), (
+            f"{stem}: cumulative column left the route"
+        )
 
         # The last turnpoint's cumulative distance is the task distance.
-        assert actual[-1] == results.optimized_distance_km
+        assert actual[-1] == report.task_distance_m
 
         # An optimized prefix never exceeds the same prefix through centers.
-        for tp in results.turnpoints:
-            assert tp.cumulative_optimized_km <= tp.cumulative_center_km
+        for row in rows:
+            assert row.cumulative_m <= row.cumulative_center_m
 
     def test_edge_cases_and_robustness(self):
         """Test algorithm robustness with edge cases."""
@@ -212,42 +171,35 @@ class TestDistanceComprehensive:
         """
         task = reference_task(task_name).task
 
-        results = calculate_task_distances(task)
+        report = DistanceReport.from_task(task)
+        rows = report.route()
 
         # Validate structure
-        assert len(results.turnpoints) == len(task.turnpoints)
+        assert len(rows) == len(task.turnpoints)
 
         # Validate optimization effectiveness
-        center_km = results.center_distance_km
-        opt_km = results.optimized_distance_km
+        center_m = report.center_distance_m
+        opt_m = report.task_distance_m
 
-        assert center_km > 0, f"{task_name}: Center distance should be positive"
-        assert opt_km > 0, f"{task_name}: Optimized distance should be positive"
-        assert opt_km < center_km, f"{task_name}: Optimization should reduce distance"
+        assert center_m is not None
+        assert center_m > 0, f"{task_name}: Center distance should be positive"
+        assert opt_m > 0, f"{task_name}: Optimized distance should be positive"
+        assert opt_m < center_m, f"{task_name}: Optimization should reduce distance"
 
         # Cumulative distances should be non-decreasing
-        for prev_tp, tp_result in zip(results.turnpoints, results.turnpoints[1:]):
-            assert tp_result.cumulative_center_km >= prev_tp.cumulative_center_km
-            assert tp_result.cumulative_optimized_km >= prev_tp.cumulative_optimized_km
+        for prev, row in zip(rows, rows[1:]):
+            assert row.cumulative_center_m >= prev.cumulative_center_m
+            assert row.cumulative_m >= prev.cumulative_m
 
 
 class TestProjectionFromARoute:
-    """`task_distances_from`: the report as a projection of one route."""
-
-    @pytest.mark.parametrize("stem", ["task_bevo", "task_gibe"])
-    def test_agrees_with_optimizing_from_scratch(self, stem):
-        """Projecting a measured task gives exactly the report as measuring one."""
-        task = reference_task(stem).task
-
-        assert task_distances_from(MeasuredTask.from_task(task)) == (
-            calculate_task_distances(task)
-        )
+    """`DistanceReport.from_measured_task`: the report as a projection of one route."""
 
     def test_a_task_and_its_map_can_share_one_route(self):
-        """The distance table and the drawn map cost one optimizer run together.
+        """The distance report and the drawn map cost one optimizer run together.
 
         This is the pairing the task viewer makes on every request: it used to
-        optimize the task once for the table and again for the GeoJSON.
+        optimize the task once for the report and again for the GeoJSON.
         """
         task = reference_task("task_bevo").task
 
@@ -260,12 +212,12 @@ class TestProjectionFromARoute:
 
         with patch.object(common.MeasuredTask, "from_task", counting):
             drawing = TaskDrawing.from_task(task)
-            table = task_distances_from(drawing.measured)
+            report = DistanceReport.from_measured_task(drawing.measured)
             geojson = drawing_to_geojson(drawing)
 
         assert len(calls) == 1
-        # The table's total and the drawn line describe the same route.
-        assert table.optimized_distance_km == round(drawing.route.total_m / 1000, 1)
+        # The report's total and the drawn line describe the same route.
+        assert report.task_distance_m == drawing.route.total_m
         (line,) = [
             f
             for f in geojson["features"]
@@ -273,90 +225,33 @@ class TestProjectionFromARoute:
         ]
         assert len(line["geometry"]["coordinates"]) == len(drawing.route.points)
 
-    @pytest.mark.parametrize("count", [0, 1], ids=["no turnpoints", "one turnpoint"])
-    def test_a_task_too_short_to_have_a_distance_is_refused(self, count):
-        """It used to answer 0.0 km and `turnpoints: []`.
 
-        The table and the report are both at the front door, and they gave one
-        task two answers: the table dropped the turnpoint the task did have and
-        reported a distance of zero, where the report raised. The table is a
-        rendering of the report now, so it refuses because the report does —
-        `tests/distance/test_report.py` pins the rule itself.
-        """
-        turnpoints = [turnpoint("A", 46.5, 8.0)][:count]
-        task = Task(task_type=TaskType.CLASSIC, version=1, turnpoints=turnpoints)
-
-        for call in (
-            lambda: calculate_task_distances(task),
-            lambda: task_distances_from(MeasuredTask.from_task(task)),
-        ):
-            with pytest.raises(TooFewTurnpointsError, match="at least two turnpoints"):
-                call()
-
-
-class TestTheTableIsARenderingOfTheReport:
-    """One report, displayed — not a second measurement of the same task.
-
-    The table used to derive its centre column leg by leg while
-    ``DistanceReport`` asked ``center_distance``, and its rows carried
-    different keys and units from the report's. Two published shapes of one
-    task, disagreeing by up to 50 m by construction, with nothing saying which
-    was canonical.
-    """
-
-    @pytest.mark.parametrize("stem", ["task_bevo", "task_gibe", "task_fobe_line"])
-    def test_every_total_is_the_report_rounded(self, stem):
-        """Not "close to" — the same number, displayed."""
-        task = reference_task(stem).task
-        report = DistanceReport.from_task(task)
-        table = calculate_task_distances(task)
-
-        assert table.optimized_distance_km == round(report.task_distance_m / 1000, 1)
-        assert table.center_distance_km == round(
-            (report.center_distance_m or 0.0) / 1000, 1
-        )
-
-    @pytest.mark.parametrize("stem", ["task_bevo", "task_gibe", "task_fobe_line"])
-    def test_every_row_is_the_reports_row_rounded(self, stem):
-        """Including the centre column, which the table used to re-derive."""
-        task = reference_task(stem).task
-        rows = DistanceReport.from_task(task).route()
-        table = calculate_task_distances(task)
-
-        assert len(table.turnpoints) == len(rows)
-        for row, tp in zip(rows, table.turnpoints):
-            assert tp.index == row.index
-            assert tp.name == row.name
-            assert tp.cumulative_optimized_km == round(row.cumulative_m / 1000, 1)
-            assert tp.cumulative_center_km == round(row.cumulative_center_m / 1000, 1)
+class TestTheCentreColumn:
+    """The centre column and the centre total are one polyline."""
 
     @pytest.mark.parametrize("stem", ["task_bevo", "task_pepi"])
     def test_the_centre_column_ends_at_the_centre_total(self, stem):
         """The prefix and the total are one polyline, so they must agree.
 
         They are both ``PROPOSED_READING``. Deriving the column from a
-        different reading than the total printed above it would put a table in
-        disagreement with its own last row — which is why
+        different reading than the total would put the report in disagreement with
+        its own last row — which is why
         ``cumulative_center_m`` lives in ``center_distance``.
         """
-        table = calculate_task_distances(reference_task(stem).task)
+        report = DistanceReport.from_task(reference_task(stem).task)
 
-        assert table.turnpoints[-1].cumulative_center_km == table.center_distance_km
+        assert report.route()[-1].cumulative_center_m == report.center_distance_m
 
 
-def test_the_table_does_not_optimize_the_speed_section():
-    """The table never shows §7.2's second distance, so it must not pay for it.
+def test_the_report_does_not_optimize_the_speed_section():
+    """§7.2's second distance is derived on first use, not at construction.
 
     ``DistanceReport`` used to optimize ``taskToESS`` at construction — a
-    second route per table, which the task viewer's "one drawing, one route"
+    second route per drawing, which the task viewer's "one drawing, one route"
     comments said did not happen.
     """
-    from pyxctsk.distance import DistanceReport, MeasuredTask, TaskDistanceTable
-
     report = DistanceReport.from_measured_task(
         MeasuredTask.from_task(reference_task("task_bevo").task)
     )
-    TaskDistanceTable.from_report(report)
-
     assert "speed_section" not in report.__dict__
     assert report.speed_section is not None  # still there when asked for

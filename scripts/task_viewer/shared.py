@@ -7,6 +7,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from flask import current_app
 
+from pyxctsk import DistanceReport
+
 # Configuration
 BASE_DIR = Path(os.path.dirname(os.path.abspath(__file__))) / ".." / "downloaded_tasks"
 JSON_DIR = BASE_DIR / "json"
@@ -75,19 +77,26 @@ def load_task_data(
     return json_data, geojson_data
 
 
+def _km(metres: float) -> float:
+    """Metres to kilometres, at the 0.1 km a board shows."""
+    return round(metres / 1000.0, 1)
+
+
 def prepare_comparison_data(
-    original_data: Dict[str, Any], xctrack_results: Dict[str, Any], task: Any
+    original_data: Dict[str, Any], report: DistanceReport
 ) -> Dict[str, Any]:
     """Prepare comparison data between original and xctrack calculations.
 
     Args:
         original_data (Dict[str, Any]): The original task data loaded from JSON.
-        xctrack_results (Dict[str, Any]): The results from XCTrack calculations.
-        task (Any): The parsed task object.
+        report (DistanceReport): The task's distances, from pyxctsk.
 
     Returns:
         Dict[str, Any]: Dictionary containing summary and turnpoint comparison data.
     """
+    xctrack_center_km = _km(report.center_distance_m or 0.0)
+    xctrack_optimized_km = _km(report.task_distance_m)
+    xctrack_rows = report.route()
     comparison: Dict[str, Any] = {
         "summary": {
             "original_center_km": original_data["metadata"].get(
@@ -96,8 +105,8 @@ def prepare_comparison_data(
             "original_optimized_km": original_data["metadata"].get(
                 "distance_optimized_km", 0
             ),
-            "xctrack_center_km": xctrack_results.get("center_distance_km", 0),
-            "xctrack_optimized_km": xctrack_results.get("optimized_distance_km", 0),
+            "xctrack_center_km": xctrack_center_km,
+            "xctrack_optimized_km": xctrack_optimized_km,
         },
         "turnpoints": [],
     }
@@ -127,7 +136,6 @@ def prepare_comparison_data(
 
     # Compare turnpoint by turnpoint
     original_tps = original_data.get("turnpoints", [])
-    xctrack_tps = xctrack_results.get("turnpoints", [])
 
     for i, orig_tp in enumerate(original_tps):
         tp_comparison = {
@@ -146,14 +154,10 @@ def prepare_comparison_data(
         }
 
         # Find corresponding xctrack turnpoint
-        if i < len(xctrack_tps):
-            xctrack_tp = xctrack_tps[i]
-            tp_comparison["xctrack"]["center_km"] = xctrack_tp.get(
-                "cumulative_center_km", 0
-            )
-            tp_comparison["xctrack"]["optimized_km"] = xctrack_tp.get(
-                "cumulative_optimized_km", 0
-            )
+        if i < len(xctrack_rows):
+            xctrack_row = xctrack_rows[i]
+            tp_comparison["xctrack"]["center_km"] = _km(xctrack_row.cumulative_center_m)
+            tp_comparison["xctrack"]["optimized_km"] = _km(xctrack_row.cumulative_m)
 
         # Calculate differences
         center_diff = (

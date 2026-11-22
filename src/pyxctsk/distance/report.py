@@ -46,7 +46,7 @@ S7F_EDITION = "2026 V1.0"
 #: used to answer 0.0 and only the CLI knew to refuse.
 #:
 #: :class:`DistanceReport` checks it at construction, so every way of building
-#: a report — and the distance table rendered from one — refuses alike. It was
+#: a report refuses alike. It was
 #: once a copy in each of two entry points, and ``from_measured_task``, the
 #: third, had none: it reported a one-turnpoint task as 0.0 m.
 #: :class:`~pyxctsk.distance.MeasuredTask` deliberately does not check it — a
@@ -91,10 +91,8 @@ NOTES = {
 class RouteRow:
     """One turnpoint of the report: where it is, and where the route crosses it.
 
-    A value rather than a dict, so its two readers — the JSON rendering and the
-    distance table — name its fields rather than spell them as string keys. The
-    table read eight of them by string, where a typo was a ``KeyError`` at
-    runtime. Field order is the JSON key order.
+    A value rather than a dict, so a reader names its fields rather than
+    spelling them as string keys. Field order is the JSON key order.
 
     Attributes:
         index: Position in the task, from 0.
@@ -154,8 +152,7 @@ class DistanceReport:
 
         Derived on first use rather than at construction. It is a second route
         optimization — S7F measures ``taskToESS`` separately — and it used to
-        run for every report, including the ones behind a distance table that
-        never shows it: one extra optimizer run per drawing in the task viewer,
+        run for every report, including the ones that never read it: one extra optimizer run per drawing in the task viewer,
         whose comments said one drawing meant one route.
         """
         return SpeedSection.from_measured_task(self.measured)
@@ -267,8 +264,6 @@ class DistanceReport:
         """
         cumulative = self.measured.cumulative_m()
         # The centre column's prefix, from the module that owns the convention.
-        # `task_distances` used to re-derive it leg by leg beside this one, so
-        # the two published shapes measured the same thing twice.
         center_cumulative = cumulative_center_m(self.task)
         return [
             RouteRow(

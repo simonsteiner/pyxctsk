@@ -41,17 +41,14 @@ from .distance import (
     MeasuredTask,
     OptimizedRoute,
     SpeedSection,
-    TaskDistanceTable,
     TaskTurnpoint,
     TooFewTurnpointsError,
     calculate_iteratively_refined_route,
-    calculate_task_distances,
     center_distance,
     center_distance_readings,
     distance_through_centers,
     geodesic_distance,
     optimized_distance,
-    task_distances_from,
     task_to_turnpoints,
 )
 from .exceptions import (
@@ -101,7 +98,6 @@ __version__ = pyxctsk_version()
 # contents, this checks that a reader can find a name in them.
 __all__ = [
     "calculate_iteratively_refined_route",
-    "calculate_task_distances",
     "center_distance",
     "center_distance_readings",
     "CenterDistanceReading",
@@ -141,10 +137,8 @@ __all__ = [
     "SSSType",
     "Takeoff",
     "Task",
-    "task_distances_from",
     "task_to_kml",
     "task_to_turnpoints",
-    "TaskDistanceTable",
     "TaskDrawing",
     "TaskTurnpoint",
     "TaskType",

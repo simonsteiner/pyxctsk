@@ -27,8 +27,6 @@ own. Everything a caller outside the package needs is named here —
 - :mod:`~pyxctsk.distance.measured_task` — ``MeasuredTask``, a task beside the
   optimized route flown for it. Every module that needs both takes this one
   value, so a task cannot be paired with another task's route
-- :mod:`~pyxctsk.distance.task_distances` — per-leg and cumulative distances,
-  projected from one measured task
 - :mod:`~pyxctsk.distance.goal_line` — the ``GoalLine`` deep module: length,
   endpoints and semicircular control zone, in one place
 - :mod:`~pyxctsk.distance.speed_section` — ``SpeedSection``, §7.2's second
@@ -100,12 +98,6 @@ from .route_optimization import (
     plane_circle,
 )
 from .speed_section import SpeedSection
-from .task_distances import (
-    TaskDistanceTable,
-    TurnpointRow,
-    calculate_task_distances,
-    task_distances_from,
-)
 from .turnpoint import TaskTurnpoint
 
 # Export all the main public functions and classes
@@ -134,10 +126,6 @@ __all__ = [
     "NOTES",
     "TooFewTurnpointsError",
     "geodesic_distance",
-    "calculate_task_distances",
-    "task_distances_from",
-    "TaskDistanceTable",
-    "TurnpointRow",
     "task_to_turnpoints",
     # Configuration
     "FAI_SPHERE_RADIUS_M",

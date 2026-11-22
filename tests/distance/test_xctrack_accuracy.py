@@ -13,8 +13,8 @@ These tests encode the acceptance criteria from the route-optimization audit
 Everything here goes straight at the optimizer. The crossing, goal-line and
 convergence cases are `test_route_optimization_cases.py` and the earth model is
 `test_earth.py`. The pipeline that calls the optimizer —
-`calculate_task_distances`, cumulative distances, degenerate inputs — is
-`test_task_distances.py`; the optimizer's internals are
+`DistanceReport`, cumulative distances, degenerate inputs — is
+`test_report_pipeline.py`; the optimizer's internals are
 `test_route_optimization.py`.
 """
 

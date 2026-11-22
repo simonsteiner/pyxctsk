@@ -204,12 +204,16 @@ class TestSeeYouSemantics:
     @pytest.mark.parametrize("name", ["seeyou-finish-1220", "seeyou-finish-auto"])
     def test_centers_distance_matches_seeyou_exactly(self, name):
         """Through-centers distance is unambiguous, and we agree to 0.1 km."""
-        from pyxctsk.distance import calculate_task_distances
+        from pyxctsk.distance import DistanceReport
 
         task = parse_task((FIXTURES / f"{name}_qr_code.txt").read_text())
-        result = calculate_task_distances(task)
+        result = DistanceReport.from_task(task)
 
-        assert result.center_distance_km == self.REFERENCE[name]["total_km"]
+        assert result.center_distance_m is not None
+        assert (
+            round(result.center_distance_m / 1000, 1)
+            == (self.REFERENCE[name]["total_km"])
+        )
 
     @pytest.mark.parametrize("name", ["seeyou-finish-1220", "seeyou-finish-auto"])
     def test_optimized_legs_match_seeyou_except_the_first(self, name):
@@ -311,11 +315,12 @@ class TestConformantElevatedGoal:
         Guards the duplicate-collapse fix: these two circles are concentric but
         differ in radius, so they must not be merged (ADR 0002).
         """
-        from pyxctsk.distance import calculate_task_distances
+        from pyxctsk.distance import DistanceReport
 
         task = parse_task((FIXTURES / "xcontest-conformant.xctsk").read_text())
-        result = calculate_task_distances(task)
+        result = DistanceReport.from_task(task)
 
         assert task.turnpoints[-2].radius == 61600
         assert task.turnpoints[-1].radius == 400
-        assert result.optimized_distance_km > result.center_distance_km
+        assert result.center_distance_m is not None
+        assert result.task_distance_m > result.center_distance_m

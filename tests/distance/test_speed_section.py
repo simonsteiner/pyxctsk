@@ -1,6 +1,6 @@
 """The speed section's distance — FAI Sporting Code S7F 2026 §7.2.
 
-§7.2 defines two task distances. `test_task_distances.py` covers the first;
+§7.2 defines two task distances. `test_report_pipeline.py` covers the first;
 this covers the second, including the property that made it a module of its
 own: the ESS route is a *separate* optimization, not a prefix of the task's.
 """
