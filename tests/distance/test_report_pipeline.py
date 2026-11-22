@@ -126,8 +126,10 @@ class TestDistanceComprehensive:
             f"{stem}: cumulative column left the route"
         )
 
-        # The last turnpoint's cumulative distance is the task distance.
-        assert actual[-1] == report.task_distance_m
+        # The last turnpoint's cumulative distance is the task distance. To
+        # within a millionth of a metre, not bit for bit: from Python 3.12 ``sum()``
+        # compensates, so a total and a running prefix differ in the last bit.
+        assert actual[-1] == pytest.approx(report.task_distance_m, abs=1e-6)
 
         # An optimized prefix never exceeds the same prefix through centers.
         for row in rows:
@@ -258,7 +260,11 @@ class TestTheCentreColumn:
         """
         report = DistanceReport.from_task(reference_task(stem).task)
 
-        assert report.route()[-1].cumulative_center_m == report.center_distance_m
+        # A millionth of a metre, not bit for bit: from Python 3.12 ``sum()`` compensates,
+        # so the total and the running prefix differ in the last bit.
+        assert report.route()[-1].cumulative_center_m == pytest.approx(
+            report.center_distance_m, abs=1e-6
+        )
 
 
 def test_the_report_does_not_optimize_the_speed_section():
