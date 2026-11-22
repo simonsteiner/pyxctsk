@@ -9,7 +9,13 @@ import pytest
 
 from pyxctsk import GoalType, TurnpointType
 from pyxctsk.export import common
-from pyxctsk.export.common import GOAL_COLOR, Color, TaskDrawing, turnpoint_color
+from pyxctsk.export.common import (
+    GOAL_COLOR,
+    Color,
+    CylinderFeature,
+    TaskDrawing,
+    turnpoint_color,
+)
 from tests.builders import three_turnpoint_task
 
 
@@ -96,12 +102,13 @@ class TestOnePalette:
 
         The two writers used to normalize it differently — KML to
         `TurnpointType.NONE`, GeoJSON not at all — and agreed only because both
-        lookups fell through to the same default. `color_of` is the one answer.
+        lookups fell through to the same default. The cylinder feature is the one answer.
         """
         task = three_turnpoint_task(GoalType.CYLINDER)
         task.turnpoints[0].type = None
         drawing = TaskDrawing.from_task(task)
 
-        assert drawing.color_of(drawing.turnpoints[0]) == turnpoint_color(
-            TurnpointType.NONE
-        )
+        first = drawing.features[0]
+        assert isinstance(first, CylinderFeature)
+        assert first.role is TurnpointType.NONE
+        assert first.color == turnpoint_color(TurnpointType.NONE)

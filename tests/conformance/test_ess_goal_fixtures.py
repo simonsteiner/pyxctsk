@@ -130,7 +130,7 @@ class TestIsEssGoalAsksTheLastTurnpoint:
     It used to find the *first* turnpoint marked ESS and compare it to the last
     one by value. ``Turnpoint`` is a plain dataclass, so on a task that flies
     the same waypoint twice the comparison could match the wrong occurrence —
-    the hazard ``TaskDrawing.is_goal`` documents and avoids with identity.
+    the hazard ``TaskDrawing.features`` avoids by comparing identity.
     Asking the goal what it is needs neither.
     """
 

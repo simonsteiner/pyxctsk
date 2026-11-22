@@ -15,10 +15,24 @@ from pyxctsk import EarthModel, GoalType, UnmeasurableRouteError
 from pyxctsk.distance import GoalLine, GoalLineOrientation
 from pyxctsk.distance.earth import geodesic_distance
 from pyxctsk.export import common
-from pyxctsk.export.common import TaskDrawing
+from pyxctsk.export.common import (
+    GOAL_COLOR,
+    ControlZoneFeature,
+    CylinderFeature,
+    GoalLineFeature,
+    RouteFeature,
+    TaskDrawing,
+)
 from pyxctsk.export.geojson import drawing_to_geojson, generate_task_geojson
 from pyxctsk.export.kml import drawing_to_kml
 from tests.builders import three_turnpoint_task
+
+
+def _cylinder(drawing: TaskDrawing, index: int) -> CylinderFeature:
+    """The drawing's cylinder feature at this position."""
+    feature = drawing.features[index]
+    assert isinstance(feature, CylinderFeature)
+    return feature
 
 
 class TestTaskDrawing:
@@ -30,8 +44,9 @@ class TestTaskDrawing:
 
         assert drawing.goal_line is None
         assert len(drawing.turnpoints) == 3
-        assert drawing.is_goal(drawing.turnpoints[-1])
-        assert not drawing.is_goal(drawing.turnpoints[0])
+        cylinders = [f for f in drawing.features if isinstance(f, CylinderFeature)]
+        assert cylinders[-1].color == GOAL_COLOR
+        assert cylinders[0].color != GOAL_COLOR
 
     def test_the_task_is_the_measured_ones(self):
         """One task per drawing: the one its route was measured for."""
@@ -67,7 +82,9 @@ class TestTaskDrawing:
 
         assert drawing.goal_line is None
         assert len(drawing.turnpoints) == 3
-        assert drawing.is_goal(drawing.turnpoints[-1])
+        last = drawing.features[2]
+        assert isinstance(last, CylinderFeature)
+        assert last.color == GOAL_COLOR
 
     def test_coincident_centres_still_yield_a_line(self):
         """Concentric cylinders have an approach direction even so.
@@ -104,16 +121,19 @@ class TestTaskDrawing:
         drawing = TaskDrawing.from_task(task)
 
         assert len(drawing.route.points) == 1
-        assert drawing.route_coordinates() is None
+        assert not any(isinstance(f, RouteFeature) for f in drawing.features)
 
-    def test_route_coordinates_follow_the_route(self):
-        """The drawn line is the optimized route, in order."""
-        drawing = TaskDrawing.from_task(three_turnpoint_task(GoalType.CYLINDER))
+    def test_features_come_cylinders_route_goal_line_control_zone(self):
+        """The one order both writers emit, stated once."""
+        drawing = TaskDrawing.from_task(three_turnpoint_task(GoalType.LINE))
 
-        assert drawing.route_coordinates() == list(drawing.route.points)
-        coordinates = drawing.route_coordinates()
-        assert coordinates is not None
-        assert len(coordinates) == 3
+        assert [type(f) for f in drawing.features] == [
+            CylinderFeature,
+            CylinderFeature,
+            RouteFeature,
+            GoalLineFeature,
+            ControlZoneFeature,
+        ]
 
 
 class TestTheCylinderOutline:
@@ -133,7 +153,7 @@ class TestTheCylinderOutline:
         drawing = TaskDrawing.from_task(task)
         centre = (46.0, 8.0)
 
-        ring = drawing.outline_of(task.turnpoints[1])
+        ring = _cylinder(drawing, 1).outline()
 
         assert ring[0] == ring[-1]
         for lon, lat in ring:
@@ -156,7 +176,7 @@ class TestTheCylinderOutline:
         drawing = TaskDrawing.from_task(task)
 
         with pytest.raises(UnmeasurableRouteError, match="far side of the earth"):
-            drawing.outline_of(task.turnpoints[0])
+            _cylinder(drawing, 0).outline()
         with pytest.raises(UnmeasurableRouteError, match="far side of the earth"):
             drawing_to_kml(drawing)
         takeoff = drawing_to_geojson(drawing)["features"][0]
@@ -184,7 +204,7 @@ class TestTheCylinderOutline:
         """The writer renders the drawing's answer rather than its own."""
         drawing = TaskDrawing.from_task(three_turnpoint_task(GoalType.CYLINDER))
         kml = drawing_to_kml(drawing)
-        lon, lat = drawing.outline_of(drawing.turnpoints[1])[5]
+        lon, lat = _cylinder(drawing, 1).outline()[5]
 
         assert f"{lon},{lat}," in kml
 
@@ -234,21 +254,3 @@ class TestOneDrawingTwoFormats:
         assert generate_task_geojson(task) == drawing_to_geojson(
             TaskDrawing.from_task(task)
         )
-
-    def test_both_formats_draw_the_same_route(self):
-        """The KML course line and the GeoJSON route come from one value."""
-        drawing = TaskDrawing.from_task(three_turnpoint_task(GoalType.CYLINDER))
-        route = drawing.route_coordinates()
-        assert route is not None
-
-        geojson = drawing_to_geojson(drawing)
-        (feature,) = [
-            f
-            for f in geojson["features"]
-            if f["properties"]["type"] == "optimized_route"
-        ]
-        assert feature["geometry"]["coordinates"] == [[lon, lat] for lat, lon in route]
-
-        kml = drawing_to_kml(drawing)
-        for lat, lon in route:
-            assert f"{lon},{lat}" in kml

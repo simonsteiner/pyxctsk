@@ -229,7 +229,7 @@ class Task:
         This used to search for the *first* turnpoint marked ESS and compare it
         to the last one by value. ``Turnpoint`` is a plain dataclass, so a task
         that legitimately flies the same turnpoint twice could match the wrong
-        occurrence — the hazard :meth:`~pyxctsk.export.TaskDrawing.is_goal`
+        occurrence — the hazard :meth:`~pyxctsk.export.common.TaskDrawing.features`
         documents and avoids by comparing identity. Asking the last turnpoint
         what it is needs neither a search nor a comparison. It also drops
         ``find_ess_turnpoint``, which had no other caller, no test and no

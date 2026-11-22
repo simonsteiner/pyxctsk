@@ -12,50 +12,31 @@ All features include geometry and properties suitable for web map display, inclu
 Intended for use in web-based or desktop mapping tools to visualize XCTrack competition tasks.
 """
 
-from typing import Any
+from typing import Any, assert_never
 
-from ..model.task import Task, Turnpoint
+from ..model.task import Task
 from .common import (
-    CONTROL_ZONE_EDGE_COLOR,
-    CONTROL_ZONE_FILL_COLOR,
-    GOAL_LINE_COLOR,
-    ROUTE_COLOR,
+    ControlZoneFeature,
+    CylinderFeature,
+    GoalLineFeature,
+    RouteFeature,
     TaskDrawing,
 )
 
 
-def _create_turnpoint_feature(
-    drawing: TaskDrawing, turnpoint: Turnpoint, index: int
-) -> dict[str, Any]:
-    """Create a GeoJSON feature for a turnpoint.
-
-    Args:
-        drawing: The task drawing, which knows which turnpoint is the goal.
-        turnpoint: The turnpoint object to create a feature for.
-        index: The index of the turnpoint in the task.
-
-    Returns:
-        GeoJSON feature dictionary for the turnpoint.
-    """
-    color = drawing.color_of(turnpoint).hex
-
+def _cylinder(cylinder: CylinderFeature) -> dict[str, Any]:
+    """A cylinder as a GeoJSON Point feature."""
+    color = cylinder.color.hex
     return {
         "type": "Feature",
-        "geometry": {
-            "type": "Point",
-            "coordinates": [turnpoint.waypoint.lon, turnpoint.waypoint.lat],
-        },
+        "geometry": {"type": "Point", "coordinates": list(cylinder.centre)},
         "properties": {
-            "name": drawing.label_of(turnpoint, index),
+            "name": cylinder.name,
             "type": "cylinder",
-            "radius": turnpoint.radius,
-            "description": drawing.description_of(turnpoint),
-            "turnpoint_index": index,
-            # ``.value``, not the member: every sibling accessor on the
-            # drawing returns a rendered primitive, and this is a JSON
-            # document. It worked only because ``TurnpointType`` subclasses
-            # ``str``, so the enum leaked into the output undetected.
-            "tp_type": drawing.role_of(turnpoint).value,
+            "radius": cylinder.radius,
+            "description": cylinder.description,
+            "turnpoint_index": cylinder.index,
+            "tp_type": cylinder.role.value,
             "color": color,
             "fillColor": color,
             "fillOpacity": 0.1,
@@ -65,98 +46,66 @@ def _create_turnpoint_feature(
     }
 
 
-def _create_optimized_route_feature(drawing: TaskDrawing) -> dict[str, Any] | None:
-    """Create a GeoJSON feature for the optimized route.
-
-    Args:
-        drawing: The task drawing, carrying the route.
-
-    Returns:
-        The route feature, or None when there is no line to draw.
-    """
-    opt_coords = drawing.route_coordinates_lon_lat()
-    if opt_coords is None:
-        return None
-
+def _route(route: RouteFeature) -> dict[str, Any]:
+    """The optimized route as a GeoJSON LineString feature."""
     return {
         "type": "Feature",
         "geometry": {
             "type": "LineString",
-            "coordinates": [list(point) for point in opt_coords],
+            "coordinates": [list(point) for point in route.points],
         },
         "properties": {
-            "name": drawing.route_label(),
+            "name": route.name,
             "type": "optimized_route",
-            "color": ROUTE_COLOR.hex,
+            "color": route.color.hex,
             "weight": 3,
             "opacity": 0.8,
             "arrowheads": True,
-            "arrow_color": ROUTE_COLOR.hex,
+            "arrow_color": route.color.hex,
             "arrow_size": 8,
             "arrow_spacing": 100,  # meters between arrows
         },
     }
 
 
-def _create_goal_line_features(drawing: TaskDrawing) -> list[dict[str, Any]]:
-    """Create goal line and control zone features for LINE type goals.
-
-    Args:
-        drawing: The task drawing, carrying the goal line if there is one.
-
-    Returns:
-        The goal-line and control-zone features, or an empty list.
-    """
-    goal_line = drawing.goal_line
-    if goal_line is None:
-        return []
-
-    (lon1, lat1), (lon2, lat2), _ = goal_line.endpoints()
-    features: list[dict[str, Any]] = []
-
-    # Create goal line feature
-    goal_line_feature = {
+def _goal_line(goal_line: GoalLineFeature) -> dict[str, Any]:
+    """The goal line as a GeoJSON LineString feature."""
+    first, second = goal_line.ends()
+    return {
         "type": "Feature",
-        "geometry": {
-            "type": "LineString",
-            "coordinates": [[lon1, lat1], [lon2, lat2]],
-        },
+        "geometry": {"type": "LineString", "coordinates": [list(first), list(second)]},
         "properties": {
-            "name": drawing.goal_line_label(),
+            "name": goal_line.name,
             "type": "goal_line",
             "length": goal_line.length,
-            "description": drawing.goal_line_description(),
-            "stroke": GOAL_LINE_COLOR.hex,
+            "description": goal_line.description,
+            "stroke": goal_line.color.hex,
             "stroke-width": 4,
             "stroke-opacity": 1.0,
         },
     }
-    features.append(goal_line_feature)
 
-    # Convert control zone coordinates to GeoJSON format [lon, lat]
-    control_zone_geojson_coords = [[lon, lat] for lon, lat in goal_line.control_zone()]
 
-    control_zone_feature = {
+def _control_zone(zone: ControlZoneFeature) -> dict[str, Any]:
+    """The control zone as a GeoJSON Polygon feature."""
+    return {
         "type": "Feature",
         "geometry": {
             "type": "Polygon",
-            "coordinates": [control_zone_geojson_coords],
+            "coordinates": [[[lon, lat] for lon, lat in zone.outline()]],
         },
         "properties": {
-            "name": drawing.control_zone_label(),
+            "name": zone.name,
             "type": "goal_control_zone",
-            "radius": goal_line.control_zone_radius,
-            "description": drawing.control_zone_description(),
-            "fill": CONTROL_ZONE_FILL_COLOR.hex,
+            "radius": zone.radius,
+            "description": zone.description,
+            "fill": zone.fill_color.hex,
             "fill-opacity": 0.3,
-            "stroke": CONTROL_ZONE_EDGE_COLOR.hex,
+            "stroke": zone.edge_color.hex,
             "stroke-width": 2,
             "stroke-opacity": 0.8,
         },
     }
-    features.append(control_zone_feature)
-
-    return features
 
 
 def generate_task_geojson(task: Task) -> dict[str, Any]:
@@ -184,18 +133,17 @@ def drawing_to_geojson(drawing: TaskDrawing) -> dict[str, Any]:
         A GeoJSON FeatureCollection.
     """
     features: list[dict[str, Any]] = []
-
-    # Create turnpoint features. The drawing has already dropped the last
-    # turnpoint if a goal line replaces it.
-    for i, tp in enumerate(drawing.turnpoints):
-        features.append(_create_turnpoint_feature(drawing, tp, i))
-
-    # Add optimized route if available
-    opt_route_feature = _create_optimized_route_feature(drawing)
-    if opt_route_feature:
-        features.append(opt_route_feature)
-
-    # Add goal line features for LINE type goals
-    features.extend(_create_goal_line_features(drawing))
+    for feature in drawing.features:
+        match feature:
+            case CylinderFeature():
+                features.append(_cylinder(feature))
+            case RouteFeature():
+                features.append(_route(feature))
+            case GoalLineFeature():
+                features.append(_goal_line(feature))
+            case ControlZoneFeature():
+                features.append(_control_zone(feature))
+            case _:
+                assert_never(feature)
 
     return {"type": "FeatureCollection", "features": features}

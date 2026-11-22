@@ -71,8 +71,8 @@ uv run pyxctsk distances task.xctsk --format text  # try the CLI
 
 ### Export
 
-- **`TaskDrawing.from_task()` in `export/common.py` derives what a task looks like once.** KML and GeoJSON both render that value; a question both writers must answer the same way becomes a method on `TaskDrawing`, not a free function each calls.
-- **Geometry comes from `distance/`.** Cylinder outlines are `geodesic_arc` via `TaskDrawing.outline_of`, the goal line is `distance/goal_line.py`; the writers only draw.
+- **`TaskDrawing.from_task()` in `export/common.py` derives what a task looks like once.** KML and GeoJSON both render that value; a question both writers must answer the same way becomes a field on a feature, not a free function each calls.
+- **Geometry comes from `distance/`.** Cylinder outlines are `geodesic_arc` via `CylinderFeature.outline()`, the goal line is `distance/goal_line.py`; the writers only draw.
 
 ### Tests
 

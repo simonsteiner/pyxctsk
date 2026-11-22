@@ -1,12 +1,20 @@
 """Tests for the GeoJSON goal-line features.
 
-Covers `_create_goal_line_features` and the LINE goal that cannot produce a
+Covers the goal-line and control-zone features and the LINE goal that cannot produce a
 line, which still has to be drawn.
 """
 
 from pyxctsk import Goal, GoalType, Task, TaskType, Turnpoint, TurnpointType, Waypoint
-from pyxctsk.export.common import TaskDrawing
-from pyxctsk.export.geojson import _create_goal_line_features, generate_task_geojson
+from pyxctsk.export.geojson import generate_task_geojson
+
+
+def _goal_line_features(task: Task) -> list:
+    """The goal line and control zone features of the task's GeoJSON."""
+    return [
+        f
+        for f in generate_task_geojson(task)["features"]
+        if f["properties"]["type"] in ("goal_line", "goal_control_zone")
+    ]
 
 
 class TestLineGoalWithoutAnApproach:
@@ -65,15 +73,10 @@ class TestLineGoalWithoutAnApproach:
         assert "Goal" not in names, "the goal line replaces the goal cylinder"
 
 
-class TestCreateGoalLineFeatures:
-    """Test the _create_goal_line_features function.
+class TestGoalLineFeatures:
+    """The goal line and control zone features of a task's GeoJSON."""
 
-    These moved here from ``tests/distance/test_goal_line.py``: they assert on
-    GeoJSON output, so a distance test had been importing an export private to
-    run them.
-    """
-
-    def test_create_goal_line_features_valid_line_goal(self):
+    def test_goal_line_features_valid_line_goal(self):
         """Test creating goal line features for valid LINE goal."""
         # Create a task with LINE goal
         waypoint1 = Waypoint(name="TP1", lat=46.0, lon=8.0, alt_smoothed=1000)
@@ -87,7 +90,7 @@ class TestCreateGoalLineFeatures:
             task_type=TaskType.CLASSIC, version=1, turnpoints=[tp1, tp2], goal=goal
         )
 
-        features = _create_goal_line_features(TaskDrawing.from_task(task))
+        features = _goal_line_features(task)
 
         assert len(features) == 2  # Goal line + control zone
 
@@ -105,7 +108,7 @@ class TestCreateGoalLineFeatures:
         assert control_zone["geometry"]["type"] == "Polygon"
         assert control_zone["properties"]["type"] == "goal_control_zone"
 
-    def test_create_goal_line_features_length_tracks_goal_radius(self):
+    def test_goal_line_features_length_tracks_goal_radius(self):
         """The goal-line length follows the goal turnpoint's radius, not the previous one."""
         waypoint1 = Waypoint(name="TP1", lat=46.0, lon=8.0, alt_smoothed=1000)
         waypoint2 = Waypoint(name="Goal", lat=47.0, lon=8.0, alt_smoothed=500)
@@ -118,13 +121,13 @@ class TestCreateGoalLineFeatures:
             task_type=TaskType.CLASSIC, version=1, turnpoints=[tp1, tp2], goal=goal
         )
 
-        features = _create_goal_line_features(TaskDrawing.from_task(task))
+        features = _goal_line_features(task)
 
         assert len(features) == 2
         # Should use 2 * radius as line length
         assert features[0]["properties"]["length"] == 400.0  # 2 * 200
 
-    def test_create_goal_line_features_cylinder_goal(self):
+    def test_goal_line_features_cylinder_goal(self):
         """Test creating goal line features for CYLINDER goal."""
         waypoint1 = Waypoint(name="TP1", lat=46.0, lon=8.0, alt_smoothed=1000)
         waypoint2 = Waypoint(name="Goal", lat=47.0, lon=8.0, alt_smoothed=500)
@@ -137,22 +140,22 @@ class TestCreateGoalLineFeatures:
             task_type=TaskType.CLASSIC, version=1, turnpoints=[tp1, tp2], goal=goal
         )
 
-        features = _create_goal_line_features(TaskDrawing.from_task(task))
+        features = _goal_line_features(task)
 
         assert len(features) == 0  # No features for CYLINDER goal
 
-    def test_create_goal_line_features_no_goal(self):
+    def test_goal_line_features_no_goal(self):
         """Test creating goal line features when no goal."""
         waypoint1 = Waypoint(name="TP1", lat=46.0, lon=8.0, alt_smoothed=1000)
         tp1 = Turnpoint(radius=400, waypoint=waypoint1, type=TurnpointType.TAKEOFF)
 
         task = Task(task_type=TaskType.CLASSIC, version=1, turnpoints=[tp1], goal=None)
 
-        features = _create_goal_line_features(TaskDrawing.from_task(task))
+        features = _goal_line_features(task)
 
         assert len(features) == 0
 
-    def test_create_goal_line_features_insufficient_turnpoints(self):
+    def test_goal_line_features_insufficient_turnpoints(self):
         """Test creating goal line features with insufficient turnpoints."""
         waypoint1 = Waypoint(name="TP1", lat=46.0, lon=8.0, alt_smoothed=1000)
         tp1 = Turnpoint(radius=400, waypoint=waypoint1, type=TurnpointType.TAKEOFF)
@@ -165,11 +168,11 @@ class TestCreateGoalLineFeatures:
             goal=goal,
         )
 
-        features = _create_goal_line_features(TaskDrawing.from_task(task))
+        features = _goal_line_features(task)
 
         assert len(features) == 0
 
-    def test_create_goal_line_features_no_previous_turnpoint(self):
+    def test_goal_line_features_no_previous_turnpoint(self):
         """Test creating goal line features when no valid previous turnpoint."""
         # Create turnpoints with same coordinates
         waypoint1 = Waypoint(name="TP1", lat=47.0, lon=8.0, alt_smoothed=1000)
@@ -183,6 +186,6 @@ class TestCreateGoalLineFeatures:
             task_type=TaskType.CLASSIC, version=1, turnpoints=[tp1, tp2], goal=goal
         )
 
-        features = _create_goal_line_features(TaskDrawing.from_task(task))
+        features = _goal_line_features(task)
 
         assert len(features) == 0  # No features when no valid previous TP

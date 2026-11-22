@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking (API): `TaskDrawing` hands the writers features, not thirteen questions.** `TaskDrawing.features` is the things a map shows, in the order both writers emit them: a `CylinderFeature` per drawn turnpoint, a `RouteFeature`, and a `GoalLineFeature` and `ControlZoneFeature` when the task has a goal line. Each carries its name, description, colour and geometry (`outline()` and `ends()` compute on call). The classes are in `pyxctsk.export.common`; the fields `turnpoints`, `goal_line` and `measured`, and `task` and `route`, stay. The KML and GeoJSON outputs are byte-identical, and the private writer helpers changed with it.
+
+  | removed | read instead |
+  | --- | --- |
+  | `drawing.is_goal(tp)` | the goal's `CylinderFeature.color` is `GOAL_COLOR` |
+  | `drawing.outline_of(tp)` | `CylinderFeature.outline()` |
+  | `drawing.color_of(tp)`, `label_of(tp, i)`, `description_of(tp)`, `role_of(tp)` | `CylinderFeature.color`, `.name`, `.description`, `.role` |
+  | `drawing.route_label()`, `route_coordinates()`, `route_coordinates_lon_lat()` | `RouteFeature.name`, `.points` (lon, lat) |
+  | `drawing.goal_line_label()`, `goal_line_description()` | `GoalLineFeature.name`, `.description` |
+  | `drawing.control_zone_label()`, `control_zone_description()` | `ControlZoneFeature.name`, `.description` |
+
 ### Fixed
 
 - **A `NaN`, an `Infinity`, an overflowing number (`1e999`), a lone surrogate or nesting deeper than 100 levels, anywhere in a payload, is now refused by every command**, extensions and unknown keys included. Before, `convert` wrote the `NaN` out as invalid JSON (and to KML and GeoJSON, exit 0), crashed with `UnicodeEncodeError` on a surrogate or `RecursionError` on deep nesting. The error names where (`x[1]`), and `parse_task` raises `InvalidFormatError` for a `str` holding a lone surrogate. `dump_json` refuses the same values built in code.

@@ -9,6 +9,7 @@ could have been caught.
 import json
 import re
 from pathlib import Path
+from typing import TypeVar
 
 import pytest
 
@@ -19,11 +20,29 @@ from pyxctsk.export.common import (
     CONTROL_ZONE_FILL_COLOR,
     GOAL_LINE_COLOR,
     ROUTE_COLOR,
+    ControlZoneFeature,
+    CylinderFeature,
+    Feature,
+    GoalLineFeature,
+    RouteFeature,
     TaskDrawing,
 )
 from pyxctsk.export.geojson import drawing_to_geojson
 from pyxctsk.export.kml import FILL_ALPHA, ROUTE_ALPHA, drawing_to_kml
 from tests.builders import three_turnpoint_task
+
+F = TypeVar("F", bound=Feature)
+
+
+def _cylinders(drawing: TaskDrawing) -> list[CylinderFeature]:
+    """The drawing's cylinder features, in drawing order."""
+    return [f for f in drawing.features if isinstance(f, CylinderFeature)]
+
+
+def _only(drawing: TaskDrawing, kind: type[F]) -> F:
+    """The drawing's one feature of this kind."""
+    (feature,) = [f for f in drawing.features if isinstance(f, kind)]
+    return feature
 
 
 def _placemark_style(kml: str, name: str) -> str:
@@ -97,7 +116,7 @@ class TestBothWritersAgree:
     def test_both_writers_draw_the_turnpoints_in_the_palette_colours(self):
         """The regression: KML's colours are the shared ones, not a remapping."""
         drawing = TaskDrawing.from_task(_task_of_every_role())
-        expected = [drawing.color_of(tp) for tp in drawing.turnpoints]
+        expected = [c.color for c in _cylinders(drawing)]
 
         geojson = drawing_to_geojson(drawing)
         from_geojson = [
@@ -120,7 +139,7 @@ class TestBothWritersAgree:
         times across the two writers.
         """
         drawing = TaskDrawing.from_task(_task_of_every_role())
-        expected = [drawing.label_of(tp, i) for i, tp in enumerate(drawing.turnpoints)]
+        expected = [c.name for c in _cylinders(drawing)]
 
         geojson = drawing_to_geojson(drawing)
         from_geojson = [
@@ -137,7 +156,7 @@ class TestBothWritersAgree:
     def test_both_writers_describe_the_same_turnpoint_the_same_way(self):
         """KML wrote `Type: TurnpointType.TAKEOFF`; GeoJSON wrote no role at all."""
         drawing = TaskDrawing.from_task(_task_of_every_role())
-        expected = [drawing.description_of(tp) for tp in drawing.turnpoints]
+        expected = [c.description for c in _cylinders(drawing)]
 
         geojson = drawing_to_geojson(drawing)
         from_geojson = [
@@ -160,7 +179,7 @@ class TestBothWritersAgree:
         glossary's term.
         """
         drawing = TaskDrawing.from_task(three_turnpoint_task(GoalType.CYLINDER))
-        expected = drawing.route_label()
+        expected = _only(drawing, RouteFeature).name
 
         geojson = drawing_to_geojson(drawing)
         (route,) = [
@@ -175,7 +194,7 @@ class TestBothWritersAgree:
     def test_both_writers_name_and_describe_the_goal_line_the_same_way(self):
         """Two byte-identical f-strings, one per writer, with nothing pairing them."""
         drawing = TaskDrawing.from_task(three_turnpoint_task(GoalType.LINE))
-        assert drawing.goal_line is not None
+        feature = _only(drawing, GoalLineFeature)
 
         geojson = drawing_to_geojson(drawing)
         (line,) = [
@@ -183,14 +202,15 @@ class TestBothWritersAgree:
         ]
         kml = drawing_to_kml(drawing)
 
-        assert line["properties"]["name"] == drawing.goal_line_label()
-        assert line["properties"]["description"] == drawing.goal_line_description()
-        assert f"<name>{drawing.goal_line_label()}</name>" in kml
-        assert f"<description>{drawing.goal_line_description()}</description>" in kml
+        assert line["properties"]["name"] == feature.name
+        assert line["properties"]["description"] == feature.description
+        assert f"<name>{feature.name}</name>" in kml
+        assert f"<description>{feature.description}</description>" in kml
 
     def test_both_writers_describe_the_control_zone_the_same_way(self):
         """And its radius is the goal line's, not `length / 2` in three modules."""
         drawing = TaskDrawing.from_task(three_turnpoint_task(GoalType.LINE))
+        feature = _only(drawing, ControlZoneFeature)
         assert drawing.goal_line is not None
 
         geojson = drawing_to_geojson(drawing)
@@ -201,11 +221,11 @@ class TestBothWritersAgree:
         ]
         kml = drawing_to_kml(drawing)
 
-        assert zone["properties"]["name"] == drawing.control_zone_label()
-        assert zone["properties"]["description"] == drawing.control_zone_description()
+        assert zone["properties"]["name"] == feature.name
+        assert zone["properties"]["description"] == feature.description
         assert zone["properties"]["radius"] == drawing.goal_line.control_zone_radius
-        assert f"<name>{drawing.control_zone_label()}</name>" in kml
-        assert f"<description>{drawing.control_zone_description()}</description>" in kml
+        assert f"<name>{feature.name}</name>" in kml
+        assert f"<description>{feature.description}</description>" in kml
 
     def test_the_control_zone_radius_is_half_the_line(self):
         """S7F §6.2.3.1, owned by the goal line rather than by its captions."""
@@ -217,8 +237,7 @@ class TestBothWritersAgree:
     def test_both_writers_read_one_route_in_one_axis_order(self):
         """One flipped by unpacking, the other by positional index."""
         drawing = TaskDrawing.from_task(three_turnpoint_task(GoalType.CYLINDER))
-        lon_lat = drawing.route_coordinates_lon_lat()
-        assert lon_lat is not None
+        lon_lat = _only(drawing, RouteFeature).points
 
         geojson = drawing_to_geojson(drawing)
         (route,) = [
@@ -228,7 +247,7 @@ class TestBothWritersAgree:
         ]
 
         assert route["geometry"]["coordinates"] == [list(p) for p in lon_lat]
-        assert [(lat, lon) for lon, lat in lon_lat] == drawing.route_coordinates()
+        assert [(lat, lon) for lon, lat in lon_lat] == list(drawing.route.points)
 
     def test_no_writer_puts_a_python_repr_in_user_visible_text(self):
         """`Type: TurnpointType.TAKEOFF` and `Type: None` reached the map."""
@@ -246,16 +265,18 @@ class TestBothWritersAgree:
         """It has none, and printing `Type: None` said otherwise.
 
         Both spellings of "no role" describe the same — the asymmetry
-        ``color_of`` normalizes away, applied here too.
+        the feature normalizes away, applied here too.
         """
-        drawing = TaskDrawing.from_task(_task_of_every_role())
-        ordinary = Turnpoint(
+        task = three_turnpoint_task(GoalType.CYLINDER)
+        task.turnpoints[0] = Turnpoint(
             radius=1500,
             waypoint=Waypoint(name="X", lat=46.0, lon=8.0, alt_smoothed=0),
             type=role,
         )
+        first = _cylinders(TaskDrawing.from_task(task))[0]
 
-        assert drawing.description_of(ordinary) == "Radius: 1500m"
+        assert first.description == "Radius: 1500m"
+        assert first.role is TurnpointType.NONE
 
     def test_both_writers_draw_the_route_in_one_colour(self):
         """KML's course line was ``#ff3641`` where GeoJSON's route was ``#ff4136``."""
@@ -271,9 +292,9 @@ class TestBothWritersAgree:
         assert route["properties"]["arrow_color"] == ROUTE_COLOR.hex
 
         kml = drawing_to_kml(drawing)
-        assert _placemark_color(kml, drawing.route_label()) == ROUTE_COLOR.kml(
-            ROUTE_ALPHA
-        )
+        assert _placemark_color(
+            kml, _only(drawing, RouteFeature).name
+        ) == ROUTE_COLOR.kml(ROUTE_ALPHA)
 
     def test_both_writers_draw_the_goal_line_in_one_colour(self):
         """It was red in KML and green in GeoJSON — the same shape, two colours."""

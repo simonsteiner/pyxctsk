@@ -15,17 +15,35 @@ holds the complementary check — that both formats render the same palette — 
 between them a colour cannot change silently or drift between writers.
 """
 
+from typing import Any
+
 import pytest
 
 from pyxctsk import Goal, GoalType, Task, TaskType, Turnpoint, TurnpointType, Waypoint
 from pyxctsk.distance import MeasuredTask, OptimizedRoute
 from pyxctsk.export.common import TaskDrawing
-from pyxctsk.export.geojson import (
-    _create_optimized_route_feature,
-    _create_turnpoint_feature,
-    generate_task_geojson,
-)
+from pyxctsk.export.geojson import drawing_to_geojson, generate_task_geojson
 from tests.builders import turnpoint
+
+
+def _features_of(drawing: TaskDrawing, kind: str) -> list[dict[str, Any]]:
+    """The GeoJSON features of one ``properties.type``, in output order."""
+    return [
+        f
+        for f in drawing_to_geojson(drawing)["features"]
+        if f["properties"]["type"] == kind
+    ]
+
+
+def _turnpoint_feature(drawing: TaskDrawing, index: int) -> dict[str, Any]:
+    """The cylinder feature of the drawing's turnpoint at this position."""
+    return _features_of(drawing, "cylinder")[index]
+
+
+def _route_feature(drawing: TaskDrawing) -> dict[str, Any] | None:
+    """The route feature, or None when the drawing has none."""
+    routes = _features_of(drawing, "optimized_route")
+    return routes[0] if routes else None
 
 
 def _route(points) -> OptimizedRoute:
@@ -64,7 +82,7 @@ def _drawing_of(turnpoints: list, goal: Goal | None = None) -> TaskDrawing:
     )
 
 
-class TestCreateTurnpointFeature:
+class TestTurnpointFeature:
     """One turnpoint rendered as a GeoJSON point feature."""
 
     @pytest.mark.parametrize(
@@ -82,7 +100,7 @@ class TestCreateTurnpointFeature:
         first = turnpoint("First", 46.5, 8.0, radius=400, type=tp_type)
         drawing = _drawing_of([first, turnpoint("Goal", 47.0, 8.5, radius=400)])
 
-        feature = _create_turnpoint_feature(drawing, first, 0)
+        feature = _turnpoint_feature(drawing, 0)
 
         assert feature["properties"]["color"] == colour
 
@@ -92,7 +110,7 @@ class TestCreateTurnpointFeature:
         goal = turnpoint("Goal", 47.5, 9.0, radius=400)
         drawing = _drawing_of([first, goal], Goal(type=GoalType.CYLINDER))
 
-        feature = _create_turnpoint_feature(drawing, goal, 1)
+        feature = _turnpoint_feature(drawing, 1)
 
         assert feature["properties"]["color"] == "#ff0000"
 
@@ -101,7 +119,7 @@ class TestCreateTurnpointFeature:
         first = turnpoint("Takeoff", 46.5, 8.0, radius=1000, type=TurnpointType.TAKEOFF)
         drawing = _drawing_of([first, turnpoint("Goal", 47.0, 8.5, radius=400)])
 
-        feature = _create_turnpoint_feature(drawing, first, 0)
+        feature = _turnpoint_feature(drawing, 0)
 
         assert feature["type"] == "Feature"
         assert feature["geometry"]["type"] == "Point"
@@ -115,7 +133,7 @@ class TestCreateTurnpointFeature:
         unnamed = turnpoint("", 46.5, 8.0, radius=400)
         drawing = _drawing_of([unnamed, turnpoint("Goal", 47.0, 8.5, radius=400)])
 
-        feature = _create_turnpoint_feature(drawing, unnamed, 0)
+        feature = _turnpoint_feature(drawing, 0)
 
         assert feature["properties"]["name"] == "TP1"
 
@@ -124,7 +142,7 @@ class TestCreateTurnpointFeature:
         first = turnpoint("Test", 46.5, 8.0, radius=500, type=TurnpointType.TAKEOFF)
         drawing = _drawing_of([first, turnpoint("Goal", 47.0, 8.5, radius=400)])
 
-        props = _create_turnpoint_feature(drawing, first, 0)["properties"]
+        props = _turnpoint_feature(drawing, 0)["properties"]
 
         assert set(props) >= {
             "name",
@@ -157,14 +175,14 @@ def _route_drawing(points) -> TaskDrawing:
     return TaskDrawing(turnpoints=(), goal_line=None, measured=_through_centres(task))
 
 
-class TestCreateOptimizedRouteFeature:
-    """Test the _create_optimized_route_feature function."""
+class TestRouteFeature:
+    """The optimized route rendered as a GeoJSON line feature."""
 
-    def test_create_optimized_route_feature_valid(self):
+    def test_route_feature_valid(self):
         """Test creating optimized route feature with valid coordinates."""
         coords = [(46.0, 8.0), (46.1, 8.1), (46.2, 8.2)]
 
-        feature = _create_optimized_route_feature(_route_drawing(coords))
+        feature = _route_feature(_route_drawing(coords))
 
         assert feature is not None
         assert feature["type"] == "Feature"
@@ -180,36 +198,36 @@ class TestCreateOptimizedRouteFeature:
         assert props["type"] == "optimized_route"
         assert props["color"] == "#ff4136"
 
-    def test_create_optimized_route_feature_single_point(self):
+    def test_route_feature_single_point(self):
         """Test creating optimized route feature with single point."""
         coords = [(46.0, 8.0)]
 
-        feature = _create_optimized_route_feature(_route_drawing(coords))
+        feature = _route_feature(_route_drawing(coords))
 
         assert feature is None
 
-    def test_create_optimized_route_feature_empty(self):
+    def test_route_feature_empty(self):
         """Test creating optimized route feature with empty coordinates."""
         coords: list[tuple[float, float]] = []
 
-        feature = _create_optimized_route_feature(_route_drawing(coords))
+        feature = _route_feature(_route_drawing(coords))
 
         assert feature is None
 
-    def test_create_optimized_route_feature_two_points(self):
+    def test_route_feature_two_points(self):
         """Test creating optimized route feature with minimum valid points."""
         coords = [(46.0, 8.0), (46.1, 8.1)]
 
-        feature = _create_optimized_route_feature(_route_drawing(coords))
+        feature = _route_feature(_route_drawing(coords))
 
         assert feature is not None
         assert len(feature["geometry"]["coordinates"]) == 2
 
-    def test_create_optimized_route_feature_properties(self):
+    def test_route_feature_properties(self):
         """Test that optimized route feature has all required properties."""
         coords = [(46.0, 8.0), (46.1, 8.1)]
 
-        feature = _create_optimized_route_feature(_route_drawing(coords))
+        feature = _route_feature(_route_drawing(coords))
 
         assert (
             feature is not None
@@ -330,8 +348,8 @@ class TestRepeatedTurnpoint:
         assert turnpoints[-1] == turnpoints[-2], "precondition: the two are equal"
 
         drawing = _drawing_of(turnpoints, task.goal)
-        goal_feature = _create_turnpoint_feature(drawing, turnpoints[-1], 2)
-        middle_feature = _create_turnpoint_feature(drawing, turnpoints[1], 1)
+        goal_feature = _turnpoint_feature(drawing, 2)
+        middle_feature = _turnpoint_feature(drawing, 1)
 
         assert goal_feature["properties"]["color"] == "#ff0000"  # goal red
         assert middle_feature["properties"]["color"] == "#269abc"  # default blue
