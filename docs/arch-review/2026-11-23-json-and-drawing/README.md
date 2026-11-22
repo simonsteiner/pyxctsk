@@ -139,3 +139,6 @@ Every job sets `priority:` under `parallel: true`, which lefthook ignores; `mypy
 <!-- filled during implementation: where a PR deliberately differs from this report, and why -->
 
 - **C1 · Q6:** the message for a refused JSON payload is `looks like JSON, but it was refused: <reason>`, not the old text with the reason appended. "Not a task in any format" is false for a task whose only fault is `"x":NaN`; the old text stays for JSON that decodes but matches no format.
+- **C2 · Q2:** `CylinderFeature` carries a private-by-use `earth_model` field Q2 did not list, because `outline()` computes on call (Q3) and needs the task's earth.
+- **C2 · Q3:** `GoalLineFeature` and `ControlZoneFeature` each carry a `goal_line` field, because `ends()` and `outline()` compute on call and ask the `GoalLine` then, not when the drawing is built.
+- **C2 · Q11:** the Build ran prune-tests and deleted two duplicate tests in `tests/export/test_common.py` that the features made redundant.
