@@ -39,6 +39,7 @@ The backlog, in rank order. After the scan only three parts of the report change
 | [S5](#s5--docstrings-narrate-the-codes-history) | Docstrings narrate the code's history | - | ↔ two-way | maintainability | in-progress | `refactor/smaller-findings-2026-11-23` | | | 73 lines in 26 files |
 | [S6](#s6--the-hook-jobs-break-three-setup-rules) | The hook jobs break three setup rules | - | ↔ two-way | maintainability | todo | `chore/lefthook-jobs` | | | carried from 2026-10-20 S4 |
 | [S7](#s7--the-compare-views-error-page-raises) | The compare view's error page raises | - | ↔ two-way | maintainability | todo | `fix/compare-view-error` | | | carried from 2026-10-20 S5 |
+| [S8](#s8--a-script-imports-a-function-from-a-module-that-no-longer-has-it) | A script imports a function from a module that no longer has it | - | ↔ two-way | maintainability | todo | | | | found during C3; fails on main too |
 
 Strength: 🟢 Strong · 🟡 Worth exploring · ⚪ Speculative · 🔴 live defect (a bug reproduced during the scan).
 Door: ↔ two-way (a revert undoes it) · 🚪 one-way (a data migration, a published wire or file format, deleted user data; stops at Step 6 for the user).
@@ -126,6 +127,12 @@ Every job sets `priority:` under `parallel: true`, which lefthook ignores; `mypy
 `scripts/task_viewer/app.py:171-175` · `scripts/task_viewer/templates/compare_view/map_script.html:12` · own PR (carried from 2026-10-20 S5)
 
 `compare_task` renders the page with `error` but no `original_geojson`, and the map script's `{{ original_geojson | tojson | safe }}` raises on `Undefined`, so a task whose distances fail gives a 500, not the error page. Pass the GeoJSON it already loaded, or guard the include.
+
+### S8 · A script imports a function from a module that no longer has it
+
+`scripts/test_distance_calculations.py:34` · own PR (found during C3)
+
+The script imports `task_to_turnpoints` from `pyxctsk.distance.task_distances`, a name that moved to `distance/measured_task.py`, so it raises `ImportError` on `main` before it runs anything. Import it from where it lives, or retire the script if nothing still runs it.
 
 ## Recommendation
 
