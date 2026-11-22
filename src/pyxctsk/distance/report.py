@@ -152,8 +152,9 @@ class DistanceReport:
 
         Derived on first use rather than at construction. It is a second route
         optimization — S7F measures ``taskToESS`` separately — and it used to
-        run for every report, including the ones that never read it: one extra optimizer run per drawing in the task viewer,
-        whose comments said one drawing meant one route.
+        run for every report, including the ones that never read it: one extra
+        optimizer run per drawing in the task viewer, whose comments said one
+        drawing meant one route.
         """
         return SpeedSection.from_measured_task(self.measured)
 

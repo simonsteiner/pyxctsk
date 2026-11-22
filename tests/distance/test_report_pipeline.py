@@ -7,8 +7,9 @@ one turnpoint, zero radii, concentric circles) do something defined.
 
 How close the optimizer gets to XCTrack's published numbers is not asserted
 here; `test_xctrack_accuracy.py` owns that, and does it on every reference task
-at a tighter tolerance. The one reference check kept below (the centre distance) runs through
-`DistanceReport.from_task`, so it is testing the wiring, not the algorithm.
+at a tighter tolerance, but on `optimized_distance` directly. The two reference
+checks kept below (the centre and the optimized distance) run through
+`DistanceReport.from_task`, so they test the wiring, not the algorithm.
 """
 
 from unittest.mock import patch
@@ -29,6 +30,11 @@ from tests.corpus import reference_task, tasks_with_reference_distance
 
 #: The reference tasks the producer recorded distances for, discovered once.
 WITH_REFERENCE = tasks_with_reference_distance()
+
+#: How far the report's optimized distance may sit from the producer's.
+#: Looser than `test_xctrack_accuracy` allows the optimizer itself: what is
+#: under test here is the wiring above it.
+TOLERANCE = 0.02
 
 #: Synthetic route with enough cylinder radius for optimization to matter.
 TEST_TURNPOINTS = [
@@ -61,6 +67,18 @@ class TestDistanceComprehensive:
 
         assert difference < 0.005, (
             f"{reference.stem}: center distance differs by {difference:.1%} "
+            f"(calc: {calc_km:.1f}km, ref: {ref_km:.1f}km)"
+        )
+
+    @pytest.mark.parametrize("reference", WITH_REFERENCE, ids=str)
+    def test_optimized_distance_matches_reference(self, reference):
+        """The report's task distance reproduces the producer's optimized one."""
+        ref_km = reference.reference_optimized_km
+        calc_km = DistanceReport.from_task(reference.task).task_distance_m / 1000
+        difference = abs(calc_km - ref_km) / ref_km
+
+        assert difference < TOLERANCE, (
+            f"{reference.stem}: optimized distance differs by {difference:.1%} "
             f"(calc: {calc_km:.1f}km, ref: {ref_km:.1f}km)"
         )
 
