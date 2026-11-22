@@ -366,10 +366,11 @@ def _unrecognized(inp: Input) -> InvalidFormatError:
         The error to raise.
     """
     if inp.looks_like_json:
-        reason = "looks like JSON, but it is not a task in any format"
         if inp.refusal is not None:
-            reason = f"{reason}: {inp.refusal}"
-        return InvalidFormatError(reason)
+            return InvalidFormatError(
+                f"looks like JSON, but it was refused: {inp.refusal}"
+            )
+        return InvalidFormatError("looks like JSON, but it is not a task in any format")
     if inp.text is not None and inp.text.strip().lower().endswith(_FILE_EXTENSIONS):
         return InvalidFormatError(
             "invalid format — this looks like a file name; "

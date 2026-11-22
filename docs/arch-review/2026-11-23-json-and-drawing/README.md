@@ -137,3 +137,5 @@ Every job sets `priority:` under `parallel: true`, which lefthook ignores; `mypy
 ## Departures
 
 <!-- filled during implementation: where a PR deliberately differs from this report, and why -->
+
+- **C1 · Q6:** the message for a refused JSON payload is `looks like JSON, but it was refused: <reason>`, not the old text with the reason appended. "Not a task in any format" is false for a task whose only fault is `"x":NaN`; the old text stays for JSON that decodes but matches no format.
