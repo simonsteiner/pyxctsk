@@ -119,13 +119,15 @@ class Input:
         text: The bytes decoded as UTF-8, or None if they are not UTF-8 (a
             binary image, say). Text-based adapters do not recognize such input.
         document: The text decoded as JSON, or :data:`_NOT_JSON`. Decoded here
-            so recognition and reading share one decode; the two JSON adapters
-            used to decode the same payload a second time each.
+            so recognition and reading share one decode.
+        refusal: Why :func:`load_json` refused the text, if it did, so the
+            error for unrecognized input can say it.
     """
 
     raw: bytes
     text: str | None
     document: Any
+    refusal: MalformedPayloadError | None = None
 
     @classmethod
     def of(cls, data: bytes | str) -> "Input":
@@ -139,7 +141,12 @@ class Input:
         """
         if isinstance(data, str):
             text: str | None = data
-            raw = data.encode("utf-8")
+            try:
+                raw = data.encode("utf-8")
+            except UnicodeEncodeError:
+                raise InvalidFormatError(
+                    "text UTF-8 cannot encode (a lone surrogate)"
+                ) from None
         else:
             raw = bytes(data)
             try:
@@ -148,13 +155,14 @@ class Input:
                 text = None
 
         document: Any = _NOT_JSON
+        refusal: MalformedPayloadError | None = None
         if text is not None:
             try:
                 document = load_json(text)
-            except MalformedPayloadError:
-                document = _NOT_JSON
+            except MalformedPayloadError as exc:
+                refusal = exc
 
-        return cls(raw=raw, text=text, document=document)
+        return cls(raw=raw, text=text, document=document, refusal=refusal)
 
     @property
     def mapping(self) -> dict[str, Any] | None:
@@ -358,7 +366,10 @@ def _unrecognized(inp: Input) -> InvalidFormatError:
         The error to raise.
     """
     if inp.looks_like_json:
-        return InvalidFormatError("looks like JSON, but it is not a task in any format")
+        reason = "looks like JSON, but it is not a task in any format"
+        if inp.refusal is not None:
+            reason = f"{reason}: {inp.refusal}"
+        return InvalidFormatError(reason)
     if inp.text is not None and inp.text.strip().lower().endswith(_FILE_EXTENSIONS):
         return InvalidFormatError(
             "invalid format — this looks like a file name; "

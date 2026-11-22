@@ -12,8 +12,9 @@ and for a JSON ``true`` latitude no error at all: it was 1°N.
 The rules, once each:
 
 - **A number is finite and not a boolean.** ``True == 1`` in Python; on the
-  wire it is not a number. Python's ``json`` reads ``NaN`` and ``Infinity``,
-  and an integer too large for a float, so finiteness is checked here.
+  wire it is not a number. ``load_json`` refuses ``NaN`` and ``Infinity``, but
+  ``from_dict`` takes dicts that never went through it, so finiteness is
+  checked here too.
 - **A number may be spelled as a string** — in JSON's own number grammar,
   nothing looser. Burnair writes ``"radius": "700"``, and producers have
   written the QR version and earth model as strings; it is one rule for every

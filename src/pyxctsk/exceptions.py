@@ -97,7 +97,8 @@ class MalformedPayloadError(pyXCTSKError, ValueError):
     """Raised when a payload is JSON of the wrong shape for the format.
 
     The one error reading a task raises, from either format, whatever went
-    wrong inside it. The field tables used to trust wire types: a list where
+    wrong inside it; writing JSON raises it too, for a value no JSON document
+    can carry. The field tables used to trust wire types: a list where
     an object belongs reached ``.get`` and escaped as ``AttributeError``, a
     string where a list belongs was read one character at a time, and the
     parser kept a tuple of whichever built-in types had leaked out so far.

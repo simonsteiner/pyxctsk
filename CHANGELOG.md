@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A `NaN`, an `Infinity`, an overflowing number (`1e999`), a lone surrogate or nesting deeper than 100 levels, anywhere in a payload, is now refused by every command**, extensions and unknown keys included. Before, `convert` wrote the `NaN` out as invalid JSON (and to KML and GeoJSON, exit 0), crashed with `UnicodeEncodeError` on a surrogate or `RecursionError` on deep nesting. The error names where (`x[1]`), and `parse_task` raises `InvalidFormatError` for a `str` holding a lone surrogate. `dump_json` refuses the same values built in code.
+
 ## [v0.7.0] - 2026-10-02
 
 ### Upgrading

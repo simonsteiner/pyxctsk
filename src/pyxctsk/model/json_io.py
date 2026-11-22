@@ -7,6 +7,7 @@ spelled as ``json.dumps`` options at a call site.
 """
 
 import json
+import math
 from typing import Any, Literal, Mapping
 
 from ..exceptions import MalformedPayloadError
@@ -46,8 +47,56 @@ def require_object(data: Any) -> Mapping[str, Any]:
     return data
 
 
+#: How many arrays and objects may sit inside one another. RFC 8259 §9 lets a
+#: parser refuse deeper documents; without a bound, a document of a few hundred
+#: brackets loads and then overflows the stack in :func:`json.dumps`.
+MAX_NESTING = 100
+
+
+def _segment(key: object) -> str:
+    """Spell a key for a path, escaping what the console could not print."""
+    text = str(key)
+    try:
+        text.encode("utf-8")
+    except UnicodeEncodeError:
+        return text.encode("unicode_escape").decode("ascii")
+    return text
+
+
+def _refuse_unwritable(value: Any, path: str = "", depth: int = 1) -> None:
+    """Raise if JSON cannot carry ``value`` and UTF-8 cannot write it.
+
+    Raises:
+        MalformedPayloadError: For a float that is not finite, a string UTF-8
+            cannot encode, or nesting past :data:`MAX_NESTING`, located by
+            ``path``.
+    """
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise MalformedPayloadError("expected a finite number", path)
+    elif isinstance(value, str):
+        try:
+            value.encode("utf-8")
+        except UnicodeEncodeError:
+            raise MalformedPayloadError("text UTF-8 cannot encode", path) from None
+    elif isinstance(value, (Mapping, list, tuple)):
+        if depth > MAX_NESTING:
+            raise MalformedPayloadError(
+                f"nested deeper than {MAX_NESTING} levels", path
+            )
+        if isinstance(value, Mapping):
+            for key, item in value.items():
+                where = f"{path}.{_segment(key)}" if path else _segment(key)
+                if isinstance(key, str):
+                    _refuse_unwritable(key, where)
+                _refuse_unwritable(item, where, depth + 1)
+        else:
+            for index, item in enumerate(value):
+                _refuse_unwritable(item, f"{path}[{index}]", depth + 1)
+
+
 def load_json(text: str | bytes) -> Any:
-    """Decode a JSON document, refusing one that is not JSON at all.
+    """Decode a JSON document that :func:`dump_json` can write back.
 
     Args:
         text: The document.
@@ -56,12 +105,20 @@ def load_json(text: str | bytes) -> Any:
         The decoded value, of whatever JSON type it is.
 
     Raises:
-        MalformedPayloadError: If it does not decode.
+        MalformedPayloadError: If it does not decode, holds a number that is
+            not finite (``NaN``, ``Infinity``, ``1e999``), a string UTF-8
+            cannot encode, or nests deeper than :data:`MAX_NESTING`.
     """
     try:
-        return json.loads(text)
+        value = json.loads(text)
+    except RecursionError:
+        raise MalformedPayloadError(
+            f"nested deeper than {MAX_NESTING} levels"
+        ) from None
     except ValueError as exc:
         raise MalformedPayloadError(f"not JSON: {exc}") from exc
+    _refuse_unwritable(value)
+    return value
 
 
 #: The layouts a JSON output is written in, one per kind of output: ``compact``
@@ -90,10 +147,8 @@ def dump_json(value: Any, *, layout: JsonLayout) -> str:
     the fix that reached two of them could not reach the other two. Only the
     layout is each output's own, and it is one of :data:`JsonLayout`'s.
 
-    A lone surrogate cannot arrive from a parsed task — the ``TEXT`` codec
-    refuses one at read. A model built in code can still hold one, and then the
-    document cannot be encoded as UTF-8; the model does not validate on
-    construction, and this writer does not either.
+    A value built in code is held to what :func:`load_json` accepts, since the
+    model does not validate on construction.
 
     Args:
         value: What to encode.
@@ -101,5 +156,10 @@ def dump_json(value: Any, *, layout: JsonLayout) -> str:
 
     Returns:
         The document.
+
+    Raises:
+        MalformedPayloadError: If the value holds a number that is not finite,
+            a string UTF-8 cannot encode, or nesting past :data:`MAX_NESTING`.
     """
+    _refuse_unwritable(value)
     return json.dumps(value, ensure_ascii=False, **_LAYOUT_OPTIONS[layout])

@@ -25,6 +25,11 @@ from tests.conformance._support import BASE_TASK, task_json
 from tests.corpus import reference_task
 
 
+def _raw_json(raw: str) -> str:
+    """Spell a case the way the document writes it: a number bare, a string quoted."""
+    return raw if raw[0] in "N1" else f'"{raw}"'
+
+
 class TestUnrecognizedInputSaysWhy:
     """One message for every failure hid a missing install as a corrupt file.
 
@@ -274,6 +279,29 @@ class TestAMalformedScalarIsRefusedWhereItIsRead:
 
         with pytest.raises(InvalidFormatError, match=r"waypoint\.name"):
             parse_task(doc)
+
+    @pytest.mark.parametrize("raw", ["\\ud800", "NaN", "1e999"])
+    def test_an_unknown_key_cannot_hold_what_json_cannot_write(self, raw):
+        """Passthrough carried it unchecked; ``convert`` then crashed or wrote ``NaN``."""
+        payload = task_json()[:-1] + f', "x": {_raw_json(raw)}}}'
+
+        with pytest.raises(InvalidFormatError, match=r"\bx\b"):
+            parse_task(payload)
+
+    def test_an_xctsk_url_with_an_unwritable_unknown_key_is_refused(self):
+        """The QR path reaches the same ``load_json``."""
+        with pytest.raises(InvalidFormatError, match=r"x2"):
+            parse_task('XCTSK:{"v":2,"t":1,"x2":NaN}')
+
+    def test_nesting_the_decoder_cannot_read_is_refused(self):
+        """It escaped ``convert`` as ``RecursionError``."""
+        with pytest.raises(InvalidFormatError, match="nested"):
+            parse_task("[" * 100_000 + "]" * 100_000)
+
+    def test_a_str_holding_a_lone_surrogate_is_refused(self):
+        """``data.encode("utf-8")`` escaped as ``UnicodeEncodeError``."""
+        with pytest.raises(InvalidFormatError):
+            parse_task('{"x": "\ud800"}')
 
     def test_a_version_spelled_as_a_string_is_the_version(self):
         """``--strict`` said "defines version 1, the task declares 1"."""
