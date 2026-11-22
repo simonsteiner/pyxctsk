@@ -22,8 +22,8 @@ cylinder's outline, a goal line's end — goes through
 :func:`geodesic_destination`, which refuses a distance no point on this earth
 lies at, with :class:`~pyxctsk.exceptions.UnmeasurableRouteError`. pyproj
 walks a geodesic past the antipode and round again for as long as it is asked,
-so a cylinder reaching past the far side used to come back as a finite point
-somewhere else, and a distance that was simply wrong.
+so without that refusal a cylinder reaching past the far side would come back
+as a finite point somewhere else, and a distance that was simply wrong.
 """
 
 import math
@@ -65,9 +65,8 @@ def _is_fai_sphere(earth_model: EarthModelLike) -> bool:
         True for the FAI sphere model, False otherwise.
 
     Raises:
-        ValueError: If the value names no earth model this library knows. It
-            used to fall through to WGS84, so a misspelling cost 97.6 m on a
-            135 km leg and said nothing.
+        ValueError: If the value names no earth model this library knows, so
+            a misspelling is not silently measured as WGS84.
     """
     if earth_model is None:
         return False
@@ -328,9 +327,7 @@ def geodesic_arc(
     The one way this library draws a curve on the earth: a cylinder's outline
     is a 360° sweep and a goal line's control zone a 180° one. Every point is
     exactly ``radius`` from the centre on the chosen earth, so the outline a
-    map shows is the boundary the optimized route touches. The KML cylinder
-    used to be drawn with a fixed 111 320 m per degree instead, 129 m out at a
-    50 km radius, and the route visibly missed the cylinder it touched.
+    map shows is the boundary the optimized route touches.
 
     Args:
         center: (lat, lon) in degrees.

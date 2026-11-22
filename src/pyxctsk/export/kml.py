@@ -22,8 +22,7 @@ ROUTE_ALPHA = 0xE6  # Course line, 90% opaque
 
 # Both are metres above ground, and both are presentation choices: the
 # cylinders are extruded high enough to read as volumes, the goal line low
-# enough to sit inside them rather than above. The second used to be a bare
-# `500` at the call site with a comment, beside a named constant for the first.
+# enough to sit inside them rather than above.
 TURNPOINT_ALTITUDE = 5000
 GOAL_LINE_ALTITUDE = 500
 

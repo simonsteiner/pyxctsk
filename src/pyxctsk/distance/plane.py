@@ -64,15 +64,8 @@ def local_tm_transformers(
     interest, then converted back to geographic coordinates.
 
     The earth's own figure comes from :mod:`~pyxctsk.distance.earth`, which is
-    where the choice between the two is made. This function used to build both
-    of them itself, in a two-branch ``if`` pairing a datum with a geographic
-    CRS — so the module docstring next door claiming the choice was made
-    "once" was not true, and only that module refused a value naming no earth.
-
-    It was also two functions: this one converted its arguments and handed
-    them to a cached twin, keyed on ``fai_sphere: bool`` — the two-valued
-    world :data:`EarthModelLike` was widened to replace, one layer down. The
-    cache is keyed on the model itself now, so the pass-through is gone.
+    where the choice between the two is made. The cache is keyed on the model
+    itself.
 
     ``+k_0`` rather than ``+k``: the two are synonyms in PROJ, but the 2026
     edition's own document history records the correction "parameter +k_0
@@ -107,9 +100,9 @@ def task_area_center(
     The centre of their bounding box, not their mean: a task with six
     turnpoints clustered at one end and one far away is centred between the
     extremes, so the projection covers the whole of it rather than leaning
-    toward wherever the points are dense. The mean is what this used to
-    return, and it disagreed with XCTrack's published distance by 72 m on
-    ``task_bevo`` where the box centre disagrees by 27 m.
+    toward wherever the points are dense. The mean disagrees with XCTrack's
+    published distance by 72 m on ``task_bevo`` where the box centre disagrees
+    by 27 m.
 
     Longitudes are handled as §7.1.6.1 specifies, which is what makes a task
     straddling the antimeridian work: normalize to (-180, 180], sort, and if
@@ -155,14 +148,9 @@ class LocalPlane:
 
     The spec places optimal points in a plane "centred on the area of
     interest", which :func:`task_area_center` derives per §7.1.6.
-    That policy used to be written twice: the route optimizer projected onto
-    the task area, while :meth:`TaskTurnpoint.optimal_point` projected onto a
-    plane centred on *that turnpoint*. Same paragraph of the spec, two
-    different answers, and the tests aimed at the one the product does not
-    use — so a crossing-case fix could go green and ship nothing.
 
-    Making the plane a value the caller passes is what lets both go through
-    one solver: the optimizer builds one for the task and reuses it across
+    Making the plane a value the caller passes is what lets every caller go
+    through one solver: the optimizer builds one for the task and reuses it across
     every sweep, and a caller asking about a single turnpoint
     (``boundary_point``) must pass the plane it means.
 

@@ -277,14 +277,11 @@ class TaskDrawing:
 class Color:
     """One colour, as the bytes it is, for either writer to render.
 
-    The palette used to be shared as ``#rrggbb`` strings, which meant the KML
-    writer needed a hand-written dict mapping each of those strings back to a
-    ``simplekml.Color`` constant. That dict re-declared the whole palette and
-    lost four of its five turnpoint values — a TAKEOFF turnpoint was ``#204d74``
-    in GeoJSON and ``#00008b`` in KML, and only the goal's red survived — and its
-    ``.get(hex, blue)`` default meant a sixth entry would have degraded to blue
-    rather than failing. A colour value with one total renderer per format has
-    nothing to look up and nothing to default to.
+    The palette is shared as colour values, not ``#rrggbb`` strings, so the KML
+    writer needs no dict mapping strings back to ``simplekml.Color`` constants
+    that would re-declare the palette and default an unknown entry. A colour
+    value with one total renderer per format has nothing to look up and nothing
+    to default to.
 
     Attributes:
         red: Red channel, 0-255.

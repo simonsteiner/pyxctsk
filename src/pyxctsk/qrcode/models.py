@@ -352,8 +352,7 @@ def _no_turnpoint_type(raw: Any) -> bool:
     """Whether a QR ``t`` says "no type": absent, null, or the integer 0.
 
     The integer is read by :data:`INTEGER`, the rule every other wire integer
-    follows, so ``"0"`` is no type exactly as ``0`` is; it used to be refused
-    as ``'0' is not one of [1, 2, 3]``. What ``INTEGER`` refuses — ``false``,
+    follows, so ``"0"`` is no type exactly as ``0`` is. What ``INTEGER`` refuses — ``false``,
     say — is not absent either, and the codec then says why.
     """
     if raw is None:

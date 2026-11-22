@@ -42,13 +42,10 @@ from .speed_section import SpeedSection
 S7F_EDITION = "2026 V1.0"
 
 #: The fewest turnpoints a task needs before any of these numbers mean anything.
-#: One turnpoint has no leg, so there is no route and no distance — the library
-#: used to answer 0.0 and only the CLI knew to refuse.
+#: One turnpoint has no leg, so there is no route and no distance.
 #:
 #: :class:`DistanceReport` checks it at construction, so every way of building
-#: a report refuses alike. It was
-#: once a copy in each of two entry points, and ``from_measured_task``, the
-#: third, had none: it reported a one-turnpoint task as 0.0 m.
+#: a report refuses alike.
 #: :class:`~pyxctsk.distance.MeasuredTask` deliberately does not check it — a
 #: drawing of a one-turnpoint task is still a drawing.
 MIN_TURNPOINTS_FOR_DISTANCE = 2
@@ -151,10 +148,8 @@ class DistanceReport:
         """§7.2's second distance, or None when the task has no SSS/ESS pair.
 
         Derived on first use rather than at construction. It is a second route
-        optimization — S7F measures ``taskToESS`` separately — and it used to
-        run for every report, including the ones that never read it: one extra
-        optimizer run per drawing in the task viewer, whose comments said one
-        drawing meant one route.
+        optimization — S7F measures ``taskToESS`` separately — so it is not run
+        for a report that never reads it.
         """
         return SpeedSection.from_measured_task(self.measured)
 

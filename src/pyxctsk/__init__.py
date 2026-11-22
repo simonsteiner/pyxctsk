@@ -89,9 +89,8 @@ from .renderer import OUTPUT_FORMATS, OutputFormat, render_task
 
 # Single source of truth: the version declared in pyproject.toml, read from the
 # installed package metadata. Through `metadata.pyxctsk_version`, which is also
-# what `pyxctsk --version` and the distance report print — this line used to
-# call `importlib.metadata.version` itself and raise on a source checkout,
-# where the other spelling returned "unknown".
+# what `pyxctsk --version` and the distance report print. It returns "unknown"
+# on a source checkout rather than raising.
 __version__ = pyxctsk_version()
 # Sorted, case-insensitively. It was in no discernible order, which is what
 # makes an accidental omission invisible; tests/test_front_door.py checks the

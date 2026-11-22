@@ -18,8 +18,7 @@ The modules:
 - :mod:`~pyxctsk.qrcode.image` — optional QR image rendering and reading
 
 The QR models hold the model's own enums (``TurnpointType``, ``GoalType`` …);
-the integers the format writes them as are codecs in the field tables. There
-used to be six parallel ``IntEnum`` classes and twelve tables translating them.
+the integers the format writes them as are codecs in the field tables.
 
 Note for readers: this package is called ``qrcode`` and so is the third-party
 image library. Absolute imports (``import qrcode`` in :mod:`~pyxctsk.qrcode.image`)

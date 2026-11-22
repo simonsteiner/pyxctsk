@@ -190,14 +190,14 @@ class QRCodeTask:
         waypoints payload is unknown here, and is carried through rather than
         silently dropped.
 
-        **The shape is decided once.** It used to be decided twice, on two
-        different inputs — here on the payload's keys, and in :meth:`to_dict`
-        on :attr:`task_type` — and :class:`_CompetitionTaskType` can put the
-        two into disagreement, because it reads the legacy ``"W"`` spelling
-        that the competition shape's ``taskType`` sometimes carried. A payload
-        read in one shape then wrote itself in the other, so one round trip
-        dropped the goal, the earth model, the takeoff window and every
-        turnpoint radius, silently. Reducing the value here is what
+        **The shape is decided once.** Deciding it twice, on two different
+        inputs — here on the payload's keys, and in :meth:`to_dict` on
+        :attr:`task_type` — would let :class:`_CompetitionTaskType` put the two
+        into disagreement, because it reads the legacy ``"W"`` spelling that
+        the competition shape's ``taskType`` sometimes carried: a payload read
+        in one shape would write itself in the other and drop the goal, the
+        earth model, the takeoff window and every turnpoint radius. Reducing
+        the value here is what
         :meth:`as_waypoints` already means by "the copy is reduced to what the
         format can represent": an object must equal what re-reading its own
         payload produces.
@@ -226,9 +226,9 @@ class QRCodeTask:
         from waypoints without cylinders". Radii, turnpoint types, descriptions,
         the timing sections and the earth model are dropped, because the
         simplified payload has nowhere to put them. Serialized output is
-        unchanged either way, since ``to_dict`` never wrote those fields; what
-        this fixes is the in-memory object, which used to keep values that
-        reading the same payload back would not produce. Extensions and unknown
+        unchanged either way, since ``to_dict`` never writes those fields; what
+        this reduces is the in-memory object, so it holds only values that
+        reading the same payload back would produce. Extensions and unknown
         keys stay: the simplified payload does carry those.
 
         Returns:
@@ -314,11 +314,8 @@ class QRCodeTask:
         the converter.
 
         This is the QR format's adapter onto the rules, which read a
-        :class:`~pyxctsk.model.validation.TaskStructure`. It used to live in
-        ``conversion.py``, reached through a function-local import, because the
-        turnpoint roles had to be translated out of this format's own integer
-        enum first; the models hold the model's enums now, so there is nothing
-        to translate.
+        :class:`~pyxctsk.model.validation.TaskStructure`. The models hold the
+        model's enums, so there is nothing to translate first.
 
         Returns:
             list[ValidationIssue]: One issue per violated rule; empty if this
@@ -358,8 +355,8 @@ class _CompetitionTaskType(Field):
     or ``W``), and written as the one constant this shape means.
 
     Lenient about spellings, not about values: anything else is refused as the
-    full format refuses it. It used to read as absent, so ``"taskType": "FOO"``
-    was re-written as ``CLASSIC`` with the value lost.
+    full format refuses it, so ``"taskType": "FOO"`` is not read as absent and
+    re-written as ``CLASSIC``.
     """
 
     @property
@@ -429,11 +426,10 @@ _NON_DEFAULT_EARTH_MODEL = Optionality(
 #: back out untouched, which is what this library does with anything it cannot
 #: interpret.
 #:
-#: ``carry_unreadable`` is what makes that sentence true. It was written before
-#: the mechanism existed and the mechanism could not deliver it: ``g`` and ``s``
-#: are declared keys, and the passthrough excludes every declared key by
-#: construction, so a malformed section was dropped on the way in and the
-#: payload came back out without it. See :meth:`Field.unread`.
+#: ``carry_unreadable`` is what makes that sentence true: ``g`` and ``s`` are
+#: declared keys, and the passthrough excludes every declared key by
+#: construction, so without it a malformed section would be dropped on the way
+#: in. See :meth:`Field.unread`.
 _A_DICT_OR_NOTHING = Optionality(
     absent=lambda raw: not isinstance(raw, dict),
     omit=lambda value: value is None,

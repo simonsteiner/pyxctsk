@@ -8,10 +8,7 @@ boundary are two steps of route optimization, and are in
 :mod:`~pyxctsk.distance.route_optimization`; the polyline through the centres
 is the primitive under :mod:`~pyxctsk.distance.center_distance`, and is there.
 
-This file used to be the largest in the library and held four subjects under a
-name that covers one; after the split it still held the projection and
-correction helpers, so reading one optimizer pass meant visiting six modules.
-The others are :mod:`~pyxctsk.distance.earth`, :mod:`~pyxctsk.distance.plane`
+The other modules are :mod:`~pyxctsk.distance.earth`, :mod:`~pyxctsk.distance.plane`
 and :mod:`~pyxctsk.distance.solver`.
 """
 
@@ -28,13 +25,9 @@ class TurnpointGeometry(Protocol):
     goal's type, which earth to measure on) is outside this interface.
 
     **It is exactly what the implementation reads, in both directions.**
-    ``earth_model`` used to be a third attribute, because
-    ``calculate_iteratively_refined_route`` read it off the *first* turnpoint
-    to pick the model for the whole route — a property of the task copied onto
-    every turnpoint and read from one. A misspelled model on any other
-    turnpoint was silently ignored, and a list mixing the two earths measured
-    278 m differently depending on which came first. The earth model is now an
-    argument of the optimizer, supplied once by ``MeasuredTask`` from the task.
+    ``earth_model`` is not an attribute: it is a property of the task, not of
+    each turnpoint, so it is an argument of the optimizer, supplied once by
+    ``MeasuredTask`` from the task.
     ``goal_type`` went the same way earlier: the LINE-goal rule belongs to
     ``task_to_turnpoints``, and a LINE goal arrives here already carrying
     ``radius = 0``. An interface declaring a value nothing reads misleads a

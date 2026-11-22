@@ -3,9 +3,7 @@
 Both directions live here, behind one flag, because they are one optional
 feature — the ``qr`` extra — and one question for a caller: can this install
 handle QR *images*? The strings themselves (``XCTSK:``/``XCTSKZ:``) need none of
-this. Decoding used to live in ``parser.py`` with its own flag checking a
-different set of imports, and the library offered no decode function at all, so
-tests and scripts called zxing-cpp directly in eight places.
+this. Decoding lives here, behind the same flag as rendering.
 """
 
 from io import BytesIO

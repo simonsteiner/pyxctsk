@@ -7,9 +7,6 @@ the task dataclasses, which are checked by ``validation.py`` instead.
 
 Both of its refusals are one :class:`~pyxctsk.exceptions.InvalidTimeOfDayError`
 in one wording, ``invalid time '25:00:00Z': hour must be between 0 and 23``.
-The constructor used to raise a bare ``ValueError`` in a style of its own, and
-the parser's message came out wrapped twice — ``invalid time: 'Invalid time
-string: 12:00Z'``.
 """
 
 import re

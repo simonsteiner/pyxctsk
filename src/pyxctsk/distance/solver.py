@@ -85,7 +85,7 @@ def _plane_pcp_point(
     Returns:
         The optimal boundary point (x, y).
     """
-    # scipy.optimize is 297 ms of the 400 ms `import pyxctsk` used to cost,
+    # scipy.optimize is most of what importing `pyxctsk` would cost,
     # and this is the only place in the library that needs it. Importing it
     # here means a caller that only parses, converts or draws a task never
     # pays for the optimizer's dependency tree; sys.modules caches it, so the
@@ -283,10 +283,7 @@ def optimize_plane_route(
     zero-radius circle is touched at its centre. **No circle is special**: a
     route that must start at a centre — a task's takeoff, under ADR 0002 — is
     asked for by passing that circle with radius 0, which is what
-    ``route_optimization`` does. The solver used to carry that rule itself,
-    fixing the first point at the first centre and refusing to merge the
-    second circle into the first, while the caller applied it a second time
-    after solving. Three deterministic placements seed alternating odd/even
+    ``route_optimization`` does. Three deterministic placements seed alternating odd/even
     sweeps, and the shortest converged route wins. Consecutive duplicate
     circles share one optimized point.
 

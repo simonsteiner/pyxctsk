@@ -1,13 +1,8 @@
 """A task beside the optimized route flown for it.
 
 Every number S7F §7 defines is measured along one route, and that route belongs
-to one task. Nothing used to bind the two: "the optimized route of this task"
-was a two-step incantation — convert the turnpoints, then optimize them — and
-each caller wrote it out, so the pairing survived only as a sentence in two
-docstrings that no caller and no type checker could check. Handing
-``task_distances_from_route`` a task and *another* task's route returned a
-fully formed report 12.8 km out, reporting 36.9% savings, with no error; the
-reverse direction filled the cumulative column with a silent tail of zeros.
+to one task. A task paired with another task's route would give a fully formed
+report that is simply wrong.
 
 :class:`MeasuredTask` is that pair as one value, so the mismatch stops being
 representable rather than staying documented. It holds three things and derives
@@ -48,20 +43,15 @@ def task_to_turnpoints(task: Task) -> list[TaskTurnpoint]:
     earth model is not copied onto the cylinders: it is the task's, and it is
     handed to the optimizer once.
 
-    ``plane_circle`` used to apply the same rule a second time, from the goal
-    type carried on each cylinder, and both docstrings claimed sole ownership
-    while ``center_distance._goal_radius`` picked a side in prose. Owning it
-    here is what lets that module read the answer off ``turnpoints[-1].radius``
-    rather than re-deriving it, and what makes ``MeasuredTask.turnpoints``
-    mean what it says.
+    Owning the rule here is what lets ``plane_circle`` and ``center_distance``
+    read the answer off ``turnpoints[-1].radius`` rather than re-deriving it,
+    and what makes ``MeasuredTask.turnpoints`` mean what it says.
 
     **A negative radius is refused here**, with the issue
     :meth:`Task.validate` reports for it, because this is where a radius
     becomes a size. Reading stays lenient — the full and QR formats both carry
-    one, and ``--strict`` names it — but it cannot be measured: it used to
-    surface as :class:`~pyxctsk.MismatchedRouteError` saying the *route* point
-    was 11.0 m outside a cylinder of radius -11, blaming the optimizer for the
-    task. Every role is refused alike, a takeoff and a LINE goal included,
+    one, and ``--strict`` names it — but it cannot be measured, and the
+    refusal names the task rather than blaming the route. Every role is refused alike, a takeoff and a LINE goal included,
     whose radius the route does not touch: no role makes a negative size mean
     one, and the drawing outlines it.
 
@@ -122,7 +112,7 @@ class MeasuredTask:
     task, which is the one place the LINE-goal rule is applied. The route must
     then fit them: one point per turnpoint, measured on the task's earth model,
     and each point inside its cylinder. Another task's route fails the last
-    check by kilometres; it used to produce a report 46 km short, with no error.
+    check by kilometres.
 
     A measured task is a snapshot. It holds the turnpoints and route as they
     were when it was built, so build it after the task is final — the same
