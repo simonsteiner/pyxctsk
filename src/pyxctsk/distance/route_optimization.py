@@ -49,7 +49,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from itertools import accumulate
 
-from .earth import EarthModelLike, geod_for_earth_model, snap_to_boundary
+from .earth import EarthModelLike, geodesic_legs, snap_to_boundary
 from .plane import LocalPlane
 from .solver import optimize_plane_route, plane_optimal_point
 from .turnpoint import TurnpointGeometry
@@ -293,11 +293,7 @@ def calculate_iteratively_refined_route(
     plane = LocalPlane.around(route, earth_model)
     route = _corrected_path(turnpoints, plane, max_sweeps)
 
-    g = geod_for_earth_model(earth_model)
-    legs = []
-    for i in range(len(route) - 1):
-        _, _, leg = g.inv(route[i][1], route[i][0], route[i + 1][1], route[i + 1][0])
-        legs.append(float(leg))
+    legs = geodesic_legs(route, earth_model)
 
     return OptimizedRoute(
         points=tuple(route), legs=tuple(legs), earth_model=earth_model

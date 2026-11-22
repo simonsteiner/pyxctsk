@@ -27,6 +27,7 @@ somewhere else, and a distance that was simply wrong.
 """
 
 import math
+from collections.abc import Sequence
 from functools import lru_cache
 
 from pyproj import CRS, Geod
@@ -201,6 +202,28 @@ def geodesic_distance(
     g = geod_for_earth_model(earth_model)
     _, _, dist = g.inv(point1[1], point1[0], point2[1], point2[0])
     return float(dist)
+
+
+def geodesic_legs(
+    points: Sequence[tuple[float, float]], earth_model: EarthModelLike = None
+) -> list[float]:
+    """Compute the length of each leg along (lat, lon) points for an earth model.
+
+    Every sum of legs in the package starts here, so the totals and the
+    cumulative columns are sums of the same numbers.
+
+    Args:
+        points: (lat, lon) points in order.
+        earth_model: Earth model selector (see :func:`geod_for_earth_model`).
+
+    Returns:
+        One distance in meters per consecutive pair, so ``len(points) - 1``
+        of them (none for fewer than two points).
+    """
+    return [
+        geodesic_distance(points[i], points[i + 1], earth_model)
+        for i in range(len(points) - 1)
+    ]
 
 
 def geodesic_destination(

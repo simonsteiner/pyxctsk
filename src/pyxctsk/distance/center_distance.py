@@ -40,9 +40,10 @@ property of that choice, not a separate convention.
 
 from collections.abc import Sequence
 from enum import Enum
+from itertools import accumulate
 
 from ..model.task import Task
-from .earth import EarthModelLike, geodesic_distance
+from .earth import EarthModelLike, geodesic_legs
 from .measured_task import task_to_turnpoints
 from .speed_section import speed_section_indices
 from .turnpoint import TurnpointGeometry
@@ -79,14 +80,6 @@ class CenterDistanceReading(str, Enum):
 PROPOSED_READING = CenterDistanceReading.LAUNCH_TO_GOAL
 
 
-def _polyline(points: list[tuple[float, float]], earth_model: EarthModelLike) -> float:
-    """Total geodesic length through these (lat, lon) points, in metres."""
-    return sum(
-        geodesic_distance(points[i], points[i + 1], earth_model)
-        for i in range(len(points) - 1)
-    )
-
-
 def distance_through_centers(
     turnpoints: Sequence[TurnpointGeometry], earth_model: EarthModelLike = None
 ) -> float:
@@ -107,7 +100,7 @@ def distance_through_centers(
     Returns:
         float: Distance through centers in meters.
     """
-    return _polyline([tp.center for tp in turnpoints], earth_model)
+    return sum(geodesic_legs([tp.center for tp in turnpoints], earth_model))
 
 
 def _goal_radius(task: Task) -> float:
@@ -172,8 +165,11 @@ def center_distance(
             return None
         turnpoints = turnpoints[indices[0] :]
 
-    total = _polyline(
-        [(tp.waypoint.lat, tp.waypoint.lon) for tp in turnpoints], task.earth_model
+    total = sum(
+        geodesic_legs(
+            [(tp.waypoint.lat, tp.waypoint.lon) for tp in turnpoints],
+            task.earth_model,
+        )
     )
 
     if reading is CenterDistanceReading.LAUNCH_TO_GOAL_BOUNDARY:
@@ -204,12 +200,7 @@ def cumulative_center_m(task: Task) -> list[float]:
         with no turnpoints; ``[0.0]`` for one with a single turnpoint.
     """
     centers = [(tp.waypoint.lat, tp.waypoint.lon) for tp in task.turnpoints]
-    cumulative = [0.0]
-    for i in range(1, len(centers)):
-        cumulative.append(
-            cumulative[-1]
-            + geodesic_distance(centers[i - 1], centers[i], task.earth_model)
-        )
+    cumulative = list(accumulate(geodesic_legs(centers, task.earth_model), initial=0.0))
     return cumulative[: len(centers)]
 
 
