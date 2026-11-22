@@ -5,8 +5,17 @@ implements the [XCTrack Competition Interfaces](https://xctrack.org/Competition_
 specification and FAI Sporting Code S7F. Each file is dated and kept as written —
 superseded reviews stay for history rather than being edited. Newest first.
 
+- [2026-11-23 — The JSON reader accepts what the writer cannot write, and the drawing asks thirteen questions](2026-11-23-json-and-drawing/README.md)
+  — **3 candidates, 7 smaller findings, all open;** the status table in the report's
+  `README.md` is the backlog. Scoped by six months of churn, the `distance/` core and the
+  front door came back clean. The headline is three inputs that escape the library's
+  errors or write invalid JSON (a lone surrogate, `NaN`, deep nesting in an unknown key),
+  all reproduced from the CLI and all one gap: `load_json` takes what `dump_json` cannot
+  write. Also: `TaskDrawing` grew one accessor per shared answer until its interface
+  matched its implementation, and the board distance table keeps three public ways in
+  for one consumer.
 - [2026-10-20 — Thirteen hand-written files block their next commit once the token budget is enforced](2026-10-20-token-budget/README.md)
-  — **7 candidates, 4 smaller findings, all open;** the status table in the report's
+  — **7 candidates, 4 smaller findings; two left open, carried into 2026-11-23;** the status table in the report's
   `README.md` is the backlog. The first review written as a folder, so that no file
   in it outgrows the 5,000-token budget that the `file-tokens`
   pre-commit job enforces. After `.gitattributes` marks the downloaded, vendored and dated files,
