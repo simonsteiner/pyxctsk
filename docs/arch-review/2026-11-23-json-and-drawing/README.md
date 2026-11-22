@@ -31,7 +31,7 @@ The backlog, in rank order. After the scan only three parts of the report change
 |---|---|---|---|---|---|---|---|---|---|
 | [C1](C1-json-round-trip.md) | `load_json` reads only what `dump_json` can write | 🟢 Strong · 🔴 live defect | ↔ two-way | maintainability | pr-open | `refactor/json-round-trip` | [#53](https://github.com/simonsteiner/pyxctsk/pull/53) | no | absorbs 2026-10-02 S13, S14, S15; batch 2026-11-23: C1 → C2 → C3 → S1-S3, S5 |
 | [C2](C2-drawing-features.md) | The drawing hands each writer features, not thirteen questions | 🟢 Strong | ↔ two-way | deepening | pr-open | `refactor/drawing-features` | [#54](https://github.com/simonsteiner/pyxctsk/pull/54) | yes | outputs stay byte-identical |
-| [C3](C3-distance-table.md) | One way to the distance table, owned by its one consumer | 🟡 Worth exploring | ↔ two-way | deepening | in-progress | `refactor/distance-table` | | | breaks the public `TaskDistanceTable` names |
+| [C3](C3-distance-table.md) | One way to the distance table, owned by its one consumer | 🟡 Worth exploring | ↔ two-way | deepening | pr-open | `refactor/distance-table` | [#55](https://github.com/simonsteiner/pyxctsk/pull/55) | yes | breaks the public `TaskDistanceTable` names |
 | [S1](#s1--two-predicates-for-a-line-goal) | Two predicates for a line goal | - | ↔ two-way | coupling | in-progress | `refactor/smaller-findings-2026-11-23` | | | |
 | [S2](#s2--three-hand-written-leg-loops) | Three hand-written leg loops | - | ↔ two-way | deepening | in-progress | `refactor/smaller-findings-2026-11-23` | | | |
 | [S3](#s3--eleven-type-ignores-around-the-optional-qr-imports) | Eleven `type: ignore`s around the optional QR imports | - | ↔ two-way | maintainability | in-progress | `refactor/smaller-findings-2026-11-23` | | | |
