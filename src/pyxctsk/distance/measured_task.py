@@ -74,9 +74,9 @@ def task_to_turnpoints(task: Task) -> list[TaskTurnpoint]:
     if negative:
         raise TaskValidationError(negative)
 
-    # ``has_line_goal`` reads the goal as *flown* (the format's CYLINDER default
+    # ``goal_type_is_line`` reads the goal as *flown* (the format's CYLINDER default
     # applied), which is geometry's question; validation reads what the file said.
-    line_goal = task.has_line_goal
+    line_goal = task.goal_type_is_line
 
     last = len(task.turnpoints) - 1
     return [

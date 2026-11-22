@@ -133,7 +133,7 @@ class Task:
         return self.goal
 
     @property
-    def has_line_goal(self) -> bool:
+    def goal_type_is_line(self) -> bool:
         """Whether the goal this task is flown to is a ``LINE``.
 
         Asked of :attr:`effective_goal`, so a task with no turnpoints has none.

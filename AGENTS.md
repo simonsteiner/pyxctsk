@@ -67,6 +67,7 @@ uv run pyxctsk distances task.xctsk --format text  # try the CLI
 - **Distance-so-far is read from the `OptimizedRoute` legs.** Never optimize a prefix of the turnpoints: the optimizer treats the last circle as the finish, so a prefix gives a different number.
 - **The speed section is its own optimized route.** `distance/speed_section.py`'s `SpeedSection` optimizes to the ESS separately, as S7F does.
 - **`GoalLine.from_task()` is the only answer to whether a task has a goal line.** Its orientation is a `GoalLineOrientation` parameter (2025 rule by default).
+- **`Task.goal_type_is_line` asks only the flown goal's type.** It is True for a one-turnpoint LINE task, which has no goal line; ask `GoalLine.from_task()` whether there is one.
 - **S7F does not define the distance through centres.** `distance/center_distance.py` names the readings and `PROPOSED_READING` is the one pyxctsk publishes.
 
 ### Export
