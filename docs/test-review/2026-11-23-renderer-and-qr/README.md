@@ -10,7 +10,7 @@ The backlog, in rank order. After the scan only this table (including `S` rows B
 
 | ID | Candidate | Kind | Strength | Door | Fix | Status | Branch | PR | Notes |
 |---|---|---|---|---|---|---|---|---|---|
-| [C1](C1-renderer-tautology.md) | Drop the renderer test that compares each row with the call it wraps | 🗑️ waste | 🟢 Strong | ↔ two-way | `prune-tests` | in-progress | `test/renderer-tautology` | | 3.6 s of a 14.2 s suite; batch 2026-11-23: C1 → C2 → S1-S5, seams agreed as listed |
+| [C1](C1-renderer-tautology.md) | Drop the renderer test that compares each row with the call it wraps | 🗑️ waste | 🟢 Strong | ↔ two-way | `prune-tests` | pr-open | `test/renderer-tautology` | [#60](https://github.com/simonsteiner/pyxctsk/pull/60) | 3.6 s of a 14.2 s suite; batch 2026-11-23: C1 → C2 → S1-S5, seams agreed as listed |
 | [C2](C2-core-only-suite.md) | Run the suite once without the `qr` extra | 🔧 infra | 🟡 Worth exploring | ↔ two-way | `direct` | in-progress | `ci/core-only-suite` | | |
 | [S1](#s1--a-qr-image-mismatch-is-reported-as-a-skip) | A QR image mismatch is reported as a skip | 🕳️ blind spot | - | ↔ two-way | `tdd` | in-progress | `test/smaller-findings-1` | | |
 | [S2](#s2--the-refused-payload-wording-is-unpinned) | The refused-payload wording is unpinned | 🕳️ blind spot | - | ↔ two-way | `tdd` | in-progress | `test/smaller-findings-1` | | fix `b501266` added no test |
@@ -103,3 +103,5 @@ Fix `17b4615` wrote `.value` instead of the `TurnpointType` member, but the test
 ## Departures
 
 <!-- filled during implementation: where a PR deliberately differs from this report, and why -->
+
+- **C1:** the cut was made by hand, not through `prune-tests`: the card named one test, so there was nothing for the skill to choose. The Ship review was a read of the 33-line diff against the card rather than `review-prs`. The test class kept two tests and is renamed `TestTheOptionsAndTheReadBack`, since "what they always were" no longer describes them.
