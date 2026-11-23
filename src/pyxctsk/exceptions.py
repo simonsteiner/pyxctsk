@@ -131,6 +131,15 @@ class MalformedPayloadError(pyXCTSKError, ValueError):
         return MalformedPayloadError(self.reason, path)
 
 
+class NotJsonError(MalformedPayloadError):
+    """Raised when a payload does not decode as JSON at all.
+
+    Told apart from its parent so a caller can say whether the text was JSON
+    that held a value no JSON document can carry, or not JSON in the first
+    place.
+    """
+
+
 class MismatchedRouteError(pyXCTSKError, ValueError):
     """Raised when a route is paired with a task it was not flown for.
 

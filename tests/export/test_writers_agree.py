@@ -223,7 +223,11 @@ class TestBothWritersAgree:
 
         assert zone["properties"]["name"] == feature.name
         assert zone["properties"]["description"] == feature.description
-        assert zone["properties"]["radius"] == drawing.goal_line.control_zone_radius
+        assert (
+            zone["properties"]["radius"]
+            == feature.radius
+            == drawing.goal_line.control_zone_radius
+        )
         assert f"<name>{feature.name}</name>" in kml
         assert f"<description>{feature.description}</description>" in kml
 

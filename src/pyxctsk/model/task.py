@@ -238,8 +238,7 @@ class Task:
         first ESS turnpoint nor a comparison by value: ``Turnpoint`` is a plain
         dataclass, so a task that legitimately flies the same turnpoint twice
         could match the wrong occurrence — the hazard
-        :meth:`~pyxctsk.export.common.TaskDrawing.features` documents and
-        avoids by comparing identity.
+        :attr:`~pyxctsk.export.common.TaskDrawing.features` avoids by comparing identity.
 
         Note this is *not* "does the task have a speed section" — that is
         :func:`~pyxctsk.distance.speed_section.speed_section_indices`, which
