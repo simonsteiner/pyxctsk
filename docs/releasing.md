@@ -99,7 +99,7 @@ lockfile) with `uv version X.Y.Z`.
 
 Run [`scripts/verify.sh`](../scripts/verify.sh) to execute the complete non-mutating gate: lockfile,
 lint, formatting, types, spelling, artifact build, the full test suite from the
-built sdist, and a smoke test of the built wheel without the optional `qr`
+built sdist (once with the `qr` extra and once without it), and a smoke test of the built wheel without the optional `qr`
 extra (`scripts/check_core_without_qr.py`). The **CI** workflow runs that gate on Python 3.11, 3.12, 3.13, and 3.14
 on every pull request and push to `main`; **Release** and **Publish** call the
 same workflow rather than repeating the matrix.
