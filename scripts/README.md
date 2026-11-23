@@ -34,7 +34,7 @@ tools are listed in [external-repos.md](external-repos.md).
 
 ### `xcontest_xctsk_tool.py`
 
-[`xcontest_xctsk_tool.py`](xcontest_xctsk_tool.py) is a CLI for batch uploading XCTSK files, downloading tasks and HTML pages, and downloading QR codes via the XContest REST API from <https://tools.xcontest.org/xctsk/>. Implements retry logic and rate limiting, prints each downloaded task's author and last-modified time, and supports for both v1 and v2 API endpoints. The API client and the batch loops are in [`xcontest_client.py`](xcontest_client.py). It reads and writes only paths inside the directory it runs from; run it from `scripts/`, like the examples.
+[`xcontest_xctsk_tool.py`](xcontest_xctsk_tool.py) is a CLI for batch uploading XCTSK files, downloading tasks and HTML pages, and downloading QR codes via the XContest REST API from <https://tools.xcontest.org/xctsk/>. Implements retry logic and rate limiting, prints the author and last-modified time when the server sends them, and supports both v1 and v2 API endpoints. The API client and the batch loops are in [`xcontest_client.py`](xcontest_client.py). It reads and writes only paths inside the directory it runs from; run it from `scripts/`, like the examples.
 
 #### REST API Endpoints
 
@@ -101,7 +101,7 @@ uv run python xcontest_xctsk_tool.py process --author "Your Name"
 
 ### `extract_task_data.py`
 
-Copies the XCTrack HTML exports in `downloaded_tasks/html` to `downloaded_tasks/html_cleaned` with embedded images removed (skipping files already there), then parses `html_cleaned` with BeautifulSoup for task metadata, turnpoints and the embedded GeoJSON. Number columns (`#`, radius, the km columns) are converted, keeping the text with a warning when a value doesn't parse; coordinates are not checked. The parsing is in [`task_html_parser.py`](task_html_parser.py); `extract_task_data.py` reads the pages and writes the files.
+Copies the XCTrack HTML exports in `downloaded_tasks/html` to `downloaded_tasks/html_cleaned` with embedded images removed (skipping files already there), then parses `html_cleaned` with BeautifulSoup for task metadata, turnpoints and the embedded GeoJSON. The turnpoint table's number columns (`#`, radius, the km columns) are converted, keeping the text with a warning when a value doesn't parse; the two metadata distances fall back to `0.0` without a warning. Only the GeoJSON's structure is checked, not the coordinates. The parsing is in [`task_html_parser.py`](task_html_parser.py); `extract_task_data.py` reads the pages and writes the files.
 
 #### Usage
 
