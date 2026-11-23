@@ -124,14 +124,6 @@ with no radii, no timing and no goal. Both formats have one, and it is a
 different shape rather than a subset that happens to leave fields out.
 _Avoid_: simplified task, waypoint task, waypoints mode
 
-## Drawing it
-
-**Feature**:
-One thing a map shows: a turnpoint cylinder, the optimized route, the goal line
-or its control zone. `TaskDrawing.features` lists them, each carrying its name,
-description, colour and geometry, and the KML and GeoJSON writers only serialize
-them.
-
 ## What a format is made of
 
 **Serializable shape**:
