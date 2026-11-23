@@ -3,10 +3,9 @@
 A leaf module because three places need this string and none of them may
 import the others: :mod:`pyxctsk.cli` for ``--version``,
 :mod:`pyxctsk.distance.report` for the report's provenance line, and the
-package ``__init__`` for :data:`pyxctsk.__version__`. It lived in
-``distance/report.py`` — a general "what version am I" utility parked in the
-S7F report module, reached from the CLI by a private-path import, and the only
-reason ``cli.py`` had an import edge into ``distance`` at all.
+package ``__init__`` for :data:`pyxctsk.__version__`. Keeping it out of
+``distance/`` is what lets ``cli.py`` report its version without an import
+edge into ``distance``.
 
 Named for ``importlib.metadata`` rather than ``version``, which would shadow
 the name ``__init__`` imports and read one letter from ``pyxctsk.VERSION``,

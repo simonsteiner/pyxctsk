@@ -13,9 +13,9 @@ These are repository utilities and are not included in the published
 uv sync --group tools
 ```
 
-Run commands through `uv run`. The examples below run from `scripts/`
-(`cd scripts` first), because `xcontest_xctsk_tool.py` reads and writes only
-paths inside the directory it runs from.
+Run commands through `uv run`, from `scripts/` (`cd scripts` first): the
+examples below use paths relative to it, and `xcontest_xctsk_tool.py` reads and
+writes only paths inside the directory it runs from.
 
 The release tooling (`verify.sh`, `prepare_release.sh`, `release.sh`,
 `changelog_extract.py`, `check_core_without_qr.py`) is covered in
@@ -34,7 +34,7 @@ tools are listed in [external-repos.md](external-repos.md).
 
 ### `xcontest_xctsk_tool.py`
 
-[`xcontest_xctsk_tool.py`](xcontest_xctsk_tool.py) is a CLI for batch uploading XCTSK files, downloading tasks and HTML pages, and downloading QR codes via the XContest REST API from <https://tools.xcontest.org/xctsk/>. Implements retry logic, rate limiting, and metadata preservation with support for both v1 and v2 API endpoints. The API client and the batch loops are in [`xcontest_client.py`](xcontest_client.py). It reads and writes only paths inside the directory it runs from, so run it from the repository root or `scripts/`.
+[`xcontest_xctsk_tool.py`](xcontest_xctsk_tool.py) is a CLI for batch uploading XCTSK files, downloading tasks and HTML pages, and downloading QR codes via the XContest REST API from <https://tools.xcontest.org/xctsk/>. Implements retry logic, rate limiting, and metadata preservation with support for both v1 and v2 API endpoints. The API client and the batch loops are in [`xcontest_client.py`](xcontest_client.py). It reads and writes only paths inside the directory it runs from; run it from `scripts/`, like the examples.
 
 #### REST API Endpoints
 

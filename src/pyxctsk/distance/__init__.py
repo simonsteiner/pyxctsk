@@ -43,10 +43,8 @@ own. Everything a caller outside the package needs is named here —
 
 The goal line lives here rather than with the KML and GeoJSON writers that draw
 it because the shapes of a task must not depend on the formats it is exported
-to. Note that this is now the *only* reason: the second one — that distance
-calculation needed the goal-line length itself — stopped being true when the
-`TaskTurnpoint.goal_line_length` attribute that carried it turned out to be
-written and never read. `export/` is `goal_line`'s only consumer today.
+to; distance calculation itself never needs the goal-line length. `export/` is
+`goal_line`'s only consumer today.
 
 `goal_line` does depend on the optimizer, though: S7F 2025+ orients the line
 against the optimized route point rather than a turnpoint centre, so the
