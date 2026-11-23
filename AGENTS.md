@@ -15,7 +15,7 @@ uv run pytest tests/qrcode/test_codec.py -vv -s  # run one test file, verbose, n
 uv run pytest tests/distance -q  # run one test package
 uv run ruff check --fix src/ tests/ scripts/  # lint and autofix
 uv run ruff format src/ tests/ scripts/  # format
-uv run mypy src/ tests/  # type-check (strict)
+uv run mypy src/ tests/  # type-check (strict flags set in pyproject.toml)
 uv run rumdl check .  # lint Markdown
 uv run lefthook install  # enable the pre-commit hooks (ruff, mypy, rumdl, cspell, token budget)
 uv run lefthook run pre-commit  # run the hooks on staged files
@@ -28,9 +28,9 @@ uv run pyxctsk distances task.xctsk --format text  # try the CLI
 
 ### Layering
 
-- **Dependencies run `model → qrcode` and `model → distance → export`, never back.** `model/` imports nothing else in the package; `tests/test_layering.py` enforces it on every import that runs at import time.
+- **Dependencies run `model → qrcode` and `model → distance → export`, never back.** `model/` imports nothing else in the package but the leaves `exceptions` and `metadata`; `tests/test_layering.py` enforces it on every import that runs at import time.
 - **Inside a package, import sibling submodules directly, never through the package `__init__`.** `distance/__init__.py` and the other package `__init__`s only re-export.
-- **Function-local imports are pinned by name.** A new one needs an entry with its reason in `EXPECTED_DEFERRED_IMPORTS` in `tests/test_layering.py`; the two that exist break import cycles.
+- **Function-local imports of a pyxctsk module are pinned by name.** A new one needs an entry with its reason in `EXPECTED_DEFERRED_IMPORTS` in `tests/test_layering.py`; the two that exist break import cycles.
 - **Optional dependencies are imported under `try/except ImportError`.** The core must import without the `qr` extra; follow `src/pyxctsk/qrcode/image.py`.
 
 ### Reading and writing tasks
@@ -44,7 +44,7 @@ uv run pyxctsk distances task.xctsk --format text  # try the CLI
 ### Wire formats
 
 - **Every wire shape is one ordered `Shape` field table, declared beside its class** (`TASK_SHAPE` in `model/task.py`, `QR_TASK_SHAPE` in `qrcode/task.py`); `model/shape.py` holds the machinery. `to_dict` and `from_dict` traverse it, row order is output order, and adding a spec field is one row; a class with two shapes gets two tables, never a union key set.
-- **Every scalar row names a wire-scalar codec** (`TEXT`, `NUMBER`, `WHOLE_METRES`, `INTEGER`, `LATITUDE`, `LONGITUDE`) from `model/shape.py`, which re-exports them from `model/codec.py` where they are defined. A bad value raises `MalformedPayloadError` from the table, with a path like `turnpoints[0].waypoint`.
+- **Every scalar row names a wire-scalar codec** (`TEXT`, `NUMBER`, `WHOLE_METRES`, `INTEGER`, `LATITUDE`, `LONGITUDE`, `TIME_OF_DAY`) from `model/shape.py`, which re-exports them from `model/codec.py` where they are defined. A bad value raises `MalformedPayloadError` from the table, with a path like `turnpoints[0].waypoint`.
 - **JSON goes through `load_json` and `dump_json` in `model/shape.py`.** Name a `JsonLayout` (`compact`, `line` or `indented`); never call `json.dumps` with options of your own.
 - **Unknown keys are preserved, never interpreted.** Use `model/passthrough.py` through `Shape`; never map a non-spec key onto a spec field because the names match.
 - **`Task` ↔ `QRCodeTask` conversion lives only in `qrcode/conversion.py`.** Never import one format's task module from the other at module level; `Task.to_qr_code_task()` and `QRCodeTask.to_task()` reach conversion through function-local imports.
@@ -90,13 +90,13 @@ uv run pyxctsk distances task.xctsk --format text  # try the CLI
 ## Hard constraints
 
 - **Ask before adding a runtime dependency or an extra.**
-- **Never cut a release, bump the version or push a tag unless asked.** Releases publish to PyPI through `.github/workflows/release.yml` or `scripts/release.sh`.
+- **Never cut a release, bump the version or push a tag unless asked.** Only `.github/workflows/publish.yml` publishes to PyPI; `release.yml` and `scripts/release.sh` both end by running it at a tag.
 - **Never edit `scripts/task_viewer/airscore_clone/`.** It is vendored third-party code.
 - **Never hand-edit the expected outputs in `tests/data/reference_tasks/` to make a test pass.** A mismatch there is a finding to report.
 
 ## Gotchas
 
-- **Run everything through `uv run`.** Don't activate the venv or call bare `python`; `requires-python` is `>=3.11` because `scipy>=1.16` needs it.
+- **Run everything through `uv run`.** Don't activate the venv or call bare `python`; `requires-python` is `>=3.11` because `scipy>=1.17` needs it.
 - **`src/pyxctsk/qrcode/` shares its name with the third-party `qrcode` library.** Absolute imports reach the library, relative imports reach the package.
 - **QR images go through `qrcode/image.py`.** Call `generate_qrcode_image` and `read_qrcode_image`, never zxing-cpp directly, including in tests and scripts.
 - **A root `o.fa` is not `goal.finishAltitude`.** SeeYou Navigator's `fa` is absolute AMSL; the spec's is AGL above the last turnpoint.
