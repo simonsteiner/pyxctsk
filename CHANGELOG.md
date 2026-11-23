@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **`Task.goal_type_is_line`** says whether the goal the task is flown to is a `LINE`, reading the format's `CYLINDER` default for a missing goal or goal type. It asks only the type: a task needs two turnpoints for a goal line, so ask `GoalLine.from_task()` whether there is one to draw.
+- **`pyxctsk.distance.earth.geodesic_legs(points, earth_model)`** gives the length of each leg along a list of (lat, lon) points; every distance total and cumulative column in the package now adds these up.
+
 ### Changed
 
 - **Breaking (API): `TaskDrawing` hands the writers features, not thirteen questions.** `TaskDrawing.features` is the things a map shows, in the order both writers emit them: a `CylinderFeature` per drawn turnpoint, a `RouteFeature`, and a `GoalLineFeature` and `ControlZoneFeature` when the task has a goal line. Each carries its name, description, colour and geometry (`outline()` and `ends()` compute on call). The classes are in `pyxctsk.export.common`; the fields `turnpoints`, `goal_line` and `measured`, and `task` and `route`, stay. The KML and GeoJSON outputs are byte-identical, and the private writer helpers changed with it.
