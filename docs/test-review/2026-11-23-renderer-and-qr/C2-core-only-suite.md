@@ -8,7 +8,7 @@
 
 Every CI run installs `--all-extras` before `pytest`, so the `QR_CODE_SUPPORT` skip markers and the probe in `tests/qr_test_utils.py` have never run on the install they exist for.
 
-**Now:** `scripts/verify.sh` runs the suite once, from the extracted sdist, after `uv sync --frozen --all-extras`, on Python 3.11–3.14. The core-only check is a wheel in a bare venv running `scripts/check_core_without_qr.py`, which imports the package and calls the image entry points; it has no pytest. The missing-extra error paths are tested by monkeypatching `QR_CODE_SUPPORT` (6 sites in `tests/test_cli_errors.py` and `tests/qrcode/test_image.py`), not by a real core-only install.
+**Now:** `scripts/verify.sh` runs the suite once, from the extracted sdist, after `uv sync --frozen --all-extras`, on Python 3.11–3.14. The core-only check is a wheel in a bare venv running `scripts/check_core_without_qr.py`, which imports the package and calls the image entry points; it has no pytest. The missing-extra error paths are tested by monkeypatching `QR_CODE_SUPPORT` (6 sites in `tests/test_cli_errors.py`, `tests/qrcode/test_image.py` and `tests/conformance/test_parser_diagnostics.py`), not by a real core-only install.
 
 **Change:** one more pytest run in `verify.sh` against a core-only sync of the sdist (no `--all-extras`), on one Python version, so the skip markers and the import guard are exercised for real.
 

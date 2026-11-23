@@ -8,6 +8,7 @@ six-line PNG incantation and its own media types — which is what made the seam
 real rather than hypothetical.
 """
 
+import json
 import re
 
 import pytest
@@ -91,6 +92,20 @@ class TestTheTableIsTheOnlyStatementOfTheFormats:
 
 class TestTheOptionsAndTheReadBack:
     """What a rendering carries through the table: `compressed`, and a read-back."""
+
+    def test_each_map_row_calls_its_own_writer(self):
+        """The table wires each name to a writer; one task shows the wiring.
+
+        Nothing else pins it: the row-kind test sees only ``str`` against
+        ``bytes``, and each writer's own tests call the writer directly.
+        """
+        task = reference_task("task_bevo").task
+
+        assert json.loads(str(render_task(task, "geojson")))["type"] == (
+            "FeatureCollection"
+        )
+        assert "<kml " in str(render_task(task, "kml"))
+        assert str(render_task(task, "qrcode-json")).startswith("XCTSK:")
 
     def test_compressed_reaches_the_two_rows_that_read_it(self):
         """And is ignored by the three that do not, without the caller asking."""

@@ -17,6 +17,7 @@ from pyxctsk.distance import (
     geodesic_distance,
     optimized_distance,
 )
+from pyxctsk.distance.earth import geodesic_legs
 from tests.builders import task, turnpoint
 from tests.corpus import reference_task
 
@@ -108,3 +109,22 @@ class TestTheEarthModelSelector:
 
         with pytest.raises(ValueError, match="not an earth model"):
             MeasuredTask.from_task(built)
+
+
+class TestGeodesicLegs:
+    """One length per consecutive pair: what every total and column adds up."""
+
+    @pytest.mark.parametrize("points", [[], [(46.0, 7.0)]], ids=["none", "one"])
+    def test_fewer_than_two_points_have_no_legs(self, points):
+        """A route needs two points to have a leg."""
+        assert geodesic_legs(points) == []
+
+    def test_each_leg_is_the_geodesic_between_its_ends(self):
+        """On the task's earth: the FAI sphere's legs differ from WGS84's."""
+        points = [(46.0, 7.0), (46.1, 7.0), (46.1, 7.2)]
+        for model in (None, EarthModel.FAI_SPHERE):
+            assert geodesic_legs(points, model) == [
+                geodesic_distance(points[0], points[1], model),
+                geodesic_distance(points[1], points[2], model),
+            ]
+        assert geodesic_legs(points) != geodesic_legs(points, EarthModel.FAI_SPHERE)

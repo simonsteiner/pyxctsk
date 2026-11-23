@@ -5,6 +5,7 @@ docs/arch-review/. Each test retains its original diagnostic provenance.
 """
 
 import json
+import math
 from typing import Any
 
 import pytest
@@ -13,6 +14,7 @@ from pyxctsk import (
     DistanceReport,
     GoalType,
     InvalidFormatError,
+    MalformedPayloadError,
     Task,
     UnmeasurableRouteError,
     load_task,
@@ -304,6 +306,22 @@ class TestAMalformedScalarIsRefusedWhereItIsRead:
         """It escaped ``convert`` as ``RecursionError``."""
         with pytest.raises(InvalidFormatError, match="nested"):
             parse_task("[" * 100_000 + "]" * 100_000)
+
+    @pytest.mark.parametrize("raw", ["NaN", "1e999", '"\\ud800"'])
+    def test_a_bare_value_json_cannot_write_says_why(self, raw):
+        """It decodes, so it is JSON: the refusal is the reason, not "invalid format"."""
+        with pytest.raises(
+            InvalidFormatError, match="looks like JSON, but it was refused"
+        ):
+            parse_task(raw)
+
+    def test_a_model_built_in_code_is_refused_on_the_way_out(self):
+        """The model does not validate on construction, so the renderer refuses."""
+        task = Task.from_dict(json.loads(task_json()) | {"x": math.nan})
+
+        with pytest.raises(MalformedPayloadError) as caught:
+            render_task(task, "json")
+        assert caught.value.path == "x"
 
     def test_a_str_holding_a_lone_surrogate_is_refused(self):
         """``data.encode("utf-8")`` escaped as ``UnicodeEncodeError``."""
