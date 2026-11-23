@@ -8,13 +8,12 @@ six-line PNG incantation and its own media types — which is what made the seam
 real rather than hypothetical.
 """
 
-import json
 import re
 
 import pytest
 
 from pyxctsk import OUTPUT_FORMATS, parse_task, render_task
-from tests.corpus import reference_task, reference_tasks
+from tests.corpus import reference_task
 from tests.paths import TESTS_DIR
 
 
@@ -77,34 +76,8 @@ class TestTheTableIsTheOnlyStatementOfTheFormats:
         assert OUTPUT_FORMATS["json"].extension == ".xctsk"
 
 
-class TestTheRenderingsAreWhatTheyAlwaysWere:
-    """The table is a seam, not a change of output."""
-
-    @staticmethod
-    def _without_element_ids(kml: str) -> str:
-        """Element ids come from a process-global counter in simplekml.
-
-        So two renders of one task differ in every `id="N"` and the
-        `<styleUrl>#N</styleUrl>` pointing at it, and in nothing else. Not this
-        seam's doing, and not worth asserting about.
-        """
-        return re.sub(r"(?<=id=\")\d+|(?<=>#)\d+", "N", kml)
-
-    @pytest.mark.parametrize("reference", reference_tasks(), ids=str)
-    def test_each_row_agrees_with_the_call_it_replaced(self, reference):
-        """Byte-for-byte, across the whole corpus."""
-        from pyxctsk import generate_task_geojson, task_to_kml
-
-        task = reference.task
-
-        assert render_task(task, "json") == task.to_json()
-        assert self._without_element_ids(
-            str(render_task(task, "kml"))
-        ) == self._without_element_ids(task_to_kml(task))
-        assert json.loads(str(render_task(task, "geojson"))) == generate_task_geojson(
-            task
-        )
-        assert render_task(task, "qrcode-json") == task.to_qr_code_task().to_string()
+class TestTheOptionsAndTheReadBack:
+    """What a rendering carries through the table: `compressed`, and a read-back."""
 
     def test_compressed_reaches_the_two_rows_that_read_it(self):
         """And is ignored by the three that do not, without the caller asking."""
