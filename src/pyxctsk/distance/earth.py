@@ -22,11 +22,12 @@ cylinder's outline, a goal line's end — goes through
 :func:`geodesic_destination`, which refuses a distance no point on this earth
 lies at, with :class:`~pyxctsk.exceptions.UnmeasurableRouteError`. pyproj
 walks a geodesic past the antipode and round again for as long as it is asked,
-so a cylinder reaching past the far side used to come back as a finite point
-somewhere else, and a distance that was simply wrong.
+so without that refusal a cylinder reaching past the far side would come back
+as a finite point somewhere else, and a distance that was simply wrong.
 """
 
 import math
+from collections.abc import Sequence
 from functools import lru_cache
 
 from pyproj import CRS, Geod
@@ -64,9 +65,8 @@ def _is_fai_sphere(earth_model: EarthModelLike) -> bool:
         True for the FAI sphere model, False otherwise.
 
     Raises:
-        ValueError: If the value names no earth model this library knows. It
-            used to fall through to WGS84, so a misspelling cost 97.6 m on a
-            135 km leg and said nothing.
+        ValueError: If the value names no earth model this library knows, so
+            a misspelling is not silently measured as WGS84.
     """
     if earth_model is None:
         return False
@@ -203,6 +203,30 @@ def geodesic_distance(
     return float(dist)
 
 
+def geodesic_legs(
+    points: Sequence[tuple[float, float]], earth_model: EarthModelLike = None
+) -> list[float]:
+    """Compute the length of each leg along (lat, lon) points for an earth model.
+
+    Every sum of legs in the package starts here, so the totals and the
+    cumulative columns add up the same legs. They agree to the last bit only on
+    Python 3.11: from 3.12 ``sum()``, which the totals use, compensates for
+    rounding and a running sum does not, so the two can differ in the last bit.
+
+    Args:
+        points: (lat, lon) points in order.
+        earth_model: Earth model selector (see :func:`geod_for_earth_model`).
+
+    Returns:
+        One distance in meters per consecutive pair, so ``len(points) - 1``
+        of them (none for fewer than two points).
+    """
+    return [
+        geodesic_distance(points[i], points[i + 1], earth_model)
+        for i in range(len(points) - 1)
+    ]
+
+
 def geodesic_destination(
     center: tuple[float, float],
     azimuth: float,
@@ -305,9 +329,7 @@ def geodesic_arc(
     The one way this library draws a curve on the earth: a cylinder's outline
     is a 360° sweep and a goal line's control zone a 180° one. Every point is
     exactly ``radius`` from the centre on the chosen earth, so the outline a
-    map shows is the boundary the optimized route touches. The KML cylinder
-    used to be drawn with a fixed 111 320 m per degree instead, 129 m out at a
-    50 km radius, and the route visibly missed the cylinder it touched.
+    map shows is the boundary the optimized route touches.
 
     Args:
         center: (lat, lon) in degrees.

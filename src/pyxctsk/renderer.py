@@ -89,8 +89,7 @@ class OutputFormat:
         media_type: The MIME type to serve it as.
         extension: The file extension to save it under, leading dot included.
         binary: True when :attr:`render` returns bytes rather than text. The
-            one fact a caller needs before it can open a file or set a header,
-            and the one every call site used to infer from the format name.
+            one fact a caller needs before it can open a file or set a header.
         render: The task and the ``compressed`` flag to the payload. The flag
             is accepted by every row and read by the two QR ones, so a caller
             passes it without asking which formats care.
@@ -137,8 +136,7 @@ def render_task(
         ``OUTPUT_FORMATS[output_format].binary`` rather than guessing.
 
     Raises:
-        ValueError: If no such format exists. It used to be a chain of ``elif``
-            with no ``else``, which wrote nothing and reported success.
+        ValueError: If no such format exists.
     """
     try:
         fmt = OUTPUT_FORMATS[output_format]

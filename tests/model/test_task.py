@@ -36,6 +36,7 @@ from pyxctsk import (
     parse_task,
 )
 from pyxctsk.exceptions import InvalidTimeOfDayError
+from tests import builders
 from tests.corpus import reference_task
 
 
@@ -339,3 +340,32 @@ def test_both_formats_write_non_ascii_names_as_they_are():
     assert "Zürich" in built.to_json()
     assert "Zürich" in built.to_qr_code_task().to_json()
     assert Task.from_json(built.to_json()).turnpoints[1].waypoint.name == "Küçük"
+
+
+class TestTheGoalTypeIsLine:
+    """``goal_type_is_line`` asks the flown goal's type, nothing more."""
+
+    @pytest.mark.parametrize(
+        ("goal", "expected"),
+        [
+            (GoalType.LINE, True),
+            (GoalType.CYLINDER, False),
+            (None, False),
+            (Goal(type=None), False),
+        ],
+        ids=["line", "cylinder", "no goal", "no goal type"],
+    )
+    def test_it_reads_the_flown_goal(self, goal, expected):
+        """A missing goal or goal type is the format's CYLINDER default."""
+        assert builders.task(goal=goal).goal_type_is_line is expected
+
+    def test_a_task_with_no_turnpoints_keeps_its_declared_goal(self):
+        """There is no goal line to draw, but the question is only the type."""
+        task = Task(
+            task_type=TaskType.CLASSIC,
+            version=1,
+            turnpoints=[],
+            goal=Goal(type=GoalType.LINE),
+        )
+
+        assert task.goal_type_is_line is True

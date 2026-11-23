@@ -49,7 +49,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from itertools import accumulate
 
-from .earth import EarthModelLike, geod_for_earth_model, snap_to_boundary
+from .earth import EarthModelLike, geodesic_legs, snap_to_boundary
 from .plane import LocalPlane
 from .solver import optimize_plane_route, plane_optimal_point
 from .turnpoint import TurnpointGeometry
@@ -112,12 +112,10 @@ def plane_circle(
 ) -> tuple[float, float, float]:
     """Return a turnpoint as the circle the solver sees: (x, y, radius).
 
-    A projection and nothing else. It used to also apply the rule that **a LINE
-    goal is a zero-radius circle at the goal center** — but so does
+    A projection and nothing else. The rule that **a LINE goal is a
+    zero-radius circle at the goal center** belongs to
     :func:`~pyxctsk.distance.measured_task.task_to_turnpoints`, which builds
-    every cylinder the library measures, and each docstring claimed to be the
-    only place that rule lived while a third module picked a side in prose. The
-    rule now belongs to the constructor: a LINE goal arrives here already
+    every cylinder the library measures: a LINE goal arrives here already
     carrying ``radius=0``, which is also what
     :func:`~pyxctsk.distance.center_distance.center_distance` reads it as.
 
@@ -180,11 +178,9 @@ def boundary_point(
     which solves every circle jointly and is what a task's route is measured
     with. Both project, solve and correct; only the solve differs.
 
-    **The plane is required.** It used to default to one centred on this
-    turnpoint — a projection no shipped code path ever builds — and the
-    crossing-case tests took that default, so a fix to the projection the
-    product does use could go green and ship nothing. ``plane.py`` records
-    that failure as fixed; the default was the half of it left in place.
+    **The plane is required.** A default centred on this turnpoint would be a
+    projection no shipped code path builds, and tests taking it could go green
+    while the projection the product does use is wrong.
 
     Args:
         turnpoint: The circle to touch.
@@ -293,11 +289,7 @@ def calculate_iteratively_refined_route(
     plane = LocalPlane.around(route, earth_model)
     route = _corrected_path(turnpoints, plane, max_sweeps)
 
-    g = geod_for_earth_model(earth_model)
-    legs = []
-    for i in range(len(route) - 1):
-        _, _, leg = g.inv(route[i][1], route[i][0], route[i + 1][1], route[i + 1][0])
-        legs.append(float(leg))
+    legs = geodesic_legs(route, earth_model)
 
     return OptimizedRoute(
         points=tuple(route), legs=tuple(legs), earth_model=earth_model

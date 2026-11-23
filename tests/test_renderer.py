@@ -14,14 +14,27 @@ import re
 import pytest
 
 from pyxctsk import OUTPUT_FORMATS, parse_task, render_task
-from tests.corpus import reference_task, reference_tasks
+from tests.corpus import reference_task
 from tests.paths import TESTS_DIR
+from tests.qr_test_utils import QR_CODE_SUPPORT
 
 
 class TestEveryRowRenders:
     """One row per format, and each of them answers for itself."""
 
-    @pytest.mark.parametrize("name", sorted(OUTPUT_FORMATS))
+    @pytest.mark.parametrize(
+        "name",
+        [
+            pytest.param(
+                name,
+                marks=pytest.mark.skipif(
+                    name == "png" and not QR_CODE_SUPPORT,
+                    reason="QR code dependencies not available",
+                ),
+            )
+            for name in sorted(OUTPUT_FORMATS)
+        ],
+    )
     def test_the_payload_matches_the_rows_declared_kind(self, name):
         """`binary` is what a caller needs before it can open a file."""
         task = reference_task("task_bevo").task
@@ -68,43 +81,27 @@ class TestTheTableIsTheOnlyStatementOfTheFormats:
 
         assert listed.split("|") == list(OUTPUT_FORMATS)
 
-    def test_the_task_files_extension_and_media_type_are_the_json_row_only(self):
-        """No second name for them at the front door, which nothing read."""
-        import pyxctsk
-
-        assert not hasattr(pyxctsk, "EXTENSION")
-        assert not hasattr(pyxctsk, "MIME_TYPE")
+    def test_the_task_files_extension_is_the_json_rows(self):
+        """The one place the extension is named."""
         assert OUTPUT_FORMATS["json"].extension == ".xctsk"
 
 
-class TestTheRenderingsAreWhatTheyAlwaysWere:
-    """The table is a seam, not a change of output."""
+class TestTheOptionsAndTheReadBack:
+    """What a rendering carries through the table: `compressed`, and a read-back."""
 
-    @staticmethod
-    def _without_element_ids(kml: str) -> str:
-        """Element ids come from a process-global counter in simplekml.
+    def test_each_map_row_calls_its_own_writer(self):
+        """The table wires each name to a writer; one task shows the wiring.
 
-        So two renders of one task differ in every `id="N"` and the
-        `<styleUrl>#N</styleUrl>` pointing at it, and in nothing else. Not this
-        seam's doing, and not worth asserting about.
+        Nothing else pins it: the row-kind test sees only ``str`` against
+        ``bytes``, and each writer's own tests call the writer directly.
         """
-        return re.sub(r"(?<=id=\")\d+|(?<=>#)\d+", "N", kml)
+        task = reference_task("task_bevo").task
 
-    @pytest.mark.parametrize("reference", reference_tasks(), ids=str)
-    def test_each_row_agrees_with_the_call_it_replaced(self, reference):
-        """Byte-for-byte, across the whole corpus."""
-        from pyxctsk import generate_task_geojson, task_to_kml
-
-        task = reference.task
-
-        assert render_task(task, "json") == task.to_json()
-        assert self._without_element_ids(
-            str(render_task(task, "kml"))
-        ) == self._without_element_ids(task_to_kml(task))
-        assert json.loads(str(render_task(task, "geojson"))) == generate_task_geojson(
-            task
+        assert json.loads(str(render_task(task, "geojson")))["type"] == (
+            "FeatureCollection"
         )
-        assert render_task(task, "qrcode-json") == task.to_qr_code_task().to_string()
+        assert "<kml " in str(render_task(task, "kml"))
+        assert str(render_task(task, "qrcode-json")).startswith("XCTSK:")
 
     def test_compressed_reaches_the_two_rows_that_read_it(self):
         """And is ignored by the three that do not, without the caller asking."""

@@ -43,7 +43,7 @@ uv run pyxctsk distances task.xctsk --format text  # try the CLI
 
 ### Wire formats
 
-- **Every wire shape is one ordered field table in `src/pyxctsk/model/shape.py`.** `to_dict` and `from_dict` traverse it, row order is output order, and adding a spec field is one row; a class with two shapes gets two tables, never a union key set.
+- **Every wire shape is one ordered `Shape` field table, declared beside its class** (`TASK_SHAPE` in `model/task.py`, `QR_TASK_SHAPE` in `qrcode/task.py`); `model/shape.py` holds the machinery. `to_dict` and `from_dict` traverse it, row order is output order, and adding a spec field is one row; a class with two shapes gets two tables, never a union key set.
 - **Every scalar row names a wire-scalar codec** (`TEXT`, `NUMBER`, `WHOLE_METRES`, `INTEGER`, `LATITUDE`, `LONGITUDE`) from `model/shape.py`, which re-exports them from `model/codec.py` where they are defined. A bad value raises `MalformedPayloadError` from the table, with a path like `turnpoints[0].waypoint`.
 - **JSON goes through `load_json` and `dump_json` in `model/shape.py`.** Name a `JsonLayout` (`compact`, `line` or `indented`); never call `json.dumps` with options of your own.
 - **Unknown keys are preserved, never interpreted.** Use `model/passthrough.py` through `Shape`; never map a non-spec key onto a spec field because the names match.
@@ -67,12 +67,13 @@ uv run pyxctsk distances task.xctsk --format text  # try the CLI
 - **Distance-so-far is read from the `OptimizedRoute` legs.** Never optimize a prefix of the turnpoints: the optimizer treats the last circle as the finish, so a prefix gives a different number.
 - **The speed section is its own optimized route.** `distance/speed_section.py`'s `SpeedSection` optimizes to the ESS separately, as S7F does.
 - **`GoalLine.from_task()` is the only answer to whether a task has a goal line.** Its orientation is a `GoalLineOrientation` parameter (2025 rule by default).
+- **`Task.goal_type_is_line` asks only the flown goal's type.** It is True for a one-turnpoint LINE task, which has no goal line; ask `GoalLine.from_task()` whether there is one.
 - **S7F does not define the distance through centres.** `distance/center_distance.py` names the readings and `PROPOSED_READING` is the one pyxctsk publishes.
 
 ### Export
 
-- **`TaskDrawing.from_task()` in `export/common.py` derives what a task looks like once.** KML and GeoJSON both render that value; a question both writers must answer the same way becomes a method on `TaskDrawing`, not a free function each calls.
-- **Geometry comes from `distance/`.** Cylinder outlines are `geodesic_arc` via `TaskDrawing.outline_of`, the goal line is `distance/goal_line.py`; the writers only draw.
+- **`TaskDrawing.from_task()` in `export/common.py` derives what a task looks like once.** KML and GeoJSON both render that value; a question both writers must answer the same way becomes a field on a feature, not a free function each calls.
+- **Geometry comes from `distance/`.** Cylinder outlines are `geodesic_arc` via `CylinderFeature.outline()`, the goal line is `distance/goal_line.py`; the writers only draw.
 
 ### Tests
 
@@ -113,5 +114,6 @@ uv run pyxctsk distances task.xctsk --format text  # try the CLI
 - `docs/s7f-distance-reference.md` — what S7F defines about task distances and what it leaves open.
 - `docs/adr/` — the route-optimizer, touching and earth-model decisions.
 - `docs/arch-review/` — dated architecture and spec-conformance reviews; read the current two (`2026-08-16-competition-interfaces-audit.md`, `2026-08-18-s7f-2026-conformance-audit.md`) before changing conformance behaviour.
+- `docs/test-review/` — dated test reviews; the newest one's status table is the open test backlog.
 - `scripts/README.md` and `scripts/task_viewer/README.md` — the repository utilities.
 - `CHANGELOG.md` — what each release changed.

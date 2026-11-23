@@ -155,6 +155,3 @@ disable_error_code = ["no-untyped-def"]
 minversion = "6.0"
 addopts = "-ra -q"
 testpaths = ["tests"]
-markers = [
-    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
-]

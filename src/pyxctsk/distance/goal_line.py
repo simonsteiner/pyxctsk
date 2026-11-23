@@ -33,16 +33,15 @@ the 2024 orientation it still optimizes nothing at all.
 Everything else here is :class:`GoalLine`'s own implementation. Callers use the
 object: ``length``, ``approach_azimuth()``, ``endpoints()`` and
 ``control_zone()``. There is deliberately no tuple-shaped accessor beside them
-— the writers used to unpack a positional 4-tuple that carried exactly those
-answers, and the endpoint math itself used to be a free function taking six
-positional floats that the method built by unpacking its own two points.
+— a positional 4-tuple would invite the writers to unpack it, and the endpoint
+math takes points rather than six positional floats.
 """
 
 from dataclasses import dataclass
 from enum import Enum
 from typing import Sequence
 
-from ..model.task import GoalType, Task, Turnpoint
+from ..model.task import Task, Turnpoint
 from .earth import (
     EarthModelLike,
     geod_for_earth_model,
@@ -144,14 +143,8 @@ def _semicircle_arc(
     A uniform sweep from ``forward_azimuth - 90`` to ``forward_azimuth + 90``,
     which is the front half of the circle — the side a pilot crosses from.
 
-    It used to take a start, an end *and* a through azimuth and interpolate the
-    two halves separately, each normalizing its own angle difference into
-    (-180, 180]. Its one caller has only ever passed those three azimuths, for
-    which both halves reduce to this single step; the generality bought nothing
-    and was what made the function long enough to need two branches. Old
-    against new over 300 randomized (lat, lon, azimuth, radius) combinations
-    agrees to 7e-15° — 1e-9 m, which is float-ordering noise. Across
-    the reference corpus's GeoJSON, 3 of 1748 floats move at all.
+    Its one caller passes only the approach azimuth, for which a start, end
+    and through azimuth would all reduce to this single step.
 
     Args:
         center: (lat, lon) of the goal.
@@ -189,8 +182,8 @@ class GoalLine:
         length: Total goal-line length in meters.
         earth_model: The model the geometry is measured on (an ``EarthModel``
             member, its string value, or None for WGS84), per ADR 0003. A task
-            declaring the FAI sphere used to get its route measured on the
-            sphere and its goal line on the ellipsoid, in one document.
+            declaring the FAI sphere has its goal line measured on the sphere
+            like its route.
     """
 
     center: tuple[float, float]
@@ -252,8 +245,7 @@ class GoalLine:
     @staticmethod
     def _has_line_goal(task: Task) -> bool:
         """Whether this task has a LINE goal with enough turnpoints to orient one."""
-        goal = task.effective_goal
-        return bool(goal and goal.type == GoalType.LINE and len(task.turnpoints) >= 2)
+        return task.goal_type_is_line and len(task.turnpoints) >= 2
 
     @classmethod
     def _build(
@@ -320,11 +312,6 @@ class GoalLine:
         goal, and measured on the task's earth model so it agrees with the
         distances the same task reports.
 
-        The math used to sit in a free function taking six positional floats,
-        which this method built by unpacking its own two (lat, lon) tuples —
-        in a module that flips axis order between neighbouring lines, where
-        swapping two of six floats costs a rotated goal line.
-
         Raises:
             UnmeasurableRouteError: If half the line reaches past the far side
                 of the earth, where it has no end (see
@@ -345,9 +332,8 @@ class GoalLine:
         """Half the line: the control zone's radius, and each endpoint's reach.
 
         S7F §6.2.3.1 gives the semicircular control zone the line's half-length
-        as its radius, so this is one number with one owner. Both export writers
-        used to recompute ``length / 2`` to caption it, beside the two places
-        here that need it as geometry — one rule in three modules.
+        as its radius, so this is one number with one owner, for the export writers
+        and the geometry alike.
         """
         return self.length / 2
 

@@ -10,7 +10,7 @@ Task Viewer is a standalone Flask application for displaying and comparing XCTra
 - Visualize task routes and turnpoints on an interactive map
 - View detailed task metadata and turnpoint information
 - Compare task representation between different formats (JSON and GeoJSON)
-- Calculate task distances using the XCTrack and AirScore algorithm implementations
+- Calculate task distances with pyxctsk's `DistanceReport` and, for comparison, the vendored AirScore implementation
 - API endpoints for programmatic access to task data
 
 ## Project Structure
@@ -78,9 +78,25 @@ Use this to validate:
 - Accurate calculation of distances
 - Proper representation of turnpoints and routes
 
+## Pages
+
+Served by [`app.py`](app.py):
+
+- `/`: the list of tasks.
+- `/task/<task_name>`: one task's metadata and map.
+- `/compare/<task_name>`: the original task beside pyxctsk's distances and map.
+- `/geojson_debug/<task_name>`: the GeoJSON pyxctsk writes, with the goal line in focus.
+- `/airscore/<task_name>`: the task measured by the vendored AirScore code.
+
 ## API Endpoints
 
-The application provides several API endpoints for programmatic access to task data and related resources:
+Served by [`api.py`](api.py), for programmatic access to task data and related resources:
+
+### `GET /api/qrcode_image/<task_name>.png`
+
+Returns a PNG QR code for the specified task.
+
+---
 
 ### `GET /api/task/<task_name>`
 

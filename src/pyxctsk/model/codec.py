@@ -1,19 +1,16 @@
 """Wire-scalar codecs: how one value is spelled on the wire.
 
 Every scalar a table reads goes through one of the codecs below, and each
-kind of scalar has exactly one rule. The table used to check containers and
-trust scalars: ``name``, ``lat``, ``lon``, ``version`` and ``fa`` were read
-as whatever JSON held, and "a number on the wire" was answered three
-different ways by three codecs. So a bad scalar parsed and failed where it
-was first *used* — an ``OverflowError`` for an infinite radius, a
-``TypeError`` from the planar projection for a latitude spelled ``"46"``,
-and for a JSON ``true`` latitude no error at all: it was 1°N.
+kind of scalar has exactly one rule. The table checks scalars as well as
+containers, so a bad scalar fails where it is read rather than where it is
+first *used*.
 
 The rules, once each:
 
 - **A number is finite and not a boolean.** ``True == 1`` in Python; on the
-  wire it is not a number. Python's ``json`` reads ``NaN`` and ``Infinity``,
-  and an integer too large for a float, so finiteness is checked here.
+  wire it is not a number. ``load_json`` refuses ``NaN`` and ``Infinity``, but
+  ``from_dict`` takes dicts that never went through it, so finiteness is
+  checked here too.
 - **A number may be spelled as a string** — in JSON's own number grammar,
   nothing looser. Burnair writes ``"radius": "700"``, and producers have
   written the QR version and earth model as strings; it is one rule for every
@@ -231,9 +228,7 @@ def wire_int_codec(table: Mapping[Any, int]) -> Codec:
     The QR format writes a goal type as ``1`` or ``2`` where the full format
     writes ``"LINE"`` or ``"CYLINDER"``. That is a spelling, not a second kind
     of value, so the QR models hold the same enums as the full ones and this
-    codec is where the integers live. They used to be six ``IntEnum`` classes
-    and twelve translation tables between them and the model's enums, with a
-    default at every call site for whatever a table left out.
+    codec is where the integers live.
 
     Args:
         table: Each value's wire integer. Must be one-to-one. The integer is
@@ -268,8 +263,7 @@ def list_codec(item: Codec) -> Codec:
 
     def from_wire(raw: Any) -> list[Any]:
         # A list is required, not just an iterable: a string where an array
-        # belongs used to be read one character at a time, so a single time
-        # gate written as ``"12:00:00Z"`` reported "invalid time: '1'".
+        # belongs is refused, not read one character at a time.
         if not isinstance(raw, list):
             raise MalformedPayloadError(f"expected an array, got {json_type(raw)}")
         return [read_at(f"[{i}]", item.from_wire, r) for i, r in enumerate(raw)]

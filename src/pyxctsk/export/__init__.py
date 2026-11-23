@@ -8,10 +8,11 @@ outermost layer of the library.
 
 - :mod:`~pyxctsk.export.kml` — ``task_to_kml``, ``drawing_to_kml``
 - :mod:`~pyxctsk.export.geojson` — ``generate_task_geojson``, ``drawing_to_geojson``
-- :mod:`~pyxctsk.export.common` — ``TaskDrawing``, plus the styling both writers need
+- :mod:`~pyxctsk.export.common` — ``TaskDrawing`` and its features, plus the styling both writers need
 
-``TaskDrawing.from_task`` derives what a task looks like once — the turnpoints to
-draw, the goal line, the optimized route — and both writers render that value.
+``TaskDrawing.from_task`` derives what a task looks like once, and its
+``features`` (cylinders, route, goal line, control zone) are what both writers
+render.
 Rendering one task in both formats therefore optimizes the route once, and the
 two formats cannot disagree about the task's shape.
 

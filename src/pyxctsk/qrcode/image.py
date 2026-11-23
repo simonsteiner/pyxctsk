@@ -3,9 +3,7 @@
 Both directions live here, behind one flag, because they are one optional
 feature — the ``qr`` extra — and one question for a caller: can this install
 handle QR *images*? The strings themselves (``XCTSK:``/``XCTSKZ:``) need none of
-this. Decoding used to live in ``parser.py`` with its own flag checking a
-different set of imports, and the library offered no decode function at all, so
-tests and scripts called zxing-cpp directly in eight places.
+this. Decoding lives here, behind the same flag as rendering.
 """
 
 from io import BytesIO
@@ -17,7 +15,9 @@ from ..exceptions import (
 )
 
 # Optional QR code dependencies. The ``qr`` extra installs all three, so one
-# flag answers for both directions.
+# flag answers for both directions. When one is missing the names stay unbound:
+# ``_require_support`` is the only way to the code that uses them, and it
+# raises first.
 try:
     import qrcode
     import zxingcpp
@@ -25,9 +25,6 @@ try:
 
     QR_CODE_SUPPORT = True
 except ImportError:
-    qrcode = None  # type: ignore
-    zxingcpp = None  # type: ignore
-    Image = None  # type: ignore
     QR_CODE_SUPPORT = False
 
 
@@ -57,9 +54,9 @@ def generate_qrcode_image(data: str, size: int = 1024) -> "Image.Image":
     """
     _require_support("rendering a QR code image")
 
-    qr = qrcode.QRCode(  # type: ignore
+    qr = qrcode.QRCode(
         version=1,
-        error_correction=qrcode.constants.ERROR_CORRECT_M,  # type: ignore
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
         box_size=10,
         border=4,
     )
@@ -70,9 +67,9 @@ def generate_qrcode_image(data: str, size: int = 1024) -> "Image.Image":
 
     # Resize to requested size. Image.Resampling arrived in Pillow 9.1 and
     # pyproject pins >= 11.3, so there is no older-API branch to fall back to.
-    resized: "Image.Image" = img.resize(  # type: ignore[no-any-unimported]
+    resized: "Image.Image" = img.resize(
         (size, size),
-        Image.Resampling.LANCZOS,  # type: ignore[union-attr]
+        Image.Resampling.LANCZOS,
     )
     return resized
 
@@ -99,9 +96,9 @@ def read_qrcode_image(image: "bytes | Image.Image") -> list[str]:
     _require_support("reading a QR code image")
     if isinstance(image, (bytes, bytearray)):
         try:
-            image = Image.open(BytesIO(image))  # type: ignore[union-attr]
+            image = Image.open(BytesIO(image))
             image.load()
         except Exception as exc:  # Pillow raises a wide range here
             raise MalformedPayloadError(f"not a readable image: {exc}") from exc
-    formats = zxingcpp.BarcodeFormats(zxingcpp.BarcodeFormat.QRCode)  # type: ignore[union-attr]
-    return [code.text for code in zxingcpp.read_barcodes(image, formats=formats)]  # type: ignore[union-attr]
+    formats = zxingcpp.BarcodeFormats(zxingcpp.BarcodeFormat.QRCode)
+    return [code.text for code in zxingcpp.read_barcodes(image, formats=formats)]

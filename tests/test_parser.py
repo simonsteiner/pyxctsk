@@ -30,6 +30,7 @@ from pyxctsk.parser import (
     Input,
 )
 from tests.corpus import reference_task, reference_tasks
+from tests.qr_test_utils import QR_CODE_SUPPORT
 
 
 def _adapter(name):
@@ -65,6 +66,9 @@ class TestExactlyOneAdapterRecognizesAPayload:
 
         assert [a.name for a in FORMAT_ADAPTERS if a.recognizes(inp)] == ["XCTSK: URL"]
 
+    @pytest.mark.skipif(
+        not QR_CODE_SUPPORT, reason="QR code dependencies not available"
+    )
     def test_a_qr_image_is_only_the_image_adapters(self, tmp_path):
         """Binary input decodes as no text, so no text adapter sees it."""
         from pyxctsk import generate_qrcode_image

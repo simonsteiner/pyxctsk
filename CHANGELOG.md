@@ -4,6 +4,41 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **`Task.goal_type_is_line`** says whether the goal the task is flown to is a `LINE`, reading the format's `CYLINDER` default for a missing goal or goal type. It asks only the type: a task needs two turnpoints for a goal line, so ask `GoalLine.from_task()` whether there is one to draw.
+- **`pyxctsk.distance.earth.geodesic_legs(points, earth_model)`** gives the length of each leg along a list of (lat, lon) points; every distance total and cumulative column in the package now adds these up.
+
+### Changed
+
+- **Breaking (API): `TaskDrawing` hands the writers features, not thirteen questions.** `TaskDrawing.features` is the things a map shows, in the order both writers emit them: a `CylinderFeature` per drawn turnpoint, a `RouteFeature`, and a `GoalLineFeature` and `ControlZoneFeature` when the task has a goal line. Each carries its name, description, colour and geometry (`outline()` and `ends()` compute on call). The classes are in `pyxctsk.export.common`; the fields `turnpoints`, `goal_line` and `measured`, and `task` and `route`, stay. The KML and GeoJSON outputs are byte-identical, and the private writer helpers changed with it.
+
+  | removed | read instead |
+  | --- | --- |
+  | `drawing.is_goal(tp)` | the goal's `CylinderFeature.color` is `GOAL_COLOR` |
+  | `drawing.outline_of(tp)` | `CylinderFeature.outline()` |
+  | `drawing.color_of(tp)`, `label_of(tp, i)`, `description_of(tp)`, `role_of(tp)` | `CylinderFeature.color`, `.name`, `.description`, `.role` |
+  | `drawing.route_label()`, `route_coordinates()`, `route_coordinates_lon_lat()` | `RouteFeature.name`, `.points` (lon, lat) |
+  | `drawing.goal_line_label()`, `goal_line_description()` | `GoalLineFeature.name`, `.description` |
+  | `drawing.control_zone_label()`, `control_zone_description()` | `ControlZoneFeature.name`, `.description` |
+
+- **Breaking (API): the per-turnpoint distance table is gone; read `DistanceReport`.** `TaskDistanceTable`, `TurnpointRow`, `task_distances_from`, `calculate_task_distances` and `DISPLAY_PRECISION_KM` (the module `pyxctsk.distance.task_distances`) were a rendering of `DistanceReport` in kilometres rounded to 0.1, which nothing in the library read; the task viewer, which did, rounds the four numbers it shows itself. `pyxctsk distances` and its JSON are unchanged, and so is the task viewer's display.
+
+  | removed | read instead |
+  | --- | --- |
+  | `calculate_task_distances(task)` | `DistanceReport.from_task(task)` |
+  | `task_distances_from(measured)` | `DistanceReport.from_measured_task(measured)` |
+  | `TaskDistanceTable.from_report(report)` | `report` itself |
+  | `.center_distance_km`, `.optimized_distance_km` | `.center_distance_m`, `.task_distance_m`, in metres and unrounded |
+  | `.savings_km` | `center_distance_m − task_distance_m` |
+  | `.savings_percent` | `(center_distance_m − task_distance_m) / center_distance_m × 100`, which the table gave as 0.0 with no centre distance |
+  | `.turnpoints[i].lat`, `.lon`, `.radius` | `report.route()[i].center_lat`, `.center_lon`, `.radius_m` |
+  | `.turnpoints[i].cumulative_center_km`, `.cumulative_optimized_km` | `report.route()[i].cumulative_center_m`, `.cumulative_m` |
+
+### Fixed
+
+- **A `NaN`, an `Infinity`, an overflowing number (`1e999`), a lone surrogate or nesting deeper than 100 levels, anywhere in a payload, is now refused by every command**, extensions and unknown keys included. Before, `convert` wrote the `NaN` out as invalid JSON (and to KML and GeoJSON, exit 0), crashed with `UnicodeEncodeError` on a surrogate or `RecursionError` on deep nesting. The error names where (`x[1]`), and `parse_task` raises `InvalidFormatError` for a `str` holding a lone surrogate. `dump_json` refuses the same values built in code.
+
 ## [v0.7.0] - 2026-10-02
 
 ### Upgrading

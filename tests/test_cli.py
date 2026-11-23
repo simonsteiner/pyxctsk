@@ -307,6 +307,9 @@ class TestWritingOutput:
         assert result.exit_code == 0, result.output
         assert out.read_bytes().endswith(b"\n")
 
+    @pytest.mark.skipif(
+        not QR_CODE_SUPPORT, reason="QR code dependencies not available"
+    )
     def test_a_png_is_written_as_bytes_not_text(self, tmp_path):
         """The one format whose payload is binary, through the same seam."""
         out = tmp_path / "qr.png"

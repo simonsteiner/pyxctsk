@@ -67,7 +67,7 @@ it agrees to within **49 m**, which is inside the 0.1 km display rounding. That 
 is by convention, not by specification, and it is exactly the kind of agreement that
 breaks silently when a new vendor arrives.
 
-The reading is now stated in one place — `src/pyxctsk/distance/center_distance.py` — and
+The reading is now stated in one place — [`src/pyxctsk/distance/center_distance.py`](../src/pyxctsk/distance/center_distance.py) — and
 the alternatives are kept beside it and reported by `pyxctsk distances`, for exactly one
 purpose: **if your board disagrees with ours, you can tell in one command whether the
 cause is a different reading or a different bug.**
@@ -120,8 +120,8 @@ published values are XCTrack's displayed figures, rounded to 0.1 km, so every ro
 
 **Where pyxctsk is lower, we can prove the published number is not the optimum.** Every
 point of a pyxctsk route sits on its cylinder boundary, in order — that is asserted for
-all 22 tasks in `tests/conformance/test_s7f_conformance.py::
-TestRouteOptimizerConformance::test_every_route_point_touches_its_cylinder`. A shorter
+all 24 tasks by `TestRouteOptimizerConformance::test_every_route_point_touches_its_cylinder`
+in [`tests/conformance/test_s7f_conformance.py`](../tests/conformance/test_s7f_conformance.py). A shorter
 route that touches every control zone in order is, by §7.2, the task distance. On `pepi`,
 `nubu` and `lorili` the published figure is 0.7–0.9 km above a demonstrably feasible path.
 
@@ -215,7 +215,7 @@ uv run pytest                       # the conformance suite, including the asser
 
 ```console
 $ pyxctsk distances your-task.xctsk --format text
-pyxctsk 0.5.0  |  FAI S7F 2026 V1.0  |  earth model: WGS84
+pyxctsk 0.7.0  |  FAI S7F 2026 V1.0  |  earth model: WGS84
 
   task distance (§7.2)            92.002 km
   speed section (§7.2)            86.761 km
@@ -238,7 +238,7 @@ version, the S7F edition, the earth model, every reading of the centre distance,
 **the optimized crossing point for every turnpoint**. Reads stdin, writes with `-o`, so a
 whole corpus goes through it in a loop.
 
-From Python, if you prefer — the same report the CLI renders, as a value:
+From Python, if you prefer — the same report the CLI renders, as a value ([`distance/report.py`](../src/pyxctsk/distance/report.py)):
 
 ```python
 from pyxctsk import DistanceReport, load_task
@@ -255,8 +255,10 @@ print(report.as_text())                 # what --format text prints
 `speed_section_distance_m` is `None` rather than a number when the task has no
 SSS/ESS pair, so check it before dividing — roughly a third of the corpus has none.
 
-The 22 tasks are in `tests/data/reference_tasks/`, each as a `.xctsk` alongside the
-published values it is compared against. They are real competition tasks.
+The corpus is 24 real competition tasks in
+[`tests/data/reference_tasks/`](../tests/data/reference_tasks/README.md), 22 of them with
+published values: the `.xctsk` files in `xctsk/`, the values they are compared against in
+`json/`.
 
 ---
 

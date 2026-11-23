@@ -23,11 +23,11 @@ from shared import (
 )
 
 from pyxctsk import (
+    DistanceReport,
     TaskDrawing,
     drawing_to_geojson,
     generate_task_geojson,
     load_task,
-    task_distances_from,
 )
 
 # Add task_viewer and its subdirectories to path to import AirScore utilities
@@ -143,15 +143,13 @@ def compare_task(task_name: str):
         # Parse the task with pyxctsk
         task = load_task(xctsk_path)
 
-        # One drawing: the table and the map share a single optimized route.
+        # One drawing: the distances and the map share a single optimized route.
         drawing = TaskDrawing.from_task(task)
-        # `.as_dict()`: the table is a value now, and this consumer wants the
-        # dictionary rendering it has always read.
-        distance_results = task_distances_from(drawing.measured).as_dict()
+        report = DistanceReport.from_measured_task(drawing.measured)
         xctrack_geojson = drawing_to_geojson(drawing)
 
         # Prepare comparison data
-        comparison_data = prepare_comparison_data(json_data, distance_results, task)
+        comparison_data = prepare_comparison_data(json_data, report)
 
         return render_template(
             "compare_view.html",

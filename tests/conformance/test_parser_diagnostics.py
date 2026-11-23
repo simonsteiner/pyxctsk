@@ -5,6 +5,7 @@ docs/arch-review/. Each test retains its original diagnostic provenance.
 """
 
 import json
+import math
 from typing import Any
 
 import pytest
@@ -13,6 +14,7 @@ from pyxctsk import (
     DistanceReport,
     GoalType,
     InvalidFormatError,
+    MalformedPayloadError,
     Task,
     UnmeasurableRouteError,
     load_task,
@@ -23,6 +25,12 @@ from pyxctsk.qrcode import image
 from pyxctsk.qrcode.encoding import encode_num, encode_waypoint_turnpoint
 from tests.conformance._support import BASE_TASK, task_json
 from tests.corpus import reference_task
+from tests.qr_test_utils import QR_CODE_SUPPORT
+
+
+def _raw_json(raw: str) -> str:
+    """Spell a case the way the document writes it: a number bare, a string quoted."""
+    return raw if raw[0] in "N1" else f'"{raw}"'
 
 
 class TestUnrecognizedInputSaysWhy:
@@ -49,6 +57,18 @@ class TestUnrecognizedInputSaysWhy:
         with pytest.raises(InvalidFormatError, match="looks like JSON"):
             parse_task('{"taskType": "CLASSIC", "vers')
 
+    def test_a_json_task_refused_for_one_value_says_it_was_refused(self):
+        """Not "not a task in any format": the task is there, one value is not."""
+        payload = task_json()[:-1] + ', "x": NaN}'
+
+        with pytest.raises(
+            InvalidFormatError, match=r"looks like JSON, but it was refused: .*\bx\b"
+        ):
+            parse_task(payload)
+
+    @pytest.mark.skipif(
+        not QR_CODE_SUPPORT, reason="QR code dependencies not available"
+    )
     def test_an_image_with_no_qr_code_says_so(self, tmp_path):
         """Not "invalid format": the file was read, it just carries no task.
 
@@ -65,6 +85,9 @@ class TestUnrecognizedInputSaysWhy:
         with pytest.raises(InvalidFormatError, match="no XCTSK: QR code"):
             load_task(png)
 
+    @pytest.mark.skipif(
+        not QR_CODE_SUPPORT, reason="QR code dependencies not available"
+    )
     def test_an_unreadable_image_is_told_apart_from_a_blank_one(self, tmp_path):
         """The distinction the magic-byte guess could not make."""
         png = tmp_path / "truncated.png"
@@ -274,6 +297,45 @@ class TestAMalformedScalarIsRefusedWhereItIsRead:
 
         with pytest.raises(InvalidFormatError, match=r"waypoint\.name"):
             parse_task(doc)
+
+    @pytest.mark.parametrize("raw", ["\\ud800", "NaN", "1e999"])
+    def test_an_unknown_key_cannot_hold_what_json_cannot_write(self, raw):
+        """Passthrough carried it unchecked; ``convert`` then crashed or wrote ``NaN``."""
+        payload = task_json()[:-1] + f', "x": {_raw_json(raw)}}}'
+
+        with pytest.raises(InvalidFormatError, match=r"\bx\b"):
+            parse_task(payload)
+
+    def test_an_xctsk_url_with_an_unwritable_unknown_key_is_refused(self):
+        """The QR path reaches the same ``load_json``."""
+        with pytest.raises(InvalidFormatError, match=r"x2"):
+            parse_task('XCTSK:{"v":2,"t":1,"x2":NaN}')
+
+    def test_nesting_the_decoder_cannot_read_is_refused(self):
+        """It escaped ``convert`` as ``RecursionError``."""
+        with pytest.raises(InvalidFormatError, match="nested"):
+            parse_task("[" * 100_000 + "]" * 100_000)
+
+    @pytest.mark.parametrize("raw", ["NaN", "1e999", '"\\ud800"'])
+    def test_a_bare_value_json_cannot_write_says_why(self, raw):
+        """It decodes, so it is JSON: the refusal is the reason, not "invalid format"."""
+        with pytest.raises(
+            InvalidFormatError, match="looks like JSON, but it was refused"
+        ):
+            parse_task(raw)
+
+    def test_a_model_built_in_code_is_refused_on_the_way_out(self):
+        """The model does not validate on construction, so the renderer refuses."""
+        task = Task.from_dict(json.loads(task_json()) | {"x": math.nan})
+
+        with pytest.raises(MalformedPayloadError) as caught:
+            render_task(task, "json")
+        assert caught.value.path == "x"
+
+    def test_a_str_holding_a_lone_surrogate_is_refused(self):
+        """``data.encode("utf-8")`` escaped as ``UnicodeEncodeError``."""
+        with pytest.raises(InvalidFormatError):
+            parse_task('{"x": "\ud800"}')
 
     def test_a_version_spelled_as_a_string_is_the_version(self):
         """``--strict`` said "defines version 1, the task declares 1"."""

@@ -180,3 +180,10 @@ One way a task is written out — the full JSON, a map, a QR payload, a QR image
 — together with what a caller needs to deliver it: its media type, its file
 extension, and whether the payload is bytes or text.
 _Avoid_: exporter, writer (a _writer_ is the code, a format is the choice)
+
+**Feature**:
+One thing a map of a task shows: a turnpoint's cylinder, the optimized route,
+the goal line or its control zone, each with the name, description and colour
+it is shown with. Every map format shows the same features in the same order;
+only how each is spelled differs.
+_Avoid_: placemark (KML's word for one), layer, shape

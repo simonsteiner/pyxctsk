@@ -158,15 +158,11 @@ def test_roundtrip_basic():
             qr_image.save(tmp.name, format="PNG")
 
             image = Image.open(tmp.name)
-            try:
-                decoded_objects = decode_qr(image)
-                assert decoded_objects, "Failed to decode QR code"
+            decoded_objects = decode_qr(image)
+            assert decoded_objects, "Failed to decode QR code"
 
-                decoded_string = decoded_objects[0]
-                assert decoded_string == qr_string, "QR code roundtrip failed"
-            except Exception as e:
-                # If decoding fails unexpectedly, skip rather than fail.
-                pytest.skip(f"QR decode failed: {e}")
+            decoded_string = decoded_objects[0]
+            assert decoded_string == qr_string, "QR code roundtrip failed"
 
 
 @pytest.mark.skipif(not QR_CODE_SUPPORT, reason="QR code dependencies not available")

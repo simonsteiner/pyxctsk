@@ -1,16 +1,17 @@
 """Task to KML conversion."""
 
 import re
+from typing import assert_never
 
 import simplekml  # type: ignore
 
 from ..model.task import Task
 from .common import (
-    CONTROL_ZONE_EDGE_COLOR,
-    CONTROL_ZONE_FILL_COLOR,
-    GOAL_LINE_COLOR,
-    ROUTE_COLOR,
     Color,
+    ControlZoneFeature,
+    CylinderFeature,
+    GoalLineFeature,
+    RouteFeature,
     TaskDrawing,
 )
 
@@ -21,8 +22,7 @@ ROUTE_ALPHA = 0xE6  # Course line, 90% opaque
 
 # Both are metres above ground, and both are presentation choices: the
 # cylinders are extruded high enough to read as volumes, the goal line low
-# enough to sit inside them rather than above. The second used to be a bare
-# `500` at the call site with a comment, beside a named constant for the first.
+# enough to sit inside them rather than above.
 TURNPOINT_ALTITUDE = 5000
 GOAL_LINE_ALTITUDE = 500
 
@@ -58,7 +58,7 @@ def _create_turnpoint_style(color: Color) -> simplekml.Style:
     """Create the style for a turnpoint cylinder in the given colour.
 
     Args:
-        color: The turnpoint's colour, from :meth:`TaskDrawing.color_of`.
+        color: The cylinder's colour.
 
     Returns:
         A configured simplekml.Style object.
@@ -72,124 +72,69 @@ def _create_turnpoint_style(color: Color) -> simplekml.Style:
     return style
 
 
-def _create_turnpoint_elements(
-    kml: simplekml.Kml,
-    drawing: TaskDrawing,
-    task_altitude: int,
-) -> None:
-    """Create turnpoint circles and center points in the KML.
+def _add_cylinder(kml: simplekml.Kml, cylinder: CylinderFeature) -> None:
+    """Add a cylinder's polygon and its centre point."""
+    altitude = TURNPOINT_ALTITUDE
+    lon, lat = cylinder.centre
+    label = _xml_text(cylinder.name)
 
-    Args:
-        kml: The KML document to add elements to.
-        drawing: The task drawing, which knows both which turnpoints to draw
-            and which of them is the goal.
-        task_altitude: Unified altitude for the task.
-    """
-    for i, turnpoint in enumerate(drawing.turnpoints):
-        coord = (turnpoint.waypoint.lon, turnpoint.waypoint.lat, task_altitude)
+    polygon = kml.newpolygon(
+        name=label,
+        description=cylinder.description,
+        outerboundaryis=[(lon, lat, altitude) for lon, lat in cylinder.outline()],
+        extrude=1,
+        altitudemode=simplekml.AltitudeMode.relativetoground,
+    )
+    style = _create_turnpoint_style(cylinder.color)
+    polygon.style = style
 
-        circle_coords = [
-            (lon, lat, task_altitude) for lon, lat in drawing.outline_of(turnpoint)
-        ]
-
-        label = _xml_text(drawing.label_of(turnpoint, i))
-
-        # Create turnpoint circle as polygon
-        circle_polygon = kml.newpolygon(
-            name=label,
-            description=drawing.description_of(turnpoint),
-            outerboundaryis=circle_coords,
-            extrude=1,
-            altitudemode=simplekml.AltitudeMode.relativetoground,
-        )
-
-        # The drawing answers what colour this turnpoint is, goal included.
-        style = _create_turnpoint_style(drawing.color_of(turnpoint))
-        circle_polygon.style = style
-
-        # Add turnpoint center point, in the same colour as its cylinder.
-        center_point = kml.newpoint(
-            name=f"{label} Center",
-            coords=[coord],
-        )
-        center_point.style.iconstyle.scale = 0.5
-        center_point.style.iconstyle.color = style.linestyle.color
+    # The centre point is in the same colour as its cylinder.
+    center_point = kml.newpoint(name=f"{label} Center", coords=[(lon, lat, altitude)])
+    center_point.style.iconstyle.scale = 0.5
+    center_point.style.iconstyle.color = style.linestyle.color
 
 
-def _create_course_line(kml: simplekml.Kml, drawing: TaskDrawing) -> None:
-    """Create the course line along the optimized route, if there is one.
-
-    Fewer than two points is not a line: a task with one turnpoint used to emit
-    a one-coordinate ``<LineString>``, and an empty task a phantom one at
-    0°N 0°E, because simplekml writes an empty coordinate list as a single zero
-    point. GeoJSON omits the route feature in that case and KML now agrees.
-
-    Args:
-        kml: The KML document to add elements to.
-        drawing: The task drawing, carrying the optimized route.
-    """
-    route_coordinates = drawing.route_coordinates_lon_lat()
-    if route_coordinates is None:
-        return
-
-    # Create the course line
+def _add_route(kml: simplekml.Kml, route: RouteFeature) -> None:
+    """Add the course line, clamped to the ground, in the route colour."""
     course_line = kml.newlinestring(
-        name=drawing.route_label(),
-        description=(
-            f"XCTrack task course with {len(drawing.task.turnpoints)} turnpoints"
-        ),
-        coords=route_coordinates,
+        name=route.name,
+        description=route.description,
+        coords=list(route.points),
         altitudemode=simplekml.AltitudeMode.clamptoground,
     )
-
-    # Style the course line: the shared route colour, 90% opaque.
-    course_line.style.linestyle.color = ROUTE_COLOR.kml(ROUTE_ALPHA)
+    course_line.style.linestyle.color = route.color.kml(ROUTE_ALPHA)
     course_line.style.linestyle.width = 4
 
 
-def _create_goal_line_elements(
-    kml: simplekml.Kml, drawing: TaskDrawing, altitude: int
-) -> None:
-    """Create goal line and control zone for LINE type goals.
-
-    Args:
-        kml: The KML document to add elements to.
-        drawing: The task drawing, carrying the goal line if there is one.
-        altitude: altitude for the line.
-    """
-    goal_line = drawing.goal_line
-    if goal_line is None:
-        return
-
-    (lon1, lat1), (lon2, lat2), _ = goal_line.endpoints()
-
-    # Create goal line
-    goal_line_placemark = kml.newlinestring(
-        name=drawing.goal_line_label(),
-        description=drawing.goal_line_description(),
+def _add_goal_line(kml: simplekml.Kml, goal_line: GoalLineFeature) -> None:
+    """Add the goal line, at the goal-line altitude."""
+    altitude = GOAL_LINE_ALTITUDE
+    (lon1, lat1), (lon2, lat2) = goal_line.ends()
+    placemark = kml.newlinestring(
+        name=goal_line.name,
+        description=goal_line.description,
         coords=[(lon1, lat1, altitude), (lon2, lat2, altitude)],
         extrude=1,
         altitudemode=simplekml.AltitudeMode.relativetoground,
     )
-    goal_line_placemark.style.linestyle.color = GOAL_LINE_COLOR.kml()
-    goal_line_placemark.style.linestyle.width = 5
+    placemark.style.linestyle.color = goal_line.color.kml()
+    placemark.style.linestyle.width = 5
 
-    # Create control zone polygon
-    control_zone_coords_3d = [
-        (lon, lat, altitude) for lon, lat in goal_line.control_zone()
-    ]
 
-    control_zone = kml.newpolygon(
-        name=drawing.control_zone_label(),
-        description=drawing.control_zone_description(),
-        outerboundaryis=control_zone_coords_3d,
+def _add_control_zone(kml: simplekml.Kml, zone: ControlZoneFeature) -> None:
+    """Add the control zone polygon, at the goal-line altitude."""
+    altitude = GOAL_LINE_ALTITUDE
+    polygon = kml.newpolygon(
+        name=zone.name,
+        description=zone.description,
+        outerboundaryis=[(lon, lat, altitude) for lon, lat in zone.outline()],
         extrude=1,
         altitudemode=simplekml.AltitudeMode.relativetoground,
     )
-    control_zone.style.linestyle.color = CONTROL_ZONE_EDGE_COLOR.kml()
-    control_zone.style.linestyle.width = 2
-    control_zone.style.polystyle.color = CONTROL_ZONE_FILL_COLOR.kml(FILL_ALPHA)
-    control_zone.style.polystyle.outline = 1
+    polygon.style.linestyle.color = zone.edge_color.kml()
+    polygon.style.linestyle.width = 2
+    polygon.style.polystyle.color = zone.fill_color.kml(FILL_ALPHA)
+    polygon.style.polystyle.outline = 1
 
 
 def task_to_kml(task: Task) -> str:
@@ -227,9 +172,17 @@ def drawing_to_kml(drawing: TaskDrawing) -> str:
     """
     kml = simplekml.Kml()
 
-    _create_turnpoint_elements(kml, drawing, TURNPOINT_ALTITUDE)
-    # The course line is clamped to the ground; the goal line is not.
-    _create_course_line(kml, drawing)
-    _create_goal_line_elements(kml, drawing, GOAL_LINE_ALTITUDE)
+    for feature in drawing.features:
+        match feature:
+            case CylinderFeature():
+                _add_cylinder(kml, feature)
+            case RouteFeature():
+                _add_route(kml, feature)
+            case GoalLineFeature():
+                _add_goal_line(kml, feature)
+            case ControlZoneFeature():
+                _add_control_zone(kml, feature)
+            case _:
+                assert_never(feature)
 
     return str(kml.kml())

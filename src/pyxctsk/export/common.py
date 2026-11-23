@@ -1,28 +1,25 @@
-"""What the KML and GeoJSON writers both need to draw a task.
+"""What the KML and GeoJSON writers both draw: the task's features.
 
-:class:`TaskDrawing` is that answer, derived once per task: which turnpoints to
-draw, which of them is the goal, whether there is a goal line, and the optimized
-route. Both writers render the same value rather than each asking the same
-questions again — which is not only cheaper (the optimizer ran once per format)
-but the reason the answers cannot disagree. They did: the goal line's presence
-and the decision to drop the last turnpoint were computed separately, and a LINE
-goal with no usable approach direction lost its goal from both outputs. There is
-no free function beside the drawing that answers any of those a second way.
+:class:`TaskDrawing` is derived once per task and yields :attr:`~TaskDrawing.features`,
+the things a map shows, in the order both writers emit them: a
+:class:`CylinderFeature` per drawn turnpoint, the :class:`RouteFeature`, and
+the :class:`GoalLineFeature` and :class:`ControlZoneFeature` when the task has
+a goal line. Each carries its name, description, colour and geometry, so a
+writer only serializes, and the two formats cannot disagree about what the
+task looks like. Whether there is a goal line, and the decision to drop the
+last turnpoint for it, is made once, in :meth:`TaskDrawing.from_task`.
 
 Also here: the palette, as :class:`Color` values that each writer renders with a
-total function of its own format. The cylinder outline is *not* computed here:
-:meth:`TaskDrawing.outline_of` asks :func:`~pyxctsk.distance.earth.geodesic_arc`,
-on the task's earth model, the same primitive the goal line's control zone is
-drawn with. It used to be a planar polygon built from a fixed 111 320 m per
-degree — "a decorative outline, not a measured shape", as this docstring put
-it — and at a 50 km radius the decoration was 129 m from the boundary the
-route is measured to, so the route visibly missed the cylinder it touched. This
-module must not grow a second opinion about task geometry.
+total function of its own format. Geometry is not computed here: cylinder
+outlines and the control zone come from
+:func:`~pyxctsk.distance.earth.geodesic_arc` and :mod:`pyxctsk.distance.goal_line`
+on the task's earth model, the same primitives the distance calculation uses.
+This module must not grow a second opinion about task geometry.
 """
 
 from dataclasses import dataclass
 
-from ..distance.earth import geodesic_arc
+from ..distance.earth import EarthModelLike, geodesic_arc
 from ..distance.goal_line import GoalLine
 from ..distance.measured_task import MeasuredTask
 from ..distance.route_optimization import OptimizedRoute
@@ -33,26 +30,140 @@ CIRCLE_POINTS = 64
 
 
 @dataclass(frozen=True)
+class CylinderFeature:
+    """One turnpoint cylinder, as a map draws it.
+
+    Geometry is computed by :meth:`outline`, not when the drawing is built: a
+    cylinder no earth can hold still has a drawing, and only a writer that
+    draws its ring fails.
+
+    Attributes:
+        index: Position among the drawn turnpoints, zero-based.
+        name: The turnpoint's name, or ``TP1``, ``TP2``, ... if it has none.
+        description: The role and radius, the role omitted when it has none.
+        role: The turnpoint's role; :attr:`TurnpointType.NONE` if it has none.
+        color: The cylinder's colour, the goal's red included.
+        centre: The centre as (lon, lat).
+        radius: The radius in metres, as the task declares it.
+        earth_model: The task's earth, which :meth:`outline` measures on.
+    """
+
+    index: int
+    name: str
+    description: str
+    role: TurnpointType
+    color: "Color"
+    centre: tuple[float, float]
+    radius: int
+    earth_model: EarthModelLike
+
+    def outline(self) -> list[tuple[float, float]]:
+        """The cylinder's boundary as a closed ring of (lon, lat) points.
+
+        Measured on the task's earth model, so every point is exactly the
+        radius from the centre: the boundary the optimized route touches
+        (S7F 7.1.7), not an approximation of it.
+
+        Returns:
+            ``CIRCLE_POINTS + 1`` points, the last equal to the first.
+        """
+        lon, lat = self.centre
+        ring = geodesic_arc(
+            (lat, lon), self.radius, 0.0, 360.0, CIRCLE_POINTS, self.earth_model
+        )
+        ring[-1] = ring[0]  # closed exactly, not to within float noise
+        return ring
+
+
+@dataclass(frozen=True)
+class RouteFeature:
+    """The optimized route, drawn as a line.
+
+    Attributes:
+        name: The route's name, the glossary's *optimized route*.
+        description: How many turnpoints the task has.
+        color: The line's colour.
+        points: The route as (lon, lat) points, at least two.
+    """
+
+    name: str
+    description: str
+    color: "Color"
+    points: tuple[tuple[float, float], ...]
+
+
+@dataclass(frozen=True)
+class GoalLineFeature:
+    """The goal line of a LINE goal.
+
+    Attributes:
+        name: The line's name.
+        description: The line's length, rounded to the metre.
+        color: The line's colour.
+        length: The line's length in metres.
+        goal_line: The line itself, which :meth:`ends` asks on call.
+    """
+
+    name: str
+    description: str
+    color: "Color"
+    length: float
+    goal_line: GoalLine
+
+    def ends(self) -> tuple[tuple[float, float], tuple[float, float]]:
+        """The line's two ends as (lon, lat), computed on call."""
+        first, second, _ = self.goal_line.endpoints()
+        return first, second
+
+
+@dataclass(frozen=True)
+class ControlZoneFeature:
+    """The control zone around a goal line.
+
+    Attributes:
+        name: The zone's name.
+        description: The zone's radius, rounded to the metre.
+        edge_color: The outline's colour.
+        fill_color: The fill's colour.
+        radius: The zone's radius in metres, which S7F 6.2.3.1 makes half the
+            goal line.
+        goal_line: The line the zone surrounds, which :meth:`outline` asks on
+            call.
+    """
+
+    name: str
+    description: str
+    edge_color: "Color"
+    fill_color: "Color"
+    radius: float
+    goal_line: GoalLine
+
+    def outline(self) -> list[tuple[float, float]]:
+        """The zone's boundary as (lon, lat) points, computed on call."""
+        return self.goal_line.control_zone()
+
+
+#: What a map shows, so a writer's ``match`` ends in ``assert_never`` and a new
+#: kind fails the type check in every writer.
+Feature = CylinderFeature | RouteFeature | GoalLineFeature | ControlZoneFeature
+
+
+@dataclass(frozen=True)
 class TaskDrawing:
     """Everything both writers need to draw one task, derived once.
 
-    Built by :meth:`from_task`, which runs the optimizer once. Rendering the
-    same task in both formats therefore costs one route, not two, and — more
-    importantly — the two formats cannot disagree about what the task looks
-    like, because they are reading one value rather than each deriving their
-    own.
-
-    A drawing is a snapshot: it holds the turnpoints and route as they were
-    when it was built, so build it after the task is final.
+    Built by :meth:`from_task`, which runs the optimizer once, so both formats
+    cost one route and read one value. A drawing is a snapshot: build it after
+    the task is final.
 
     Attributes:
-        turnpoints: The turnpoints to draw, in order — the task's own, less the
+        turnpoints: The turnpoints to draw, in order: the task's own, less the
             last one when a goal line replaces it.
         goal_line: The task's goal line, or None if it has none.
         measured: The task beside the optimized route through its cylinders.
             Read :attr:`route` for the route alone; hand the whole value to
-            ``task_distances_from`` for the table beside the map, which is
-            that same measurement rendered rather than a second one.
+            ``DistanceReport.from_measured_task`` for the distances beside the
+            map.
     """
 
     turnpoints: tuple[Turnpoint, ...]
@@ -61,18 +172,81 @@ class TaskDrawing:
 
     @property
     def task(self) -> Task:
-        """The task being drawn, for names, counts and descriptions.
-
-        Read through :attr:`measured` rather than held beside it: a second
-        field was a second place to put a task, and a drawing could then name
-        one task while routing another.
-        """
+        """The task being drawn."""
         return self.measured.task
 
     @property
     def route(self) -> OptimizedRoute:
         """The optimized route through the task's cylinders."""
         return self.measured.route
+
+    @property
+    def features(self) -> tuple[Feature, ...]:
+        """What to draw, in order: cylinders, route, goal line, control zone.
+
+        The route is present only at two points or more, the goal line and
+        control zone only when the task has a goal line. Built on each read;
+        no geometry is computed until a feature's method asks for it.
+        """
+        task = self.task
+        # The goal is found by identity, not value (``turnpoint is last``
+        # below): a task may end by flying the same turnpoint twice, and a
+        # value search would draw the goal as an ordinary one.
+        last = task.turnpoints[-1] if task.turnpoints else None
+        features: list[Feature] = []
+        for index, turnpoint in enumerate(self.turnpoints):
+            role = turnpoint.type or TurnpointType.NONE
+            radius = f"Radius: {turnpoint.radius}m"
+            waypoint = turnpoint.waypoint
+            features.append(
+                CylinderFeature(
+                    index=index,
+                    name=waypoint.name or f"TP{index + 1}",
+                    description=(
+                        radius
+                        if role is TurnpointType.NONE
+                        else f"Type: {role.value}, {radius}"
+                    ),
+                    role=role,
+                    color=turnpoint_color(role, turnpoint is last),
+                    centre=(waypoint.lon, waypoint.lat),
+                    radius=turnpoint.radius,
+                    earth_model=task.earth_model,
+                )
+            )
+        if len(self.route.points) >= 2:
+            features.append(
+                RouteFeature(
+                    name="Optimized Route",
+                    description=f"XCTrack task course with {len(task.turnpoints)} turnpoints",
+                    color=ROUTE_COLOR,
+                    points=tuple((lon, lat) for lat, lon in self.route.points),
+                )
+            )
+        if self.goal_line is not None:
+            line = self.goal_line
+            features.append(
+                GoalLineFeature(
+                    name="Goal Line",
+                    description=f"Goal line length: {line.length:.0f}m",
+                    color=GOAL_LINE_COLOR,
+                    length=line.length,
+                    goal_line=line,
+                )
+            )
+            features.append(
+                ControlZoneFeature(
+                    name="Goal Control Zone",
+                    description=(
+                        f"Goal control zone radius: {line.control_zone_radius:.0f}m"
+                    ),
+                    edge_color=CONTROL_ZONE_EDGE_COLOR,
+                    fill_color=CONTROL_ZONE_FILL_COLOR,
+                    radius=line.control_zone_radius,
+                    goal_line=line,
+                )
+            )
+        return tuple(features)
 
     @classmethod
     def from_task(cls, task: Task) -> "TaskDrawing":
@@ -91,7 +265,7 @@ class TaskDrawing:
         measured = MeasuredTask.from_task(task)
         goal_line = GoalLine.from_measured_task(measured)
         # A goal line replaces the last turnpoint, so it is dropped exactly when
-        # there is a line to draw in its place — one decision, made here.
+        # there is a line to draw in its place.
         turnpoints = task.turnpoints[:-1] if goal_line else task.turnpoints
         return cls(
             turnpoints=tuple(turnpoints),
@@ -99,222 +273,16 @@ class TaskDrawing:
             measured=measured,
         )
 
-    def is_goal(self, turnpoint: Turnpoint) -> bool:
-        """Whether this turnpoint is the task's goal.
-
-        Compares identity, not value: a task may legitimately end by flying the
-        same turnpoint twice, and ``Turnpoint`` is a plain dataclass, so
-        searching by value would find the earlier occurrence and draw the goal
-        as an ordinary turnpoint.
-
-        Args:
-            turnpoint: One of the task's turnpoints.
-
-        Returns:
-            True if this is the task's last turnpoint, which is always its goal
-            — :attr:`Task.effective_goal` guarantees a task with turnpoints
-            has one.
-        """
-        turnpoints = self.task.turnpoints
-        return bool(turnpoints) and turnpoint is turnpoints[-1]
-
-    def outline_of(self, turnpoint: Turnpoint) -> list[tuple[float, float]]:
-        """The boundary of this turnpoint's cylinder, as a closed ring.
-
-        Measured on the task's earth model, so every point is exactly the
-        turnpoint's radius from its centre — the boundary the optimized route
-        touches (§7.1.7), not an approximation of it.
-
-        Args:
-            turnpoint: One of the turnpoints being drawn.
-
-        Returns:
-            ``CIRCLE_POINTS + 1`` (lon, lat) points, the last equal to the
-            first.
-        """
-        ring = geodesic_arc(
-            (turnpoint.waypoint.lat, turnpoint.waypoint.lon),
-            turnpoint.radius,
-            0.0,
-            360.0,
-            CIRCLE_POINTS,
-            self.task.earth_model,
-        )
-        ring[-1] = ring[0]  # closed exactly, not to within float noise
-        return ring
-
-    def color_of(self, turnpoint: Turnpoint) -> "Color":
-        """The colour this turnpoint is drawn in, in either format.
-
-        Both writers used to compose this themselves out of :meth:`is_goal` and
-        the turnpoint's type, and they spelled the type differently: KML
-        normalized a missing one to ``TurnpointType.NONE`` while GeoJSON passed
-        ``None`` into a parameter annotated ``TurnpointType``. They agreed only
-        by falling through to the same default, which is the shape this module
-        exists to remove — a question both writers must answer identically is a
-        method on the drawing, not something each of them assembles.
-
-        Args:
-            turnpoint: One of the turnpoints being drawn.
-
-        Returns:
-            The colour for that turnpoint, the goal's red included.
-        """
-        return turnpoint_color(
-            turnpoint.type or TurnpointType.NONE, self.is_goal(turnpoint)
-        )
-
-    def label_of(self, turnpoint: Turnpoint, index: int) -> str:
-        """The name this turnpoint is drawn under, in either format.
-
-        Falls back to a positional name for an unnamed turnpoint. The spec
-        requires the key but the writers tolerate an empty value, and both
-        composed the same ``TP{i+1}`` fallback themselves — three times
-        between them.
-
-        Args:
-            turnpoint: One of the turnpoints being drawn.
-            index: Its position in the drawing, zero-based.
-
-        Returns:
-            The turnpoint's name, or ``TP1``, ``TP2``, … if it has none.
-        """
-        return turnpoint.waypoint.name or f"TP{index + 1}"
-
-    def description_of(self, turnpoint: Turnpoint) -> str:
-        """The description this turnpoint is drawn with, in either format.
-
-        Both writers assembled their own and disagreed. KML interpolated the
-        enum member itself — ``Type: TurnpointType.TAKEOFF`` — putting a Python
-        repr into user-visible map text, and printed ``Type: None`` for an
-        ordinary turnpoint; GeoJSON left the role out of the description
-        entirely and reached for it with ``getattr(turnpoint, "type", None)``,
-        a defensive lookup on a dataclass field that always exists, skipping
-        the ``or TurnpointType.NONE`` normalisation :meth:`color_of` performs.
-        That asymmetry is exactly what this module exists to remove.
-
-        Args:
-            turnpoint: One of the turnpoints being drawn.
-
-        Returns:
-            The role and radius, with the role omitted when it has none.
-        """
-        role = turnpoint.type or TurnpointType.NONE
-        radius = f"Radius: {turnpoint.radius}m"
-        if role is TurnpointType.NONE:
-            return radius
-        return f"Type: {role.value}, {radius}"
-
-    def role_of(self, turnpoint: Turnpoint) -> TurnpointType:
-        """The turnpoint's role, normalized the way :meth:`color_of` reads it.
-
-        Args:
-            turnpoint: One of the turnpoints being drawn.
-
-        Returns:
-            The role, or :attr:`TurnpointType.NONE` if it carries none.
-        """
-        return turnpoint.type or TurnpointType.NONE
-
-    def route_label(self) -> str:
-        """The name the optimized route is drawn under, in either format.
-
-        The two writers disagreed: KML wrote "Course Line" and GeoJSON wrote
-        "Optimized Route" for the same line, each pinned as expected by a test
-        in its own file, so the suite enforced the divergence. This is the
-        glossary's term (``GLOSSARY.md``: *optimized route*), which is what
-        makes it the one to keep.
-
-        Returns:
-            The route's name.
-        """
-        return "Optimized Route"
-
-    def goal_line_label(self) -> str:
-        """The name the goal line is drawn under, in either format."""
-        return "Goal Line"
-
-    def goal_line_description(self) -> str:
-        """The description the goal line is drawn with, in either format.
-
-        Both writers composed this themselves, character for character. A
-        question both must answer identically is a method here — the rule this
-        module states, applied to the goal line as it already was to the
-        turnpoints.
-
-        Returns:
-            The line's length, rounded to the metre.
-
-        Raises:
-            ValueError: If the task has no goal line to describe.
-        """
-        if self.goal_line is None:
-            raise ValueError("this task has no goal line")
-        return f"Goal line length: {self.goal_line.length:.0f}m"
-
-    def control_zone_label(self) -> str:
-        """The name the control zone is drawn under, in either format."""
-        return "Goal Control Zone"
-
-    def control_zone_description(self) -> str:
-        """The description the control zone is drawn with, in either format.
-
-        The radius is asked of the goal line, which owns S7F §6.2.3.1's rule
-        that it is half the line. Both writers used to spell ``length / 2``
-        here instead, so the rule lived in three modules.
-
-        Returns:
-            The zone's radius, rounded to the metre.
-
-        Raises:
-            ValueError: If the task has no goal line, so no control zone.
-        """
-        if self.goal_line is None:
-            raise ValueError("this task has no goal line")
-        return f"Goal control zone radius: {self.goal_line.control_zone_radius:.0f}m"
-
-    def route_coordinates(self) -> list[tuple[float, float]] | None:
-        """The optimized route as (lat, lon) points, or None if there is no line.
-
-        A route needs two points to be a line, so a task with fewer than two
-        turnpoints has nothing to draw here.
-
-        Returns:
-            The route's (lat, lon) points, or None if there are fewer than two.
-        """
-        if len(self.route.points) < 2:
-            return None
-        return list(self.route.points)
-
-    def route_coordinates_lon_lat(self) -> list[tuple[float, float]] | None:
-        """The optimized route in the axis order both output formats want.
-
-        KML coordinates and GeoJSON positions are both (lon, lat), and both
-        writers flipped :meth:`route_coordinates` themselves — one by unpacking,
-        one by positional index — in a codebase that records axis-order
-        confusion as a defect class it has already paid for.
-
-        Returns:
-            The route's (lon, lat) points, or None if there is no line to draw.
-        """
-        points = self.route_coordinates()
-        if points is None:
-            return None
-        return [(lon, lat) for lat, lon in points]
-
 
 @dataclass(frozen=True)
 class Color:
     """One colour, as the bytes it is, for either writer to render.
 
-    The palette used to be shared as ``#rrggbb`` strings, which meant the KML
-    writer needed a hand-written dict mapping each of those strings back to a
-    ``simplekml.Color`` constant. That dict re-declared the whole palette and
-    lost four of its five turnpoint values — a TAKEOFF turnpoint was ``#204d74``
-    in GeoJSON and ``#00008b`` in KML, and only the goal's red survived — and its
-    ``.get(hex, blue)`` default meant a sixth entry would have degraded to blue
-    rather than failing. A colour value with one total renderer per format has
-    nothing to look up and nothing to default to.
+    The palette is shared as colour values, not ``#rrggbb`` strings, so the KML
+    writer needs no dict mapping strings back to ``simplekml.Color`` constants
+    that would re-declare the palette and default an unknown entry. A colour
+    value with one total renderer per format has nothing to look up and nothing
+    to default to.
 
     Attributes:
         red: Red channel, 0-255.

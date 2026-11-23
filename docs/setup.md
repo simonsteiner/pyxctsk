@@ -54,14 +54,15 @@ uv run rumdl check .
 
 `scripts/verify.sh` runs the whole gate CI runs on every pull request: lockfile,
 lint, formatting, types, Markdown, spelling, the built artifacts, the test suite
-from the extracted sdist, and a core-only wheel smoke test.
+from the extracted sdist (once with the `qr` extra and once without it), and a
+core-only wheel smoke test.
 
 cspell needs Node (`npx`). New domain words go in `cspell-dictionary.txt`.
 
 ## Troubleshooting
 
 - **Import errors or a stale environment**: re-sync with `uv sync --all-extras`.
-- **The QR image tests fail**: the `qr` extra is missing. `uv sync` without
+- **The QR image tests are skipped**: the `qr` extra is missing. `uv sync` without
   `--all-extras`, or a first `uv run` in a fresh checkout, installs the core
   only; re-sync with `uv sync --all-extras`.
 - **Rebuild from scratch**: `rm -rf .venv && uv sync --all-extras`.

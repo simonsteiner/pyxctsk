@@ -26,9 +26,7 @@ A row is an attribute, a key, a codec and an :class:`Optionality` — that is
 :class:`Value`, and **nesting is a codec, not a kind of row**. A ``Shape`` is
 already one (``write`` is ``to_wire``, ``read`` is ``from_wire``), so a nested
 object is ``Value(..., shape_codec(CHILD))`` and a nested list is
-``Value(..., list_codec(shape_codec(CHILD)))``. Two further ``Field``
-subclasses used to exist for those, each restating ``Value``'s
-required/absent/omit dance with one line changed.
+``Value(..., list_codec(shape_codec(CHILD)))``.
 
 Genuinely irregular fields are still one row each. ``z`` packs four numbers
 into one key, the QR task flattens its takeoff into root ``to``/``tc``, and
@@ -39,8 +37,7 @@ field also goes through.
 
 Absence is one decision, not two. A field's :class:`Optionality` says both when
 an incoming value counts as absent and when an outgoing one is skipped, because
-those two answers are the ones that used to be written in different places and
-quietly stop matching.
+those two answers, kept in different places, would quietly stop matching.
 """
 
 from abc import ABC, abstractmethod

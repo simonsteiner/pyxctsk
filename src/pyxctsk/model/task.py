@@ -108,14 +108,11 @@ class Task:
         there is nothing to be a goal, and this is ``self.goal`` — typically
         None.
 
-        **Derived, not stored.** ``__post_init__`` used to write this back onto
-        :attr:`goal`, which made it part of the object and therefore part of
-        the output: a task file with no ``goal`` key round-tripped into one
-        carrying ``{"goal": {"type": "CYLINDER"}}``. That is the only place the
-        library invented a field, in the module whose own docstring says
-        nothing derived is stored on these dataclasses and in a codebase whose
-        passthrough design exists so that what arrives is what leaves. It went
-        unnoticed because every reference task carries a goal.
+        **Derived, not stored.** Writing this back onto :attr:`goal` would make
+        it part of the object and therefore part of the output: a task file
+        with no ``goal`` key would round-trip into one carrying
+        ``{"goal": {"type": "CYLINDER"}}``. Nothing derived is stored on these
+        dataclasses, so that what arrives is what leaves.
 
         Ask for this wherever the *flown* goal is meant — the cylinders and the
         goal line. Read :attr:`goal` where what the file said is meant, which
@@ -134,6 +131,19 @@ class Task:
         if not self.goal.type:
             return replace(self.goal, type=GoalType.CYLINDER)
         return self.goal
+
+    @property
+    def goal_type_is_line(self) -> bool:
+        """Whether the goal this task is flown to is a ``LINE``.
+
+        Asked of :attr:`effective_goal`, so a missing goal or goal type counts as
+        the format's ``CYLINDER`` default. A task with no turnpoints keeps the
+        goal it declares, so it can still answer True. Whether there are enough
+        turnpoints to orient a line is a separate question, and ``GoalLine``
+        asks it.
+        """
+        goal = self.effective_goal
+        return goal is not None and goal.type is GoalType.LINE
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization.
@@ -226,14 +236,12 @@ class Task:
         :mod:`~pyxctsk.model.validation`'s — it reports
         ``ELEVATED_GOAL_IS_NOT_ESS`` and leaves this answering the annotation.
 
-        This used to search for the *first* turnpoint marked ESS and compare it
-        to the last one by value. ``Turnpoint`` is a plain dataclass, so a task
-        that legitimately flies the same turnpoint twice could match the wrong
-        occurrence — the hazard :meth:`~pyxctsk.export.TaskDrawing.is_goal`
-        documents and avoids by comparing identity. Asking the last turnpoint
-        what it is needs neither a search nor a comparison. It also drops
-        ``find_ess_turnpoint``, which had no other caller, no test and no
-        mention in the docs.
+        This asks the last turnpoint what it is, with neither a search for the
+        first ESS turnpoint nor a comparison by value: ``Turnpoint`` is a plain
+        dataclass, so a task that legitimately flies the same turnpoint twice
+        could match the wrong occurrence — the hazard
+        :attr:`~pyxctsk.export.common.TaskDrawing.features` avoids by comparing
+        identity.
 
         Note this is *not* "does the task have a speed section" — that is
         :func:`~pyxctsk.distance.speed_section.speed_section_indices`, which

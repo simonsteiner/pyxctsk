@@ -21,10 +21,10 @@ from pyxctsk import (
     UnmeasurableRouteError,
 )
 from pyxctsk.distance import (
+    DistanceReport,
     MeasuredTask,
     OptimizedRoute,
     TooFewTurnpointsError,
-    task_distances_from,
     task_to_turnpoints,
 )
 from pyxctsk.distance.earth import geodesic_distance
@@ -119,9 +119,7 @@ class TestTheNumbersItProjects:
         """The measurement is empty; asking it for a *distance* is the error.
 
         `MeasuredTask` stays total — it is the pair, not the verdict — while
-        the two published distance shapes both refuse, which they did not
-        always: `task_distances_from` used to answer zeros for the task
-        `DistanceReport` raised on.
+        `DistanceReport`, the published distance, refuses.
         """
         measured = MeasuredTask.from_task(
             Task(task_type=TaskType.CLASSIC, version=1, turnpoints=[])
@@ -130,7 +128,7 @@ class TestTheNumbersItProjects:
         assert measured.turnpoints == ()
         assert measured.cumulative_m() == []
         with pytest.raises(TooFewTurnpointsError):
-            task_distances_from(measured)
+            DistanceReport.from_measured_task(measured)
 
     @pytest.mark.parametrize(
         "goal", [None, Goal(type=GoalType.LINE)], ids=["no goal", "a goal"]
@@ -162,11 +160,15 @@ class TestTheMismatchIsGone:
     @pytest.mark.parametrize(
         "func",
         [
-            task_distances_from,
+            DistanceReport.from_measured_task,
             GoalLine.from_measured_task,
             SpeedSection.from_measured_task,
         ],
-        ids=["task_distances_from", "GoalLine.from_measured_task", "SpeedSection"],
+        ids=[
+            "DistanceReport.from_measured_task",
+            "GoalLine.from_measured_task",
+            "SpeedSection",
+        ],
     )
     def test_no_interface_takes_a_task_and_a_route_separately(self, func):
         """Each takes the pair as one value, so the two cannot disagree."""
@@ -180,10 +182,10 @@ class TestTheMismatchIsGone:
         bevo = MeasuredTask.from_task(reference_task("task_bevo").task)
         duna = MeasuredTask.from_task(reference_task("task_duna").task)
 
-        assert task_distances_from(bevo) != task_distances_from(duna)
-        assert task_distances_from(bevo).optimized_distance_km == round(
-            bevo.total_m / 1000, 1
-        )
+        assert DistanceReport.from_measured_task(
+            bevo
+        ) != DistanceReport.from_measured_task(duna)
+        assert DistanceReport.from_measured_task(bevo).task_distance_m == bevo.total_m
 
 
 class TestTheConstructorChecksThePair:

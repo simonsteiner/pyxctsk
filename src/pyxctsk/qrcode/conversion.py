@@ -7,11 +7,9 @@ the one module that imports both.
 
 Both models hold the same enums — ``TurnpointType``, ``GoalType`` and the rest.
 The QR format's integers are a spelling, and live in its field tables as
-:func:`~pyxctsk.model.shape.wire_int_codec` codecs. This module used to carry
-twelve translation tables between the model's enums and six parallel
-``IntEnum`` classes, with a default at each call site for whatever a table
-left out — so a new ``TurnpointType`` member silently became ``NONE`` going
-out and ``None`` coming back.
+:func:`~pyxctsk.model.shape.wire_int_codec` codecs, so this module carries no
+enum translation tables and a new ``TurnpointType`` member cannot silently
+become ``NONE`` going out and ``None`` coming back.
 
 Unknown keys cross here too, and this is the one place that can tell whether
 they may: a key is unknown only relative to the format it arrived in, and this

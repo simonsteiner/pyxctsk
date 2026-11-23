@@ -94,7 +94,7 @@ class ValidationIssue:
     """One violated structural rule.
 
     ``str()`` gives the message, so an issue drops into a f-string or a
-    ``"; ".join(...)`` wherever a plain string used to be.
+    ``"; ".join(...)`` wherever a plain string is expected.
 
     Attributes:
         rule (ValidationRule): Which rule was broken.

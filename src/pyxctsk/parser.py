@@ -9,11 +9,9 @@ Supports:
 - Image bytes containing a QR code (if QR code dependencies are available)
 
 **Reading a file is a separate entry point**, :func:`load_task`. ``parse_task``
-used to guess whether a string was a path or a payload — a slash, or a known
-extension, meant "open this" — so ``parse_task(Path(...))`` failed as "invalid
-format", an existing ``task.txt`` was never opened, nine call sites wrapped
-paths in ``str()`` to steer the guess, and any caller handing it untrusted text
-let that text read local files and learn from the error which of them exist.
+never guesses whether a string is a path or a payload and never touches the
+filesystem, so a caller handing it untrusted text cannot make it read local
+files.
 Now ``parse_task`` never touches the filesystem, and ``load_task`` always does.
 
 The auto-detection works by trying an ordered list of focused format adapters,
@@ -54,6 +52,7 @@ from .exceptions import (
     InvalidFormatError,
     MalformedPayloadError,
     MissingQRCodeSupportError,
+    NotJsonError,
     TaskValidationError,
 )
 from .model.shape import load_json
@@ -95,7 +94,7 @@ QR_FORMAT_ONLY_KEYS = QR_FORMAT_KEYS - TASK_SHAPE.keys
 #: Magic bytes for the image formats the QR adapter can read. This is the one
 #: list of them: it is what the image adapter recognizes *and* what tells a
 #: caller their PNG failed for want of a dependency rather than for being
-#: unreadable. The two used to be separate lists that could disagree.
+#: unreadable.
 _IMAGE_MAGIC = (b"\x89PNG\r\n\x1a\n", b"\xff\xd8\xff")
 
 
@@ -109,23 +108,25 @@ _NOT_JSON = object()
 class Input:
     """The input as every adapter needs to see it, decoded once.
 
-    One value rather than a ``(text, raw)`` pair: of the eight parameters the
-    four adapters used to take, three were dead — ``raw`` in the two JSON
-    adapters, ``text`` in the image one — because a uniform two-argument
-    signature is a lowest common denominator, not an interface.
+    One value rather than a ``(text, raw)`` pair: a uniform two-argument
+    signature would leave ``raw`` dead in the two JSON adapters and ``text``
+    dead in the image one, a lowest common denominator rather than an
+    interface.
 
     Attributes:
         raw: The input bytes.
         text: The bytes decoded as UTF-8, or None if they are not UTF-8 (a
             binary image, say). Text-based adapters do not recognize such input.
         document: The text decoded as JSON, or :data:`_NOT_JSON`. Decoded here
-            so recognition and reading share one decode; the two JSON adapters
-            used to decode the same payload a second time each.
+            so recognition and reading share one decode.
+        refusal: Why :func:`load_json` refused the text, if it did, so the
+            error for unrecognized input can say it.
     """
 
     raw: bytes
     text: str | None
     document: Any
+    refusal: MalformedPayloadError | None = None
 
     @classmethod
     def of(cls, data: bytes | str) -> "Input":
@@ -139,7 +140,12 @@ class Input:
         """
         if isinstance(data, str):
             text: str | None = data
-            raw = data.encode("utf-8")
+            try:
+                raw = data.encode("utf-8")
+            except UnicodeEncodeError:
+                raise InvalidFormatError(
+                    "text UTF-8 cannot encode (a lone surrogate)"
+                ) from None
         else:
             raw = bytes(data)
             try:
@@ -148,13 +154,14 @@ class Input:
                 text = None
 
         document: Any = _NOT_JSON
+        refusal: MalformedPayloadError | None = None
         if text is not None:
             try:
                 document = load_json(text)
-            except MalformedPayloadError:
-                document = _NOT_JSON
+            except MalformedPayloadError as exc:
+                refusal = exc
 
-        return cls(raw=raw, text=text, document=document)
+        return cls(raw=raw, text=text, document=document, refusal=refusal)
 
     @property
     def mapping(self) -> dict[str, Any] | None:
@@ -173,11 +180,15 @@ class Input:
     def looks_like_json(self) -> bool:
         """Whether the input is JSON, or was trying to be.
 
-        True for a document that decoded, and also for one that did not — a
-        truncated payload starting with ``{`` parsed as far as being
-        JSON-shaped, and saying so is more use than "invalid format".
+        True for a document that decoded, for one that decoded but holds a
+        value no JSON document can carry (a bare ``NaN``), and for one that
+        did not decode — a truncated payload starting with ``{`` parsed as far
+        as being JSON-shaped, and saying so is more use than "invalid format".
         """
-        return self.document is not _NOT_JSON or self.raw.lstrip()[:1] in (b"{", b"[")
+        decoded = self.document is not _NOT_JSON or (
+            self.refusal is not None and not isinstance(self.refusal, NotJsonError)
+        )
+        return decoded or self.raw.lstrip()[:1] in (b"{", b"[")
 
 
 @dataclass(frozen=True)
@@ -203,8 +214,8 @@ def _is_xctsk_url(inp: Input) -> bool:
 
     Asked of the bytes, so it is total: a scheme followed by bytes that are not
     UTF-8 is still this format's, and :func:`_read_xctsk_url` says why it
-    cannot be read. It used to re-decode them strictly here, and
-    ``XCTSK:\xff`` escaped the CLI as a ``UnicodeDecodeError`` traceback.
+    cannot be read. It does not re-decode them strictly here, so ``XCTSK:\xff``
+    reports an error rather than raising ``UnicodeDecodeError``.
     """
     return inp.raw.startswith(_QR_SCHEMES)
 
@@ -286,15 +297,13 @@ def _read_qrcode_image(inp: Input) -> Arrived:
     Decoding is :func:`~pyxctsk.qrcode.image.read_qrcode_image`'s; reading the
     text it finds is the URL adapter's. This adapter only chooses the code, so
     a code that *is* an ``XCTSK:`` payload but a malformed one reports why,
-    exactly as the same string passed inline does. It used to be skipped, and
-    the image reported as carrying no code at all.
+    exactly as the same string passed inline does.
 
     Raises:
         InvalidFormatError: If QR image support is not installed, if the image
             cannot be opened, if it carries no XCTSK code, or if the code it
-            carries cannot be read. Each of these used to be the same "invalid
-            format", so a missing install was indistinguishable from a corrupt
-            file.
+            carries cannot be read. Each is reported separately, so a missing
+            install is distinguishable from a corrupt file.
     """
     try:
         texts = read_qrcode_image(inp.raw)
@@ -327,8 +336,7 @@ def _read_qrcode_image(inp: Input) -> Arrived:
 
 #: Ordered list of format adapters. At most one recognizes any given input, so
 #: the order is a tie-break for a payload spelling keys from both formats, not
-#: the thing keeping one adapter out of another's input. It used to be the
-#: latter — see the module docstring.
+#: the thing keeping one adapter out of another's input.
 FORMAT_ADAPTERS = (
     FormatAdapter("XCTSK: URL", _is_xctsk_url, _read_xctsk_url),
     FormatAdapter("task JSON", _is_task_json, _read_task_json),
@@ -340,16 +348,13 @@ FORMAT_ADAPTERS = (
 def _unrecognized(inp: Input) -> InvalidFormatError:
     """Build the error for input no adapter recognized.
 
-    Every failure used to raise ``InvalidFormatError("invalid format")`` — a
-    missing file, a directory, truncated JSON, an unreadable QR image, and a
-    perfectly good QR image on a machine without the optional dependencies all
-    produced the identical message, so a missing install was indistinguishable
-    from a corrupt file.
+    Failures with a specific cause are reported by the code that knows it, so a
+    missing install is distinguishable from a corrupt file.
 
     The image cases belong to the image adapter and the file cases to
     :func:`load_task`. What is left here is JSON that is not a task, and text
-    that reads like a file name — which is worth saying, because it is what
-    ``parse_task`` used to open.
+    that reads like a file name — which is worth saying, because
+    ``parse_task`` does not open files.
 
     Args:
         inp: The input nothing recognized.
@@ -358,6 +363,10 @@ def _unrecognized(inp: Input) -> InvalidFormatError:
         The error to raise.
     """
     if inp.looks_like_json:
+        if inp.refusal is not None:
+            return InvalidFormatError(
+                f"looks like JSON, but it was refused: {inp.refusal}"
+            )
         return InvalidFormatError("looks like JSON, but it is not a task in any format")
     if inp.text is not None and inp.text.strip().lower().endswith(_FILE_EXTENSIONS):
         return InvalidFormatError(

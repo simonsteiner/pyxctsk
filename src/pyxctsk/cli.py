@@ -258,8 +258,7 @@ def distances(
     Raises:
         SystemExit: If input is missing, the task cannot be parsed, or it has
             too few turnpoints to have a distance at all. All three are
-            ``pyXCTSKError`` — this command used to name the last one
-            separately, because it descended from ``ValueError`` alone.
+            ``pyXCTSKError``.
     """
     try:
         input_data = _read_input(input_file)

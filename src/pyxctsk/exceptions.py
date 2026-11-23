@@ -44,11 +44,10 @@ class TaskValidationError(pyXCTSKError):
 
     The whole point of a named rule is that a caller can react to a specific
     violation without matching on the English message, so this is typed:
-    ``except TaskValidationError as e: e.issues[0].rule`` used to fail the type
-    checker with *"object" has no attribute "rule"*. The import is under
-    ``TYPE_CHECKING`` because the cycle it avoids is a runtime one, through
-    ``model/__init__`` — ``validation`` itself imports only ``model.enums``,
-    and never these exceptions.
+    ``except TaskValidationError as e: e.issues[0].rule`` type-checks. The
+    import is under ``TYPE_CHECKING`` because the cycle it avoids is a runtime
+    one, through ``model/__init__`` — ``validation`` itself imports only
+    ``model.enums``, and never these exceptions.
 
     Attributes:
         issues: One :class:`~pyxctsk.model.validation.ValidationIssue` per
@@ -97,11 +96,9 @@ class MalformedPayloadError(pyXCTSKError, ValueError):
     """Raised when a payload is JSON of the wrong shape for the format.
 
     The one error reading a task raises, from either format, whatever went
-    wrong inside it. The field tables used to trust wire types: a list where
-    an object belongs reached ``.get`` and escaped as ``AttributeError``, a
-    string where a list belongs was read one character at a time, and the
-    parser kept a tuple of whichever built-in types had leaked out so far.
-    Now the table checks, and every failure carries where it happened.
+    wrong inside it; writing JSON raises it too, for a value no JSON document
+    can carry. The field tables check wire types, and every failure carries
+    where it happened.
 
     Attributes:
         reason: What was wrong, without the location.
@@ -134,14 +131,22 @@ class MalformedPayloadError(pyXCTSKError, ValueError):
         return MalformedPayloadError(self.reason, path)
 
 
+class NotJsonError(MalformedPayloadError):
+    """Raised when a payload does not decode as JSON at all.
+
+    Told apart from its parent so a caller can say whether the text was JSON
+    that held a value no JSON document can carry, or not JSON in the first
+    place.
+    """
+
+
 class MismatchedRouteError(pyXCTSKError, ValueError):
     """Raised when a route is paired with a task it was not flown for.
 
     ``MeasuredTask`` exists to make that pairing unrepresentable, and its
     constructor is public, so it is where the check lives: one route point per
     turnpoint, each inside its turnpoint's cylinder, measured on the task's
-    earth model. Handing it another task's route used to return a fully formed
-    report — 47.8 km for a 94.0 km task — with no error. ``ValueError`` is kept
+    earth model. ``ValueError`` is kept
     for the reason :class:`TooFewTurnpointsError` states.
     """
 
@@ -154,13 +159,11 @@ class UnmeasurableRouteError(pyXCTSKError):
     :class:`~pyxctsk.distance.plane.LocalPlane` is the only way into or out of
     it: a point a quarter of the globe from the plane's central meridian has
     no finite planar image, and a planar point thousands of kilometres out has
-    no finite way back. Those used to surface from the solver as an
-    ``AssertionError`` about its own placements, as pyproj's ``CRSError``, or
-    as a distance of ``NaN`` metres with exit 0. And a cylinder reaching past
+    no finite way back. And a cylinder reaching past
     the far side of the earth has no boundary at all, which
     :func:`~pyxctsk.distance.earth.geodesic_destination` refuses wherever a
     point is placed on one — a route point snapped onto it, its outline, a
-    goal line's end; that used to be a finite, wrong distance with exit 0.
+    goal line's end.
 
     It is not a ``ValueError``: unlike :class:`TooFewTurnpointsError` it has
     no earlier type to stay compatible with.

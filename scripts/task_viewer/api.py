@@ -12,10 +12,10 @@ from shared import (
 
 from pyxctsk import (
     OUTPUT_FORMATS,
+    DistanceReport,
     TaskDrawing,
     drawing_to_geojson,
     load_task,
-    task_distances_from,
 )
 
 api_bp: Blueprint = Blueprint("api", __name__)
@@ -154,13 +154,11 @@ def compare_task_api(task_name: str) -> Response | tuple[Response, int]:
 
     try:
         task = load_task(xctsk_path)
-        # One drawing: the table and the map share a single optimized route.
+        # One drawing: the distances and the map share a single optimized route.
         drawing = TaskDrawing.from_task(task)
-        # `.as_dict()`: the table is a value now, and this consumer wants the
-        # dictionary rendering it has always read.
-        distance_results = task_distances_from(drawing.measured).as_dict()
+        report = DistanceReport.from_measured_task(drawing.measured)
         xctrack_geojson = drawing_to_geojson(drawing)
-        comparison_data = prepare_comparison_data(json_data, distance_results, task)
+        comparison_data = prepare_comparison_data(json_data, report)
 
         return jsonify(
             {
