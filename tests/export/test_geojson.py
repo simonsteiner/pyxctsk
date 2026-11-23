@@ -159,6 +159,7 @@ class TestTurnpointFeature:
         }
         assert props["description"] == "Type: TAKEOFF, Radius: 500m"
         assert props["turnpoint_index"] == 0
+        assert type(props["tp_type"]) is str
 
 
 def _route_drawing(points) -> TaskDrawing:
