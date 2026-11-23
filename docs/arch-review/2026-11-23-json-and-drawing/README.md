@@ -34,7 +34,7 @@ The backlog, in rank order. After the scan only three parts of the report change
 | [C3](C3-distance-table.md) | One way to the distance table, owned by its one consumer | 🟡 Worth exploring | ↔ two-way | deepening | pr-open | `refactor/distance-table` | [#55](https://github.com/simonsteiner/pyxctsk/pull/55) | yes | breaks the public `TaskDistanceTable` names |
 | [S1](#s1--two-predicates-for-a-line-goal) | Two predicates for a line goal | - | ↔ two-way | coupling | in-progress | `refactor/smaller-findings-2026-11-23` | | | |
 | [S2](#s2--three-hand-written-leg-loops) | Three hand-written leg loops | - | ↔ two-way | deepening | in-progress | `refactor/smaller-findings-2026-11-23` | | | |
-| [S3](#s3--eleven-type-ignores-around-the-optional-qr-imports) | Eleven `type: ignore`s around the optional QR imports | - | ↔ two-way | maintainability | in-progress | `refactor/smaller-findings-2026-11-23` | | | |
+| [S3](#s3--ten-type-ignores-around-the-optional-qr-imports) | Ten `type: ignore`s around the optional QR imports | - | ↔ two-way | maintainability | in-progress | `refactor/smaller-findings-2026-11-23` | | | |
 | [S4](#s4--a-test-pins-a-geojson-writer-internal) | A test pins a GeoJSON writer internal | - | ↔ two-way | coupling | pr-open | rides with C2 | [#54](https://github.com/simonsteiner/pyxctsk/pull/54) | | |
 | [S5](#s5--docstrings-narrate-the-codes-history) | Docstrings narrate the code's history | - | ↔ two-way | maintainability | in-progress | `refactor/smaller-findings-2026-11-23` | | | 73 lines in 26 files |
 | [S6](#s6--the-hook-jobs-break-three-setup-rules) | The hook jobs break three setup rules | - | ↔ two-way | maintainability | todo | `chore/lefthook-jobs` | | | carried from 2026-10-20 S4 |
@@ -58,8 +58,8 @@ flowchart LR
   subgraph draw["Drawing · 20 commits on common.py"]
     direction TB
     TD["export/common.py · TaskDrawing · 13 methods"]:::shallow
-    K["export/kml.py"]:::module -- "13 calls" --> TD
-    G["export/geojson.py"]:::module -- "13 calls" --> TD
+    K["export/kml.py"]:::module -- "10 calls" --> TD
+    G["export/geojson.py"]:::module -- "10 calls" --> TD
   end
   subgraph table["Distance table"]
     direction TB
@@ -73,7 +73,7 @@ flowchart LR
   classDef leak fill:#fef2f2,stroke:#dc2626,stroke-width:2px,color:#991b1b
 ```
 
-Three inputs escape `pyXCTSKError` or write invalid JSON through `load_json` and passthrough, all reproduced from the CLI. `export/common.py` changes with `kml.py` in 75% and with `geojson.py` in 80% of its commits. The `distance/` core (`solver.py`, `plane.py`, `measured_task.py`, `speed_section.py`, `goal_line.py`, `report.py`) and the front door (`parser.py`, `renderer.py`, `cli.py`) came back clean on all three lenses, and the layering holds.
+Three inputs escape `pyXCTSKError` or write invalid JSON through `load_json` and passthrough, all reproduced from the CLI. 75% of `kml.py`'s commits and 80% of `geojson.py`'s also touch `export/common.py`. The `distance/` core (`solver.py`, `plane.py`, `measured_task.py`, `speed_section.py`, `goal_line.py`, `report.py`) and the front door (`parser.py`, `renderer.py`, `cli.py`) came back clean on all three lenses, and the layering holds.
 
 - **No file is over the 5,000-token budget.** Watch list: `src/pyxctsk/qrcode/task.py` 4.7k (its field tables at lines 352-493 are the seam to split along), `src/pyxctsk/parser.py` 4.5k (the `Input` value and the four `FormatAdapter`s at lines 109-340).
 
@@ -98,7 +98,7 @@ Three inputs escape `pyXCTSKError` or write invalid JSON through `load_json` and
 
 `_polyline` and `cumulative_center_m` each walk the same centres leg by leg, and the "last row equals the total" invariant is a docstring; the route's legs call `Geod.inv` directly instead of `earth.geodesic_distance`. One "legs along these points on this earth" function in `distance/earth.py` serves all three.
 
-### S3 · Eleven `type: ignore`s around the optional QR imports
+### S3 · Ten `type: ignore`s around the optional QR imports
 
 `src/pyxctsk/qrcode/image.py:28-30,60,62,73,75,102,106,107` · smaller-findings PR
 

@@ -174,9 +174,10 @@ class TestTheCylinderOutline:
         task.earth_model = model
         task.turnpoints[0].radius = 10**300
         drawing = TaskDrawing.from_task(task)
+        takeoff_cylinder = _cylinder(drawing, 0)
 
         with pytest.raises(UnmeasurableRouteError, match="far side of the earth"):
-            _cylinder(drawing, 0).outline()
+            takeoff_cylinder.outline()
         with pytest.raises(UnmeasurableRouteError, match="far side of the earth"):
             drawing_to_kml(drawing)
         takeoff = drawing_to_geojson(drawing)["features"][0]
