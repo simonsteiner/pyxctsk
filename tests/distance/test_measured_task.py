@@ -119,9 +119,7 @@ class TestTheNumbersItProjects:
         """The measurement is empty; asking it for a *distance* is the error.
 
         `MeasuredTask` stays total — it is the pair, not the verdict — while
-        the two published distance shapes both refuse, which they did not
-        always: `task_distances_from` used to answer zeros for the task
-        `DistanceReport` raised on.
+        `DistanceReport`, the published distance, refuses.
         """
         measured = MeasuredTask.from_task(
             Task(task_type=TaskType.CLASSIC, version=1, turnpoints=[])
