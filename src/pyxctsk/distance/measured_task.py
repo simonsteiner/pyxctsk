@@ -47,13 +47,13 @@ def task_to_turnpoints(task: Task) -> list[TaskTurnpoint]:
     read the answer off ``turnpoints[-1].radius`` rather than re-deriving it,
     and what makes ``MeasuredTask.turnpoints`` mean what it says.
 
-    **A negative radius is refused here**, with the issue
-    :meth:`Task.validate` reports for it, because this is where a radius
-    becomes a size. Reading stays lenient — the full and QR formats both carry
-    one, and ``--strict`` names it — but it cannot be measured, and the
-    refusal names the task rather than blaming the route. Every role is refused alike, a takeoff and a LINE goal included,
-    whose radius the route does not touch: no role makes a negative size mean
-    one, and the drawing outlines it.
+    **A negative radius is refused here**, with the issue :meth:`Task.validate`
+    reports for it, because this is where a radius becomes a size. Reading
+    stays lenient — the full and QR formats both carry one, and ``--strict``
+    names it — but it cannot be measured, and the refusal names the task rather
+    than blaming the route. Every role is refused alike, a takeoff and a LINE
+    goal included, whose radius the route does not touch: no role makes a
+    negative size mean one, and the drawing outlines it.
 
     Args:
         task (Task): Task object.
