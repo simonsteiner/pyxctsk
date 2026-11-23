@@ -18,7 +18,7 @@ Every CI run installs `--all-extras` before `pytest`, so the `QR_CODE_SUPPORT` s
 |---|---|---|
 | AGENTS.md says the core must work without the `qr` extra, but the suite only ever runs with it, so a test that needs the extra and lacks a skip passes in CI and fails for a contributor. | Run the suite once on a core-only install. | a missing skip fails CI<br>the import guard is tested for real |
 
-**After:** <!-- filled at Ship -->
+**After:** 0 tests added or removed; 5 gated on `QR_CODE_SUPPORT` (Q1), each seen red on a core-only install before the gate. The core-only run from the extracted sdist: 1,617 passed, 65 skipped, 0 failed, 10.4 s locally (Measure: before, never run; on the unchanged tests, 5 failed). `scripts/verify.sh` passes end to end in 31.7 s locally.
 
 <details>
 <summary>Decisions</summary>

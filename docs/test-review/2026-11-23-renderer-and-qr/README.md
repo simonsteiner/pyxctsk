@@ -105,3 +105,4 @@ Fix `17b4615` wrote `.value` instead of the `TurnpointType` member, but the test
 <!-- filled during implementation: where a PR deliberately differs from this report, and why -->
 
 - **C1:** the cut was made by hand, not through `prune-tests`: the card named one test, so there was nothing for the skill to choose. The Ship review was a read of the 33-line diff against the card rather than `review-prs`. The test class kept two tests and is renamed `TestTheOptionsAndTheReadBack`, since "what they always were" no longer describes them.
+- **C2 · Q4:** the core-only run is on all four CI legs, not one Python version: the legs run in parallel, so one or four costs the same wall time, and picking one would need a `ci.yml` change or a version hard-coded into `verify.sh`. The scan said the suite's behaviour without the extra was unknown; the Design phase found five tests that need the extra and had no skip, so C2 became a live defect.
