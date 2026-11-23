@@ -85,12 +85,11 @@ def distance_through_centers(
 ) -> float:
     """Sum the geodesic legs between consecutive turnpoint centers.
 
-    The primitive, not the published number. **S7F defines no "distance
-    through centres"**, so which points to include and where to stop is a
-    convention — see :func:`center_distance` below, which owns that decision.
-    It lived in ``turnpoint.py`` beside a second copy of the same loop here. A caller producing a figure for a task board
-    wants ``center_distance(task)``; a caller who already knows exactly which
-    turnpoints it means wants this.
+    The primitive, not the published number. **S7F defines no "distance through
+    centres"**, so which points to include and where to stop is a convention —
+    see :func:`center_distance` below, which owns that decision. A caller
+    producing a figure for a task board wants ``center_distance(task)``; a
+    caller who already knows exactly which turnpoints it means wants this.
 
     Args:
         turnpoints: The turnpoints whose centres to join.
@@ -108,9 +107,8 @@ def _goal_radius(task: Task) -> float:
 
     A LINE goal is a zero-radius point to the optimizer — the line is centred
     on the goal, so its optimal crossing is the goal centre — which
-    ``task_to_turnpoints`` states, and since ``plane_circle`` stopped stating
-    it too, states alone. Reading it from there is what keeps this reading
-    measuring to the same place the optimized distance does.
+    ``task_to_turnpoints`` alone states. Reading it from there is what keeps
+    this reading measuring to the same place the optimized distance does.
 
     Args:
         task: The task whose goal to size.
@@ -185,12 +183,14 @@ def center_distance(
 def cumulative_center_m(task: Task) -> list[float]:
     """Distance through centres to each turnpoint, in metres.
 
-    One entry per turnpoint, starting at 0.0, so the last equals
-    ``center_distance(task)`` under :data:`PROPOSED_READING` — which it must,
-    being the prefix of exactly that polyline. It lives here rather than beside
-    the table that displays it because the convention is this module's: a
-    cumulative column derived from a *different* reading than the total printed
-    above it would disagree with its own last row.
+    One entry per turnpoint, starting at 0.0, so the last is
+    ``center_distance(task)`` under :data:`PROPOSED_READING` — which it must
+    be, being the prefix of exactly that polyline — to the last bit on Python
+    3.11 and within rounding from 3.12 (see
+    :func:`~pyxctsk.distance.earth.geodesic_legs`). It lives here rather than
+    beside the table that displays it because the convention is this module's:
+    a cumulative column derived from a *different* reading than the total
+    printed above it would disagree with its own last row.
 
     Args:
         task: The task to measure.

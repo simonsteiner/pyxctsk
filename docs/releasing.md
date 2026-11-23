@@ -99,8 +99,8 @@ lockfile) with `uv version X.Y.Z`.
 
 Run [`scripts/verify.sh`](../scripts/verify.sh) to execute the complete non-mutating gate: lockfile,
 lint, formatting, types, spelling, artifact build, the full test suite from the
-built sdist, and a smoke test of the built wheel without the optional `qr`
-extra. The **CI** workflow runs that gate on Python 3.11, 3.12, 3.13, and 3.14
+built sdist (once with the `qr` extra and once without it), and a smoke test of the built wheel without the optional `qr`
+extra (`scripts/check_core_without_qr.py`). The **CI** workflow runs that gate on Python 3.11, 3.12, 3.13, and 3.14
 on every pull request and push to `main`; **Release** and **Publish** call the
 same workflow rather than repeating the matrix.
 
@@ -112,11 +112,13 @@ same workflow rather than repeating the matrix.
 ## Manual fallback
 
 If the scripts are unavailable, a reduced form of the same steps by hand — the
-tag push runs **Publish**, with the same checks. It skips two of
-[`prepare_release.sh`](../scripts/prepare_release.sh)'s guards, so check them
-yourself first: that the tag `v$VERSION` exists neither locally nor on origin,
-and that `python3 scripts/changelog_extract.py "$VERSION"` prints the release
-notes after the roll.
+tag push runs **Publish**, with the same checks. It skips
+[`prepare_release.sh`](../scripts/prepare_release.sh)'s guards and its undo on
+failure, so check three things yourself: before you start, that
+`git status --porcelain` prints nothing (`git commit -am` below sweeps in any
+modified file) and that the tag `v$VERSION` exists neither locally nor on
+origin; after the roll, that `python3 scripts/changelog_extract.py "$VERSION"`
+prints the release notes.
 
 ```bash
 VERSION="$(uv version --bump minor --dry-run --short)"

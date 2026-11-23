@@ -209,7 +209,9 @@ def geodesic_legs(
     """Compute the length of each leg along (lat, lon) points for an earth model.
 
     Every sum of legs in the package starts here, so the totals and the
-    cumulative columns are sums of the same numbers.
+    cumulative columns add up the same legs. They agree to the last bit only on
+    Python 3.11: from 3.12 ``sum()``, which the totals use, compensates for
+    rounding and a running sum does not, so the two can differ in the last bit.
 
     Args:
         points: (lat, lon) points in order.

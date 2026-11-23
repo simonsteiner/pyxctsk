@@ -283,9 +283,9 @@ def optimize_plane_route(
     zero-radius circle is touched at its centre. **No circle is special**: a
     route that must start at a centre — a task's takeoff, under ADR 0002 — is
     asked for by passing that circle with radius 0, which is what
-    ``route_optimization`` does. Three deterministic placements seed alternating odd/even
-    sweeps, and the shortest converged route wins. Consecutive duplicate
-    circles share one optimized point.
+    ``route_optimization`` does. Three deterministic placements seed
+    alternating odd/even sweeps, and the shortest converged route wins.
+    Consecutive duplicate circles share one optimized point.
 
     Args:
         circles: Planar circles as (x, y, radius), in route order.
