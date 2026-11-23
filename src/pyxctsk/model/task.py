@@ -136,9 +136,11 @@ class Task:
     def goal_type_is_line(self) -> bool:
         """Whether the goal this task is flown to is a ``LINE``.
 
-        Asked of :attr:`effective_goal`, so a task with no turnpoints has none.
-        Whether there are enough turnpoints to orient a line is a separate
-        question, and ``GoalLine`` asks it.
+        Asked of :attr:`effective_goal`, so a missing goal or goal type counts as
+        the format's ``CYLINDER`` default. A task with no turnpoints keeps the
+        goal it declares, so it can still answer True. Whether there are enough
+        turnpoints to orient a line is a separate question, and ``GoalLine``
+        asks it.
         """
         goal = self.effective_goal
         return goal is not None and goal.type is GoalType.LINE
@@ -238,7 +240,8 @@ class Task:
         first ESS turnpoint nor a comparison by value: ``Turnpoint`` is a plain
         dataclass, so a task that legitimately flies the same turnpoint twice
         could match the wrong occurrence — the hazard
-        :attr:`~pyxctsk.export.common.TaskDrawing.features` avoids by comparing identity.
+        :attr:`~pyxctsk.export.common.TaskDrawing.features` avoids by comparing
+        identity.
 
         Note this is *not* "does the task have a speed section" — that is
         :func:`~pyxctsk.distance.speed_section.speed_section_indices`, which

@@ -44,10 +44,10 @@ class TaskValidationError(pyXCTSKError):
 
     The whole point of a named rule is that a caller can react to a specific
     violation without matching on the English message, so this is typed:
-    ``except TaskValidationError as e: e.issues[0].rule`` type-checks. The import is under
-    ``TYPE_CHECKING`` because the cycle it avoids is a runtime one, through
-    ``model/__init__`` — ``validation`` itself imports only ``model.enums``,
-    and never these exceptions.
+    ``except TaskValidationError as e: e.issues[0].rule`` type-checks. The
+    import is under ``TYPE_CHECKING`` because the cycle it avoids is a runtime
+    one, through ``model/__init__`` — ``validation`` itself imports only
+    ``model.enums``, and never these exceptions.
 
     Attributes:
         issues: One :class:`~pyxctsk.model.validation.ValidationIssue` per
