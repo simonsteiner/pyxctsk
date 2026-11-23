@@ -114,5 +114,6 @@ uv run pyxctsk distances task.xctsk --format text  # try the CLI
 - `docs/s7f-distance-reference.md` — what S7F defines about task distances and what it leaves open.
 - `docs/adr/` — the route-optimizer, touching and earth-model decisions.
 - `docs/arch-review/` — dated architecture and spec-conformance reviews; read the current two (`2026-08-16-competition-interfaces-audit.md`, `2026-08-18-s7f-2026-conformance-audit.md`) before changing conformance behaviour.
+- `docs/test-review/` — dated test reviews; the newest one's status table is the open test backlog.
 - `scripts/README.md` and `scripts/task_viewer/README.md` — the repository utilities.
 - `CHANGELOG.md` — what each release changed.

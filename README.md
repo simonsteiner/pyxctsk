@@ -159,6 +159,7 @@ See the CLI startup message (`pyxctsk --help` or running the CLI with no argumen
 - [docs/s7f-distance-reference.md](./docs/s7f-distance-reference.md) — what FAI S7F defines about task distances, and what it leaves open
 - [docs/adr/](./docs/adr/) — design decisions behind the route optimizer
 - [docs/arch-review/](./docs/arch-review/) — architecture and spec-conformance reviews
+- [docs/test-review/](./docs/test-review/) — reviews of the test suite
 - [docs/releasing.md](./docs/releasing.md) — how releases are cut and published
 - [docs/updating-dependencies.md](./docs/updating-dependencies.md) — bumping dependencies
 - [GLOSSARY.md](./GLOSSARY.md) — the domain vocabulary
