@@ -188,11 +188,12 @@ class TaskDrawing:
         no geometry is computed until a feature's method asks for it.
         """
         task = self.task
+        # The goal is found by identity, not value (``turnpoint is last``
+        # below): a task may end by flying the same turnpoint twice, and a
+        # value search would draw the goal as an ordinary one.
         last = task.turnpoints[-1] if task.turnpoints else None
         features: list[Feature] = []
         for index, turnpoint in enumerate(self.turnpoints):
-            # Identity, not value: a task may end by flying the same turnpoint
-            # twice, and a value search would draw the goal as an ordinary one.
             role = turnpoint.type or TurnpointType.NONE
             radius = f"Radius: {turnpoint.radius}m"
             waypoint = turnpoint.waypoint
