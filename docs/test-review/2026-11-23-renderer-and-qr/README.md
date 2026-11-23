@@ -104,4 +104,5 @@ Fix `17b4615` wrote `.value` instead of the `TurnpointType` member, but the test
 
 <!-- filled during implementation: where a PR deliberately differs from this report, and why -->
 
+- **C1 · review:** the test is rewritten at one task, not deleted outright: the PR #60 review showed it was the only guard on which writer the `kml` and `geojson` rows call, so `test_each_map_row_calls_its_own_writer` keeps that on `task_bevo` (#58 corrects the card).
 - **C1:** the cut was made by hand, not through `prune-tests`: the card named one test, so there was nothing for the skill to choose. The Ship review was a read of the 33-line diff against the card rather than `review-prs`. The test class kept two tests and is renamed `TestTheOptionsAndTheReadBack`, since "what they always were" no longer describes them.

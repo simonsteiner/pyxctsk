@@ -20,7 +20,7 @@ The class `TestTheRenderingsAreWhatTheyAlwaysWere` keeps `test_compressed_reache
 |---|---|---|
 | A quarter of every run re-computes each row's output with the very call the row makes, across 24 tasks, when one task is enough to pin which writer each row calls. | Replace the parametrized test and its helper with one task's wiring check (a GeoJSON `FeatureCollection`, a `<kml` root, an `XCTSK:` prefix); the row-kind and read-back tests stay. | −3.6 s per run (−25%)<br>renderer refactors stop touching it |
 
-**After:** −24 tests (1,691 → 1,667), no test added. `tests/test_renderer.py` 3.0 s → 0.7 s, the suite 13.4 s → 12.1 s (`/usr/bin/time uv run pytest -q` with the pytest cache off, one run each on the same machine). The remaining class is `TestTheOptionsAndTheReadBack`.
+**After:** −24 parametrized tests, +1 one-task wiring test (`test_each_map_row_calls_its_own_writer`, red when `_render_geojson` calls `task_to_kml`), so 1,691 → 1,668 at this layer. `tests/test_renderer.py` 3.0 s → 0.7 s, the suite 13.4 s → 12.1 s (`/usr/bin/time uv run pytest -q` with the pytest cache off, one run each on the same machine). The remaining class is `TestTheOptionsAndTheReadBack`.
 
 <details>
 <summary>Decisions</summary>
