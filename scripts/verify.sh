@@ -63,6 +63,16 @@ fi
   cd "$verify_tmp_dir/source/$sdist_root"
   uv sync --frozen --all-extras
   uv run --frozen pytest
+
+  # The same tests on a core-only install: the skip markers and import guards
+  # run on the install they exist for. `uv sync` is exact, so it removes the extra.
+  uv sync --frozen
+  uv run --frozen python -c "
+import importlib.util, sys
+present = [m for m in ('PIL', 'qrcode', 'zxingcpp') if importlib.util.find_spec(m)]
+sys.exit(f'the qr extra is still installed: {present}') if present else None
+"
+  uv run --frozen pytest
 )
 
 uv venv "$verify_tmp_dir/core-only"

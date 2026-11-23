@@ -15,12 +15,25 @@ import pytest
 from pyxctsk import OUTPUT_FORMATS, parse_task, render_task
 from tests.corpus import reference_task
 from tests.paths import TESTS_DIR
+from tests.qr_test_utils import QR_CODE_SUPPORT
 
 
 class TestEveryRowRenders:
     """One row per format, and each of them answers for itself."""
 
-    @pytest.mark.parametrize("name", sorted(OUTPUT_FORMATS))
+    @pytest.mark.parametrize(
+        "name",
+        [
+            pytest.param(
+                name,
+                marks=pytest.mark.skipif(
+                    name == "png" and not QR_CODE_SUPPORT,
+                    reason="QR code dependencies not available",
+                ),
+            )
+            for name in sorted(OUTPUT_FORMATS)
+        ],
+    )
     def test_the_payload_matches_the_rows_declared_kind(self, name):
         """`binary` is what a caller needs before it can open a file."""
         task = reference_task("task_bevo").task

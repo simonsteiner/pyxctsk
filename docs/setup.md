@@ -54,7 +54,8 @@ uv run rumdl check .
 
 `scripts/verify.sh` runs the whole gate CI runs on every pull request: lockfile,
 lint, formatting, types, Markdown, spelling, the built artifacts, the test suite
-from the extracted sdist, and a core-only wheel smoke test.
+from the extracted sdist (once with the `qr` extra and once without it), and a
+core-only wheel smoke test.
 
 cspell needs Node (`npx`). New domain words go in `cspell-dictionary.txt`.
 

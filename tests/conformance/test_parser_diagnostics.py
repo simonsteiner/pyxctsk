@@ -23,6 +23,7 @@ from pyxctsk.qrcode import image
 from pyxctsk.qrcode.encoding import encode_num, encode_waypoint_turnpoint
 from tests.conformance._support import BASE_TASK, task_json
 from tests.corpus import reference_task
+from tests.qr_test_utils import QR_CODE_SUPPORT
 
 
 def _raw_json(raw: str) -> str:
@@ -54,6 +55,9 @@ class TestUnrecognizedInputSaysWhy:
         with pytest.raises(InvalidFormatError, match="looks like JSON"):
             parse_task('{"taskType": "CLASSIC", "vers')
 
+    @pytest.mark.skipif(
+        not QR_CODE_SUPPORT, reason="QR code dependencies not available"
+    )
     def test_an_image_with_no_qr_code_says_so(self, tmp_path):
         """Not "invalid format": the file was read, it just carries no task.
 
@@ -70,6 +74,9 @@ class TestUnrecognizedInputSaysWhy:
         with pytest.raises(InvalidFormatError, match="no XCTSK: QR code"):
             load_task(png)
 
+    @pytest.mark.skipif(
+        not QR_CODE_SUPPORT, reason="QR code dependencies not available"
+    )
     def test_an_unreadable_image_is_told_apart_from_a_blank_one(self, tmp_path):
         """The distinction the magic-byte guess could not make."""
         png = tmp_path / "truncated.png"
