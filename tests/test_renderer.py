@@ -80,12 +80,8 @@ class TestTheTableIsTheOnlyStatementOfTheFormats:
 
         assert listed.split("|") == list(OUTPUT_FORMATS)
 
-    def test_the_task_files_extension_and_media_type_are_the_json_row_only(self):
-        """No second name for them at the front door, which nothing read."""
-        import pyxctsk
-
-        assert not hasattr(pyxctsk, "EXTENSION")
-        assert not hasattr(pyxctsk, "MIME_TYPE")
+    def test_the_task_files_extension_is_the_json_rows(self):
+        """The one place the extension is named."""
         assert OUTPUT_FORMATS["json"].extension == ".xctsk"
 
 

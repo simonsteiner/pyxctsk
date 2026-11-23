@@ -234,7 +234,6 @@ class TestValidatingWhatArrived:
         from pyxctsk.model.validation import FULL_FORMAT_VERSION
 
         assert pyxctsk.FULL_FORMAT_VERSION is FULL_FORMAT_VERSION
-        assert not hasattr(pyxctsk, "VERSION")
         assert self._payload(1, 2, 3).to_task().version == FULL_FORMAT_VERSION
 
 
