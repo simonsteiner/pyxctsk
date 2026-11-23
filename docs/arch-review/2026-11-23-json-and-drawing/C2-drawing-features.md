@@ -13,8 +13,8 @@ flowchart LR
     K1["kml.py"]:::module
     G1["geojson.py"]:::module
     T1["TaskDrawing · is_goal · outline_of · color_of · label_of · description_of · role_of · route_label · goal_line_label · goal_line_description · control_zone_label · control_zone_description · route_coordinates · route_coordinates_lon_lat"]:::shallow
-    K1 -- "13 calls, same order" --> T1
-    G1 -- "13 calls, same order" --> T1
+    K1 -- "10 of its 13 methods" --> T1
+    G1 -- "10 of its 13 methods" --> T1
   end
   subgraph after["After"]
     direction TB
@@ -39,14 +39,14 @@ flowchart LR
   style after fill:#fafaf9,stroke:#e2e8f0
 ```
 
-`TaskDrawing` has 13 public methods, most of them one to three lines, and each writer reads 13 of its attributes in the same order; `export/common.py` is in 20 commits in six months, changing with `kml.py` in 75% and `geojson.py` in 80%.
+`TaskDrawing` has 13 public methods, most of them one to three lines, and each writer calls 10 of them; `export/common.py` is in 20 commits in six months, and 75% of `kml.py`'s commits and 80% of `geojson.py`'s also touch it.
 
 **Removes:**
 
 - `src/pyxctsk/export/common.py:237-253,259-274`: `goal_line_description` and `control_zone_description` raise `ValueError` unless the caller checked `goal_line` first, an ordering rule each writer has to know.
 - `src/pyxctsk/export/common.py:219-235,255-257`: `route_label`, `goal_line_label`, `control_zone_label` return constants and read nothing from the drawing.
 - `src/pyxctsk/export/common.py:164,202,217`: `turnpoint.type or TurnpointType.NONE` normalized three times, though `role_of` exists to be the one reading.
-- `src/pyxctsk/export/common.py:276-300`: `route_coordinates` and `route_coordinates_lon_lat`, two orders of one route, the first used only by tests.
+- `src/pyxctsk/export/common.py:276-300`: `route_coordinates` and `route_coordinates_lon_lat`, two orders of one route; the first is a helper of the second whose only outside callers are tests.
 - `src/pyxctsk/export/common.py:102`: `is_goal`, public for `color_of` and tests.
 - `tests/export/test_geojson_goal_line.py:9`: the test that imports `_create_goal_line_features` (S4).
 

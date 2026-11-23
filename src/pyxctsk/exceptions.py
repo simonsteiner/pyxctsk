@@ -44,10 +44,10 @@ class TaskValidationError(pyXCTSKError):
 
     The whole point of a named rule is that a caller can react to a specific
     violation without matching on the English message, so this is typed:
-    ``except TaskValidationError as e: e.issues[0].rule`` type-checks. The import is under
-    ``TYPE_CHECKING`` because the cycle it avoids is a runtime one, through
-    ``model/__init__`` — ``validation`` itself imports only ``model.enums``,
-    and never these exceptions.
+    ``except TaskValidationError as e: e.issues[0].rule`` type-checks. The
+    import is under ``TYPE_CHECKING`` because the cycle it avoids is a runtime
+    one, through ``model/__init__`` — ``validation`` itself imports only
+    ``model.enums``, and never these exceptions.
 
     Attributes:
         issues: One :class:`~pyxctsk.model.validation.ValidationIssue` per
@@ -129,6 +129,15 @@ class MalformedPayloadError(pyXCTSKError, ValueError):
         else:
             path = f"{segment}.{self.path}"
         return MalformedPayloadError(self.reason, path)
+
+
+class NotJsonError(MalformedPayloadError):
+    """Raised when a payload does not decode as JSON at all.
+
+    Told apart from its parent so a caller can say whether the text was JSON
+    that held a value no JSON document can carry, or not JSON in the first
+    place.
+    """
 
 
 class MismatchedRouteError(pyXCTSKError, ValueError):

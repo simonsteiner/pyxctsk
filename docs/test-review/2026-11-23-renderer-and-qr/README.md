@@ -1,6 +1,6 @@
 # pyxctsk: a quarter of the suite re-checks the renderer against the calls it wraps, and a skip hides the QR image round trip
 
-`2026-11-23` · at `32571f4` (`refactor/smaller-findings-2026-11-23`, the top of the 2026-11-23 architecture-review stack) · scope: `src/pyxctsk/`, weighted by `test-history.py drift` over six months · glossary: `GLOSSARY.md` · ADRs read: 0001–0004 (none bears on a test)
+`2026-11-23` · at `32571f4` (`refactor/smaller-findings-2026-11-23`, the top of the 2026-11-23 architecture-review stack) · scope: `src/pyxctsk/`, weighted by `test-history.py drift` (the test-review skill's `scripts/test-history.py`, not in this repo) over six months · glossary: `GLOSSARY.md` · ADRs read: 0001–0004 (none bears on a test)
 
 **Jump to:** [Status](#status) · [Vitals](#vitals) · [Where it hurts](#where-it-hurts) · [Smaller findings](#smaller-findings) · [Recommendation](#recommendation) · cards: [C1](C1-renderer-tautology.md) · [C2](C2-core-only-suite.md)
 
@@ -96,7 +96,7 @@ Fix `17b4615` wrote `.value` instead of the `TurnpointType` member, but the test
 ## Recommendation
 
 > [!IMPORTANT]
-> **Start with [C1 · Drop the renderer test that compares each row with the call it wraps](C1-renderer-tautology.md)**: it is a quarter of every run and guards nothing the other renderer tests don't.
+> **Start with [C1 · Drop the renderer test that compares each row with the call it wraps](C1-renderer-tautology.md)**: it is a quarter of every run, and of what it guards only the row-to-writer wiring needs keeping, which one task does.
 >
 > **Proposed batch** (every 🟢 Strong, in order, then one PR for S1–S5): C1 → S1–S5
 

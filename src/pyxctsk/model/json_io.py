@@ -8,9 +8,9 @@ spelled as ``json.dumps`` options at a call site.
 
 import json
 import math
-from typing import Any, Literal, Mapping
+from typing import Any, Iterator, Literal, Mapping
 
-from ..exceptions import MalformedPayloadError
+from ..exceptions import MalformedPayloadError, NotJsonError
 
 
 def json_type(value: Any) -> str:
@@ -63,36 +63,53 @@ def _segment(key: object) -> str:
     return text
 
 
+def _children(
+    value: Mapping[Any, Any] | list[Any] | tuple[Any, ...], path: str
+) -> Iterator[tuple[Any, str, bool]]:
+    """Yield a container's keys and items, each with the path it sits at.
+
+    Each entry is (child, path, nested): a mapping yields each ``str`` key
+    (not nested) and then its value (nested), both at the key's
+    path; a list or tuple yields its items at ``[index]``, nested.
+    """
+    if isinstance(value, Mapping):
+        for key, item in value.items():
+            where = f"{path}.{_segment(key)}" if path else _segment(key)
+            if isinstance(key, str):
+                yield key, where, False
+            yield item, where, True
+    else:
+        for index, item in enumerate(value):
+            yield item, f"{path}[{index}]", True
+
+
 def _refuse_unwritable(value: Any, path: str = "", depth: int = 1) -> None:
     """Raise if JSON cannot carry ``value`` and UTF-8 cannot write it.
 
     Raises:
-        MalformedPayloadError: For a float that is not finite, a string UTF-8
-            cannot encode, or nesting past :data:`MAX_NESTING`, located by
-            ``path``.
+        MalformedPayloadError: For a float that is not finite or a string UTF-8
+            cannot encode, located by ``path``, or for nesting past
+            :data:`MAX_NESTING`, which names no path: a path that deep would be
+            the whole message.
     """
-    if isinstance(value, float):
-        if not math.isfinite(value):
-            raise MalformedPayloadError("expected a finite number", path)
-    elif isinstance(value, str):
-        try:
-            value.encode("utf-8")
-        except UnicodeEncodeError:
-            raise MalformedPayloadError("text UTF-8 cannot encode", path) from None
-    elif isinstance(value, (Mapping, list, tuple)):
+    if isinstance(value, float) and not math.isfinite(value):
+        raise MalformedPayloadError("expected a finite number", path)
+    if isinstance(value, str) and not _encodes(value):
+        raise MalformedPayloadError("text UTF-8 cannot encode", path)
+    if isinstance(value, (Mapping, list, tuple)):
         if depth > MAX_NESTING:
-            raise MalformedPayloadError(
-                f"nested deeper than {MAX_NESTING} levels", path
-            )
-        if isinstance(value, Mapping):
-            for key, item in value.items():
-                where = f"{path}.{_segment(key)}" if path else _segment(key)
-                if isinstance(key, str):
-                    _refuse_unwritable(key, where)
-                _refuse_unwritable(item, where, depth + 1)
-        else:
-            for index, item in enumerate(value):
-                _refuse_unwritable(item, f"{path}[{index}]", depth + 1)
+            raise MalformedPayloadError(f"nested deeper than {MAX_NESTING} levels")
+        for child, where, nested in _children(value, path):
+            _refuse_unwritable(child, where, depth + 1 if nested else depth)
+
+
+def _encodes(text: str) -> bool:
+    """Whether UTF-8 can encode ``text``, which a lone surrogate defeats."""
+    try:
+        text.encode("utf-8")
+    except UnicodeEncodeError:
+        return False
+    return True
 
 
 def load_json(text: str | bytes) -> Any:
@@ -116,7 +133,7 @@ def load_json(text: str | bytes) -> Any:
             f"nested deeper than {MAX_NESTING} levels"
         ) from None
     except ValueError as exc:
-        raise MalformedPayloadError(f"not JSON: {exc}") from exc
+        raise NotJsonError(f"not JSON: {exc}") from exc
     _refuse_unwritable(value)
     return value
 
