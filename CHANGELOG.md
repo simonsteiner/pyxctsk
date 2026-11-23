@@ -22,9 +22,11 @@ All notable changes to this project will be documented in this file.
   | removed | read instead |
   | --- | --- |
   | `calculate_task_distances(task)` | `DistanceReport.from_task(task)` |
-  | `task_distances_from(measured)`, `TaskDistanceTable.from_report(report)` | `DistanceReport.from_measured_task(measured)` |
+  | `task_distances_from(measured)` | `DistanceReport.from_measured_task(measured)` |
+  | `TaskDistanceTable.from_report(report)` | `report` itself |
   | `.center_distance_km`, `.optimized_distance_km` | `.center_distance_m`, `.task_distance_m`, in metres and unrounded |
-  | `.savings_km`, `.savings_percent` | subtract the two distances |
+  | `.savings_km` | `center_distance_m − task_distance_m` |
+  | `.savings_percent` | `(center_distance_m − task_distance_m) / center_distance_m × 100`, which the table gave as 0.0 with no centre distance |
   | `.turnpoints[i].lat`, `.lon`, `.radius` | `report.route()[i].center_lat`, `.center_lon`, `.radius_m` |
   | `.turnpoints[i].cumulative_center_km`, `.cumulative_optimized_km` | `report.route()[i].cumulative_center_m`, `.cumulative_m` |
 

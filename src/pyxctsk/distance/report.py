@@ -46,9 +46,9 @@ S7F_EDITION = "2026 V1.0"
 #: used to answer 0.0 and only the CLI knew to refuse.
 #:
 #: :class:`DistanceReport` checks it at construction, so every way of building
-#: a report refuses alike. It was
-#: once a copy in each of two entry points, and ``from_measured_task``, the
-#: third, had none: it reported a one-turnpoint task as 0.0 m.
+#: a report refuses alike. It was once a copy in each of two entry points, and
+#: ``from_measured_task``, the third, had none: it reported a one-turnpoint task
+#: as 0.0 m.
 #: :class:`~pyxctsk.distance.MeasuredTask` deliberately does not check it — a
 #: drawing of a one-turnpoint task is still a drawing.
 MIN_TURNPOINTS_FOR_DISTANCE = 2
