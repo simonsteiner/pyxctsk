@@ -2,7 +2,7 @@
 
 Real tasks covering how the End of Speed Section relates to the goal — a case
 the main corpus in `../xctsk/` barely exercises. Exercised by
-`tests/test_ess_goal_fixtures.py`.
+`tests/conformance/test_ess_goal_fixtures.py`.
 
 | file | shape |
 | --- | --- |

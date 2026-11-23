@@ -61,7 +61,7 @@ cspell needs Node (`npx`). New domain words go in `cspell-dictionary.txt`.
 ## Troubleshooting
 
 - **Import errors or a stale environment**: re-sync with `uv sync --all-extras`.
-- **The QR image tests fail**: the `qr` extra is missing. `uv sync` without
+- **The QR image tests are skipped**: the `qr` extra is missing. `uv sync` without
   `--all-extras`, or a first `uv run` in a fresh checkout, installs the core
   only; re-sync with `uv sync --all-extras`.
 - **Rebuild from scratch**: `rm -rf .venv && uv sync --all-extras`.

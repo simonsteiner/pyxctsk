@@ -2,7 +2,7 @@
 
 Real tasks that set an elevated goal, in **two different encodings** — which is
 the point of keeping them together. Exercised by
-`tests/test_elevated_goal_fixtures.py`.
+`tests/conformance/test_elevated_goal_fixtures.py`.
 
 | files | producer | where the finish altitude lives | datum |
 | --- | --- | --- | --- |

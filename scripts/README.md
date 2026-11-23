@@ -13,8 +13,15 @@ These are repository utilities and are not included in the published
 uv sync --group tools
 ```
 
-Run commands through `uv run`, for example
-`uv run python scripts/extract_task_data.py`.
+Run commands through `uv run`. The examples below run from `scripts/`
+(`cd scripts` first), because `xcontest_xctsk_tool.py` reads and writes only
+paths inside the directory it runs from.
+
+The release tooling (`verify.sh`, `prepare_release.sh`, `release.sh`,
+`changelog_extract.py`, `check_core_without_qr.py`) is covered in
+[docs/releasing.md](../docs/releasing.md), and the map viewer in
+[task_viewer/README.md](task_viewer/README.md). Repositories that inspired these
+tools are listed in [external-repos.md](external-repos.md).
 
 ## Common Workflows
 
@@ -27,7 +34,7 @@ Run commands through `uv run`, for example
 
 ### `xcontest_xctsk_tool.py`
 
-CLI tool for batch uploading XCTSK files, downloading tasks and HTML pages, and downloading QR codes via the XContest REST API from <https://tools.xcontest.org/xctsk/>. Implements retry logic, rate limiting, and metadata preservation with support for both v1 and v2 API endpoints. The command line is `xcontest_xctsk_tool.py`; the API client and the batch loops are in `xcontest_client.py`. It reads and writes only paths inside the directory it runs from, so run it from the repository root or `scripts/`.
+[`xcontest_xctsk_tool.py`](xcontest_xctsk_tool.py) is a CLI for batch uploading XCTSK files, downloading tasks and HTML pages, and downloading QR codes via the XContest REST API from <https://tools.xcontest.org/xctsk/>. Implements retry logic, rate limiting, and metadata preservation with support for both v1 and v2 API endpoints. The API client and the batch loops are in [`xcontest_client.py`](xcontest_client.py). It reads and writes only paths inside the directory it runs from, so run it from the repository root or `scripts/`.
 
 #### REST API Endpoints
 
@@ -57,30 +64,30 @@ All operations use the XContest tools REST API:
 Process all XCTSK files and download HTML pages:
 
 ```bash
-python xcontest_xctsk_tool.py process --author "Your Name"
+uv run python xcontest_xctsk_tool.py process --author "Your Name"
 ```
 
 - Uploads all `.xctsk` files from `xctsk_files/`
 - Downloads HTML for each task to `downloaded_tasks/html/`
-- Saves upload results to `upload_results.json`
+- Saves upload results to `scripts/upload_results.json`
 
 #### Individual Commands
 
-- **Upload**: `python xcontest_xctsk_tool.py upload --directory xctsk_files --author "Your Name"`
+- **Upload**: `uv run python xcontest_xctsk_tool.py upload --directory xctsk_files --author "Your Name"`
   - `--directory, -d`: Directory containing XCTSK files (required)
   - `--author, -a`: Author name for uploads
   - `--results-file, -r`: File to save upload results in JSON format
 
-- **Download tasks**: `python xcontest_xctsk_tool.py download --codes abcd,efgh --output downloaded_tasks/xctsk`
+- **Download tasks**: `uv run python xcontest_xctsk_tool.py download --codes abcd,efgh --output downloaded_tasks/xctsk`
   - `--codes, -c`: Comma-separated list of task codes (required)
   - `--output, -o`: Output directory (required)
   - `--version, -v`: API version (1 or 2, default: 1)
 
-- **Download HTML**: `python xcontest_xctsk_tool.py html --codes abcd,efgh --output downloaded_tasks/html`
+- **Download HTML**: `uv run python xcontest_xctsk_tool.py html --codes abcd,efgh --output downloaded_tasks/html`
   - `--codes, -c`: Comma-separated list of task codes (required)
   - `--output, -o`: Output directory (required)
 
-- **Download QR code**: `python xcontest_xctsk_tool.py qr --file task.xctsk --output qr.svg`
+- **Download QR code**: `uv run python xcontest_xctsk_tool.py qr --file task.xctsk --output qr.svg`
   - `--file, -f`: XCTSK file (required)
   - `--output, -o`: Output SVG file (required)
   - Uploads the XCTSK file to XContest API and downloads the generated QR code SVG
@@ -93,13 +100,13 @@ python xcontest_xctsk_tool.py process --author "Your Name"
 
 ### `extract_task_data.py`
 
-Parses XCTrack HTML exports in `downloaded_tasks/html_cleaned`, removes embedded images, and extracts task metadata, turnpoints, and embedded GeoJSON. Outputs cleaned HTML, structured JSON, and GeoJSON for downstream analysis or visualization using BeautifulSoup for robust HTML parsing with validation for distance and coordinate fields. The parsing is in `task_html_parser.py`; `extract_task_data.py` reads the pages and writes the files.
+Parses XCTrack HTML exports in `downloaded_tasks/html_cleaned`, removes embedded images, and extracts task metadata, turnpoints, and embedded GeoJSON. Outputs cleaned HTML, structured JSON, and GeoJSON for downstream analysis or visualization using BeautifulSoup for robust HTML parsing with validation for distance and coordinate fields. The parsing is in [`task_html_parser.py`](task_html_parser.py); `extract_task_data.py` reads the pages and writes the files.
 
 #### Usage
 
 ```bash
 # Process all HTML files in downloaded_tasks/html_cleaned directory
-python extract_task_data.py
+uv run python extract_task_data.py
 ```
 
 #### Output Structure
@@ -110,19 +117,19 @@ python extract_task_data.py
 
 ### `extract_qr_from_html.py`
 
-Locates base64-encoded SVG QR codes in HTML files, decodes and converts them to images, and extracts QR data using OpenCV and zxing-cpp. Supports batch processing, intermediate PNG output, and error handling for malformed images.
+Locates base64-encoded SVG QR codes in HTML files, decodes and converts them to images, and extracts QR data using CairoSVG (SVG to PNG), OpenCV and zxing-cpp. Supports batch processing, intermediate PNG output (`-o`), verbose output (`-v`), and error handling for malformed images.
 
 #### Usage Examples
 
 ```bash
 # Process a single HTML file
-python extract_qr_from_html.py downloaded_tasks/html/task_bevo.html
+uv run python extract_qr_from_html.py downloaded_tasks/html/task_bevo.html
 
 # Process all HTML files in a directory
-python extract_qr_from_html.py downloaded_tasks/html/*.html
+uv run python extract_qr_from_html.py downloaded_tasks/html/*.html
 
 # Save intermediate PNG images
-python extract_qr_from_html.py downloaded_tasks/html/*.html -o output_images
+uv run python extract_qr_from_html.py downloaded_tasks/html/*.html -o output_images
 ```
 
 #### Output Files
@@ -132,7 +139,7 @@ python extract_qr_from_html.py downloaded_tasks/html/*.html -o output_images
 
 ### `test_distance_calculations.py`
 
-Validation script that compares optimized distance calculations with reference data from JSON files. Tests the accuracy of the pyxctsk distance calculation engine against known values.
+Validation script that compares optimized distance calculations with reference data from JSON files. It does not run at the moment: it imports `task_to_turnpoints` from a module that no longer exists (S8 in the [2026-11-23 architecture review](../docs/arch-review/2026-11-23-json-and-drawing/README.md)). The same check runs in the test suite as `tests/distance/test_xctrack_accuracy.py`.
 
 ### `test_qrcode_generation.py`
 
