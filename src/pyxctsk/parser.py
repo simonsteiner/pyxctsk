@@ -54,6 +54,7 @@ from .exceptions import (
     InvalidFormatError,
     MalformedPayloadError,
     MissingQRCodeSupportError,
+    NotJsonError,
     TaskValidationError,
 )
 from .model.shape import load_json
@@ -181,11 +182,15 @@ class Input:
     def looks_like_json(self) -> bool:
         """Whether the input is JSON, or was trying to be.
 
-        True for a document that decoded, and also for one that did not — a
-        truncated payload starting with ``{`` parsed as far as being
-        JSON-shaped, and saying so is more use than "invalid format".
+        True for a document that decoded, for one that decoded but holds a
+        value no JSON document can carry (a bare ``NaN``), and for one that
+        did not decode — a truncated payload starting with ``{`` parsed as far
+        as being JSON-shaped, and saying so is more use than "invalid format".
         """
-        return self.document is not _NOT_JSON or self.raw.lstrip()[:1] in (b"{", b"[")
+        decoded = self.document is not _NOT_JSON or (
+            self.refusal is not None and not isinstance(self.refusal, NotJsonError)
+        )
+        return decoded or self.raw.lstrip()[:1] in (b"{", b"[")
 
 
 @dataclass(frozen=True)
