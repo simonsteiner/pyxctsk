@@ -43,7 +43,7 @@ uv run pyxctsk distances task.xctsk --format text  # try the CLI
 
 ### Wire formats
 
-- **Every wire shape is one ordered field table in `src/pyxctsk/model/shape.py`.** `to_dict` and `from_dict` traverse it, row order is output order, and adding a spec field is one row; a class with two shapes gets two tables, never a union key set.
+- **Every wire shape is one ordered `Shape` field table, declared beside its class** (`TASK_SHAPE` in `model/task.py`, `QR_TASK_SHAPE` in `qrcode/task.py`); `model/shape.py` holds the machinery. `to_dict` and `from_dict` traverse it, row order is output order, and adding a spec field is one row; a class with two shapes gets two tables, never a union key set.
 - **Every scalar row names a wire-scalar codec** (`TEXT`, `NUMBER`, `WHOLE_METRES`, `INTEGER`, `LATITUDE`, `LONGITUDE`) from `model/shape.py`, which re-exports them from `model/codec.py` where they are defined. A bad value raises `MalformedPayloadError` from the table, with a path like `turnpoints[0].waypoint`.
 - **JSON goes through `load_json` and `dump_json` in `model/shape.py`.** Name a `JsonLayout` (`compact`, `line` or `indented`); never call `json.dumps` with options of your own.
 - **Unknown keys are preserved, never interpreted.** Use `model/passthrough.py` through `Shape`; never map a non-spec key onto a spec field because the names match.
