@@ -253,7 +253,8 @@ print(report.as_text())                 # what --format text prints
 ```
 
 `speed_section_distance_m` is `None` rather than a number when the task has no
-SSS/ESS pair, so check it before dividing — roughly a third of the corpus has none.
+SSS/ESS pair, so check it before dividing — two of the 24 corpus tasks (the waypoint
+routes) have none.
 
 The corpus is 24 real competition tasks in
 [`tests/data/reference_tasks/`](../tests/data/reference_tasks/README.md), 22 of them with

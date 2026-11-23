@@ -10,7 +10,7 @@ These are repository utilities and are not included in the published
 `pyxctsk` wheel. From the repository root, install their dependencies with:
 
 ```bash
-uv sync --group tools
+uv sync --all-extras --group tools
 ```
 
 Run commands through `uv run`, from `scripts/` (`cd scripts` first): the
@@ -34,11 +34,11 @@ tools are listed in [external-repos.md](external-repos.md).
 
 ### `xcontest_xctsk_tool.py`
 
-[`xcontest_xctsk_tool.py`](xcontest_xctsk_tool.py) is a CLI for batch uploading XCTSK files, downloading tasks and HTML pages, and downloading QR codes via the XContest REST API from <https://tools.xcontest.org/xctsk/>. Implements retry logic, rate limiting, and metadata preservation with support for both v1 and v2 API endpoints. The API client and the batch loops are in [`xcontest_client.py`](xcontest_client.py). It reads and writes only paths inside the directory it runs from; run it from `scripts/`, like the examples.
+[`xcontest_xctsk_tool.py`](xcontest_xctsk_tool.py) is a CLI for batch uploading XCTSK files, downloading tasks and HTML pages, and downloading QR codes via the XContest REST API from <https://tools.xcontest.org/xctsk/>. Implements retry logic and rate limiting, prints the author and last-modified time when the server sends them, and supports both v1 and v2 API endpoints. The API client and the batch loops are in [`xcontest_client.py`](xcontest_client.py). It reads and writes only paths inside the directory it runs from; run it from `scripts/`, like the examples.
 
 #### REST API Endpoints
 
-All operations use the XContest tools REST API:
+The commands use these XContest tools REST API endpoints, and `html` fetches the task page `GET /xctsk/load?taskCode=<task code>`:
 
 - **POST `/api/xctsk/qr`**
   - Upload a `.xctsk` file (Content-Type: `application/json`)
@@ -47,7 +47,7 @@ All operations use the XContest tools REST API:
 
 - **POST `/api/xctsk/save`**
   - Upload a `.xctsk` file (Content-Type: `application/json`)
-  - Returns: Numeric task code
+  - Returns: JSON `{"taskCode": ...}` (older servers: a plain number)
   - Add header `Author:` to specify uploader (ASCII only)
 
 - **GET `/api/xctsk/load/<task code>`**
@@ -67,9 +67,10 @@ Process all XCTSK files and download HTML pages:
 uv run python xcontest_xctsk_tool.py process --author "Your Name"
 ```
 
-- Uploads all `.xctsk` files from `xctsk_files/`
-- Downloads HTML for each task to `downloaded_tasks/html/`
-- Saves upload results to `scripts/upload_results.json`
+- Uploads all `.xctsk` files from `xctsk_files/` (`--xctsk-dir, -x`)
+- Downloads HTML for each task to `downloaded_tasks/html/` (`--html-output, -o`)
+- Saves upload results to `scripts/upload_results.json` (`--results-file, -r`)
+- Defaults are relative to the script, not the working directory
 
 #### Individual Commands
 
@@ -95,17 +96,17 @@ uv run python xcontest_xctsk_tool.py process --author "Your Name"
 #### Notes
 
 - Built-in 1s delay between requests (rate limiting)
-- All commands support `--timeout` (default: 30s) and `--retries` (default: 3)
+- `--timeout` (default: 30s) and `--retries` (default: 3) are top-level options, so they go before the command: `xcontest_xctsk_tool.py --timeout 60 upload ...`
 - For troubleshooting, ensure `requests` is installed and files are valid
 
 ### `extract_task_data.py`
 
-Parses XCTrack HTML exports in `downloaded_tasks/html_cleaned`, removes embedded images, and extracts task metadata, turnpoints, and embedded GeoJSON. Outputs cleaned HTML, structured JSON, and GeoJSON for downstream analysis or visualization using BeautifulSoup for robust HTML parsing with validation for distance and coordinate fields. The parsing is in [`task_html_parser.py`](task_html_parser.py); `extract_task_data.py` reads the pages and writes the files.
+Copies the XCTrack HTML exports in `downloaded_tasks/html` to `downloaded_tasks/html_cleaned` with embedded images removed (skipping files already there), then parses `html_cleaned` with BeautifulSoup for task metadata, turnpoints and the embedded GeoJSON. The turnpoint table's number columns (`#`, radius, the km columns) are converted, keeping the text with a warning when a value doesn't parse; the two metadata distances fall back to `0.0` without a warning. Only the GeoJSON's structure is checked, not the coordinates. The parsing is in [`task_html_parser.py`](task_html_parser.py); `extract_task_data.py` reads the pages and writes the files.
 
 #### Usage
 
 ```bash
-# Process all HTML files in downloaded_tasks/html_cleaned directory
+# Clean downloaded_tasks/html, then process downloaded_tasks/html_cleaned
 uv run python extract_task_data.py
 ```
 
@@ -117,7 +118,7 @@ uv run python extract_task_data.py
 
 ### `extract_qr_from_html.py`
 
-Locates base64-encoded SVG QR codes in HTML files, decodes and converts them to images, and extracts QR data using CairoSVG (SVG to PNG), OpenCV and zxing-cpp. Supports batch processing, intermediate PNG output (`-o`), verbose output (`-v`), and error handling for malformed images.
+Locates base64-encoded SVG QR codes in HTML files, decodes and converts them to images, and extracts QR data using CairoSVG (SVG to PNG), OpenCV and zxing-cpp. Supports batch processing, intermediate PNG output (`-o`), and error handling for malformed images.
 
 #### Usage Examples
 
@@ -143,7 +144,7 @@ Validation script that compares optimized distance calculations with reference d
 
 ### `test_qrcode_generation.py`
 
-Test script for QR code generation functionality. Generates QR codes for XCTSK files and compares them with expected results, testing both string generation and PNG image output.
+Test script for QR code generation functionality. Generates QR codes for the XCTSK files in `downloaded_tasks/xctsk` (`--xctsk-dir`) and compares them with the strings `extract_qr_from_html.py` wrote to `downloaded_tasks/qrcode` (`--expected-dir`), testing both string generation and PNG image output written to `downloaded_tasks/qrcode_test_output` (`--output-dir`). `--show-details` and `--show-mismatches` print more.
 
 ### `check_qr_deps.py`
 
@@ -161,10 +162,17 @@ scripts/
 ├── test_distance_calculations.py  # Distance calculation validation
 ├── test_qrcode_generation.py   # QR code generation testing
 ├── check_qr_deps.py           # Dependency verification
+├── add_line_to_filenames.sh   # Adds `_line` to five line-goal tasks' downloaded files
+├── goal_definition.txt        # Note on the spec's goal definition
+├── path_opt/                  # Earlier route-optimizer experiments and the Ding–Xie–Jiang paper
+├── task_viewer/               # Map viewer (see its README)
+├── xctsk_files/               # Input for xcontest_xctsk_tool.py process
 └── downloaded_tasks/          # Output directory structure
+    ├── xctsk/                 # Downloaded .xctsk files
     ├── html/                  # Original HTML files
     ├── html_cleaned/          # Processed HTML files
     ├── json/                  # Extracted task data
     ├── geojson/              # Map visualization data
-    └── qrcode/               # QR code images and text
+    ├── qrcode/               # QR code images and text
+    └── qrcode_test_output/   # test_qrcode_generation.py output
 ```
