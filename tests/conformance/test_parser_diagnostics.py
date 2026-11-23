@@ -55,6 +55,15 @@ class TestUnrecognizedInputSaysWhy:
         with pytest.raises(InvalidFormatError, match="looks like JSON"):
             parse_task('{"taskType": "CLASSIC", "vers')
 
+    def test_a_json_task_refused_for_one_value_says_it_was_refused(self):
+        """Not "not a task in any format": the task is there, one value is not."""
+        payload = task_json()[:-1] + ', "x": NaN}'
+
+        with pytest.raises(
+            InvalidFormatError, match=r"looks like JSON, but it was refused: .*\bx\b"
+        ):
+            parse_task(payload)
+
     @pytest.mark.skipif(
         not QR_CODE_SUPPORT, reason="QR code dependencies not available"
     )
