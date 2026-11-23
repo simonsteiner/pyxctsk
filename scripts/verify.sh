@@ -65,14 +65,16 @@ fi
   uv run --frozen pytest
 
   # The same tests on a core-only install: the skip markers and import guards
-  # run on the install they exist for. `uv sync` is exact, so it removes the extra.
-  uv sync --frozen
-  uv run --frozen python -c "
+  # run on the install they exist for. The extra is uninstalled rather than
+  # re-synced away, and nothing is installed or built after that (--no-sync
+  # --no-build). --no-build alone can't sync: simplekml ships only an sdist.
+  uv pip uninstall pillow qrcode zxing-cpp
+  uv run --frozen --no-sync --no-build python -c "
 import importlib.util, sys
 present = [m for m in ('PIL', 'qrcode', 'zxingcpp') if importlib.util.find_spec(m)]
 sys.exit(f'the qr extra is still installed: {present}') if present else None
 "
-  uv run --frozen pytest
+  uv run --frozen --no-sync --no-build pytest
 )
 
 uv venv "$verify_tmp_dir/core-only"
